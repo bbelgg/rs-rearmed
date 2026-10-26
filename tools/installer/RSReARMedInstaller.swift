@@ -86,6 +86,13 @@ final class BuildRunner {
         process.currentDirectoryURL = URL(fileURLWithPath: workDir ?? repoRoot)
 
         var environment = ProcessInfo.processInfo.environment
+        // Opened from the Finder, the app gets launchd's PATH (/usr/bin:/bin:/usr/sbin:/sbin), which
+        // lacks Homebrew's cmake and ninja; add its folders as a login shell would.
+        var path = (environment["PATH"] ?? "/usr/bin:/bin:/usr/sbin:/sbin").split(separator: ":").map(String.init)
+        for dir in ["/opt/homebrew/bin", "/opt/homebrew/sbin", "/usr/local/bin"] where !path.contains(dir) {
+            path.append(dir)
+        }
+        environment["PATH"] = path.joined(separator: ":")
         if let env = env {
             for (k, v) in env { environment[k] = v }
         }
@@ -237,7 +244,7 @@ enum Steps {
         try? fm.removeItem(atPath: newDir)
         try fm.createDirectory(atPath: newDir, withIntermediateDirectories: true)
         r.appendLog("Downloading the source of \(tag)…")
-        try await r.shell("curl -fL --retry 3 -o \"\(archive)\" \"\(sourceArchiveURL(tag))\"", workDir: r.buildBase)
+        try await r.shell("curl -fsSL --retry 3 -o \"\(archive)\" \"\(sourceArchiveURL(tag))\"", workDir: r.buildBase)
         // GitHub can answer 200 with an HTML page (e.g. a release that is not public yet).
         do {
             try await r.shell("gzip -t \"\(archive)\"", workDir: r.buildBase)

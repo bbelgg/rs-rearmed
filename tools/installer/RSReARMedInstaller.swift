@@ -6,7 +6,7 @@
 //
 // When run from inside the repository it builds in place. When run standalone
 // (e.g. a binary GitHub release) it downloads the source of its release into a build folder the user
-// can choose (default ~/Library/Caches/RS Re-ARMed Build), builds there, and
+// can choose (default ~/Library/Caches/rs-rearmed-build), builds there, and
 // optionally cleans up afterwards.
 
 import AppKit
@@ -14,7 +14,9 @@ import AppKit
 let repoWebURL = "https://github.com/bbelgg/rs-rearmed"
 func sourceArchiveURL(_ tag: String) -> String { "\(repoWebURL)/archive/refs/tags/\(tag).tar.gz" }
 let releasesURL = "https://api.github.com/repos/bbelgg/rs-rearmed/releases/latest"
-let buildFolderName = "RS Re-ARMed Build"
+// No spaces: the recompiler's build scripts pass lists of paths as space-separated strings.
+let buildFolderName = "rs-rearmed-build"
+let oldBuildFolderName = "RS Re-ARMed Build"  // 1.0.0-1.0.2; a saved path ending in it gets the new name
 let defaultBuildBase = NSHomeDirectory() + "/Library/Caches/" + buildFolderName
 let buildBaseDefaultsKey = "BuildFolder"
 
@@ -707,7 +709,7 @@ class InstallerWindow: NSWindow {
 
         if !runner.embeddedInRepo {
             if let saved = UserDefaults.standard.string(forKey: buildBaseDefaultsKey), !saved.isEmpty {
-                runner.buildBase = saved
+                runner.buildBase = buildBase(in: saved)
             }
             buildDirField.stringValue = runner.buildBase
             buildDirField.isEditable = true
@@ -937,7 +939,10 @@ class InstallerWindow: NSWindow {
     private func buildBase(in folder: String) -> String {
         let path = (folder.trimmingCharacters(in: .whitespaces) as NSString).expandingTildeInPath
         guard !path.isEmpty else { return defaultBuildBase }
-        let std = (path as NSString).standardizingPath
+        var std = (path as NSString).standardizingPath
+        if (std as NSString).lastPathComponent == oldBuildFolderName {
+            std = (std as NSString).deletingLastPathComponent
+        }
         return (std as NSString).lastPathComponent == buildFolderName
             ? std : (std as NSString).appendingPathComponent(buildFolderName)
     }
@@ -952,6 +957,22 @@ class InstallerWindow: NSWindow {
             } else {
                 UserDefaults.standard.set(runner.buildBase, forKey: buildBaseDefaultsKey)
             }
+        }
+        // The recompiler's build scripts can't handle spaces in their own paths (the game folder may
+        // have them).
+        let buildPath = runner.embeddedInRepo ? runner.repoRoot : runner.buildBase
+        if buildPath.contains(where: { $0.isWhitespace }) {
+            _ = showAlert(
+                title: "Choose a folder without spaces",
+                message: """
+                    The build can't run in a folder whose path contains spaces:
+                    \(buildPath)
+
+                    \(runner.embeddedInRepo ? "Move the repository" : "Choose another build folder").
+                    """,
+                buttons: ["OK"]
+            )
+            return
         }
         runner.cleanupAfterInstall = cleanupCheck.state == .on
         Task { @MainActor in

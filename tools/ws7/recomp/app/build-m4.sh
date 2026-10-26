@@ -18,6 +18,10 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../../.." && pwd)
 build=${RS_BUILD_DIR:-$root/build}
 out=${1:-$build/m4}
+# The build scripts pass lists of paths as space-separated strings, so their own paths can't have spaces.
+case "$root|$out" in *[[:space:]]*)
+  echo "error: the repository and build paths must not contain spaces: $root, $out" >&2; exit 1 ;;
+esac
 mkdir -p "$out"
 ov=$root/tools/ws7/recomp/overrides
 

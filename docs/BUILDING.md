@@ -12,9 +12,9 @@ the source of its own release, checks prerequisites, builds everything and insta
 `~/Applications/RS Re-ARMed.app` — delete it to uninstall. A progress bar and live log keep you informed;
 if anything fails the log tells you what went wrong.
 
-The build files go in `~/Library/Caches/RS Re-ARMed Build` unless you choose another **Build folder**
-(for example on an external drive); the installer makes an `RS Re-ARMed Build` folder inside the one you
-pick and remembers it. Tick **Delete build files after install** to remove them when it's done. If you
+The build files go in `~/Library/Caches/rs-rearmed-build` unless you choose another **Build folder**
+(for example on an external drive); the installer makes a `rs-rearmed-build` folder inside the one you
+pick and remembers it. The folder's path must not contain spaces. Tick **Delete build files after install** to remove them when it's done. If you
 choose a folder on an external drive, macOS asks once whether the installer may use it.
 
 The installer needs the same prerequisites as a manual build (see below). It will ask you to launch
@@ -43,6 +43,8 @@ All commands below are run from the repository root.
 git clone https://github.com/bbelgg/rs-rearmed.git
 cd rs-rearmed
 ```
+
+Clone into a folder whose path has no spaces: the build scripts can't handle them.
 
 ### 2. Python environment
 

@@ -68,16 +68,18 @@ installed the optional packages, or leave it unset and the logo script makes its
 
 The recompiler reads a DRM-free x86_64 binary of Rocksmith 2014. The Steam copy on disk is encrypted, so you decrypt it from a running game process with `tools/steamless`:
 
-1. **Launch Rocksmith 2014 through Steam** and wait until you reach the main menu.
+1. **Quit Rocksmith 2014** if it is running: it has to start after the next step.
 
-2. **Dump the code** from the running process:
+2. **Dump the code:**
 
    ```bash
    ./tools/steamless/dump-decrypted.sh
    ```
 
-   This attaches to the game with lldb, and writes to
-   `build/steamless/`.
+   Then **launch Rocksmith 2014 through Steam**. The script makes your Steam copy load a small dylib
+   that saves the decrypted code once the game has decrypted itself, usually within a minute. It
+   writes it to `build/steamless/` and puts your Steam copy back as it was (on Ctrl-C or a timeout
+   too). You can quit the game then.
 
 3. **Reconstruct the binary:**
 

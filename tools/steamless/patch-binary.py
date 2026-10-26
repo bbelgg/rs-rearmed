@@ -16,7 +16,7 @@ import subprocess
 import sys
 import shutil
 
-GAME_DIR = os.path.expanduser(
+GAME_DIR = os.environ.get("RS_GAME_DIR") or os.path.expanduser(
     "~/Library/Application Support/Steam/steamapps/common/Rocksmith2014"
 )
 GAME_BIN = os.path.join(GAME_DIR, "Rocksmith2014.app/Contents/MacOS/Rocksmith2014")

@@ -7,6 +7,9 @@
  *         install_name_tool -id @executable_path/dump_decrypted.dylib dump_decrypted.dylib
  * Install: dump-decrypted.sh adds an LC_LOAD_WEAK_DYLIB to the game binary
  *          (same method as librsmacfixes) and copies the dylib into MacOS/.
+ * Output:  text_decrypted.bin next to this dylib (written as .part, then
+ *          renamed), where dump-decrypted.sh picks it up. The game's working
+ *          directory is not the repo's, so a relative path would not work.
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -16,6 +19,8 @@
 #include <mach-o/getsect.h>
 #include <mach-o/dyld.h>
 #include <dlfcn.h>
+#include <libgen.h>
+#include <limits.h>
 
 /* The encrypted __text starts with these bytes on disk. */
 static const unsigned char ENCRYPTED_MAGIC[] = { 0x11, 0xe1, 0xcf, 0x98 };
@@ -23,10 +28,21 @@ static const unsigned char ENCRYPTED_MAGIC[] = { 0x11, 0xe1, 0xcf, 0x98 };
 /* The DRM stub header magic. */
 static const unsigned char STUB_MAGIC[] = { 0x65, 0x6f, 0x6a, 0x78, 0x7b };
 
-static const char *OUTPUT_PATH = "build/steamless/text_decrypted.bin";
+static const char *OUTPUT_NAME = "text_decrypted.bin";
 
 static void *dump_thread(void *arg) {
     (void)arg;
+
+    /* The dump goes next to this dylib (the game's MacOS/ folder). */
+    Dl_info info;
+    char dir[PATH_MAX], path[PATH_MAX], part[PATH_MAX];
+    if (!dladdr((const void *)dump_thread, &info) || !info.dli_fname) {
+        fprintf(stderr, "[dump_decrypted] cannot find own path\n");
+        return NULL;
+    }
+    strlcpy(dir, info.dli_fname, sizeof dir);
+    snprintf(path, sizeof path, "%s/%s", dirname(dir), OUTPUT_NAME);
+    snprintf(part, sizeof part, "%s.part", path);
 
     /* Find __text section in the main executable. */
     unsigned long size = 0;
@@ -64,28 +80,23 @@ static void *dump_thread(void *arg) {
     /* Small delay to ensure decryption is fully complete. */
     usleep(500000);
 
-    FILE *f = fopen(OUTPUT_PATH, "wb");
+    FILE *f = fopen(part, "wb");
     if (!f) {
-        fprintf(stderr, "[dump_decrypted] cannot open %s: %m\n", OUTPUT_PATH);
-        /* Try fallback path */
-        const char *fallback = "/tmp/rs_text_decrypted.bin";
-        f = fopen(fallback, "wb");
-        if (!f) {
-            fprintf(stderr, "[dump_decrypted] cannot open fallback %s either\n", fallback);
-            return NULL;
-        }
-        fprintf(stderr, "[dump_decrypted] using fallback: %s\n", fallback);
+        fprintf(stderr, "[dump_decrypted] cannot open %s: %m\n", part);
+        return NULL;
     }
 
     size_t written = fwrite(text, 1, size, f);
-    fclose(f);
-
-    fprintf(stderr, "[dump_decrypted] wrote %zu bytes to disk\n", written);
-    if (written == size) {
-        fprintf(stderr, "[dump_decrypted] SUCCESS — dump complete\n");
-    } else {
-        fprintf(stderr, "[dump_decrypted] WARNING: wrote %zu of %lu bytes\n", written, size);
+    if (fclose(f) != 0 || written != size) {
+        fprintf(stderr, "[dump_decrypted] ERROR: wrote %zu of %lu bytes to %s\n", written, size, part);
+        unlink(part);
+        return NULL;
     }
+    if (rename(part, path) != 0) {
+        fprintf(stderr, "[dump_decrypted] cannot rename %s: %m\n", part);
+        return NULL;
+    }
+    fprintf(stderr, "[dump_decrypted] SUCCESS — wrote %zu bytes to %s\n", written, path);
 
     return NULL;
 }

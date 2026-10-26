@@ -321,30 +321,67 @@ enum Steps {
         }
 
         r.appendLog("The game binary needs to be decrypted from a running copy of Rocksmith 2014.")
+        let env = ["RS_GAME_DIR": r.gameDir]
 
-        let proceed = showAlert(
-            title: "Launch Rocksmith 2014",
+        // The game has to start after the setup step (which makes it load the dump dylib), so it
+        // must not be running yet.
+        let gameBin = r.gameDir + "/Rocksmith2014.app/Contents/MacOS/Rocksmith2014"
+        while (try? await r.shell("pgrep -f \"^\(gameBin)( |$)\"")) != nil {
+            let choice = showAlert(
+                title: "Quit Rocksmith 2014",
+                message: """
+                    Rocksmith 2014 is running. Quit it first: the installer prepares the game, \
+                    then asks you to start it again through Steam.
+                    """,
+                buttons: ["Try Again", "Cancel"]
+            )
+            if choice == "Cancel" { throw InstallerError.userCancelled }
+        }
+
+        let choice = showAlert(
+            title: "Decrypt the game",
             message: """
-                Launch Rocksmith 2014 through Steam and wait until you reach the main menu, \
-                then click OK.
+                The installer now prepares your Steam copy of Rocksmith 2014 to save its decrypted \
+                code, then asks you to start the game through Steam once. Your Steam copy is put back \
+                as it was afterwards.
 
                 If you already have a decrypted binary, click Skip and place it at:
                 \(imagePath)
                 """,
-            buttons: ["OK — Game is running", "Skip", "Cancel"]
+            buttons: ["Continue", "Skip", "Cancel"]
         )
-
-        if proceed == "Cancel" { throw InstallerError.userCancelled }
-
-        if proceed == "Skip" {
+        if choice == "Cancel" { throw InstallerError.userCancelled }
+        if choice == "Skip" {
             guard FileManager.default.fileExists(atPath: imagePath) else {
                 throw InstallerError.fileNotFound(imagePath)
             }
             return
         }
 
-        try await r.shell("./tools/steamless/dump-decrypted.sh")
-        try await r.shell("python3 tools/steamless/patch-binary.py")
+        do {
+            try await r.shell("./tools/steamless/dump-decrypted.sh setup", env: env)
+        } catch {
+            _ = try? await r.shell("./tools/steamless/dump-decrypted.sh restore", env: env)
+            throw error
+        }
+
+        let launch = showAlert(
+            title: "Start Rocksmith 2014",
+            message: """
+                Start Rocksmith 2014 through Steam now. The installer continues by itself once the \
+                game has been decrypted, usually within a minute of the game starting. You can quit \
+                the game then.
+                """,
+            buttons: ["OK", "Cancel"]
+        )
+        if launch == "Cancel" {
+            _ = try? await r.shell("./tools/steamless/dump-decrypted.sh restore", env: env)
+            throw InstallerError.userCancelled
+        }
+
+        // wait restores the Steam binary however it ends, before patch-binary reads it.
+        try await r.shell("./tools/steamless/dump-decrypted.sh wait", env: env)
+        try await r.shell("python3 tools/steamless/patch-binary.py", env: env)
 
         guard FileManager.default.fileExists(atPath: imagePath) else {
             throw InstallerError.fileNotFound("Decrypted binary was not created: \(imagePath)")

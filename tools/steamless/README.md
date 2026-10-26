@@ -46,12 +46,23 @@ Rocksmith 2014's macOS binary uses **Valve SteamStub DRM** (macOS variant):
 
 ### 1. `dump-decrypted.sh`
 
-Dumps the decrypted `__text` from a running game process using lldb.
+Dumps the decrypted `__text` from the running game. The DRM blocks lldb, so
+the script adds an `LC_LOAD_WEAK_DYLIB` for `dump_decrypted.dylib` to the
+Steam game binary and copies the dylib next to it. When the game starts, the
+dylib waits until `__text` is decrypted and writes it next to itself; the
+script moves it to `build/steamless/text_decrypted.bin` and puts the original
+game binary back (kept meanwhile as `Rocksmith2014.pre-dump`), however the
+wait ends: success, timeout, Ctrl-C.
 
 ```bash
-# Launch game through Steam, wait for main menu, then:
-./tools/steamless/dump-decrypted.sh [output_dir]
+# Quit the game first: it has to start after the setup.
+./tools/steamless/dump-decrypted.sh [output_dir]   # then start the game through Steam
 ```
+
+The steps also run one at a time (the installer does this): `setup` (refuses
+while the game runs), `wait` (restores afterwards) and `restore`.
+`RS_GAME_DIR` sets the game folder, `RS_DUMP_TIMEOUT` the wait in seconds
+(default 900).
 
 ### 2. `patch-binary.py`
 
@@ -71,8 +82,8 @@ Steps:
 ## Workflow
 
 ```
-1. Launch Rocksmith through Steam → wait for main menu
-2. ./tools/steamless/dump-decrypted.sh
+1. Quit Rocksmith, then ./tools/steamless/dump-decrypted.sh
+2. Launch Rocksmith through Steam → the script finishes and restores the game
 3. python3 tools/steamless/patch-binary.py
 ```
 

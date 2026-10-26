@@ -38,8 +38,17 @@ _Noreturn void rc_fail(const char *what, uint64_t addr) {
   abort();
 }
 
-// Guest address -> translated function. Every indirect call and vtable dispatch goes through here, so
-// the sorted rc_table is indexed once by an open-addressing hash (read-only afterwards, no locking).
+// Guest address -> translated function. Every indirect call and vtable dispatch goes through here.
+// Two read-only indexes over the sorted rc_table, built by rc_dispatch_init at image load (before any
+// guest code runs, so no locking or fences):
+//  * rc_disp (rc.h): direct-mapped, one 32-bit entry per 16 bytes of guest code, read inline by
+//    rc_icall at every call site. An entry holds the low 4 bits of the one function starting in its
+//    16 bytes (tag 16 | a & 15 in bits 27..31) and that function's host address (bits 0..26, in
+//    4-byte units from rc_disp.fbase); 0 if no function, or more than one, starts there (110 of 62622
+//    in the game) or the host address does not fit;
+//  * an open-addressing hash with every function, for those and for lookups before the image is loaded.
+rc_disp_t rc_disp;
+
 static struct ht_ent {
   uint64_t vmaddr;
   rc_fn fn;
@@ -64,8 +73,7 @@ static void ht_build(void) {
   __atomic_store_n(&ht, t, __ATOMIC_RELEASE);  // other threads read ht_mask and the entries after seeing ht
 }
 
-rc_fn rc_lookup(uint64_t host) {
-  uint64_t a = host - rc_slide;
+static rc_fn ht_lookup(uint64_t a) {
   struct ht_ent *t = __atomic_load_n(&ht, __ATOMIC_ACQUIRE);
   if (__builtin_expect(!t, 0)) {
     pthread_once(&ht_once, ht_build);
@@ -75,6 +83,34 @@ rc_fn rc_lookup(uint64_t host) {
     if (t[h].vmaddr == a) return t[h].fn;
     if (!t[h].fn) return 0;
   }
+}
+
+rc_fn rc_lookup(uint64_t host) {
+  rc_fn f = rc_lookup_fast(host);
+  return f ? f : ht_lookup(host - rc_slide);
+}
+
+// After rc_slide is known. rc_table is sorted by address.
+static void rc_dispatch_init(void) {
+  pthread_once(&ht_once, ht_build);
+  if (rc_table_len <= 0) return;
+  uint64_t lo = rc_table[0].vmaddr & ~15ull, hi = rc_table[rc_table_len - 1].vmaddr;
+  uint64_t n = ((hi - lo) >> 4) + 1, fbase = ~0ull;
+  for (int i = 0; i < rc_table_len; i++)
+    if ((uint64_t)rc_table[i].fn < fbase) fbase = (uint64_t)rc_table[i].fn;
+  uint32_t *tab = calloc(n, sizeof *tab);
+  if (!tab) rc_fail("out of memory", 0);
+  for (int i = 0; i < rc_table_len; i++) {
+    uint64_t a = rc_table[i].vmaddr, off = (uint64_t)rc_table[i].fn - fbase, k = (a - lo) >> 4;
+    int dup = (i > 0 && (rc_table[i - 1].vmaddr - lo) >> 4 == k) ||
+              (i + 1 < rc_table_len && (rc_table[i + 1].vmaddr - lo) >> 4 == k);
+    if (dup || (off & 3) || (off >> 2) >= (1u << 27)) continue;  // left to the hash
+    tab[k] = (uint32_t)(16 | (a & 15)) << 27 | (uint32_t)(off >> 2);
+  }
+  rc_disp.tab = tab;
+  rc_disp.fbase = fbase;
+  rc_disp.lo = rc_slide + lo;
+  rc_disp.n = n;
 }
 
 uint64_t rc_img_lo, rc_img_hi;  // host range of the mapped image
@@ -87,16 +123,20 @@ __attribute__((weak)) void rc_icall_native(rc_ctx *c, uint64_t host) {
   c->r[4] += 8;  // the callee's ret pops the return address the caller pushed
 }
 
-void rc_icall(rc_ctx *c, uint64_t host) {
+// rc_icall when the inline lookup missed: a native target, a function rc_disp does not hold, or none.
+void rc_icall_slow(rc_ctx *c, uint64_t host) {
   if (host < rc_img_lo || host >= rc_img_hi) {
     // a native function: an import stored as a pointer, or a host callback
     rc_icall_native(c, host);
     return;
   }
-  rc_fn f = rc_lookup(host);
+  rc_fn f = ht_lookup(host - rc_slide);
   if (!f) rc_fail("indirect call to untranslated code", host - rc_slide);
   f(c);
 }
+
+// Bound values of __la_symbol_ptr (rc.h, rc_la_bound).
+uint64_t rc_la_bound[RC_LA_MAX];
 
 static uint64_t uleb(const uint8_t **p) {
   uint64_t r = 0;
@@ -296,7 +336,11 @@ static void fixup_section(const struct section_64 *sc) {
   uint32_t type = sc->flags & SECTION_TYPE;
   if (type == S_MOD_INIT_FUNC_POINTERS) { init_list = e; ninit = (int)n; rc_stats.mod_inits = n; return; }
   if (type == S_MOD_TERM_FUNC_POINTERS) { term_list = e; nterm = (int)n; rc_stats.mod_terms = n; return; }
-  if (SECT_IS(sc, "__objc_selrefs")) {
+  if (SECT_IS(sc, "__la_symbol_ptr")) {
+    // what rc_import_thunk maps to the slot's thunk: a bound native address (rc.h, rc_la_bound)
+    for (size_t i = 0; i < RC_LA_MAX; i++)
+      rc_la_bound[i] = i < n && e[i] && !rc_in_image(e[i]) ? e[i] : ~0ull;
+  } else if (SECT_IS(sc, "__objc_selrefs")) {
     // each entry points at the selector's C string (SEL is a pointer to a uniqued string)
     typedef const void *(*regfn)(const char *);
     regfn reg = (regfn)dlsym(RTLD_DEFAULT, "sel_registerName");
@@ -388,6 +432,7 @@ int rc_image_load(const char *path) {
     const struct section_64 *sc = (const void *)(sg + 1);
     for (uint32_t k = 0; k < sg->nsects; k++) fixup_section(&sc[k]);
   }
+  rc_dispatch_init();
   if (log_unresolved)
     fprintf(stderr, "[rc] image: %llu binds, %llu lazy, %llu weak; %llu self, %llu dlsym, %llu unresolved slots (%llu symbols); "
             "%llu selrefs, %llu classrefs (%llu internal, %llu external, %llu null), %llu superrefs, %llu cfstrings, %llu inits\n",

@@ -23,6 +23,10 @@ typedef struct rc_ctx {
   uint64_t r[16];  // rax rcx rdx rbx rsp rbp rsi rdi r8..r15 (x86 encoding order)
   rc_v128 x[16];
   uint32_t mxcsr;
+  // Runtime-private (not a guest register): native frame of the thread's newest live native->guest
+  // call, ~0 if none. A thunk whose frame is at or below it can skip rc_unwind_sync (rc_call.h,
+  // rc_unwind_guard); kept by runtime/rc_thread.c and rc_setjmp.c.
+  uint64_t cg_fp;
 } rc_ctx;
 
 typedef void (*rc_fn)(rc_ctx *);
@@ -66,8 +70,47 @@ extern uint64_t rc_slide;  // host address of vmaddr 0 (image base - 0x100000000
 
 // Indirect call/jump dispatch: guest address -> translated function.
 rc_fn rc_lookup(uint64_t host_addr);
-void rc_icall(rc_ctx *c, uint64_t host_addr);
 _Noreturn void rc_fail(const char *what, uint64_t addr);
+//
+// rc_icall is inlined at every indirect call site (one indirect branch per site, for the branch
+// predictor): one load from rc_disp, a direct-mapped table built by rc_image_load (runtime/rc_image.c
+// has the entry format). Everything it does not resolve (native targets, the few functions that
+// share 16 bytes with another, no function at all) goes to rc_icall_slow. Read-only after the image
+// is loaded: plain loads, no TSO fences.
+typedef struct {
+  uint64_t lo;          // host address of entry 0's 16 bytes
+  uint64_t n;           // entries (0: not built, everything takes the slow path)
+  const uint32_t *tab;
+  uint64_t fbase;       // host address entries' function offsets are relative to
+} rc_disp_t;
+extern rc_disp_t rc_disp;
+static inline rc_fn rc_lookup_fast(uint64_t host) {
+  uint64_t i = (host - rc_disp.lo) >> 4;
+  if (__builtin_expect(i < rc_disp.n, 1)) {
+    uint32_t e = rc_disp.tab[i];
+    if (__builtin_expect((e >> 27) == (16 | (host & 15)), 1))
+      return (rc_fn)(rc_disp.fbase + ((uint64_t)(e & 0x7ffffff) << 2));
+  }
+  return 0;
+}
+void rc_icall_slow(rc_ctx *c, uint64_t host_addr);
+__attribute__((always_inline)) static inline void rc_icall(rc_ctx *c, uint64_t host_addr) {
+  uint64_t i = (host_addr - rc_disp.lo) >> 4;
+  if (__builtin_expect(i < rc_disp.n, 1)) {
+    uint32_t e = rc_disp.tab[i];
+    if (__builtin_expect((e >> 27) == (16 | (host_addr & 15)), 1)) {
+      ((rc_fn)(rc_disp.fbase + ((uint64_t)(e & 0x7ffffff) << 2)))(c);
+      return;
+    }
+  }
+  rc_icall_slow(c, host_addr);
+}
+// rc_la_bound[k]: the native address rc_image_load bound __la_symbol_ptr slot k to (~0 if it is
+// unbound, inside the image, or k >= RC_LA_MAX). A `call/jmp [rip+slot]` whose target still equals
+// it is the slot's import thunk I_<slot>, which is what rc_icall_native would pick
+// (xlat/calls.py: emit_slot_call).
+#define RC_LA_MAX 4096
+extern uint64_t rc_la_bound[RC_LA_MAX];
 
 // --- Runtime interfaces
 //

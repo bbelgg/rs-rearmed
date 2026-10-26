@@ -74,6 +74,7 @@ void rc_call_guest_regs(uint64_t guest_fn, const uint64_t gi[6], int ng, const u
 //    `rc_unwind_end` as a cleanup (gen_thunks.py: UNWIND_GUARD).
 void rc_unwind_sync(rc_ctx *c, const void *anchor);
 void rc_unwind_end(rc_ctx **pc);
+void rc_cg_changed(rc_thread *t);  // t->ncg changed: update t->ctx.cg_fp
 
 // --- trampoline variants (rc_tramp.c)
 // rc_tramp_get(fn) passes x0..x7 / d0..d7 straight through and returns rax/xmm0. The _ex form says

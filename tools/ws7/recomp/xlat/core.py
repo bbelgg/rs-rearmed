@@ -73,6 +73,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
             disp = struct.unpack_from("<i", self.img.data, sfo + 6 * k + 2)[0]
             slot = sa + 6 * k + 6 + disp
             self.stubs[sa + 6 * k] = (slot, self.img.binds.get(slot, "?"))
+        self.la_lo = self.img.sects.get(("__DATA", "__la_symbol_ptr"), (0,))[0]
         self.md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_64)
         self.md.detail = True
         self.fset = set(self.img.fstarts)
@@ -286,7 +287,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 out.append("switch (%s - rc_slide) { %s default: rc_fail(\"jump table\", 0x%xull); }"
                            % (tgt, cases, A))
             else:   # tail jump through a register or memory (vtable / function pointer)
-                out.append("{ uint64_t tgt = %s; SPILL_CALL(); rc_icall(c, tgt); return; }" % tgt)
+                out.append("{ uint64_t tgt = %s; SPILL_CALL(); %s return; }" % (tgt, self.icall(i, ops[0])))
         elif m == "jmp":
             t = ops[0].imm
             if t in self.fset and t != self.entry:
@@ -304,7 +305,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
             ret = A + i.size
             if ops[0].type != x86.X86_OP_IMM:
                 out.append("{ uint64_t tgt = %s; rsp -= 8; RC_STS(uint64_t, rsp, RC_A(0x%xull)); "
-                           "SPILL_CALL(); rc_icall(c, tgt); FILL_CALL(); }" % (self.rd(i, ops[0], 8), ret))
+                           "SPILL_CALL(); %s FILL_CALL(); }" % (self.rd(i, ops[0], 8), ret, self.icall(i, ops[0])))
                 return True
             t = ops[0].imm
             if t in self.stubs:

@@ -97,9 +97,8 @@ HOOKS["pthread_create"] = lambda p: [
 # Every thunk that calls a native function directly reconciles the guest context when the function
 # returns (rc_unwind_end, see rc_rt.h): the native function may have unwound over its own callbacks
 # with longjmp. The untyped bridge (rc_native_generic) does the same itself. The cost is one
-# thread-local load and compare.
-UNWIND_GUARD = ["extern void rc_unwind_end(rc_ctx **);",
-                "rc_ctx *ug_ __attribute__((cleanup(rc_unwind_end))) = c;"]
+# load and compare, inline (rc_call.h: rc_unwind_guard).
+UNWIND_GUARD = ["rc_ctx *ug_ __attribute__((cleanup(rc_unwind_guard))) = c;"]
 # Trampoline flags (rc_rt.h RC_TR_*) for a function-pointer parameter, from its type
 TR_RET = {("int", 8, False): 1, ("int", 8, True): 2, ("int", 16, False): 3, ("int", 16, True): 4, "bool": 5}
 TR_SRET, TR_VA = 16, 32
@@ -534,28 +533,31 @@ class Gen:
             o.append("}")
         o += ["", "static const struct { uint64_t slot; rc_fn fn; } rc_imp_tab[] = {"]
         o += ["  {0x%xull, I_%x}," % (s, s) for s, _, _ in self.thunks]
+        # rc_import_thunk (rc_icall_native, for every native call target): an open-addressing hash
+        # over the bound addresses, built on first use (after rc_image_load bound the slots)
+        hbits = max(4, (2 * len(self.thunks)).bit_length())
         o += ["};", "#define RC_IMP_N (sizeof rc_imp_tab / sizeof *rc_imp_tab)",
-              "static struct { uint64_t host; rc_fn fn; } rc_imp_by_host[RC_IMP_N];",
-              "static int rc_imp_n;", "static pthread_once_t rc_imp_once = PTHREAD_ONCE_INIT;",
-              "static int rc_imp_cmp(const void *a, const void *b) {",
-              "  uint64_t x = *(const uint64_t *)a, y = *(const uint64_t *)b;",
-              "  return x < y ? -1 : x > y;", "}",
+              "#define RC_IMP_H %du  /* power of two > 2 * RC_IMP_N */" % (1 << hbits),
+              "static struct { uint64_t host; rc_fn fn; } rc_imp_hash[RC_IMP_H];",
+              "static int rc_imp_ready;", "static pthread_once_t rc_imp_once = PTHREAD_ONCE_INIT;",
+              "static unsigned rc_imp_h(uint64_t h) { return (unsigned)((h * 0x9E3779B97F4A7C15ull) >> 40) & (RC_IMP_H - 1); }",
               "static void rc_imp_build(void) {",
               "  for (size_t i = 0; i < RC_IMP_N; i++) {",
               "    uint64_t h = RC_LD(uint64_t, RC_A(rc_imp_tab[i].slot));",
-              "    if (h) { rc_imp_by_host[rc_imp_n].host = h; rc_imp_by_host[rc_imp_n++].fn = rc_imp_tab[i].fn; }",
+              "    if (!h) continue;",
+              "    unsigned k = rc_imp_h(h);",
+              "    while (rc_imp_hash[k].host && rc_imp_hash[k].host != h) k = (k + 1) & (RC_IMP_H - 1);",
+              "    if (!rc_imp_hash[k].host) { rc_imp_hash[k].host = h; rc_imp_hash[k].fn = rc_imp_tab[i].fn; }",
               "  }",
-              "  qsort(rc_imp_by_host, rc_imp_n, sizeof *rc_imp_by_host, rc_imp_cmp);",
+              "  __atomic_store_n(&rc_imp_ready, 1, __ATOMIC_RELEASE);",
               "}",
               "rc_fn rc_import_thunk(uint64_t host) {",
-              "  pthread_once(&rc_imp_once, rc_imp_build);",
-              "  int lo = 0, hi = rc_imp_n - 1;",
-              "  while (lo <= hi) {",
-              "    int m = (lo + hi) / 2;",
-              "    if (rc_imp_by_host[m].host == host) return rc_imp_by_host[m].fn;",
-              "    if (rc_imp_by_host[m].host < host) lo = m + 1; else hi = m - 1;",
-              "  }",
-              "  return 0;", "}", ""]
+              "  if (__builtin_expect(!__atomic_load_n(&rc_imp_ready, __ATOMIC_ACQUIRE), 0)) pthread_once(&rc_imp_once, rc_imp_build);",
+              "  if (!host) return 0;",
+              "  for (unsigned k = rc_imp_h(host);; k = (k + 1) & (RC_IMP_H - 1)) {",
+              "    if (rc_imp_hash[k].host == host) return rc_imp_hash[k].fn;",
+              "    if (!rc_imp_hash[k].host) return 0;",
+              "  }", "}", ""]
         with open(path, "w") as f:
             f.write("\n".join(o))
 

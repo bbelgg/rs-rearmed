@@ -53,6 +53,7 @@ rc_thread *rc_thread_self(void) {
   t->stack_size = sz + pg;
   t->ctx.r[4] = ((uint64_t)m + sz + pg) & ~15ull;
   t->ctx.mxcsr = 0x1f80;
+  t->ctx.cg_fp = ~0ull;
   uint64_t id;
   pthread_threadid_np(0, &id);
   t->tid = id;
@@ -83,6 +84,9 @@ typedef struct rc_cgrec {
 static uint64_t cg_seq;
 
 static int on_native_stack(const rc_thread *t, uint64_t a) { return a >= t->nstack_lo && a < t->nstack_hi; }
+
+// After every change of t->ncg: the newest record's frame, for rc_unwind_guard (rc.h: cg_fp).
+void rc_cg_changed(rc_thread *t) { t->ctx.cg_fp = t->ncg ? t->cg[t->ncg - 1].fp : ~0ull; }
 
 // Number of records that are still ancestors of the frame at `fp`. Walks the arm64 frame-pointer chain
 // (mandatory on Darwin) up from `fp`; a record whose frame the walk passes over is dead (its frames
@@ -121,6 +125,7 @@ void rc_unwind_sync(rc_ctx *c, const void *anchor) {
   while (n && t->cg[n - 1].fp < a) n--;
   restore_regs(c, &t->cg[n].saved);  // the oldest skipped call: the state at the native function's call
   t->ncg = n;
+  rc_cg_changed(t);
 }
 
 void rc_unwind_end(rc_ctx **pc) { rc_unwind_sync(*pc, pc); }
@@ -144,6 +149,7 @@ __attribute__((noinline)) void rc_call_guest_regs(uint64_t fn, const uint64_t gi
       if (live == 0) *c = old->saved;
       else if (*old->canary == old->canary_val) restore_regs(c, &old->saved);
       t->ncg = live;
+      rc_cg_changed(t);
     }
   }
   if (t->ncg == t->capcg) {
@@ -161,6 +167,7 @@ __attribute__((noinline)) void rc_call_guest_regs(uint64_t fn, const uint64_t gi
   t->cg[idx].canary = (uint64_t *)(sp + 8ull * (uint64_t)ns);
   t->cg[idx].canary_val = CANARY ^ __atomic_add_fetch(&cg_seq, 1, __ATOMIC_RELAXED);
   *t->cg[idx].canary = t->cg[idx].canary_val;
+  rc_cg_changed(t);
   sp -= 8;  // x86 function entry: rsp == 8 (mod 16), [rsp] = return address
   *(uint64_t *)sp = SENTINEL_RET;
   c->r[4] = sp;
@@ -178,6 +185,7 @@ __attribute__((noinline)) void rc_call_guest_regs(uint64_t fn, const uint64_t gi
   out[3] = c->x[1].lo;
   *c = t->cg[idx].saved;
   t->ncg = idx;  // also drops the records of calls a native longjmp skipped inside this one
+  rc_cg_changed(t);
 }
 
 void rc_call_guest_ex(uint64_t fn, const uint64_t *ints, int nint, const uint64_t *dbls, int ndbl,

@@ -89,6 +89,13 @@ static inline void rc_ret_agg(rc_ctx *c, const void *src, uint32_t size, uint32_
     else { c->r[gi ? 2 : 0] = w[k]; gi++; }
   }
 }
+// Cleanup of the typed thunks of imports that can run guest code (thunks/gen_thunks.py: UNWIND_GUARD):
+// rc_unwind_end (rc_rt.h) unless no longjmp can have skipped a native->guest call (the newest one's
+// frame is above this thunk's), the common case, which this decides inline.
+void rc_unwind_end(rc_ctx **pc);
+static inline void rc_unwind_guard(rc_ctx **pc) {
+  if (__builtin_expect((uint64_t)pc > (*pc)->cg_fp, 0)) rc_unwind_end(pc);
+}
 static inline uint64_t rc_imp(uint64_t slot, const char *name) {
   uint64_t f = RC_LD(uint64_t, RC_A(slot));
   if (!f) rc_fail(name, slot);

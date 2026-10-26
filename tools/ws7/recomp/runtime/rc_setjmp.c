@@ -81,7 +81,7 @@ _Noreturn void rc_longjmp(rc_ctx *c, uint64_t gb, uint64_t val) {
   // Native->guest calls made since the setjmp and still open are skipped by this jump (their frames
   // are below the setjmp's): drop their records. Their saved contexts are not wanted, the setjmp's
   // registers above are; left behind, the next rc_call_guest would restore one of them.
-  if (t->ncg > r->ncg) t->ncg = r->ncg;
+  if (t->ncg > r->ncg) { t->ncg = r->ncg; rc_cg_changed(t); }
   r->w[RC_JMP_VAL] = (uint32_t)val ? (uint32_t)val : 1;
   _longjmp(*(jmp_buf *)r->w, 1);
 }

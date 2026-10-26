@@ -40,6 +40,7 @@ test: build/test_shim build/test_vtables
 	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
 	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -x86_64 build/test_shim
 	RS_STEAM_MODE=stub RS_STEAM_DLC=all RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
+	RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
 
 check: $(LIB)
 	@nm -u -arch x86_64 "$(GAME_BIN)" | grep -E '^_Steam(API|Internal)_' | sort > build/imports.txt

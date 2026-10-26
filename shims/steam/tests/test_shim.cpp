@@ -128,15 +128,16 @@ int main() {
     EXPECT(vcall<const char *>(utils, 23) != nullptr);             // GetSteamUILanguage
     EXPECT(vcall<bool>(apps, 0));                                  // BIsSubscribed
     EXPECT(vcall<bool>(apps, 6, (uint32_t)221680));                // BIsSubscribedApp
-    // DLC (the Makefile runs this with RS_STEAM_DLC=248750,258341, then with all)
+    // DLC (the Makefile runs this with RS_STEAM_DLC=248750,258341, with all, then unset: installed)
     const char *dlc_env = getenv("RS_STEAM_DLC");
     bool dlc_all = dlc_env && !strcmp(dlc_env, "all");
-    EXPECT(vcall<bool>(apps, 7, (uint32_t)248750));                // BIsDlcInstalled
+    bool dlc_list = dlc_env && !dlc_all;
+    EXPECT(vcall<bool>(apps, 7, (uint32_t)248750));                // BIsDlcInstalled: the free CDLC id
     EXPECT(vcall<bool>(apps, 7, (uint32_t)222000) == dlc_all);     // not listed: owned only with all
     EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == dlc_all);
     EXPECT(!vcall<bool>(apps, 7, (uint32_t)221680));               // the base game is no DLC
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));                // BIsSubscribedApp
-    if (!dlc_all) {
+    if (dlc_list) EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));  // BIsSubscribedApp
+    if (dlc_list) {
         EXPECT(vcall<int>(apps, 10) == 2);                             // GetDLCCount
         uint32_t dlc_id = 0;
         bool dlc_avail = false;

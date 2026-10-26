@@ -9,8 +9,8 @@
 #     seeded with a copy of the real Steam/userdata/<account>/221680/remote (profiles,
 #     LocalProfiles.json). The real Steam folder is never written, and `crd` (stored Ubisoft
 #     credentials) is never copied;
-#   - every DLC AppID counts as owned (RS_STEAM_DLC=all), so every song archive in dlc/ shows up,
-#     whatever AppID it carries;
+#   - the DLC the account owns (the ones Steam installed) and the free 248750 that custom songs
+#     carry count as owned; set RS_STEAM_DLC=all with launchctl setenv to own every AppID;
 #   - libnetguard refuses every non-local connection and logs to $HOME_DIR/logs/netguard.log.
 # The install's own files (and the Rosetta game) are not changed.
 set -u
@@ -79,7 +79,7 @@ find "$HOME_DIR/steam" -name crd -type f -delete 2>/dev/null
 # launcher leaves it without a window when the launcher itself was opened from the Finder. The
 # environment comes from launchd plus --env, so nothing else of this shell's leaks in.
 exec /usr/bin/open -n -a "$stage/Rocksmith2014.app" \
-    --env RS_STEAM_MODE=stub --env RS_STEAM_DLC=all --env RS_STEAM_DATA_DIR="$HOME_DIR/steam" \
+    --env RS_STEAM_MODE=stub --env RS_STEAM_DATA_DIR="$HOME_DIR/steam" \
     --env RS_NETGUARD_LOG="$logs/netguard.log" \
     --env DYLD_INSERT_LIBRARIES="$HOME_DIR/libnetguard.dylib" \
     --stdout "$logs/last-run.log" --stderr "$logs/last-run.log"

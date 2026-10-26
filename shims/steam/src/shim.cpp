@@ -124,6 +124,8 @@ static std::string appmanifest_language(const std::vector<std::string> &t) {
 // Installed DLC: each InstalledDepots entry of a DLC names its "dlcappid". Steam installs only the DLC the
 // account owns, so these are what the real backend reports as owned. The game hides every song whose
 // archive's AppID is not owned, and custom songs mostly carry 248750 (a free DLC; the toolkit's default).
+static const AppId_t kFreeCdlcAppId = 248750;
+
 static void appmanifest_dlc(const std::vector<std::string> &t, std::set<AppId_t> *out) {
     for (size_t i = 0; i + 1 < t.size(); i++)
         if (t[i] == "dlcappid") out->insert((AppId_t)strtoul(t[i + 1].c_str(), nullptr, 10));
@@ -188,11 +190,12 @@ static void load_config() {
     if (c.language.empty()) c.language = appmanifest_language(manifest);
     if (c.language.empty()) c.language = "english";
 
-    // installed (default): the DLC in the appmanifest; all: every app id (any AppID a song archive
-    // carries); none; or a comma-separated list of app ids.
+    // installed (default): the DLC in the appmanifest, plus the free 248750 that custom songs carry;
+    // all (opt-in): every app id (any AppID a song archive carries); none; or a comma-separated list.
     v = opt("RS_STEAM_DLC", "dlc");
     if (v.empty() || v == "installed" || v == "all") {
         appmanifest_dlc(manifest, &c.dlc);  // also what GetDLCCount lists with "all"
+        c.dlc.insert(kFreeCdlcAppId);
         c.dlc_all = v == "all";
     } else if (v != "none") {
         for (const char *p = v.c_str(); *p;) {

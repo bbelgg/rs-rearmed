@@ -52,6 +52,7 @@ These are compiled into the app. Where a switch exists, it is an environment var
 | **RSBypass** custom-song (CDLC) signature skip (an independent rewrite of [RSBypass](https://github.com/aik002/RSBypass) by aik002): song files that fail the signature check still load. Only the song loader's check is skipped | on | `RS_MODS_BYPASS=0` enforces the signature check again |
 | **Uplay sign-in prompt skipped**: Enter on the title screen goes straight to the profile list, without the "Uplay account" dialogs | on | none |
 | **Offline Steam layer**: a replacement `libsteam_api` that works without the Steam client, with its cloud saves in a local folder | on | none |
+| **Song ownership**: the offline Steam layer reports the base game, the DLC your account owns (the DLC Steam installed) and 248750, the free DLC that custom songs carry, as owned, so their songs show up | on | `RS_STEAM_DLC=all` reports every AppID as owned, for custom songs that carry another AppID |
 | **"Re-ARMed" title logo**: a tag over the title-screen logo, built automatically from your own `static.psarc` by `tools/loadscreen` | on | `RS_REARMED=0` shows the original logo; or delete `static.psarc.rearmed` |
 
 `RS_MODS_LOG=1` writes what the mods apply to `logs/last-run.log`.

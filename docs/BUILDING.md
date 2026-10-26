@@ -136,6 +136,38 @@ Environment variables the build reads:
 | `SHIM_STEAM`, `SHIM_BINK`, `SHIM_CG` | the builds from step 4 | other arm64 builds of the Steam, Bink and Cg shims to bundle |
 | `SHIMS_BUILD` | `build/shims/game` | where the game libraries from step 4 are |
 | `RC_OPT` | `-O2` | optimisation level of the generated C |
+| `RC_O1` | none | file of function addresses compiled alone at `-O1` (for functions clang mishandles at higher levels) |
+| `RC_LTO` | none | `thin`: ThinLTO across the generated C, the runtime and the overrides (see below) |
+| `RC_LTO_JOBS` | `6` | ThinLTO threads while linking |
+| `RC_PGO` | none | `gen`: an instrumented build that records a profile; `use:FILE.profdata`: optimise with it |
+| `RC_PGO_DIR` | `<output>/pgo` | where an instrumented game writes its profiles |
+| `RC_JOBS` | all cores | parallel compile jobs |
+
+#### Optimised builds (experimental)
+
+The switches above change only how the C is compiled; leave them unset for the normal build. With
+`RC_LTO=thin` the objects are LLVM bitcode and the final link does the optimisation (and most of the
+work), so it takes longer; `<output>/lto-cache` makes relinks incremental. A changed switch recompiles
+everything in that output directory.
+
+Profile-guided optimisation takes two builds and some playing in between:
+
+```bash
+RC_PGO=gen tools/ws7/recomp/app/build-m4.sh build/pgo-gen        # instrumented, slower game
+tools/play-native/install.sh build/pgo-gen/app/Rocksmith2014.app
+# play: menus, a few songs, the modes you use; quit normally
+tools/ws7/recomp/build/pgo-merge.sh build/rs.profdata build/pgo-gen/pgo
+RC_PGO=use:build/rs.profdata tools/ws7/recomp/app/build-m4.sh build/pgo-use
+tools/play-native/install.sh build/pgo-use/app/Rocksmith2014.app
+```
+
+Combine them with the other switches (`RC_OPT=-O3 RC_LTO=thin RC_PGO=...`), and use the same `RC_OPT` and
+`RC_LTO` for the gen and the use build. The instrumented game writes `<output>/pgo/rs-<pid>.profraw`
+while it runs (continuous mode, so a crash or the game's own fast exit keeps it). To write it somewhere
+else, set the path before starting the launcher; keep `%c` in it:
+`launchctl setenv LLVM_PROFILE_FILE "$HOME/Library/Application Support/RS Re-ARMed/logs/rs-%p%c.profraw"`
+(and `launchctl unsetenv LLVM_PROFILE_FILE` afterwards). A profile stays usable after small source
+changes; functions that changed are just compiled without it.
 
 The generated C goes to `<output>/gen` and the objects to `<output>/obj`. Both are derived from the game:
 keep them on your Mac.

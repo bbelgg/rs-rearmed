@@ -13,6 +13,7 @@ set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../../.." && pwd)
 rt=$here/../runtime
+. "$here/../build/optflags.sh"
 out=${1:?usage: build.sh OUTDIR}
 shims=${SHIMS_BUILD:-$root/build/shims/game}
 mkdir -p "$out/lib" "$out/obj"
@@ -29,7 +30,7 @@ for l in game lua51 png15 jpeg8 online; do
   fi
 done
 
-CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$here -I$here/src -I$rt"
+CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$here -I$here/src -I$rt $rc_lto $rc_pgo"  # RC_LTO, RC_PGO: build/optflags.sh
 G=$root/shims/game
 LUA="-DLNUM_DOUBLE -DLNUM_INT64 -I$G/third_party/lua-5.1.4-lnum/src"
 PNG="-include math.h -I$G/third_party/libpng-1.5.13"

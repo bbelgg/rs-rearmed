@@ -10,10 +10,11 @@ here=$(cd "$(dirname "$0")" && pwd)
 ov=$here/..
 root=$(cd "$ov/../../../.." && pwd)
 rt=$ov/../runtime
+. "$ov/../build/optflags.sh"
 out=${1:?usage: build.sh OUTDIR}
 mkdir -p "$out/lib" "$out/obj/mods" "$out/obj/crypto_mods"
 
-CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$ov -I$ov/src -I$here -I$rt"
+CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$ov -I$ov/src -I$here -I$rt $rc_lto $rc_pgo"  # RC_LTO, RC_PGO: build/optflags.sh
 SH="-I$root/shims/game/include"
 
 $CC -c "$here/mods.c" -o "$out/obj/mods/mods.o"

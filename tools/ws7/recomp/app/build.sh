@@ -14,6 +14,8 @@
 #       RC_PY          python with capstone       (default analysis/venv/bin/python)
 #       SHIM_STEAM / SHIM_BINK / SHIM_CG   arm64 dylibs to bundle (defaults: first arm64 build found)
 #       RC_UNIT_TEST=1 also build and run test/seam_test (no game needed)
+#       RC_LTO, RC_LTO_JOBS, RC_LTO_CACHE (default OUTDIR/lto-cache), RC_PGO, RC_PGO_DIR (default
+#                      OUTDIR/pgo): see tools/ws7/recomp/build/optflags.sh (libgame_rc.a must be built with the same)
 # Output: OUTDIR/Rocksmith2014.app (arm64). It must sit in the game folder (the shell uses the
 #         folder holding the .app as the game root); the image is cloned into Contents/Resources.
 set -eu
@@ -37,6 +39,7 @@ obj=${RC_OBJ_DIR:-$root/analysis/ws7/recomp/obj}
 img=${RC_IMAGE:-$root/analysis/cg/Rocksmith2014_x64_plain}
 py=${RC_PY:-$root/analysis/venv/bin/python}
 work=$out/work
+. "$root/tools/ws7/recomp/build/optflags.sh"
 app=$out/Rocksmith2014.app
 mkdir -p "$work" "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks/Cg.framework"
 
@@ -50,12 +53,13 @@ shim_steam=${SHIM_STEAM:-$(arm64_of "$root/shims/steam/build/libsteam_api.dylib"
 shim_bink=${SHIM_BINK:-$(arm64_of "$root/build/shims/bink/libBink2Macx64.dylib" "$root/build-rosetta/shims/bink/libBink2Macx64.dylib")}
 shim_cg=${SHIM_CG:-$(arm64_of "$root/build/shims/cg/Cg" "$root/build-rosetta/shims/cg/Cg")}
 
-CF="-arch arm64 -O2 -g -mmacosx-version-min=11.0 -fno-strict-aliasing -ffp-contract=off -Wall -Wno-unused-parameter -Wno-unused-function -I$rt -I$plat/include -I$here"
+CF="-arch arm64 -O2 -g -mmacosx-version-min=11.0 -fno-strict-aliasing -ffp-contract=off -Wall -Wno-unused-parameter -Wno-unused-function -I$rt -I$plat/include -I$here $rc_pgo"
 mkdir -p "$work/o"
 cc_obj() {  # src [extra flags]  -> work/o/<base>.o
   src=$1; shift
   b=$(basename "$src"); b=${b%.*}
-  clang $CF "$@" -c "$src" -o "$work/o/$b.o"
+  case $src in *.S) lto= ;; *) lto=$rc_lto ;; esac
+  clang $CF $lto "$@" -c "$src" -o "$work/o/$b.o"
   echo "$work/o/$b.o"
 }
 
@@ -67,10 +71,13 @@ for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done
 for s in "$rt"/rc_*.S; do objs="$objs $(cc_obj "$s")"; done
 FW="-framework AppKit -framework OpenGL -framework CoreVideo -framework IOKit -framework Foundation -framework CoreFoundation -lobjc -lz"
 exe=$app/Contents/MacOS/Rocksmith2014
+# rc_main.o names the profile file of a gen build (the image TUs carry the counters only)
+pgo_main=$(rc_pgo_main "$out/pgo")
+LF="$(rc_lto_link "$out/lto-cache") ${pgo_main:+-fprofile-instr-generate}"
 
 if [ $stub = 1 ]; then
-  objs="$objs $(cc_obj "$here/rc_main.c" -DRCAPP_STUB) $(cc_obj "$here/stub_main.c")"
-  clang -arch arm64 $objs $FW -Wl,-undefined,error -o "$exe"
+  objs="$objs $(cc_obj "$here/rc_main.c" -DRCAPP_STUB $pgo_main) $(cc_obj "$here/stub_main.c")"
+  clang -arch arm64 $LF $objs $FW -Wl,-undefined,error -o "$exe"
 else
   [ -f "$obj/libgame_rc.a" ] || { echo "no $obj/libgame_rc.a (run tools/ws7/recomp/build/build.sh, or use --stub)" >&2; exit 1; }
   thunks=${RC_THUNKS:-$work/thunks.c}
@@ -78,11 +85,11 @@ else
     "$py" -I "$root/tools/ws7/recomp/thunks/gen_thunks.py" "$img" "$thunks" --report "$work/thunks.json" > "$work/thunks.log" 2>&1 ||
       { echo "thunk generation failed, see $work/thunks.log" >&2; exit 1; }
   fi
-  objs="$objs $(cc_obj "$here/rc_main.c") $(cc_obj "$thunks" -w -DRC_ABI_TRUST)"
+  objs="$objs $(cc_obj "$here/rc_main.c" $pgo_main) $(cc_obj "$thunks" -w -DRC_ABI_TRUST)"
   ovr=${RC_OVERRIDES:-}
   [ -n "$ovr" ] || { [ -f "$root/tools/ws7/recomp/overrides/build/liboverrides.a" ] && ovr=$root/tools/ws7/recomp/overrides/build/liboverrides.a || true; }
   link() {  # extra objects...
-    clang -arch arm64 $objs "$@" $ovr "$obj/libgame_rc.a" $FW -lc++ -Wl,-stack_size,0x10000000 -Wl,-undefined,error -o "$exe" 2> "$work/link.log"
+    clang -arch arm64 $LF $objs "$@" $ovr "$obj/libgame_rc.a" $FW -lc++ -Wl,-stack_size,0x10000000 -Wl,-undefined,error -o "$exe" 2> "$work/link.log"
   }
   if ! link; then
     grep -o '"_[A-Za-z0-9_$.]*"' "$work/link.log" | tr -d '"' | sed 's/^_//' | sort -u > "$work/undefined.txt"

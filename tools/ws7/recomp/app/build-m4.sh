@@ -12,6 +12,11 @@
 # Memory order: the whole image is compiled with -DRC_MO_TSO (x86 total store
 # order): with only the threaded components fenced (Wwise, Scaleform, efd)
 # song loading hangs or reaches a ud2, i.e. game code relies on TSO elsewhere too.
+# Optimisation (unset = the default -O2 build; see tools/ws7/recomp/build/optflags.sh):
+#   RC_OPT=-O3   the generated C;  RC_O1=FILE  functions compiled alone at -O1 (gen_image.py --o1)
+#   RC_LTO=thin  ThinLTO, cache OUTDIR/lto-cache, RC_LTO_JOBS link threads (default 6)
+#   RC_PGO=gen   instrumented app, profiles in OUTDIR/pgo (RC_PGO_DIR);  RC_PGO=use:FILE.profdata
+#   RC_JOBS=N    compile jobs (default: all cores)
 # Then: tools/play-native/install.sh OUTDIR/app/Rocksmith2014.app
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -24,6 +29,8 @@ case "$root|$out" in *[[:space:]]*)
 esac
 mkdir -p "$out"
 ov=$root/tools/ws7/recomp/overrides
+export RC_LTO_CACHE=${RC_LTO_CACHE:-$out/lto-cache} RC_PGO_DIR=${RC_PGO_DIR:-$out/pgo}
+echo "build: ${RC_OPT:--O2}${RC_LTO:+ lto=$RC_LTO}${RC_PGO:+ pgo=$RC_PGO}${RC_O1:+ o1=$RC_O1}"
 
 sh "$ov/build.sh" "$out/ov" > "$out/ov.log" 2>&1 || { tail -20 "$out/ov.log"; exit 1; }
 sh "$ov/mods/build.sh" "$out/ov" > "$out/ov-mods.log" 2>&1 || { tail -20 "$out/ov-mods.log"; exit 1; }
@@ -41,7 +48,7 @@ export RC_GEN_DIR=$out/gen RC_OBJ_DIR=$out/obj
 echo 100000000-110000000 > "$out/tso-all.txt"
 export RC_TSO=$out/tso-all.txt
 for it in 1 2 3 4 5 6 7 8; do
-  sh "$root/tools/ws7/recomp/build/build.sh" --skip "$out/skip.txt" > "$out/build.$it.log" 2>&1 || true
+  sh "$root/tools/ws7/recomp/build/build.sh" ${RC_JOBS:+--jobs $RC_JOBS} --skip "$out/skip.txt" ${RC_O1:+--o1 "$RC_O1"} > "$out/build.$it.log" 2>&1 || true
   nm -u -A "$RC_OBJ_DIR/libgame_rc.a" 2>/dev/null | awk '{print $NF}' | grep '^_F_' | sed 's/^_F_//' | sort -u > "$out/refs.txt"
   awk '$2 == "drop" { print $1 }' "$out/skip.txt" | sort -u | comm -12 "$out/refs.txt" - > "$out/undrop.txt"
   n=$(wc -l < "$out/undrop.txt" | tr -d ' ')
@@ -60,12 +67,14 @@ for m in $modules rt; do
   o="$o $lib/liboverrides_$m.a"
 done
 RC_OVERRIDES="$o $lib/librs_game.a $lib/librs_lua51.a $lib/librs_png15.a $lib/librs_jpeg8.a $lib/librs_online.a" \
-  sh "$here/build.sh" "$out/app"
+  sh "$here/build.sh" "$out/app" ${RC_JOBS:+--jobs $RC_JOBS}
 if [ -s "$out/app/work/undefined.txt" ]; then
   echo "link: undefined symbols, see $out/app/work/undefined.txt" >&2
   exit 1
 fi
-"$out/app/Rocksmith2014.app/Contents/MacOS/Rocksmith2014" --init-only 2>&1 | grep 'init-only:'
+# (a gen build's self-test profile goes to work/, not into OUTDIR/pgo)
+LLVM_PROFILE_FILE=$out/app/work/init-only-%p%c.profraw \
+  "$out/app/Rocksmith2014.app/Contents/MacOS/Rocksmith2014" --init-only 2>&1 | grep 'init-only:'
 echo "app: $out/app/Rocksmith2014.app"
 
 # Build the "Re-ARMed" title logo unless RS_REARMED=0.

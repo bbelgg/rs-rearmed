@@ -128,7 +128,23 @@ int main() {
     EXPECT(vcall<const char *>(utils, 23) != nullptr);             // GetSteamUILanguage
     EXPECT(vcall<bool>(apps, 0));                                  // BIsSubscribed
     EXPECT(vcall<bool>(apps, 6, (uint32_t)221680));                // BIsSubscribedApp
-    EXPECT(!vcall<bool>(apps, 7, (uint32_t)222000));               // BIsDlcInstalled (DLC not faked)
+    // DLC (the Makefile runs this with RS_STEAM_DLC=248750,258341, then with all)
+    const char *dlc_env = getenv("RS_STEAM_DLC");
+    bool dlc_all = dlc_env && !strcmp(dlc_env, "all");
+    EXPECT(vcall<bool>(apps, 7, (uint32_t)248750));                // BIsDlcInstalled
+    EXPECT(vcall<bool>(apps, 7, (uint32_t)222000) == dlc_all);     // not listed: owned only with all
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == dlc_all);
+    EXPECT(!vcall<bool>(apps, 7, (uint32_t)221680));               // the base game is no DLC
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));                // BIsSubscribedApp
+    if (!dlc_all) {
+        EXPECT(vcall<int>(apps, 10) == 2);                             // GetDLCCount
+        uint32_t dlc_id = 0;
+        bool dlc_avail = false;
+        char dlc_name[16] = "x";
+        EXPECT(vcall<bool>(apps, 11, 1, &dlc_id, &dlc_avail, dlc_name, (int)sizeof dlc_name) &&
+               dlc_id == 258341 && dlc_avail && !dlc_name[0]);         // BGetDLCDataByIndex
+        EXPECT(!vcall<bool>(apps, 11, 2, &dlc_id, &dlc_avail, dlc_name, (int)sizeof dlc_name));
+    }
     EXPECT(strlen(vcall<const char *>(apps, 4)) > 0);              // GetCurrentGameLanguage
     EXPECT(vcall<uint64_t>(apps, 20) == sid);                      // GetAppOwner
     EXPECT(vcall<uint32_t>(http, 0, 1, "http://x") == 0);          // CreateHTTPRequest -> invalid

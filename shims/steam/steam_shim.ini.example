@@ -17,6 +17,10 @@ mode = auto
 #language = english                                             [RS_STEAM_LANGUAGE]
 #app_id = 221680                                                [SteamAppId]
 
+# DLC reported as owned: installed (the DLC depots in the appmanifest), all
+# (every app id), none, or a comma-separated list of app ids.   [RS_STEAM_DLC]
+#dlc = installed
+
 # Stub-mode Steam Cloud / stats root: <data_dir>/<account id>/<app id>/{remote,local,stats.txt}
 # Default: ~/Library/Application Support/RocksmithSteamShim/userdata  [RS_STEAM_DATA_DIR]
 #data_dir = /path/to/userdata

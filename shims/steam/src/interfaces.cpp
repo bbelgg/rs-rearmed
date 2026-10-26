@@ -21,6 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include <iterator>
 #include <map>
 #include <mutex>
 #include <string>
@@ -413,8 +414,13 @@ public:
 };
 
 // ---------------------------------------------------------------------------
-// ISteamApps. Only the base game is reported as owned; DLC ownership needs
-// the real backend.
+// ISteamApps. The base game and the DLC Steam installed (shim_config().dlc)
+// are reported as owned; with RS_STEAM_DLC=all, every app id.
+
+static bool owned(AppId_t app) {
+    const ShimConfig &c = shim_config();
+    return app == c.app_id || c.dlc_all || c.dlc.count(app);
+}
 
 class Apps {
 public:
@@ -422,9 +428,19 @@ public:
     Z(BIsLowViolence) Z(BIsCybercafe) Z(BIsVACBanned)
     virtual const char *GetCurrentGameLanguage() { return shim_config().language.c_str(); }
     virtual const char *GetAvailableGameLanguages() { return shim_config().language.c_str(); }
-    virtual bool BIsSubscribedApp(AppId_t app) { return app == shim_config().app_id; }
-    Z(BIsDlcInstalled) Z(GetEarliestPurchaseUnixTime) Z(BIsSubscribedFromFreeWeekend)
-    Z(GetDLCCount) Z(BGetDLCDataByIndex) Z(InstallDLC) Z(UninstallDLC)
+    virtual bool BIsSubscribedApp(AppId_t app) { return owned(app); }
+    virtual bool BIsDlcInstalled(AppId_t app) { return app != shim_config().app_id && owned(app); }
+    Z(GetEarliestPurchaseUnixTime) Z(BIsSubscribedFromFreeWeekend)
+    virtual int GetDLCCount() { return (int)shim_config().dlc.size(); }
+    virtual bool BGetDLCDataByIndex(int i, AppId_t *app, bool *available, char *name, int cub) {
+        const std::set<AppId_t> &dlc = shim_config().dlc;
+        if (i < 0 || i >= (int)dlc.size()) return false;
+        if (app) *app = *std::next(dlc.begin(), i);
+        if (available) *available = true;
+        if (name && cub > 0) *name = 0;  // names live in Steam's appinfo cache, which is not read
+        return true;
+    }
+    Z(InstallDLC) Z(UninstallDLC)
     Z(RequestAppProofOfPurchaseKey) Z(GetCurrentBetaName) Z(MarkContentCorrupt) Z(GetInstalledDepots)
     virtual uint32_t GetAppInstallDir(AppId_t app, char *buf, uint32_t cub) {
         const std::string &dir = shim_config().game_dir;

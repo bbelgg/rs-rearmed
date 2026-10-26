@@ -24,6 +24,7 @@
 
 #include <map>
 #include <mutex>
+#include <set>
 #include <vector>
 
 // ---------------------------------------------------------------------------
@@ -99,13 +100,33 @@ static void load_login_user(const std::string &steam_root, CSteamID *id, std::st
     if (first) { *id = first; *persona = first_name; }
 }
 
-static std::string appmanifest_language(const ShimConfig &c) {
-    std::string manifest = dirname_of(c.game_dir);  // steamapps/common
-    manifest = dirname_of(manifest) + "/appmanifest_" + std::to_string(c.app_id) + ".acf";
-    std::vector<std::string> t = vdf_tokens(read_file(manifest));
+// steamapps/appmanifest_<app>.acf. The game folder may be a stage of symlinks to the install (the native
+// launcher's), so the manifest is also looked up next to the real install, then in Steam's own library.
+static std::string appmanifest_path(const ShimConfig &c) {
+    std::string name = "/appmanifest_" + std::to_string(c.app_id) + ".acf";
+    std::vector<std::string> dirs = {dirname_of(dirname_of(c.game_dir))};
+    char real[PATH_MAX];
+    if (realpath(c.game_dir.c_str(), real)) dirs.push_back(dirname_of(dirname_of(real)));
+    if (realpath((c.game_dir + "/steam_appid.txt").c_str(), real))
+        dirs.push_back(dirname_of(dirname_of(dirname_of(real))));
+    dirs.push_back(c.steam_root + "/steamapps");
+    for (const std::string &d : dirs)
+        if (file_exists(d + name)) return d + name;
+    return std::string();
+}
+
+static std::string appmanifest_language(const std::vector<std::string> &t) {
     for (size_t i = 0; i + 1 < t.size(); i++)
         if (t[i] == "language" && !t[i + 1].empty() && t[i + 1] != "{") return t[i + 1];
     return std::string();
+}
+
+// Installed DLC: each InstalledDepots entry of a DLC names its "dlcappid". Steam installs only the DLC the
+// account owns, so these are what the real backend reports as owned. The game hides every song whose
+// archive's AppID is not owned, and custom songs mostly carry 248750 (a free DLC; the toolkit's default).
+static void appmanifest_dlc(const std::vector<std::string> &t, std::set<AppId_t> *out) {
+    for (size_t i = 0; i + 1 < t.size(); i++)
+        if (t[i] == "dlcappid") out->insert((AppId_t)strtoul(t[i + 1].c_str(), nullptr, 10));
 }
 
 static void load_config() {
@@ -162,9 +183,26 @@ static void load_config() {
     if (!(v = opt("RS_STEAM_PERSONA", "persona")).empty()) c.persona = v;
     if (c.persona.empty()) c.persona = "Player";
 
+    std::vector<std::string> manifest = vdf_tokens(read_file(appmanifest_path(c)));
     c.language = opt("RS_STEAM_LANGUAGE", "language");
-    if (c.language.empty()) c.language = appmanifest_language(c);
+    if (c.language.empty()) c.language = appmanifest_language(manifest);
     if (c.language.empty()) c.language = "english";
+
+    // installed (default): the DLC in the appmanifest; all: every app id (any AppID a song archive
+    // carries); none; or a comma-separated list of app ids.
+    v = opt("RS_STEAM_DLC", "dlc");
+    if (v.empty() || v == "installed" || v == "all") {
+        appmanifest_dlc(manifest, &c.dlc);  // also what GetDLCCount lists with "all"
+        c.dlc_all = v == "all";
+    } else if (v != "none") {
+        for (const char *p = v.c_str(); *p;) {
+            char *end;
+            unsigned long id = strtoul(p, &end, 10);
+            if (end == p) { p++; continue; }
+            if (id) c.dlc.insert((AppId_t)id);
+            p = end;
+        }
+    }
 
     c.data_dir = opt("RS_STEAM_DATA_DIR", "data_dir");
     if (c.data_dir.empty())
@@ -410,8 +448,9 @@ S_EXPORT bool SteamAPI_Init() {
         g_init_counter++;
     }
     shim_stub_init();
-    shim_log("stub SteamAPI_Init: app %u, user %llu (%s), language %s", c.app_id,
-             (unsigned long long)c.steam_id, c.persona.c_str(), c.language.c_str());
+    shim_log("stub SteamAPI_Init: app %u, user %llu (%s), language %s, DLC owned: %s", c.app_id,
+             (unsigned long long)c.steam_id, c.persona.c_str(), c.language.c_str(),
+             c.dlc_all ? "all" : std::to_string(c.dlc.size()).c_str());
     return true;
 }
 

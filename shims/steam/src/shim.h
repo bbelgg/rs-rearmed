@@ -8,6 +8,7 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <set>
 #include <string>
 
 typedef int32_t HSteamUser;
@@ -56,6 +57,8 @@ struct ShimConfig {
     std::string game_dir;      // .../steamapps/common/Rocksmith2014
     std::string data_dir;      // stub-mode userdata root: <data_dir>/<accountid>/<appid>/
     std::string steam_root;    // ~/Library/Application Support/Steam
+    std::set<AppId_t> dlc;     // stub mode: DLC reported as owned (installed DLC by default)
+    bool dlc_all = false;      // stub mode: every app id is owned (RS_STEAM_DLC=all)
     bool log = false;
 };
 

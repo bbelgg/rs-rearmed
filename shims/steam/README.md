@@ -43,8 +43,16 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
     with it the game signs in to Ubisoft by itself.
   - The identity (SteamID, persona) comes from `config/loginusers.vdf`, and
     the language from the game's appmanifest.
-  - Only the base app (221680) is reported as owned. DLC ownership is not
-    faked; use the real backend for DLC.
+  - Owned: the base app (221680) and the DLC that Steam installed, read from
+    the `dlcappid` entries of the appmanifest's `InstalledDepots` (Steam
+    installs only DLC the account owns). The game hides every song whose
+    archive's AppID is not owned, and most custom songs carry 248750 (a free
+    DLC, the toolkit's default): with only the base app owned, the native
+    build listed far fewer songs than the Steam version. The appmanifest is found next to
+    the real install when the game folder is a stage of symlinks (the native
+    launcher's). `RS_STEAM_DLC` / `dlc`: `installed` (default), `all` (every
+    app id is owned, so every archive shows up whatever its AppID; the native
+    launcher uses this), `none`, or a comma-separated list of app ids.
 
 `auto` (the default) uses real when Valve's library loads and
 `SteamAPI_Init` succeeds through it, and stub otherwise. Settings go in

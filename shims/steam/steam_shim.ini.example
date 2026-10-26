@@ -1,0 +1,25 @@
+# Copy to steam_shim.ini next to libsteam_api.dylib. Every key is optional;
+# environment variables (in brackets) take precedence.
+
+# auto: use Valve's library if it loads and SteamAPI_Init succeeds, else stub
+# real: Valve's library only (Init fails if Steam isn't reachable)
+# stub: never talk to Steam                                     [RS_STEAM_MODE]
+mode = auto
+
+# Valve's arm64-capable libsteam_api.dylib. Defaults to ./libsteam_api_valve.dylib,
+# then the copy inside the Steam client's "Steam Helper.app".     [RS_STEAM_REAL_LIB]
+#real_lib = /path/to/libsteam_api.dylib
+
+# Stub identity. Defaults come from Steam's config/loginusers.vdf (most recent
+# account) and the game's appmanifest language.
+#steam_id = 76561197960265729                                   [RS_STEAM_ID]
+#persona = Player                                               [RS_STEAM_PERSONA]
+#language = english                                             [RS_STEAM_LANGUAGE]
+#app_id = 221680                                                [SteamAppId]
+
+# Stub-mode Steam Cloud / stats root: <data_dir>/<account id>/<app id>/{remote,local,stats.txt}
+# Default: ~/Library/Application Support/RocksmithSteamShim/userdata  [RS_STEAM_DATA_DIR]
+#data_dir = /path/to/userdata
+
+# Log to stderr with a [steam-shim] prefix.                     [RS_STEAM_LOG]
+log = 0

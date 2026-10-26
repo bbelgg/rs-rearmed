@@ -1,0 +1,12 @@
+# Skip list of the override module `mods` (gen_image.py --skip). ADDR = F_ADDR is provided by
+# liboverrides_mods.a (stays in the indirect-call table). Nothing is dropped.
+# calls (guest): 100a0cc40 100a0d7e0 100a0d9c0 100a0dcd0 10008b010 100158030 100158840 1012efc90 100105620 100105640
+1000f8d20  # num_dtor            rsmacfixes: JSON-number hash (remove site 0x1000f8d59)
+1000f8f10  # num_intern         rsmacfixes: JSON-number hash (insert site 0x1000f8f61)
+1000f9920  # num_rehash         rsmacfixes: JSON-number hash (rehash site 0x1000f9a35)
+100158b70  # path_md5           rsmacfixes: path MD5 cache (hook at function entry)
+100a0d730  # dlc_update         rsmacfixes: batched DLC mounting (call site 0x100a0d742)
+101135520  # key_down           rsmacfixes: game keyboard (hook at function entry)
+101135560  # key_up             rsmacfixes: game keyboard (hook at function entry)
+101313170  # thread_set_priority rsmacfixes: Floodgate thread priority (call site 0x1013131c4)
+10137683d  # sng_verify         RSBypass: .sng signature check (test/je at 0x1001eb784, caller of this)

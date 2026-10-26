@@ -1,0 +1,221 @@
+// Adapter table of override module `lua` (generated, checked in).
+#ifndef OV_GEN_LUA_H
+#define OV_GEN_LUA_H
+#include "rc.h"
+#include "rc_ov.h"
+void F_100e0fb10(rc_ctx *c);
+void F_100e0fba0(rc_ctx *c);
+void F_100e0fc90(rc_ctx *c);
+void F_100e0fca0(rc_ctx *c);
+void F_100e0fcf0(rc_ctx *c);
+void F_100e0fd10(rc_ctx *c);
+void F_100e0fdf0(rc_ctx *c);
+void F_100e0ff00(rc_ctx *c);
+void F_100e10000(rc_ctx *c);
+void F_100e10180(rc_ctx *c);
+void F_100e10260(rc_ctx *c);
+void F_100e10340(rc_ctx *c);
+void F_100e10370(rc_ctx *c);
+void F_100e10460(rc_ctx *c);
+void F_100e10560(rc_ctx *c);
+void F_100e10680(rc_ctx *c);
+void F_100e10790(rc_ctx *c);
+void F_100e10880(rc_ctx *c);
+void F_100e10960(rc_ctx *c);
+void F_100e10b00(rc_ctx *c);
+void F_100e10ca0(rc_ctx *c);
+void F_100e10db0(rc_ctx *c);
+void F_100e10ec0(rc_ctx *c);
+void F_100e10fb0(rc_ctx *c);
+void F_100e111c0(rc_ctx *c);
+void F_100e11300(rc_ctx *c);
+void F_100e113f0(rc_ctx *c);
+void F_100e114e0(rc_ctx *c);
+void F_100e115c0(rc_ctx *c);
+void F_100e117b0(rc_ctx *c);
+void F_100e117d0(rc_ctx *c);
+void F_100e117f0(rc_ctx *c);
+void F_100e11810(rc_ctx *c);
+void F_100e11870(rc_ctx *c);
+void F_100e11940(rc_ctx *c);
+void F_100e11a10(rc_ctx *c);
+void F_100e11b20(rc_ctx *c);
+void F_100e11b50(rc_ctx *c);
+void F_100e11b70(rc_ctx *c);
+void F_100e11ba0(rc_ctx *c);
+void F_100e11c80(rc_ctx *c);
+void F_100e11da0(rc_ctx *c);
+void F_100e11ea0(rc_ctx *c);
+void F_100e11fa0(rc_ctx *c);
+void F_100e12000(rc_ctx *c);
+void F_100e12120(rc_ctx *c);
+void F_100e12250(rc_ctx *c);
+void F_100e12340(rc_ctx *c);
+void F_100e12460(rc_ctx *c);
+void F_100e12590(rc_ctx *c);
+void F_100e126c0(rc_ctx *c);
+void F_100e12820(rc_ctx *c);
+void F_100e12970(rc_ctx *c);
+void F_100e129c0(rc_ctx *c);
+void F_100e12b20(rc_ctx *c);
+void F_100e12b70(rc_ctx *c);
+void F_100e12bb0(rc_ctx *c);
+void F_100e12bc0(rc_ctx *c);
+void F_100e12cb0(rc_ctx *c);
+void F_100e12cc0(rc_ctx *c);
+void F_100e12dc0(rc_ctx *c);
+void F_100e12e40(rc_ctx *c);
+void F_100e12eb0(rc_ctx *c);
+void F_100e12ff0(rc_ctx *c);
+void F_100e13170(rc_ctx *c);
+void F_100e132d0(rc_ctx *c);
+void F_100e133c0(rc_ctx *c);
+void F_100e13510(rc_ctx *c);
+void F_100e135b0(rc_ctx *c);
+void F_100e136b0(rc_ctx *c);
+void F_100e13770(rc_ctx *c);
+void F_100e137f0(rc_ctx *c);
+void F_100e13860(rc_ctx *c);
+void F_100e13910(rc_ctx *c);
+void F_100e13950(rc_ctx *c);
+void F_100e139e0(rc_ctx *c);
+void F_100e13a20(rc_ctx *c);
+void F_100e13ac0(rc_ctx *c);
+void F_100e13b10(rc_ctx *c);
+void F_100e13b90(rc_ctx *c);
+void F_100e13c30(rc_ctx *c);
+void F_100e13cb0(rc_ctx *c);
+void F_100e13d70(rc_ctx *c);
+void F_100e13f30(rc_ctx *c);
+void F_100e14070(rc_ctx *c);
+void F_100e142b0(rc_ctx *c);
+void F_100e142d0(rc_ctx *c);
+void F_100e14330(rc_ctx *c);
+void F_100e14390(rc_ctx *c);
+void F_100e14460(rc_ctx *c);
+void F_100e14590(rc_ctx *c);
+void F_100e14650(rc_ctx *c);
+void F_100e14ab0(rc_ctx *c);
+void F_100e14b00(rc_ctx *c);
+void F_100e1a1a0(rc_ctx *c);
+void F_100e1a1e0(rc_ctx *c);
+void F_100e1a1f0(rc_ctx *c);
+void F_100e1a200(rc_ctx *c);
+void F_100e1a210(rc_ctx *c);
+void F_100e1a270(rc_ctx *c);
+void F_100e1a360(rc_ctx *c);
+void F_100e1a450(rc_ctx *c);
+void F_100e1c740(rc_ctx *c);
+void F_100e1c980(rc_ctx *c);
+void F_100e29dd0(rc_ctx *c);
+void F_100e2a1e0(rc_ctx *c);
+static const ov_entry ov_lua_entries[] = {
+  {0x100e0fb10ull, "lua_checkstack", F_100e0fb10},
+  {0x100e0fba0ull, "lua_xmove", F_100e0fba0},
+  {0x100e0fc90ull, "lua_atpanic", F_100e0fc90},
+  {0x100e0fca0ull, "lua_newthread", F_100e0fca0},
+  {0x100e0fcf0ull, "lua_gettop", F_100e0fcf0},
+  {0x100e0fd10ull, "lua_settop", F_100e0fd10},
+  {0x100e0fdf0ull, "lua_remove", F_100e0fdf0},
+  {0x100e0ff00ull, "lua_insert", F_100e0ff00},
+  {0x100e10000ull, "lua_replace", F_100e10000},
+  {0x100e10180ull, "lua_pushvalue", F_100e10180},
+  {0x100e10260ull, "lua_type", F_100e10260},
+  {0x100e10340ull, "lua_typename", F_100e10340},
+  {0x100e10370ull, "lua_iscfunction", F_100e10370},
+  {0x100e10460ull, "lua_isnumber", F_100e10460},
+  {0x100e10560ull, "lua_isinteger", F_100e10560},
+  {0x100e10680ull, "lua_isintvalue", F_100e10680},
+  {0x100e10790ull, "lua_isstring", F_100e10790},
+  {0x100e10880ull, "lua_isuserdata", F_100e10880},
+  {0x100e10960ull, "lua_rawequal", F_100e10960},
+  {0x100e10b00ull, "lua_lessthan", F_100e10b00},
+  {0x100e10ca0ull, "lua_tonumber", F_100e10ca0},
+  {0x100e10db0ull, "lua_tointeger", F_100e10db0},
+  {0x100e10ec0ull, "lua_toboolean", F_100e10ec0},
+  {0x100e10fb0ull, "lua_tolstring", F_100e10fb0},
+  {0x100e111c0ull, "lua_objlen", F_100e111c0},
+  {0x100e11300ull, "lua_tocfunction", F_100e11300},
+  {0x100e113f0ull, "lua_touserdata", F_100e113f0},
+  {0x100e114e0ull, "lua_tothread", F_100e114e0},
+  {0x100e115c0ull, "lua_topointer", F_100e115c0},
+  {0x100e117b0ull, "lua_pushnil", F_100e117b0},
+  {0x100e117d0ull, "lua_pushnumber", F_100e117d0},
+  {0x100e117f0ull, "lua_pushinteger", F_100e117f0},
+  {0x100e11810ull, "lua_pushlstring", F_100e11810},
+  {0x100e11870ull, "lua_pushstring", F_100e11870},
+  {0x100e11940ull, "lua_pushfstring", F_100e11940},
+  {0x100e11a10ull, "lua_pushcclosure", F_100e11a10},
+  {0x100e11b20ull, "lua_pushboolean", F_100e11b20},
+  {0x100e11b50ull, "lua_pushlightuserdata", F_100e11b50},
+  {0x100e11b70ull, "lua_pushthread", F_100e11b70},
+  {0x100e11ba0ull, "lua_gettable", F_100e11ba0},
+  {0x100e11c80ull, "lua_getfield", F_100e11c80},
+  {0x100e11da0ull, "lua_rawget", F_100e11da0},
+  {0x100e11ea0ull, "lua_rawgeti", F_100e11ea0},
+  {0x100e11fa0ull, "lua_createtable", F_100e11fa0},
+  {0x100e12000ull, "lua_getmetatable", F_100e12000},
+  {0x100e12120ull, "lua_getfenv", F_100e12120},
+  {0x100e12250ull, "lua_settable", F_100e12250},
+  {0x100e12340ull, "lua_setfield", F_100e12340},
+  {0x100e12460ull, "lua_rawset", F_100e12460},
+  {0x100e12590ull, "lua_rawseti", F_100e12590},
+  {0x100e126c0ull, "lua_setmetatable", F_100e126c0},
+  {0x100e12820ull, "lua_setfenv", F_100e12820},
+  {0x100e12970ull, "lua_call", F_100e12970},
+  {0x100e129c0ull, "lua_pcall", F_100e129c0},
+  {0x100e12b20ull, "lua_load", F_100e12b20},
+  {0x100e12b70ull, "lua_dump", F_100e12b70},
+  {0x100e12bb0ull, "lua_status", F_100e12bb0},
+  {0x100e12bc0ull, "lua_gc", F_100e12bc0},
+  {0x100e12cb0ull, "lua_error", F_100e12cb0},
+  {0x100e12cc0ull, "lua_next", F_100e12cc0},
+  {0x100e12dc0ull, "lua_concat", F_100e12dc0},
+  {0x100e12e40ull, "lua_newuserdata", F_100e12e40},
+  {0x100e12eb0ull, "lua_getupvalue", F_100e12eb0},
+  {0x100e12ff0ull, "lua_setupvalue", F_100e12ff0},
+  {0x100e13170ull, "lua_pushvalue_as_number", F_100e13170},
+  {0x100e132d0ull, "luaL_argerror", F_100e132d0},
+  {0x100e133c0ull, "luaL_error", F_100e133c0},
+  {0x100e13510ull, "luaL_where", F_100e13510},
+  {0x100e135b0ull, "luaL_checkoption", F_100e135b0},
+  {0x100e136b0ull, "luaL_optlstring", F_100e136b0},
+  {0x100e13770ull, "luaL_checklstring", F_100e13770},
+  {0x100e137f0ull, "luaL_newmetatable", F_100e137f0},
+  {0x100e13860ull, "luaL_checkudata", F_100e13860},
+  {0x100e13910ull, "luaL_checkstack", F_100e13910},
+  {0x100e13950ull, "luaL_checktype", F_100e13950},
+  {0x100e139e0ull, "luaL_checkany", F_100e139e0},
+  {0x100e13a20ull, "luaL_checknumber", F_100e13a20},
+  {0x100e13ac0ull, "luaL_optnumber", F_100e13ac0},
+  {0x100e13b10ull, "luaL_checkinteger", F_100e13b10},
+  {0x100e13b90ull, "luaL_optinteger", F_100e13b90},
+  {0x100e13c30ull, "luaL_getmetafield", F_100e13c30},
+  {0x100e13cb0ull, "luaL_callmeta", F_100e13cb0},
+  {0x100e13d70ull, "luaL_register", F_100e13d70},
+  {0x100e13f30ull, "luaL_findtable", F_100e13f30},
+  {0x100e14070ull, "luaL_gsub", F_100e14070},
+  {0x100e142b0ull, "luaL_buffinit", F_100e142b0},
+  {0x100e142d0ull, "luaL_addstring", F_100e142d0},
+  {0x100e14330ull, "luaL_pushresult", F_100e14330},
+  {0x100e14390ull, "luaL_prepbuffer", F_100e14390},
+  {0x100e14460ull, "luaL_addvalue", F_100e14460},
+  {0x100e14590ull, "luaL_ref", F_100e14590},
+  {0x100e14650ull, "luaL_unref", F_100e14650},
+  {0x100e14ab0ull, "luaL_loadbuffer", F_100e14ab0},
+  {0x100e14b00ull, "luaL_loadstring", F_100e14b00},
+  {0x100e1a1a0ull, "lua_sethook", F_100e1a1a0},
+  {0x100e1a1e0ull, "lua_gethook", F_100e1a1e0},
+  {0x100e1a1f0ull, "lua_gethookmask", F_100e1a1f0},
+  {0x100e1a200ull, "lua_gethookcount", F_100e1a200},
+  {0x100e1a210ull, "lua_getstack", F_100e1a210},
+  {0x100e1a270ull, "lua_getlocal", F_100e1a270},
+  {0x100e1a360ull, "lua_setlocal", F_100e1a360},
+  {0x100e1a450ull, "lua_getinfo", F_100e1a450},
+  {0x100e1c740ull, "lua_resume", F_100e1c740},
+  {0x100e1c980ull, "lua_yield", F_100e1c980},
+  {0x100e29dd0ull, "lua_newstate", F_100e29dd0},
+  {0x100e2a1e0ull, "lua_close", F_100e2a1e0},
+};
+#define OV_LUA_COUNT 106
+#endif

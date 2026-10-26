@@ -1,0 +1,27 @@
+# Binary analysis artifacts (large files, derived from game installation)
+analysis/
+
+# Build output
+build/
+build-rosetta/
+build-platform/
+
+# OS files
+.DS_Store
+
+# Compiled binaries
+*.dylib
+*.o
+*.a
+
+# Staged Cg shim (no .dylib extension)
+shims/cg/Cg
+
+# Python bytecode
+__pycache__/
+
+# Recompiler build scripts (source, not output)
+!tools/ws7/recomp/build/
+
+# Built installer app (tools/installer/build.sh)
+tools/installer/RS Re-ARMed Installer.app/

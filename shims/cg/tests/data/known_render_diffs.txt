@@ -1,0 +1,3 @@
+# Renders where the arb backend (Apple's GL running the ARB object) is not a
+# valid reference. One file name per line, then the reason.
+posteffectglow-v.vpo.vary0.f32  reads vertex.weight: Apple's ARB path does not alias it to generic attribute 1, so the native run ignores the weights the test feeds; the glsl backend follows NVIDIA's aliasing (weight = attribute 1) as Cg's arbvp1 profile assumes

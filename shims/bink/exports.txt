@@ -1,0 +1,17 @@
+_BinkOpen
+_BinkClose
+_BinkSetSoundTrack
+_BinkSetIO
+_BinkSetIOSize
+_BinkDoFrame
+_BinkNextFrame
+_BinkWait
+_BinkShouldSkip
+_BinkGetFrameBuffersInfo
+_BinkRegisterFrameBuffers
+_BinkGetSummary
+_BinkOpenTrack
+_BinkCloseTrack
+_BinkGetTrackData
+_BinkGetTrackID
+_BinkGetError

@@ -1,0 +1,7 @@
+# Python packages for the build (tools/ws7/recomp: the recompiler and the import-thunk generator).
+capstone
+
+# The "Re-ARMed" title logo (tools/loadscreen).
+pillow
+numpy
+etcpak

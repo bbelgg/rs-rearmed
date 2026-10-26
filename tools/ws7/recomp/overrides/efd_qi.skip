@@ -1,0 +1,520 @@
+# Skip list of override module `efd_qi` (gen_image.py --skip).
+# IBase::QueryInterface (slots 4 and 5) of the efd classes with a class-info table.
+10001cbd0  # GRCamera QueryInterface
+10001cc30  # GRCamera QueryInterface const
+100024580  # GRCameraBackground QueryInterface
+1000245e0  # GRCameraBackground QueryInterface const
+10002b5a0  # GRCameraBGBehavior_Animated QueryInterface
+10002b600  # GRCameraBGBehavior_Animated QueryInterface const
+100046e90  # GRCameraBGBehavior_BuildUp QueryInterface
+100046ef0  # GRCameraBGBehavior_BuildUp QueryInterface const
+100052c70  # GRCameraBGBehavior_Customize QueryInterface
+100052cd0  # GRCameraBGBehavior_Customize QueryInterface const
+1000593b0  # GRCameraBGBehavior_Debug QueryInterface
+100059410  # GRCameraBGBehavior_Debug QueryInterface const
+100060530  # GRCameraBGBehavior_Panning QueryInterface
+100060590  # GRCameraBGBehavior_Panning QueryInterface const
+1000706f0  # CameraSong QueryInterface
+100070750  # CameraSong QueryInterface const
+10007a980  # GRCameraDebug QueryInterface
+10007a9e0  # GRCameraDebug QueryInterface const
+10007f960  # GRCameraScripted QueryInterface
+10007f9c0  # GRCameraScripted QueryInterface const
+100085830  # GRCameraService QueryInterface
+100085890  # GRCameraService QueryInterface const
+1000876b0  # IGRCameraImpl QueryInterface
+100087710  # IGRCameraImpl QueryInterface const
+1000957a0  # DatabaseCommandQueue QueryInterface
+100095800  # DatabaseCommandQueue QueryInterface const
+100098c40  # DatabaseMessageSystem QueryInterface
+100098ca0  # DatabaseMessageSystem QueryInterface const
+1000a4ff0  # DatabaseService QueryInterface
+1000a5050  # DatabaseService QueryInterface const
+1000b38f0  # GRCrowdBox QueryInterface
+1000b3950  # GRCrowdBox QueryInterface const
+1000c3110  # GRCrowdSystem QueryInterface
+1000c3170  # GRCrowdSystem QueryInterface const
+1000cfbc0  # GRLightService QueryInterface
+1000cfc20  # GRLightService QueryInterface const
+1000e5290  # GRMusicService QueryInterface
+1000e52f0  # GRMusicService QueryInterface const
+1000f4590  # JSONFactory QueryInterface
+1000f45f0  # JSONFactory QueryInterface const
+1000f46e0  # JSONFactory::Response QueryInterface
+1000f4740  # JSONFactory::Response QueryInterface const
+100116be0  # PostEffectColorCorrect QueryInterface
+100116c40  # PostEffectColorCorrect QueryInterface const
+100124160  # PostEffectsService QueryInterface
+1001241c0  # PostEffectsService QueryInterface const
+100132340  # GRClipFadeEffectComponent QueryInterface
+1001323a0  # GRClipFadeEffectComponent QueryInterface const
+100138e80  # GRDisplayRatioAdjuster QueryInterface
+100138ee0  # GRDisplayRatioAdjuster QueryInterface const
+10014b5f0  # GRShowLightsSystem QueryInterface
+10014b650  # GRShowLightsSystem QueryInterface const
+100154a50  # GRVenueMenuPresentation_Flow QueryInterface
+100154ab0  # GRVenueMenuPresentation_Flow QueryInterface const
+100168600  # MainService_MacOS QueryInterface
+100168660  # MainService_MacOS QueryInterface const
+100178660  # NSP_PlayListService QueryInterface
+1001786c0  # NSP_PlayListService QueryInterface const
+100187dc0  # RSLogger QueryInterface
+100187e20  # RSLogger QueryInterface const
+100188940  # RSDejaOutDestination QueryInterface
+1001889a0  # RSDejaOutDestination QueryInterface const
+1001aca40  # GuitarService QueryInterface
+1001acaa0  # GuitarService QueryInterface const
+1001bd880  # GRLocalization QueryInterface
+1001bd8e0  # GRLocalization QueryInterface const
+100209530  # GRSongDirectory QueryInterface
+100209590  # GRSongDirectory QueryInterface const
+10021af30  # DetectionService QueryInterface
+10021af90  # DetectionService QueryInterface const
+10023b2e0  # VenueService QueryInterface
+10023b340  # VenueService QueryInterface const
+1002732d0  # GameService QueryInterface
+100273330  # GameService QueryInterface const
+100275de0  # GRAlphaSortingComponent QueryInterface
+100275e40  # GRAlphaSortingComponent QueryInterface const
+100283910  # GRBackground QueryInterface
+100283970  # GRBackground QueryInterface const
+100284ca0  # GRBackgroundService QueryInterface
+100284d00  # GRBackgroundService QueryInterface const
+100285d70  # GRObjectEffectComponent QueryInterface
+100285dd0  # GRObjectEffectComponent QueryInterface const
+100296810  # GRWorldTextManager QueryInterface
+100296870  # GRWorldTextManager QueryInterface const
+10029ab50  # GraphAssetFactory QueryInterface
+10029abb0  # GraphAssetFactory QueryInterface const
+10029aca0  # GraphAssetFactory::Response QueryInterface
+10029ad00  # GraphAssetFactory::Response QueryInterface const
+10029bee0  # GRComponent QueryInterface
+10029bf40  # GRComponent QueryInterface const
+1002a9f90  # MainService QueryInterface
+1002a9ff0  # MainService QueryInterface const
+1002ab980  # PreloadHelper QueryInterface
+1002ab9e0  # PreloadHelper QueryInterface const
+1002ad520  # PreloadHelperResponse QueryInterface
+1002ad580  # PreloadHelperResponse QueryInterface const
+1002ad720  # PreloadItem QueryInterface
+1002ad780  # PreloadItem QueryInterface const
+1002b2380  # RSBootService QueryInterface
+1002b23e0  # RSBootService QueryInterface const
+1002b3140  # RSRenderService QueryInterface
+1002b31a0  # RSRenderService QueryInterface const
+1002d5280  # GCTickable QueryInterface
+1002d52e0  # GCTickable QueryInterface const
+1002e03e0  # RSAudioService QueryInterface
+1002e0440  # RSAudioService QueryInterface const
+1003044c0  # UIManagerI QueryInterface
+100304510  # UIManagerI QueryInterface const
+100354b70  # UIMenu_LAS_SongsList QueryInterface
+100354bd0  # UIMenu_LAS_SongsList QueryInterface const
+100367480  # UIService QueryInterface
+1003674e0  # UIService QueryInterface const
+100380a30  # ResourceService QueryInterface
+100380a90  # ResourceService QueryInterface const
+100385100  # GRMinigameCamera QueryInterface
+100385160  # GRMinigameCamera QueryInterface const
+1003a6970  # OscilleratorScopeModel QueryInterface
+1003a69d0  # OscilleratorScopeModel QueryInterface const
+1003ac5d0  # ReactiveEffectsService QueryInterface
+1003ac630  # ReactiveEffectsService QueryInterface const
+1003ae9f0  # GCColorShift QueryInterface
+1003aea50  # GCColorShift QueryInterface const
+1003b1d90  # GC2DAssetHelper QueryInterface
+1003b1df0  # GC2DAssetHelper QueryInterface const
+1003c00d0  # GCAccumulatedActor QueryInterface
+1003c0130  # GCAccumulatedActor QueryInterface const
+1003e09a0  # GCPauseManager QueryInterface
+1003e0a00  # GCPauseManager QueryInterface const
+1003f1160  # GRCameraNarniaVenue QueryInterface
+1003f11c0  # GRCameraNarniaVenue QueryInterface const
+1003f93e0  # FormLoader QueryInterface
+1003f9440  # FormLoader QueryInterface const
+100416cc0  # ClipFadeManager QueryInterface
+100416d20  # ClipFadeManager QueryInterface const
+100479120  # GEService QueryInterface
+100479180  # GEService QueryInterface const
+10047bf10  # NarniaPortalModel QueryInterface
+10047bf70  # NarniaPortalModel QueryInterface const
+10047db50  # SongListService QueryInterface
+10047dbb0  # SongListService QueryInterface const
+100480710  # NarniaService QueryInterface
+100480770  # NarniaService QueryInterface const
+1004a2fa0  # GRSL2Spawner QueryInterface
+1004a3000  # GRSL2Spawner QueryInterface const
+1004cb650  # NarniaFogModel QueryInterface
+1004cb6b0  # NarniaFogModel QueryInterface const
+1004cc670  # NarniaFogParticle QueryInterface
+1004cc6d0  # NarniaFogParticle QueryInterface const
+100501a10  # MissionService QueryInterface
+100501a70  # MissionService QueryInterface const
+1005209c0  # ToneService QueryInterface
+100520a20  # ToneService QueryInterface const
+10052fc60  # StringTuner QueryInterface
+10052fcc0  # StringTuner QueryInterface const
+1005319e0  # TunerService QueryInterface
+100531a40  # TunerService QueryInterface const
+1005339e0  # InstrumentLoader QueryInterface
+100533a40  # InstrumentLoader QueryInterface const
+100534560  # GRCrowdPoint QueryInterface
+1005345c0  # GRCrowdPoint QueryInterface const
+100538c30  # GearManager QueryInterface
+100538c90  # GearManager QueryInterface const
+100539f10  # GearService QueryInterface
+100539f70  # GearService QueryInterface const
+100557690  # FogService QueryInterface
+1005576f0  # FogService QueryInterface const
+1005580f0  # GlobalFogSettings QueryInterface
+100558150  # GlobalFogSettings QueryInterface const
+100563810  # ManifestManager QueryInterface
+100563870  # ManifestManager QueryInterface const
+100581900  # StatsService QueryInterface
+100581960  # StatsService QueryInterface const
+1005c8be0  # GRCameraLoft QueryInterface
+1005c8c40  # GRCameraLoft QueryInterface const
+100607490  # GEVideoScreenModel QueryInterface
+1006074f0  # GEVideoScreenModel QueryInterface const
+100653e00  # TunerProgressBuiltin QueryInterface
+100653e60  # TunerProgressBuiltin QueryInterface const
+1006eb6d0  # GameColorManager QueryInterface
+1006eb730  # GameColorManager QueryInterface const
+10071c300  # GRCameraSessionMode QueryInterface
+10071c360  # GRCameraSessionMode QueryInterface const
+10074a010  # GCAttachmentManager QueryInterface
+10074a070  # GCAttachmentManager QueryInterface const
+10076ff60  # UIMenu_ShopSongs QueryInterface
+10076ffd0  # UIMenu_ShopSongs QueryInterface const
+100775ae0  # GRLoftAmbientLight QueryInterface
+100775b40  # GRLoftAmbientLight QueryInterface const
+100776230  # GRLoftSpotLight QueryInterface
+100776290  # GRLoftSpotLight QueryInterface const
+100777450  # GRLoftState QueryInterface
+1007774b0  # GRLoftState QueryInterface const
+100780ec0  # LoftPostEffectsManager QueryInterface
+100780f20  # LoftPostEffectsManager QueryInterface const
+100781a10  # RSVenueForkEmitterGear QueryInterface
+100781a70  # RSVenueForkEmitterGear QueryInterface const
+1007899e0  # UIMenu_ShopGear QueryInterface
+100789a50  # UIMenu_ShopGear QueryInterface const
+100798dc0  # UIMenu_ShopPacks QueryInterface
+100798e20  # UIMenu_ShopPacks QueryInterface const
+1007aa3c0  # GearPlacementNode QueryInterface
+1007aa420  # GearPlacementNode QueryInterface const
+1007ee220  # GearLava QueryInterface
+1007ee280  # GearLava QueryInterface const
+1007f0f00  # GearNifCache QueryInterface
+1007f0f60  # GearNifCache QueryInterface const
+100811f30  # GRVenueAmbientAnimations QueryInterface
+100811f90  # GRVenueAmbientAnimations QueryInterface const
+10083c3c0  # GRSoundIntensity QueryInterface
+10083c420  # GRSoundIntensity QueryInterface const
+10083de80  # GRVenuePointLight QueryInterface
+10083dee0  # GRVenuePointLight QueryInterface const
+10084f5b0  # GRLoftCabinetScreen QueryInterface
+10084f610  # GRLoftCabinetScreen QueryInterface const
+100863440  # GCLdbChlgService QueryInterface
+1008634a0  # GCLdbChlgService QueryInterface const
+100868190  # GearChangeController QueryInterface
+1008681f0  # GearChangeController QueryInterface const
+10086a4a0  # GCGFxMouseEventHandler QueryInterface
+10086a500  # GCGFxMouseEventHandler QueryInterface const
+10087fde0  # AchievementService QueryInterface
+10087fe40  # AchievementService QueryInterface const
+1008a7570  # PrizeService QueryInterface
+1008a75d0  # PrizeService QueryInterface const
+1008a8530  # GCKinectEventHandler QueryInterface
+1008a8590  # GCKinectEventHandler QueryInterface const
+1008c4140  # FavoritesService QueryInterface
+1008c41a0  # FavoritesService QueryInterface const
+100a048c0  # RSConnectExtension_RDV QueryInterface
+100a04920  # RSConnectExtension_RDV QueryInterface const
+100a05710  # RSConnectService_Steam QueryInterface
+100a05770  # RSConnectService_Steam QueryInterface const
+100a07ce0  # RSSteamService QueryInterface
+100a07d40  # RSSteamService QueryInterface const
+100a0ea40  # RSDLCService_Steam QueryInterface
+100a0eaa0  # RSDLCService_Steam QueryInterface const
+100a108f0  # RSProfileService_MacOS QueryInterface
+100a10950  # RSProfileService_MacOS QueryInterface const
+100a2f410  # RSSteamAchievement QueryInterface
+100a2f470  # RSSteamAchievement QueryInterface const
+100a30da0  # RSSteamActivityFeed QueryInterface
+100a30e00  # RSSteamActivityFeed QueryInterface const
+100a31460  # RSSteamCloudFile QueryInterface
+100a314c0  # RSSteamCloudFile QueryInterface const
+100a33510  # RSSteamDownloadableContent QueryInterface
+100a33570  # RSSteamDownloadableContent QueryInterface const
+100a35e30  # RSSteamLeaderboards QueryInterface
+100a35e90  # RSSteamLeaderboards QueryInterface const
+100a35f60  # RSSteamLeaderboardRequest QueryInterface
+100a35fc0  # RSSteamLeaderboardRequest QueryInterface const
+100a36090  # RSSteamLeaderboardRequestUpload QueryInterface
+100a360f0  # RSSteamLeaderboardRequestUpload QueryInterface const
+100a361c0  # RSSteamLeaderboardRequestDownload QueryInterface
+100a36220  # RSSteamLeaderboardRequestDownload QueryInterface const
+100a3bf90  # RSSteamWebApi QueryInterface
+100a3bff0  # RSSteamWebApi QueryInterface const
+100a53270  # FrkService QueryInterface
+100a532d0  # FrkService QueryInterface const
+100b67dd0  # GFxAssetTaskAssetFactory QueryInterface
+100b67e30  # GFxAssetTaskAssetFactory QueryInterface const
+100b6cd90  # GFxInputRouterModel QueryInterface
+100b6cdf0  # GFxInputRouterModel QueryInterface const
+100b74ff0  # GFxMovieModel QueryInterface
+100b75050  # GFxMovieModel QueryInterface const
+100b7e8e0  # GFxService QueryInterface
+100b7e940  # GFxService QueryInterface const
+1011599b0  # sub:LuaResumeCoroutineTask QueryInterface
+101159a00  # sub:LuaResumeCoroutineTask QueryInterface const
+10114ff10  # LuaScriptFactory QueryInterface
+10114ff70  # LuaScriptFactory QueryInterface const
+1011598e0  # SchedulerLua QueryInterface
+101159940  # SchedulerLua QueryInterface const
+101164650  # AttachNifData QueryInterface
+1011646b0  # AttachNifData QueryInterface const
+101169190  # CameraService QueryInterface
+1011691f0  # CameraService QueryInterface const
+101174280  # LightService QueryInterface
+1011742e0  # LightService QueryInterface const
+101176890  # NIFFactory QueryInterface
+1011768f0  # NIFFactory QueryInterface const
+101178f30  # RenderService QueryInterface
+101178f90  # RenderService QueryInterface const
+10117fc40  # SceneGraphCache QueryInterface
+10117fca0  # SceneGraphCache QueryInterface const
+101199950  # SceneGraphService QueryInterface
+1011999b0  # SceneGraphService QueryInterface const
+1011a2f00  # ShaderService QueryInterface
+1011a2f60  # ShaderService QueryInterface const
+1011a68a0  # InputActionMessage QueryInterface
+1011a6900  # InputActionMessage QueryInterface const
+1011a8290  # InputHandler QueryInterface
+1011a82f0  # InputHandler QueryInterface const
+1011aff90  # InputService QueryInterface
+1011afff0  # InputService QueryInterface const
+1011bdf20  # InputStickMessage QueryInterface
+1011bdf80  # InputStickMessage QueryInterface const
+1011be610  # KeyDownMessage QueryInterface
+1011be670  # KeyDownMessage QueryInterface const
+1011be6e0  # KeyUpMessage QueryInterface
+1011be740  # KeyUpMessage QueryInterface const
+1011bf390  # MouseMoveMessage QueryInterface
+1011bf3f0  # MouseMoveMessage QueryInterface const
+1011bf460  # MouseDownMessage QueryInterface
+1011bf4c0  # MouseDownMessage QueryInterface const
+1011bf530  # MouseUpMessage QueryInterface
+1011bf590  # MouseUpMessage QueryInterface const
+1011d2470  # Entity QueryInterface
+1011d24d0  # Entity QueryInterface const
+100097be0  # sub:EntityChangeMessage QueryInterface
+100097c30  # sub:EntityChangeMessage QueryInterface const
+1011d6d00  # EntityFactory QueryInterface
+1011d6d60  # EntityFactory QueryInterface const
+1011d8e50  # EntityLoadRequest QueryInterface
+1011d8eb0  # EntityLoadRequest QueryInterface const
+1011d8f20  # EntityLoadResult QueryInterface
+1011d8f80  # EntityLoadResult QueryInterface const
+1011d8ff0  # EntityPreloadRequest QueryInterface
+1011d9050  # EntityPreloadRequest QueryInterface const
+1011d90c0  # EntityPreloadResponse QueryInterface
+1011d9120  # EntityPreloadResponse QueryInterface const
+1011df0a0  # EntityLoaderService QueryInterface
+1011df100  # EntityLoaderService QueryInterface const
+1011e8ad0  # EntityManager QueryInterface
+1011e8b30  # EntityManager QueryInterface const
+1011ebcf0  # EntitySetLoadState QueryInterface
+1011ebd50  # EntitySetLoadState QueryInterface const
+1011d2e70  # sub:EventMessage QueryInterface
+1011d2ec0  # sub:EventMessage QueryInterface const
+1011fa930  # FlatModelFactory QueryInterface
+1011fa990  # FlatModelFactory QueryInterface const
+1012073b0  # FlatModelManager QueryInterface
+101207410  # FlatModelManager QueryInterface const
+10120f780  # PendingBehavior QueryInterface
+10120f7e0  # PendingBehavior QueryInterface const
+1012481f0  # Scheduler QueryInterface
+101248250  # Scheduler QueryInterface const
+10124c970  # ScriptFactoryResponse QueryInterface
+10124c9d0  # ScriptFactoryResponse QueryInterface const
+10125dca0  # WorldFactory QueryInterface
+10125dd00  # WorldFactory QueryInterface const
+10126ddb0  # AnimationService QueryInterface
+10126de10  # AnimationService QueryInterface const
+101278a70  # KFMFactory QueryInterface
+101278ad0  # KFMFactory QueryInterface const
+101278bc0  # KFMFactory::ResponseData QueryInterface
+101278c20  # KFMFactory::ResponseData QueryInterface const
+10127a6b0  # AssetCacheResponse QueryInterface
+10127a710  # AssetCacheResponse QueryInterface const
+10127c7d0  # AssetConfigService QueryInterface
+10127c830  # AssetConfigService QueryInterface const
+101283ce0  # AssetFactoryManager QueryInterface
+101283d40  # AssetFactoryManager QueryInterface const
+101285f50  # AssetLoadRequest QueryInterface
+101285fb0  # AssetLoadRequest QueryInterface const
+1012862e0  # AssetLoadResponse QueryInterface
+101286340  # AssetLoadResponse QueryInterface const
+101294970  # sub:AssetLocatorRequest QueryInterface
+1012949c0  # sub:AssetLocatorRequest QueryInterface const
+101293360  # sub:AssetConfigurationMessage QueryInterface
+1012933b0  # sub:AssetConfigurationMessage QueryInterface const
+1000e5dd0  # sub:AssetLocatorResponse QueryInterface
+1000e5e20  # sub:AssetLocatorResponse QueryInterface const
+101289620  # AssetTagsInfoResponse QueryInterface
+101289680  # AssetTagsInfoResponse QueryInterface const
+101292140  # AssetLocatorService QueryInterface
+1012921a0  # AssetLocatorService QueryInterface const
+1012b5b30  # ConfigManager QueryInterface
+1012b5b90  # ConfigManager QueryInterface const
+1012bb8f0  # SectionEntry QueryInterface
+1012bb950  # SectionEntry QueryInterface const
+1012c1a90  # ConfigSource QueryInterface
+1012c1af0  # ConfigSource QueryInterface const
+1012c1b60  # CommandLineSource QueryInterface
+1012c1bc0  # CommandLineSource QueryInterface const
+1012c1c30  # IniSource QueryInterface
+1012c1c90  # IniSource QueryInterface const
+1012c1d00  # EnvVarSource QueryInterface
+1012c1d60  # EnvVarSource QueryInterface const
+1012ddbe0  # DebugOutDestination QueryInterface
+1012ddc40  # DebugOutDestination QueryInterface const
+1012e1550  # FileDestination QueryInterface
+1012e15b0  # FileDestination QueryInterface const
+1012e3200  # GenericAssetFactory QueryInterface
+1012e3260  # GenericAssetFactory QueryInterface const
+1012e3a90  # GenericAssetLoadResponse QueryInterface
+1012e3af0  # GenericAssetLoadResponse QueryInterface const
+1000e5930  # sub:IMessage QueryInterface
+1000e5980  # sub:IMessage QueryInterface const
+1012ebd10  # Logger QueryInterface
+1012ebd70  # Logger QueryInterface const
+1012f4cb0  # MessageService QueryInterface
+1012f4d10  # MessageService QueryInterface const
+1012f6820  # NetMessage QueryInterface
+1012f6880  # NetMessage QueryInterface const
+1012f68f0  # AssignNetIDMessage QueryInterface
+1012f6950  # AssignNetIDMessage QueryInterface const
+1012f92c0  # PrintDestination QueryInterface
+1012f9320  # PrintDestination QueryInterface const
+1012ffd30  # ServiceManager QueryInterface
+1012ffd90  # ServiceManager QueryInterface const
+101292a70  # sub:StreamMessage QueryInterface
+101292ac0  # sub:StreamMessage QueryInterface const
+101313680  # MacOSPlatformService QueryInterface
+1013136e0  # MacOSPlatformService QueryInterface const
+10131d790  # AudioBankAssetFactory QueryInterface
+10131d7f0  # AudioBankAssetFactory QueryInterface const
+10131e5b0  # AudioBankAssetLoadResponse QueryInterface
+10131e610  # AudioBankAssetLoadResponse QueryInterface const
+1013223c0  # AudioMessage QueryInterface
+101322420  # AudioMessage QueryInterface const
+101337230  # AudioService QueryInterface
+101337290  # AudioService QueryInterface const
+1000cfe60  # SceneGraphRemovedMessage QueryInterface
+1000cfeb0  # SceneGraphRemovedMessage QueryInterface const
+1000d0170  # SceneGraphAddedMessage QueryInterface
+1000d01c0  # SceneGraphAddedMessage QueryInterface const
+1000d0bb0  # SceneGraphsUpdatedMessage QueryInterface
+1000d0c00  # SceneGraphsUpdatedMessage QueryInterface const
+1000e85f0  # SceneGraphMessage QueryInterface
+1000e8640  # SceneGraphMessage QueryInterface const
+1000f49a0  # JSONFactory::JSONFactoryData QueryInterface
+1000f4a00  # JSONFactory::JSONFactoryData QueryInterface const
+1000a55b0  # ReturnToTitleScreen QueryInterface
+1000a5600  # ReturnToTitleScreen QueryInterface const
+1002abc80  # PreloadHelperComplete QueryInterface
+1002abcd0  # PreloadHelperComplete QueryInterface const
+1002ac290  # SceneGraphCacheResponse QueryInterface
+1002ac2e0  # SceneGraphCacheResponse QueryInterface const
+1002ad850  # PreloadGroup QueryInterface
+1002ad8b0  # PreloadGroup QueryInterface const
+1002d67f0  # GCPauseMessage QueryInterface
+1002d6840  # GCPauseMessage QueryInterface const
+100372190  # RSGraphAssetFactoryLoadResponse QueryInterface
+1003721f0  # RSGraphAssetFactoryLoadResponse QueryInterface const
+1003722e0  # RSConnectGameInterface_Impl QueryInterface
+100372340  # RSConnectGameInterface_Impl QueryInterface const
+1003ac700  # ReactiveRingModel QueryInterface
+1003ac750  # ReactiveRingModel QueryInterface const
+100782720  # RingParticleEmitter QueryInterface
+100782780  # RingParticleEmitter QueryInterface const
+100326b90  # GCGFxMouseEventMessage QueryInterface
+100326be0  # GCGFxMouseEventMessage QueryInterface const
+1008a89a0  # GCKinectEventMessage QueryInterface
+1008a8a00  # GCKinectEventMessage QueryInterface const
+100a53fb0  # NiFrkParticleEffectModel QueryInterface
+100a54010  # NiFrkParticleEffectModel QueryInterface const
+100b67ea0  # GFxAssetTaskRequest QueryInterface
+100b67f00  # GFxAssetTaskRequest QueryInterface const
+1002b26e0  # GFXModelResponse QueryInterface
+1002b2730  # GFXModelResponse QueryInterface const
+101150060  # LuaScriptFactoryResponseData QueryInterface
+1011500c0  # LuaScriptFactoryResponseData QueryInterface const
+101180380  # NIFFactoryResponse QueryInterface
+1011803d0  # NIFFactoryResponse QueryInterface const
+101199d00  # AttachmentMadeMessage QueryInterface
+101199d50  # AttachmentMadeMessage QueryInterface const
+10119a270  # AttachmentMessage QueryInterface
+10119a2c0  # AttachmentMessage QueryInterface const
+10119a3d0  # AttachmentBrokenMessage QueryInterface
+10119a420  # AttachmentBrokenMessage QueryInterface const
+1011a65d0  # InputActionMapsLoaded QueryInterface
+1011a6630  # InputActionMapsLoaded QueryInterface const
+1011d2360  # ScheduledTask QueryInterface
+1011d23b0  # ScheduledTask QueryInterface const
+1011d6e30  # EntityFactory::EntityFactoryData QueryInterface
+1011d6e90  # EntityFactory::EntityFactoryData QueryInterface const
+1011d70d0  # EntityFactoryRequest QueryInterface
+1011d7120  # EntityFactoryRequest QueryInterface const
+1011d7a40  # EntityFactoryResponse QueryInterface
+1011d7aa0  # EntityFactoryResponse QueryInterface const
+1011fab00  # ResponseData QueryInterface
+1011fab60  # ResponseData QueryInterface const
+1011fccc0  # FlatModelFactoryRequest QueryInterface
+1011fcd20  # FlatModelFactoryRequest QueryInterface const
+1011fd760  # FlatModelFactoryResponse QueryInterface
+1011fd7c0  # FlatModelFactoryResponse QueryInterface const
+10124bb00  # ScriptFactoryRequest QueryInterface
+10124bb60  # ScriptFactoryRequest QueryInterface const
+10125ddf0  # WorldFactoryData QueryInterface
+10125de50  # WorldFactoryData QueryInterface const
+10125f0b0  # WorldFactoryRequest QueryInterface
+10125f110  # WorldFactoryRequest QueryInterface const
+10125f620  # WorldFactoryResponse QueryInterface
+10125f680  # WorldFactoryResponse QueryInterface const
+10126e2c0  # ActorAddedMessage QueryInterface
+10126e310  # ActorAddedMessage QueryInterface const
+10126e3c0  # ActorRemovedMessage QueryInterface
+10126e410  # ActorRemovedMessage QueryInterface const
+101279510  # KFMFactoryRequest QueryInterface
+101279570  # KFMFactoryRequest QueryInterface const
+101279ca0  # KFMFactoryResponse QueryInterface
+101279d00  # KFMFactoryResponse QueryInterface const
+101292280  # AssetLocationMap QueryInterface
+1012922e0  # AssetLocationMap QueryInterface const
+1012e3360  # ResponseData QueryInterface
+1012e33c0  # ResponseData QueryInterface const
+10131dc30  # AudioBankAssetLoadRequest QueryInterface
+10131dc90  # AudioBankAssetLoadRequest QueryInterface const
+1013224f0  # PostEventMessage QueryInterface
+101322550  # PostEventMessage QueryInterface const
+1013226a0  # PostTriggerMessage QueryInterface
+101322700  # PostTriggerMessage QueryInterface const
+101322850  # SetParamMessage QueryInterface
+1013228b0  # SetParamMessage QueryInterface const
+101322a00  # SetStateMessage QueryInterface
+101322a60  # SetStateMessage QueryInterface const
+101322c00  # SetSwitchMessage QueryInterface
+101322c60  # SetSwitchMessage QueryInterface const
+101322e00  # DoPrepareEventCallbackBehaviorMessage QueryInterface
+101322e60  # DoPrepareEventCallbackBehaviorMessage QueryInterface const
+101322fb0  # DoUnprepareEventCallbackBehaviorMessage QueryInterface
+101323010  # DoUnprepareEventCallbackBehaviorMessage QueryInterface const
+101323160  # DoLoadBankCallbackBehaviorMessage QueryInterface
+1013231c0  # DoLoadBankCallbackBehaviorMessage QueryInterface const
+101323330  # DoUnloadBankCallbackBehaviorMessage QueryInterface
+101323390  # DoUnloadBankCallbackBehaviorMessage QueryInterface const
+101323500  # DoPostEventExNotifyCallbackBehaviorMessage QueryInterface
+101323560  # DoPostEventExNotifyCallbackBehaviorMessage QueryInterface const

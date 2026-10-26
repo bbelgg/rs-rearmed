@@ -312,6 +312,74 @@ static void test_rebind(void) {
     cgDestroyProgram(b);
 }
 
+// Sets that repeat the current values are skipped; partial matrix changes,
+// changes made and undone while unbound, and a fresh program (whose GL name may
+// be recycled, with stale program.local) setting zeros must still all land.
+static void test_repeated_sets(void) {
+    CGprogram vp = load(VP_XFORM, CG_PROFILE_ARBVP1);
+    CGprogram a = load(FP_TINT, CG_PROFILE_ARBFP1), b = load(FP_TINT, CG_PROFILE_ARBFP1);
+    float M[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    const float zero[4] = {0}, ta[4] = {1, 0, 0, 1}, tb[4] = {0, 0, 1, 1};
+    cgGLBindProgram(vp);
+    cgGLBindProgram(a);
+    cgGLSetMatrixParameterfr(named(vp, "M"), M);
+    cgGLSetParameter4fv(named(vp, "offset"), zero);
+    cgGLSetParameter4fv(named(a, "tint"), ta);
+    cgGLSetParameter4fv(named(a, "tint"), ta);
+    float v[4][4];
+    for (int i = 0; i < 4; i++) { v[i][0] = v[i][1] = v[i][2] = 0.5f; v[i][3] = 1; }
+    feed(named(vp, "pos"), 4, GL_FLOAT, QUAD);
+    feed(named(vp, "v"), 4, GL_FLOAT, v);
+    // t = M v + (0.5, 1, 0, 0); out = t * tint + 0.25
+    const float wa[4] = {1.25f, 0.25f, 0.25f, 1.25f}, wb[4] = {0.25f, 0.25f, 0.75f, 1.25f};
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    check_pixel("repeated set", 0, 0, wa);
+    cgGLBindProgram(b);
+    cgGLSetParameter4fv(named(a, "tint"), tb);   // changed and changed back while unbound
+    cgGLSetParameter4fv(named(a, "tint"), ta);
+    cgGLSetParameter4fv(named(b, "tint"), tb);
+    cgGLBindProgram(a);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    check_pixel("set and reset while unbound", 0, 0, wa);
+    M[3] = 0.25f;   // first row only
+    cgGLSetMatrixParameterfr(named(vp, "M"), M);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    const float w1[4] = {1.5f, 0.25f, 0.25f, 1.25f};
+    check_pixel("matrix first row", 0, 0, w1);
+    M[15] = 2;   // last row only
+    cgGLSetMatrixParameterfr(named(vp, "M"), M);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    const float w2[4] = {1.5f, 0.25f, 0.25f, 2.25f};
+    check_pixel("matrix last row", 0, 0, w2);
+    M[3] = 0, M[15] = 1;   // first and last rows, middle unchanged
+    cgGLSetMatrixParameterfr(named(vp, "M"), M);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    check_pixel("matrix outer rows", 0, 0, wa);
+    cgGLBindProgram(b);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    check_pixel("other program", 0, 0, wb);
+    cgDestroyProgram(a);
+    CGprogram c = load(FP_TINT, CG_PROFILE_ARBFP1);
+    cgGLBindProgram(c);
+    cgGLSetParameter4fv(named(c, "tint"), zero);
+    clear();
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    const float w0[4] = {0.25f, 0.25f, 0.25f, 0.25f};
+    check_pixel("zeros into a new program", 0, 0, w0);
+    cgGLDisableClientState(named(vp, "pos"));
+    cgGLDisableClientState(named(vp, "v"));
+    CHECK(!cgGetError() && !glGetError(), "errors in repeated sets test");
+    cgDestroyProgram(vp);
+    cgDestroyProgram(b);
+    cgDestroyProgram(c);
+}
+
 static void test_kill(void) {
     CGprogram vp = load(VP_TEX, CG_PROFILE_ARBVP1);
     CGprogram fp = load(FP_KILL, CG_PROFILE_ARBFP1);
@@ -452,6 +520,7 @@ int main(void) {
     test_texture();
     test_palette();
     test_rebind();
+    test_repeated_sets();
     test_kill();
     test_foreign_program();
     test_errors();

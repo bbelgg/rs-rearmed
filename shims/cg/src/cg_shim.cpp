@@ -18,6 +18,7 @@
 //   RS_CG_LOG=1                 log errors and program creation to stderr
 //   RS_CG_DUMP_DIR=<dir>        write every translated shader there
 #define GL_SILENCE_DEPRECATION
+#include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
 
@@ -131,11 +132,26 @@ struct Context {
 
 std::set<void *> g_live;   // every valid handle, so stale/garbage handles are rejected
 
+// Direct-mapped cache of handles found in g_live: the game passes the same few
+// hundred parameters every frame, and a set lookup per cgGLSet* call shows in
+// profiles. An entry is cleared when its handle leaves g_live.
+void *g_live_cache[1024];
+inline void *&live_cache_slot(void *h) { return g_live_cache[((uintptr_t)h >> 4) & 1023]; }
+
+void live_insert(void *h) { g_live.insert(h); }
+void live_erase(void *h) {
+    g_live.erase(h);
+    if (live_cache_slot(h) == h) live_cache_slot(h) = nullptr;
+}
+
 template <class T> T *check(void *h, int err) {
+    void *&c = live_cache_slot(h);
+    if (h && c == h) return static_cast<T *>(h);
     if (!h || !g_live.count(h)) {
         set_error(err, "invalid handle");
         return nullptr;
     }
+    c = h;
     return static_cast<T *>(h);
 }
 
@@ -344,12 +360,30 @@ GLenum arb_target(const Program *p) {
     return p->stage == Stage::Vertex ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB;
 }
 
+// GL_EXT_gpu_program_parameters sets a run of program.local in one call; Apple's
+// GL has it. Looked up at the first program load.
+bool g_arb_multi = false;
+
+void arb_set_locals(Program *p, int first, int count) {
+    if (g_arb_multi) {
+        glProgramLocalParameters4fvEXT(arb_target(p), first, count, &p->slots[4 * first]);
+        return;
+    }
+    for (int i = first; i < first + count; i++)
+        glProgramLocalParameter4fvARB(arb_target(p), i, &p->slots[4 * i]);
+}
+
 void arb_upload(Program *p) {
     if (p->arb_uploaded >= p->stamp) return;
-    int n = p->arb.max_local + 1;
-    for (int i = 0; i < n && i < (int)p->slot_stamp.size(); i++)
-        if (p->slot_stamp[i] > p->arb_uploaded)
-            glProgramLocalParameter4fvARB(arb_target(p), i, &p->slots[4 * i]);
+    int n = std::min(p->arb.max_local + 1, (int)p->slot_stamp.size());
+    const uint64_t *st = p->slot_stamp.data(), seen = p->arb_uploaded;
+    for (int i = 0; i < n; i++) {
+        if (st[i] <= seen) continue;
+        int j = i + 1;
+        while (j < n && st[j] > seen) j++;
+        arb_set_locals(p, i, j - i);
+        i = j - 1;
+    }
     p->arb_uploaded = p->stamp;
 }
 
@@ -357,20 +391,54 @@ bool arb_is_bound(const Program *p) {
     return p == (p->stage == Stage::Vertex ? g_bound_vp : g_bound_fp);
 }
 
+// What the shim last set for GL_{VERTEX,FRAGMENT}_PROGRAM_ARB (enable and
+// binding) in `ctx`, so the per-draw cgGLEnableProfile/cgGLBindProgram the game
+// issues don't repeat it to the driver. The game itself never touches these
+// (it imports no ARB program calls); state of another context starts unknown.
+struct ArbState {
+    CGLContextObj ctx = nullptr;
+    int enabled[2] = {-1, -1};
+    GLuint bound[2] = {~0u, ~0u};
+};
+ArbState g_arb;
+
+ArbState &arb_state() {
+    CGLContextObj c = CGLGetCurrentContext();
+    if (c != g_arb.ctx) g_arb = ArbState(), g_arb.ctx = c;
+    return g_arb;
+}
+
+void arb_bind(GLenum target, GLuint id) {
+    ArbState &s = arb_state();
+    GLuint &b = s.bound[target == GL_FRAGMENT_PROGRAM_ARB];
+    if (b == id) return;
+    glBindProgramARB(target, id);
+    b = id;
+}
+
 // --- shared -----------------------------------------------------------------------
 
 void write_slots(Param *q, int first_row, const float *rows, int nrows) {
-    Program *p = q->program;
     if (q->info.reg_base < 0) return;   // not allocated: unused parameter
-    nrows = std::min(nrows, q->info.reg_count - first_row);
-    if (nrows <= 0) return;
-    uint64_t t = ++g_clock;
+    Program *p = q->program;
     int base = q->info.reg_base + first_row;
-    for (int r = 0; r < nrows; r++) {
-        if (base + r >= (int)p->slot_stamp.size()) break;
-        memcpy(&p->slots[4 * (base + r)], rows + 4 * r, 16);
-        p->slot_stamp[base + r] = t;
-    }
+    int n = nrows;
+    if (n > q->info.reg_count - first_row) n = q->info.reg_count - first_row;
+    if (n > (int)p->slot_stamp.size() - base) n = (int)p->slot_stamp.size() - base;
+    // Rows that already hold these values are already in (or on their way to)
+    // every GL program: only the changed span [lo, hi) is stamped and uploaded.
+    // A row never written counts as changed: Apple's GL doesn't zero
+    // program.local of a recycled program name.
+    float *dst = &p->slots[4 * base];
+    const uint64_t *st = &p->slot_stamp[base];
+    int lo = 0;
+    while (lo < n && st[lo] && !memcmp(dst + 4 * lo, rows + 4 * lo, 16)) lo++;
+    if (lo >= n) return;
+    int hi = n;
+    while (st[hi - 1] && !memcmp(dst + 4 * (hi - 1), rows + 4 * (hi - 1), 16)) hi--;
+    memcpy(dst + 4 * lo, rows + 4 * lo, 16 * (hi - lo));
+    uint64_t t = ++g_clock, prev = p->stamp;
+    for (int r = base + lo; r < base + hi; r++) p->slot_stamp[r] = t;
     p->stamp = t;
     if (cfg().glsl) {
         // glUniform goes to whatever program is current: if that isn't ours any
@@ -380,7 +448,13 @@ void write_slots(Param *q, int first_row, const float *rows, int nrows) {
             if (g_current->fp == p) upload_slots(p, g_current->fp_loc, &g_current->fp_seen);
         }
     } else if (p->loaded && arb_is_bound(p)) {
-        arb_upload(p);
+        if (p->arb_uploaded < prev) {
+            arb_upload(p);   // older writes still pending
+        } else {
+            int end = std::min(base + hi, p->arb.max_local + 1);
+            if (end > base + lo) arb_set_locals(p, base + lo, end - base - lo);
+            p->arb_uploaded = t;
+        }
     }
 }
 
@@ -402,6 +476,12 @@ bool load_program(Program *p) {
             return false;
         }
     } else {
+        static bool ext_checked = false;
+        if (!ext_checked) {
+            const char *e = (const char *)glGetString(GL_EXTENSIONS);
+            g_arb_multi = e && strstr(e, "GL_EXT_gpu_program_parameters");
+            ext_checked = true;
+        }
         GLenum target = arb_target(p);
         glGenProgramsARB(1, &p->arb_id);
         GLint prev = 0;
@@ -441,7 +521,7 @@ using namespace rscg;
 
 CG_EXPORT CGcontext cgCreateContext(void) {
     Context *c = new Context;
-    g_live.insert(c);
+    live_insert(c);
     return (CGcontext)c;
 }
 
@@ -452,7 +532,7 @@ CG_EXPORT void cgDestroyContext(CGcontext handle) {
     if (!c) return;
     std::vector<Program *> progs = c->programs;
     for (Program *p : progs) cgDestroyProgram((CGprogram)p);
-    g_live.erase(c);
+    live_erase(c);
     delete c;
 }
 
@@ -507,11 +587,11 @@ CG_EXPORT CGprogram cgCreateProgram(CGcontext handle, CGenum type, const char *t
         auto q = std::make_unique<Param>();
         q->info = info;
         q->program = p;
-        g_live.insert(q.get());
+        live_insert(q.get());
         p->params.push_back(std::move(q));
     }
     c->programs.push_back(p);
-    g_live.insert(p);
+    live_insert(p);
     logf("created %s program %s (%zu params)", p->stage == Stage::Vertex ? "vertex" : "fragment",
          program_tag(p).c_str(), p->params.size());
     return (CGprogram)p;
@@ -526,11 +606,15 @@ CG_EXPORT void cgDestroyProgram(CGprogram handle) {
     if (p->fs) glDeleteShader(p->fs);
     for (auto &v : p->vs)
         if (v.second) glDeleteShader(v.second);
-    if (p->arb_id) glDeleteProgramsARB(1, &p->arb_id);
-    for (auto &q : p->params) g_live.erase(q.get());
+    if (p->arb_id) {
+        glDeleteProgramsARB(1, &p->arb_id);   // unbinds it if bound; the name may come back
+        for (GLuint &b : g_arb.bound)
+            if (b == p->arb_id) b = ~0u;
+    }
+    for (auto &q : p->params) live_erase(q.get());
     auto &v = p->ctx->programs;
     v.erase(std::remove(v.begin(), v.end(), p), v.end());
-    g_live.erase(p);
+    live_erase(p);
     delete p;
 }
 
@@ -628,7 +712,10 @@ static void set_profile_enabled(CGprofile profile, bool on, const char *what) {
         glsl_activate();
     } else {
         GLenum cap = vertex ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB;
+        int &e = arb_state().enabled[!vertex];
+        if (e == (int)on) return;
         on ? glEnable(cap) : glDisable(cap);
+        e = on;
     }
 }
 
@@ -656,7 +743,7 @@ CG_EXPORT void cgGLBindProgram(CGprogram handle) {
     if (cfg().glsl) {
         glsl_activate();
     } else {
-        glBindProgramARB(arb_target(p), p->arb_id);
+        arb_bind(arb_target(p), p->arb_id);
         arb_upload(p);
     }
 }
@@ -665,7 +752,7 @@ CG_EXPORT void cgGLUnbindProgram(CGprofile profile) {
     if (is_vertex_profile(profile)) g_bound_vp = nullptr;
     else g_bound_fp = nullptr;
     if (cfg().glsl) glsl_activate();
-    else glBindProgramARB(is_vertex_profile(profile) ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB, 0);
+    else arb_bind(is_vertex_profile(profile) ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB, 0);
 }
 
 CG_EXPORT void cgGLSetParameter4fv(CGparameter handle, const float *v) {
@@ -802,11 +889,14 @@ CG_EXPORT void cgGLSetupSampler(CGparameter handle, CGGLuint_t texobj) {
 CG_EXPORT void cgGLEnableTextureParameter(CGparameter handle) {
     Param *q = sampler_param(handle);
     if (!q || q->info.texunit < 0) return;   // unused sampler: no unit assigned
+    // The game sets the active unit itself, so it is asked of GL (client-side
+    // state, no round trip) and only switched when it differs.
     GLint prev = GL_TEXTURE0;
     glGetIntegerv(GL_ACTIVE_TEXTURE, &prev);
-    glActiveTexture(GL_TEXTURE0 + q->info.texunit);
+    GLenum unit = GL_TEXTURE0 + q->info.texunit;
+    if ((GLenum)prev != unit) glActiveTexture(unit);
     glBindTexture(q->info.tex_target, q->texture);
-    glActiveTexture(prev);
+    if ((GLenum)prev != unit) glActiveTexture(prev);
 }
 
 CG_EXPORT void cgGLDisableTextureParameter(CGparameter handle) {

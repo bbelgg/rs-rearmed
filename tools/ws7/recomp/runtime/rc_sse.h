@@ -12,6 +12,8 @@
 //   * float->int conversion out of range / NaN: integer indefinite (INT_MIN);
 //   * cmpXX: all-ones / all-zero masks, x86 predicate semantics for NaN.
 // MXCSR is not modelled: round-to-nearest-even, no FTZ/DAZ, no exceptions.
+// The NEON forms (arm64) use the same FPCR-dependent ops as the scalar ones,
+// so they match them in every rounding mode and with FZ set too.
 // rcpps/rsqrtps are exact 1/x and 1/sqrt(x); Intel's are 12-bit estimates, so
 // the low mantissa bits differ (the result is more accurate).
 #ifndef RC_SSE_H
@@ -46,6 +48,41 @@ typedef union {
 #define RC_U(x) ((rc_vu){.v = (x)})
 #define RC_AI static inline __attribute__((always_inline))
 
+// arm64: packed float ops, compares, conversions and lane moves are NEON ops (the
+// generic per-lane forms below are the reference; -DRC_SSE_GENERIC selects them).
+#if defined(__aarch64__) && !defined(RC_SSE_GENERIC)
+#define RC_NEON 1
+#include <arm_neon.h>
+RC_AI float32x4_t rc_vf(rc_v128 v) { float32x4_t r; memcpy(&r, &v, 16); return r; }
+RC_AI float64x2_t rc_vd(rc_v128 v) { float64x2_t r; memcpy(&r, &v, 16); return r; }
+#define RC_VR(e) ({ __typeof__(e) t_ = (e); rc_v128 r_; memcpy(&r_, &t_, 16); r_; })
+// rc_xnanf/rc_xnand over lanes: r is final unless some lane is NaN (one max
+// reduction tests that); NaN lanes then get the x86 NaN, branch-free.
+RC_AI float32x4_t rc_vxnanf(float32x4_t r, float32x4_t a, float32x4_t b) {
+  float m = vmaxvq_f32(r);
+  if (__builtin_expect(m == m, 1)) return r;
+  uint32x4_t q = vdupq_n_u32(0x00400000u);
+  uint32x4_t n = vbslq_u32(vceqq_f32(b, b), vdupq_n_u32(0xffc00000u), vorrq_u32(vreinterpretq_u32_f32(b), q));
+  n = vbslq_u32(vceqq_f32(a, a), n, vorrq_u32(vreinterpretq_u32_f32(a), q));
+  return vbslq_f32(vceqq_f32(r, r), r, vreinterpretq_f32_u32(n));
+}
+RC_AI float64x2_t rc_vxnand(float64x2_t r, float64x2_t a, float64x2_t b) {
+  double m = vmaxvq_f64(r);
+  if (__builtin_expect(m == m, 1)) return r;
+  uint64x2_t q = vdupq_n_u64(0x0008000000000000ull);
+  uint64x2_t n = vbslq_u64(vceqq_f64(b, b), vdupq_n_u64(0xfff8000000000000ull), vorrq_u64(vreinterpretq_u64_f64(b), q));
+  n = vbslq_u64(vceqq_f64(a, a), n, vorrq_u64(vreinterpretq_u64_f64(a), q));
+  return vbslq_f64(vceqq_f64(r, r), r, vreinterpretq_f64_u64(n));
+}
+#define RC_VPS(NAME, OP) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_) { \
+  float32x4_t a = rc_vf(a_), b = rc_vf(b_); return RC_VR(rc_vxnanf(OP(a, b), a, b)); }
+#define RC_VPD(NAME, OP) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_) { \
+  float64x2_t a = rc_vd(a_), b = rc_vd(b_); return RC_VR(rc_vxnand(OP(a, b), a, b)); }
+// min/max as compare + select (rc_minf): NEON fmin/fmax differ on NaN and +-0.
+#define RC_VMM(NAME, T, LD, S, CMP) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_) { \
+  T a = LD(a_), b = LD(b_); return RC_VR(vbslq_##S(vc##CMP##q_##S(a, b), a, b)); }
+#endif
+
 // --- floating point arithmetic: E is evaluated per lane over A and B -------
 #define RC_PS(NAME, E) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_) { \
   rc_vu x = RC_U(a_), y = RC_U(b_), r; \
@@ -58,6 +95,20 @@ typedef union {
 #define RC_SD(NAME, E) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_) { \
   rc_vu x = RC_U(a_), y = RC_U(b_); double A = x.g[0], B = y.g[0]; x.g[0] = (E); return x.v; }
 
+#if RC_NEON
+RC_VPS(rc_addps, vaddq_f32)
+RC_VPS(rc_subps, vsubq_f32)
+RC_VPS(rc_mulps, vmulq_f32)
+RC_VPS(rc_divps, vdivq_f32)
+RC_VMM(rc_minps, float32x4_t, rc_vf, f32, lt)
+RC_VMM(rc_maxps, float32x4_t, rc_vf, f32, gt)
+RC_VPD(rc_addpd, vaddq_f64)
+RC_VPD(rc_subpd, vsubq_f64)
+RC_VPD(rc_mulpd, vmulq_f64)
+RC_VPD(rc_divpd, vdivq_f64)
+RC_VMM(rc_minpd, float64x2_t, rc_vd, f64, lt)
+RC_VMM(rc_maxpd, float64x2_t, rc_vd, f64, gt)
+#else
 RC_PS(rc_addps, rc_xnanf(A + B, A, B))
 RC_PS(rc_subps, rc_xnanf(A - B, A, B))
 RC_PS(rc_mulps, rc_xnanf(A * B, A, B))
@@ -70,6 +121,7 @@ RC_PD(rc_mulpd, rc_xnand(A * B, A, B))
 RC_PD(rc_divpd, rc_xnand(A / B, A, B))
 RC_PD(rc_minpd, rc_mind(A, B))
 RC_PD(rc_maxpd, rc_maxd(A, B))
+#endif
 RC_SS(rc_addss, rc_xnanf(A + B, A, B))
 RC_SS(rc_subss, rc_xnanf(A - B, A, B))
 RC_SS(rc_mulss, rc_xnanf(A * B, A, B))
@@ -92,12 +144,46 @@ static inline float rc_rcpf(float x) { return rc_dzf(rc_xnanf(1.0f / rc_dzf(x), 
 static inline float rc_rsqrtf(float x) { return rc_xnanf(1.0f / __builtin_sqrtf(rc_dzf(x)), x, x); }
 RC_SS(rc_rcpss, rc_rcpf(B))
 RC_SS(rc_rsqrtss, rc_rsqrtf(B))
+#if RC_NEON
+RC_AI rc_v128 rc_sqrtps(rc_v128 a, rc_v128 b_) { (void)a; float32x4_t b = rc_vf(b_); return RC_VR(rc_vxnanf(vsqrtq_f32(b), b, b)); }
+RC_AI rc_v128 rc_sqrtpd(rc_v128 a, rc_v128 b_) { (void)a; float64x2_t b = rc_vd(b_); return RC_VR(rc_vxnand(vsqrtq_f64(b), b, b)); }
+#else
 RC_PS(rc_sqrtps, rc_xnanf(__builtin_sqrtf(B), B, B))
 RC_PD(rc_sqrtpd, rc_xnand(__builtin_sqrt(B), B, B))
+#endif
 RC_PS(rc_rcpps, rc_rcpf(B))
 RC_PS(rc_rsqrtps, rc_rsqrtf(B))
 
 // horizontal / addsub
+#if RC_NEON
+// a op b over the even/odd lanes of (a:b); the "subtract" lanes add -b.
+RC_AI rc_v128 rc_haddps(rc_v128 a_, rc_v128 b_) {
+  float32x4_t a = rc_vf(a_), b = rc_vf(b_), l = vuzp1q_f32(a, b), h = vuzp2q_f32(a, b);
+  return RC_VR(rc_vxnanf(vaddq_f32(l, h), l, h));
+}
+RC_AI rc_v128 rc_hsubps(rc_v128 a_, rc_v128 b_) {
+  float32x4_t a = rc_vf(a_), b = rc_vf(b_), l = vuzp1q_f32(a, b), h = vnegq_f32(vuzp2q_f32(a, b));
+  return RC_VR(rc_vxnanf(vaddq_f32(l, h), l, h));
+}
+RC_AI rc_v128 rc_haddpd(rc_v128 a_, rc_v128 b_) {
+  float64x2_t a = rc_vd(a_), b = rc_vd(b_), l = vzip1q_f64(a, b), h = vzip2q_f64(a, b);
+  return RC_VR(rc_vxnand(vaddq_f64(l, h), l, h));
+}
+RC_AI rc_v128 rc_hsubpd(rc_v128 a_, rc_v128 b_) {
+  float64x2_t a = rc_vd(a_), b = rc_vd(b_), l = vzip1q_f64(a, b), h = vnegq_f64(vzip2q_f64(a, b));
+  return RC_VR(rc_vxnand(vaddq_f64(l, h), l, h));
+}
+RC_AI rc_v128 rc_addsubps(rc_v128 a_, rc_v128 b_) {
+  float32x4_t a = rc_vf(a_), b = rc_vf(b_);
+  b = vreinterpretq_f32_u64(veorq_u64(vreinterpretq_u64_f32(b), vdupq_n_u64(0x80000000ull)));
+  return RC_VR(rc_vxnanf(vaddq_f32(a, b), a, b));
+}
+RC_AI rc_v128 rc_addsubpd(rc_v128 a_, rc_v128 b_) {
+  float64x2_t a = rc_vd(a_), b = rc_vd(b_);
+  b = vreinterpretq_f64_u64(veorq_u64(vreinterpretq_u64_f64(b), vcombine_u64(vcreate_u64(1ull << 63), vcreate_u64(0))));
+  return RC_VR(rc_vxnand(vaddq_f64(a, b), a, b));
+}
+#else
 RC_AI rc_v128 rc_haddps(rc_v128 a, rc_v128 b) {
   rc_vu x = RC_U(a), y = RC_U(b), r;
   r.f[0] = rc_xnanf(x.f[0] + x.f[1], x.f[0], x.f[1]); r.f[1] = rc_xnanf(x.f[2] + x.f[3], x.f[2], x.f[3]);
@@ -135,6 +221,7 @@ RC_AI rc_v128 rc_addsubpd(rc_v128 a, rc_v128 b) {
   r.g[0] = rc_xsubd(x.g[0], y.g[0]); r.g[1] = rc_xnand(x.g[1] + y.g[1], x.g[1], y.g[1]);
   return r.v;
 }
+#endif
 
 // --- compares: predicate 0 eq 1 lt 2 le 3 unord 4 neq 5 nlt 6 nle 7 ord -----
 RC_AI int rc_cmp_pred(int p, double a, double b) {  // float operands convert exactly
@@ -149,6 +236,23 @@ RC_AI int rc_cmp_pred(int p, double a, double b) {  // float operands convert ex
     default: return a == a && b == b;
   }
 }
+#if RC_NEON
+#define RC_VCMP(NAME, T, U, LD, S) RC_AI rc_v128 NAME(rc_v128 a_, rc_v128 b_, int p) { \
+  T a = LD(a_), b = LD(b_); U r; \
+  switch (p & 7) { \
+    case 0: r = vceqq_##S(a, b); break; \
+    case 1: r = vcltq_##S(a, b); break; \
+    case 2: r = vcleq_##S(a, b); break; \
+    case 3: r = ~(vceqq_##S(a, a) & vceqq_##S(b, b)); break; \
+    case 4: r = ~vceqq_##S(a, b); break; \
+    case 5: r = ~vcltq_##S(a, b); break; \
+    case 6: r = ~vcleq_##S(a, b); break; \
+    default: r = vceqq_##S(a, a) & vceqq_##S(b, b); break; \
+  } \
+  return RC_VR(r); }
+RC_VCMP(rc_cmpps, float32x4_t, uint32x4_t, rc_vf, f32)
+RC_VCMP(rc_cmppd, float64x2_t, uint64x2_t, rc_vd, f64)
+#else
 RC_AI rc_v128 rc_cmpps(rc_v128 a, rc_v128 b, int p) {
   rc_vu x = RC_U(a), y = RC_U(b), r;
   for (int i = 0; i < 4; i++) r.d[i] = rc_cmp_pred(p, x.f[i], y.f[i]) ? 0xffffffffu : 0;
@@ -159,6 +263,7 @@ RC_AI rc_v128 rc_cmppd(rc_v128 a, rc_v128 b, int p) {
   for (int i = 0; i < 2; i++) r.q[i] = rc_cmp_pred(p, x.g[i], y.g[i]) ? ~0ull : 0;
   return r.v;
 }
+#endif
 RC_AI rc_v128 rc_cmpss(rc_v128 a, rc_v128 b, int p) {
   rc_vu x = RC_U(a), y = RC_U(b);
   x.d[0] = rc_cmp_pred(p, x.f[0], y.f[0]) ? 0xffffffffu : 0;
@@ -182,6 +287,21 @@ static inline int64_t rc_cvt_f64_i64(double d) {
 static inline int32_t rc_cvt_f32_i32(float f) { return rc_cvt_f64_i32((double)f); }
 static inline int64_t rc_cvt_f32_i64(float f) { return rc_cvt_f64_i64((double)f); }
 
+#if RC_NEON
+// fcvtzs saturates (NaN -> 0): lanes not below 2^31 (or NaN) get INT_MIN.
+// cvtps2dq rounds in the current mode (frinti) first, like rint.
+RC_AI int32x4_t rc_vcvtfix(float32x4_t r) {
+  return vbslq_s32(vcltq_f32(r, vdupq_n_f32(2147483648.0f)), vcvtq_s32_f32(r), vdupq_n_s32(INT32_MIN));
+}
+RC_AI rc_v128 rc_cvtdq2ps(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vcvtq_f32_s32(vreinterpretq_s32_f32(rc_vf(b)))); }
+RC_AI rc_v128 rc_cvttps2dq(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(rc_vcvtfix(rc_vf(b))); }
+RC_AI rc_v128 rc_cvtps2dq(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(rc_vcvtfix(vrndiq_f32(rc_vf(b)))); }
+RC_AI rc_v128 rc_cvtps2pd(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vcvt_f64_f32(vget_low_f32(rc_vf(b)))); }
+RC_AI rc_v128 rc_cvtdq2pd(rc_v128 a, rc_v128 b) {
+  (void)a; return RC_VR(vcvtq_f64_s64(vmovl_s32(vget_low_s32(vreinterpretq_s32_f32(rc_vf(b))))));
+}
+RC_AI rc_v128 rc_cvtpd2ps(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vcombine_f32(vcvt_f32_f64(rc_vd(b)), vdup_n_f32(0))); }
+#else
 RC_AI rc_v128 rc_cvtdq2ps(rc_v128 a, rc_v128 b) {
   (void)a; rc_vu y = RC_U(b), r;
   for (int i = 0; i < 4; i++) r.f[i] = (float)y.sd[i];
@@ -212,6 +332,7 @@ RC_AI rc_v128 rc_cvtpd2ps(rc_v128 a, rc_v128 b) {
   r.f[0] = (float)y.g[0]; r.f[1] = (float)y.g[1]; r.q[1] = 0;
   return r.v;
 }
+#endif
 RC_AI rc_v128 rc_cvttpd2dq(rc_v128 a, rc_v128 b) {
   (void)a; rc_vu y = RC_U(b), r;
   r.sd[0] = rc_cvtt_f64_i32(y.g[0]); r.sd[1] = rc_cvtt_f64_i32(y.g[1]); r.q[1] = 0;
@@ -224,6 +345,58 @@ RC_AI rc_v128 rc_cvtpd2dq(rc_v128 a, rc_v128 b) {
 }
 
 // --- shuffles / unpacks -----------------------------------------------------
+#if RC_NEON
+// Lane moves as NEON vectors, so float data stays in vector registers; the
+// immediates are constants after inlining (the lane picks fold to one shuffle).
+RC_AI uint8x16_t rc_v8(rc_v128 v) { uint8x16_t r; memcpy(&r, &v, 16); return r; }
+RC_AI uint16x8_t rc_v16(rc_v128 v) { uint16x8_t r; memcpy(&r, &v, 16); return r; }
+RC_AI uint32x4_t rc_v32(rc_v128 v) { uint32x4_t r; memcpy(&r, &v, 16); return r; }
+RC_AI uint64x2_t rc_v64(rc_v128 v) { uint64x2_t r; memcpy(&r, &v, 16); return r; }
+RC_AI rc_v128 rc_shufps(rc_v128 a, rc_v128 b, int imm) {
+  uint32x4_t x = rc_v32(a), y = rc_v32(b);
+  return RC_VR(((uint32x4_t){x[imm & 3], x[(imm >> 2) & 3], y[(imm >> 4) & 3], y[(imm >> 6) & 3]}));
+}
+RC_AI rc_v128 rc_shufpd(rc_v128 a, rc_v128 b, int imm) {
+  uint64x2_t x = rc_v64(a), y = rc_v64(b);
+  return RC_VR(((uint64x2_t){x[imm & 1], y[(imm >> 1) & 1]}));
+}
+RC_AI rc_v128 rc_pshufd(rc_v128 a, rc_v128 b, int imm) {
+  (void)a; uint32x4_t y = rc_v32(b);
+  return RC_VR(((uint32x4_t){y[imm & 3], y[(imm >> 2) & 3], y[(imm >> 4) & 3], y[(imm >> 6) & 3]}));
+}
+RC_AI rc_v128 rc_pshufhw(rc_v128 a, rc_v128 b, int imm) {
+  (void)a; uint16x8_t y = rc_v16(b);
+  return RC_VR(((uint16x8_t){y[0], y[1], y[2], y[3],
+                             y[4 + (imm & 3)], y[4 + ((imm >> 2) & 3)], y[4 + ((imm >> 4) & 3)], y[4 + ((imm >> 6) & 3)]}));
+}
+RC_AI rc_v128 rc_pshuflw(rc_v128 a, rc_v128 b, int imm) {
+  (void)a; uint16x8_t y = rc_v16(b);
+  return RC_VR(((uint16x8_t){y[imm & 3], y[(imm >> 2) & 3], y[(imm >> 4) & 3], y[(imm >> 6) & 3],
+                             y[4], y[5], y[6], y[7]}));
+}
+// tbl gives 0 for indices >= 16: keeping bit 7 maps x86's "bit 7 set -> 0".
+RC_AI rc_v128 rc_pshufb(rc_v128 a, rc_v128 b) { return RC_VR(vqtbl1q_u8(rc_v8(a), vandq_u8(rc_v8(b), vdupq_n_u8(0x8f)))); }
+RC_AI rc_v128 rc_palignr(rc_v128 a, rc_v128 b, int n) {  // (a:b) >> 8n bytes: bytes n.. of b:a, 0 past 32
+  static const uint8_t iota[16] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
+  uint8x16x2_t t = {{rc_v8(b), rc_v8(a)}};
+  return RC_VR(vqtbl2q_u8(t, vqaddq_u8(vld1q_u8(iota), vdupq_n_u8((uint8_t)(n > 255 ? 255 : n)))));
+}
+RC_AI rc_v128 rc_unpcklps(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u32(rc_v32(a), rc_v32(b))); }
+RC_AI rc_v128 rc_unpckhps(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u32(rc_v32(a), rc_v32(b))); }
+RC_AI rc_v128 rc_unpcklpd(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u64(rc_v64(a), rc_v64(b))); }
+RC_AI rc_v128 rc_unpckhpd(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u64(rc_v64(a), rc_v64(b))); }
+RC_AI rc_v128 rc_punpcklqdq(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u64(rc_v64(a), rc_v64(b))); }
+RC_AI rc_v128 rc_punpckhqdq(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u64(rc_v64(a), rc_v64(b))); }
+RC_AI rc_v128 rc_punpcklbw(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u8(rc_v8(a), rc_v8(b))); }
+RC_AI rc_v128 rc_punpckhbw(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u8(rc_v8(a), rc_v8(b))); }
+RC_AI rc_v128 rc_punpcklwd(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u16(rc_v16(a), rc_v16(b))); }
+RC_AI rc_v128 rc_punpckhwd(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u16(rc_v16(a), rc_v16(b))); }
+RC_AI rc_v128 rc_punpckldq(rc_v128 a, rc_v128 b) { return RC_VR(vzip1q_u32(rc_v32(a), rc_v32(b))); }
+RC_AI rc_v128 rc_punpckhdq(rc_v128 a, rc_v128 b) { return RC_VR(vzip2q_u32(rc_v32(a), rc_v32(b))); }
+RC_AI rc_v128 rc_movshdup(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vtrn2q_u32(rc_v32(b), rc_v32(b))); }
+RC_AI rc_v128 rc_movsldup(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vtrn1q_u32(rc_v32(b), rc_v32(b))); }
+RC_AI rc_v128 rc_movddup(rc_v128 a, rc_v128 b) { (void)a; return RC_VR(vdupq_laneq_u64(rc_v64(b), 0)); }
+#else
 RC_AI rc_v128 rc_shufps(rc_v128 a, rc_v128 b, int imm) {
   rc_vu x = RC_U(a), y = RC_U(b), r;
   r.d[0] = x.d[imm & 3]; r.d[1] = x.d[(imm >> 2) & 3];
@@ -300,6 +473,7 @@ RC_AI rc_v128 rc_movsldup(rc_v128 a, rc_v128 b) {
   return r.v;
 }
 RC_AI rc_v128 rc_movddup(rc_v128 a, rc_v128 b) { (void)a; return (rc_v128){b.lo, b.lo}; }
+#endif
 
 // --- packed integer ---------------------------------------------------------
 // E over A and B (element type of FLD); the result is stored to FLD too.

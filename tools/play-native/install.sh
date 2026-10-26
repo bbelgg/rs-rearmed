@@ -38,6 +38,7 @@ fi
 rm -rf "$home/game/Rocksmith2014.app"
 mv "$home/game/Rocksmith2014.app.new" "$home/game/Rocksmith2014.app"
 cp "$netguard" "$home/libnetguard.dylib"
+printf '%s\n' "$RS_GAME_DIR" > "$home/game-dir"  # the launcher's game folder (RS_GAME_DIR overrides it)
 
 # The launcher app: a bundle whose executable is launch.sh.
 rm -rf "$launcher"
@@ -45,7 +46,8 @@ mkdir -p "$launcher/Contents/MacOS" "$launcher/Contents/Resources"
 cp "$here/launch.sh" "$launcher/Contents/MacOS/launch"
 chmod +x "$launcher/Contents/MacOS/launch"
 [[ -f "$RS_GAME_APP/Contents/Resources/RS2014.icns" ]] && cp "$RS_GAME_APP/Contents/Resources/RS2014.icns" "$launcher/Contents/Resources/"
-cat > "$launcher/Contents/Info.plist" <<'EOF'
+version=$(head -1 "$root/VERSION")
+cat > "$launcher/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
@@ -56,7 +58,7 @@ cat > "$launcher/Contents/Info.plist" <<'EOF'
   <key>CFBundleDisplayName</key><string>RS Re-ARMed</string>
   <key>CFBundleIconFile</key><string>RS2014.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
+  <key>CFBundleShortVersionString</key><string>$version</string>
   <key>LSUIElement</key><true/>
 </dict>
 </plist>

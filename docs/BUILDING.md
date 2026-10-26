@@ -8,9 +8,12 @@ may be shared.
 
 Download `RS.Re-ARMed.Installer.app.zip` from the
 [Releases](https://github.com/bbelgg/rs-rearmed/releases) page, unzip it and open the app. It downloads
-the source of its own release, checks prerequisites, builds everything and installs a self-contained
-`~/Applications/RS Re-ARMed.app` — delete it to uninstall. A progress bar and live log keep you informed;
-if anything fails the log tells you what went wrong.
+the source of its own release, checks prerequisites, builds everything and installs it the same way as
+`tools/play-native/install.sh` (see [Install](#6-install) below): the launcher
+`~/Applications/RS Re-ARMed.app`, which you start the game with, and the game build with your saves in
+`~/Library/Application Support/RS Re-ARMed/`. When it's done it says so and offers to start the game. A
+progress bar and live log keep you informed; if anything fails it shows the error. The log of every run is
+kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 
 The build files go in `~/Library/Caches/rs-rearmed-build` unless you choose another **Build folder**
 (for example on an external drive); the installer makes a `rs-rearmed-build` folder inside the one you
@@ -146,7 +149,9 @@ tools/play-native/install.sh
 It copies the app (by default `$RS_BUILD_DIR/m4/app/Rocksmith2014.app`; pass another path as the first
 argument) and the network guard into `~/Library/Application Support/RS Re-ARMed/`, and creates the
 launcher `~/Applications/RS Re-ARMed.app`. Quit the game first. Start **RS Re-ARMed** from
-`~/Applications`.
+`~/Applications`. The game finds its files next to its own app, so start it through the launcher, which
+mirrors your game folder next to it; opening `Rocksmith2014.app` directly doesn't work. With `RS_GAME_DIR`
+set, `install.sh` remembers that game folder for the launcher.
 
 To update later, pull, repeat steps 4 and 5, and run `install.sh` again. Your saves are kept.
 `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.

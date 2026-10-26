@@ -19,6 +19,8 @@ let buildFolderName = "rs-rearmed-build"
 let oldBuildFolderName = "RS Re-ARMed Build"  // 1.0.0-1.0.2; a saved path ending in it gets the new name
 let defaultBuildBase = NSHomeDirectory() + "/Library/Caches/" + buildFolderName
 let buildBaseDefaultsKey = "BuildFolder"
+let launcherApp = NSHomeDirectory() + "/Applications/RS Re-ARMed.app"  // made by tools/play-native/install.sh
+let logsDir = NSHomeDirectory() + "/Library/Logs/RS Re-ARMed Installer"  // kept when build files are deleted
 
 // MARK: - Build runner
 
@@ -30,6 +32,7 @@ final class BuildRunner {
     var progress: Double = 0
     var isRunning = false
     var isFinished = false
+    var failure: Error?
     var failed = false
     var log = ""
 
@@ -51,18 +54,13 @@ final class BuildRunner {
     }
 
     func openLogFile() {
-        // When running standalone, logs go into the build folder (repo may not exist yet).
-        let logsDir: URL
-        if embeddedInRepo {
-            logsDir = URL(fileURLWithPath: repoRoot).appendingPathComponent("build/installer-logs")
-        } else {
-            logsDir = URL(fileURLWithPath: buildBase).appendingPathComponent("logs")
-        }
-        try? FileManager.default.createDirectory(at: logsDir, withIntermediateDirectories: true)
+        // ~/Library/Logs: outside the build folder, so the log survives "Delete build files" and shows in Console.
+        let dir = URL(fileURLWithPath: logsDir)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let formatter = DateFormatter()
         formatter.dateFormat = "yyyy-MM-dd_HHmmss"
         let name = "install-\(formatter.string(from: Date())).log"
-        let url = logsDir.appendingPathComponent(name)
+        let url = dir.appendingPathComponent(name)
         FileManager.default.createFile(atPath: url.path, contents: nil)
         logFileHandle = try? FileHandle(forWritingTo: url)
         logFileURL = url
@@ -149,6 +147,7 @@ final class BuildRunner {
         isRunning = true
         isFinished = false
         failed = false
+        failure = nil
         log = ""
         openLogFile()
 
@@ -188,6 +187,7 @@ final class BuildRunner {
             appendLog("\n✓ Installation complete.")
         } catch {
             failed = true
+            failure = error
             appendLog("\n✗ FAILED: \(error.localizedDescription)")
         }
 
@@ -424,153 +424,18 @@ enum Steps {
             throw InstallerError.fileNotFound(builtApp)
         }
 
-        let installDir = NSHomeDirectory() + "/Applications"
-        let appBundle = installDir + "/RS Re-ARMed.app"
-        let fm = FileManager.default
-
-        try fm.createDirectory(atPath: installDir, withIntermediateDirectories: true)
-
-        if fm.fileExists(atPath: appBundle) {
-            r.appendLog("Removing previous installation…")
-            try fm.removeItem(atPath: appBundle)
+        // The same install as a manual build: the game goes into ~/Library/Application Support/RS Re-ARMed/game
+        // (the launcher mirrors the game folder there, since the game finds its files next to its .app) and
+        // ~/Applications/RS Re-ARMed.app is the launcher.
+        try await r.shell("tools/play-native/install.sh \"\(builtApp)\"", env: ["RS_GAME_DIR": r.gameDir])
+        guard FileManager.default.fileExists(atPath: launcherApp + "/Contents/MacOS/launch") else {
+            throw InstallerError.fileNotFound(launcherApp)
         }
-
-        r.appendLog("Copying built app to \(appBundle)…")
-        try fm.copyItem(atPath: builtApp, toPath: appBundle)
-
-        // Bundle libnetguard inside Contents/Frameworks/
-        let fwDir = appBundle + "/Contents/Frameworks"
-        try fm.createDirectory(atPath: fwDir, withIntermediateDirectories: true)
-        let netguardSrc = r.repoRoot + "/build/ws8/libnetguard.dylib"
-        guard fm.fileExists(atPath: netguardSrc) else {
-            throw InstallerError.fileNotFound(netguardSrc)
-        }
-        try fm.copyItem(atPath: netguardSrc, toPath: fwDir + "/libnetguard.dylib")
-        r.appendLog("  Bundled libnetguard.dylib")
-
-        // Copy game icon from the Steam install
-        let gameApp = r.gameDir + "/Rocksmith2014.app"
-        let iconSrc = gameApp + "/Contents/Resources/RS2014.icns"
-        let iconDst = appBundle + "/Contents/Resources/RS2014.icns"
-        if fm.fileExists(atPath: iconSrc) && !fm.fileExists(atPath: iconDst) {
-            try? fm.copyItem(atPath: iconSrc, toPath: iconDst)
-            r.appendLog("  Copied game icon")
-        }
-        let enLproj = gameApp + "/Contents/Resources/en.lproj"
-        let enDst = appBundle + "/Contents/Resources/en.lproj"
-        if fm.fileExists(atPath: enLproj) && !fm.fileExists(atPath: enDst) {
-            try? fm.copyItem(atPath: enLproj, toPath: enDst)
-        }
-
-        // Ensure Info.plist has the icon key and display name
-        let plist = appBundle + "/Contents/Info.plist"
-        if fm.fileExists(atPath: plist) {
-            _ = try? await r.shell("""
-                /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "\(plist)" 2>/dev/null || \
-                plutil -insert CFBundleIconFile -string RS2014.icns "\(plist)"
-                """)
-            _ = try? await r.shell("""
-                plutil -replace CFBundleName -string 'RS Re-ARMed' "\(plist)" 2>/dev/null
-                plutil -replace CFBundleDisplayName -string 'RS Re-ARMed' "\(plist)" 2>/dev/null
-                """)
-        }
-
-        // Replace the binary with a launcher wrapper; rename the real binary.
-        let macosDir = appBundle + "/Contents/MacOS"
-        let realBinary = macosDir + "/Rocksmith2014"
-        let wrappedBinary = macosDir + "/Rocksmith2014-bin"
-
-        try fm.moveItem(atPath: realBinary, toPath: wrappedBinary)
-
-        let launcherScript = #"""
-            #!/bin/bash
-            # RS Re-ARMed self-contained launcher.
-            # Everything lives inside this .app bundle — delete it to uninstall.
-            set -u
-            BUNDLE="$(cd "$(dirname "$0")/.." && pwd)"
-            BINARY="$BUNDLE/MacOS/Rocksmith2014-bin"
-            NETGUARD="$BUNDLE/Frameworks/libnetguard.dylib"
-
-            GAME_DIR="${RS_GAME_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014}"
-            DATA_DIR="$HOME/Library/Application Support/RS Re-ARMed"
-
-            fail() {
-                /usr/bin/osascript -e "display alert \"RS Re-ARMed\" message \"$1\" as critical" >/dev/null 2>&1
-                echo "launch: $1" >&2; exit 1
-            }
-
-            [[ -x "$BINARY" ]]   || fail "Game binary missing inside the app bundle."
-            [[ -f "$NETGUARD" ]] || fail "libnetguard.dylib missing inside the app bundle."
-            [[ -d "$GAME_DIR" ]] || fail "Rocksmith 2014 is not installed at $GAME_DIR."
-            if pgrep -x Rocksmith2014 >/dev/null || pgrep -x Rocksmith2014-bin >/dev/null; then
-                fail "Rocksmith 2014 is already running."
-            fi
-
-            mkdir -p "$DATA_DIR/steam" "$DATA_DIR/logs"
-            logs="$DATA_DIR/logs"
-
-            # Mirror game assets via symlinks.
-            stage="$BUNDLE/Resources/game"
-            mkdir -p "$stage"
-            for e in "$GAME_DIR"/*; do
-                n=$(basename "$e")
-                case $n in Rocksmith2014.app|Rocksmith.ini) continue ;; esac
-                [[ -e "$stage/$n" || -L "$stage/$n" ]] || ln -s "$e" "$stage/$n"
-            done
-            for l in "$stage"/*; do
-                [[ -L $l && ! -e $l ]] && rm -f "$l"
-            done
-            if [[ -f "$GAME_DIR/static.psarc.rearmed" && "${RS_REARMED:-1}" != 0 ]]; then
-                ln -sfn "$GAME_DIR/static.psarc.rearmed" "$stage/static.psarc"
-            else
-                ln -sfn "$GAME_DIR/static.psarc" "$stage/static.psarc"
-            fi
-            if [[ -f "$GAME_DIR/Rocksmith.ini" ]]; then
-                awk '{ sub(/\r$/, "") }
-                     /^\[/ { sec = $0 }
-                     sec == "[Net]" && /^AutoLogin=/ { next }
-                     sec == "[Renderer.MacOS]" && /^DisableBrowser=/ { print "DisableBrowser=1"; next }
-                     { print }
-                     $0 == "[Net]" { print "AutoLogin=0" }' "$GAME_DIR/Rocksmith.ini" > "$stage/Rocksmith.ini.new" &&
-                    mv -f "$stage/Rocksmith.ini.new" "$stage/Rocksmith.ini"
-            fi
-
-            # Seed offline Steam cloud on first launch.
-            for src in "$HOME/Library/Application Support/Steam/userdata"/*/221680/remote; do
-                [[ -d $src && "${RS_NATIVE_SEED:-1}" != 0 ]] || continue
-                acct=$(basename "$(dirname "$(dirname "$src")")")
-                dst=$DATA_DIR/steam/$acct/221680/remote
-                [[ -d $dst ]] && continue
-                mkdir -p "$dst.tmp" && rsync -a --exclude crd "$src/" "$dst.tmp/" && mv "$dst.tmp" "$dst" &&
-                    echo "seeded $dst from $src (without crd)" >> "$logs/seed.log"
-            done
-            find "$DATA_DIR/steam" -name crd -type f -delete 2>/dev/null
-
-            [[ -f "$logs/last-run.log" ]] && mv -f "$logs/last-run.log" "$logs/previous-run.log"
-
-            export RS_STEAM_MODE=stub
-            export RS_STEAM_DATA_DIR="$DATA_DIR/steam"
-            export RS_NETGUARD_LOG="$logs/netguard.log"
-            export DYLD_INSERT_LIBRARIES="$NETGUARD"
-            cd "$stage"
-            exec "$BINARY" "$@" > "$logs/last-run.log" 2>&1
-            """#
-        try launcherScript.write(toFile: realBinary, atomically: true, encoding: .utf8)
-        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: realBinary)
-
-        r.appendLog("Signing the app bundle…")
-        _ = try? await r.shell(#"codesign --force --deep -s - "\#(appBundle)" 2>/dev/null"#)
-
-        _ = try? await r.shell("""
-            lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister
-            [[ -x $lsregister ]] && "$lsregister" -f "\(appBundle)" 2>/dev/null
-            touch "\(appBundle)"
-            """)
 
         r.appendLog("\n══════════════════════════════════════════")
-        r.appendLog("Installed: \(appBundle)")
-        r.appendLog("To uninstall, just delete RS Re-ARMed.app.")
-        r.appendLog("Saves are in ~/Library/Application Support/RS Re-ARMed/")
+        r.appendLog("Installed: \(launcherApp)")
+        r.appendLog("Game and saves: ~/Library/Application Support/RS Re-ARMed/")
+        r.appendLog("To uninstall, delete both.")
         r.appendLog("══════════════════════════════════════════")
     }
 
@@ -634,6 +499,7 @@ class InstallerWindow: NSWindow {
     let progressLabel = NSTextField(labelWithString: "")
     let logView = NSTextView()
     let showLogButton = NSButton(title: "Show Log File", target: nil, action: nil)
+    let playButton = NSButton(title: "Start RS Re-ARMed", target: nil, action: nil)
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
 
     init() {
@@ -806,6 +672,13 @@ class InstallerWindow: NSWindow {
         showLogButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(showLogButton)
 
+        playButton.bezelStyle = .rounded
+        playButton.isHidden = true
+        playButton.target = self
+        playButton.action = #selector(startGame)
+        playButton.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(playButton)
+
         // The cleanup checkbox goes between the source field and the progress bar.
         let checkTopAnchor = runner.embeddedInRepo
             ? sourceField.bottomAnchor
@@ -880,6 +753,10 @@ class InstallerWindow: NSWindow {
             showLogButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
             showLogButton.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             showLogButton.widthAnchor.constraint(equalToConstant: 140),
+
+            playButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            playButton.trailingAnchor.constraint(equalTo: startButton.leadingAnchor, constant: -8),
+            playButton.widthAnchor.constraint(equalToConstant: 160),
         ])
 
         Timer.scheduledTimer(withTimeInterval: 0.1, repeats: true) { [weak self] _ in
@@ -891,10 +768,13 @@ class InstallerWindow: NSWindow {
         progressBar.doubleValue = runner.progress
         stepLabel.stringValue = runner.isRunning
             ? "Step \(runner.currentStep)/\(runner.totalSteps): \(runner.stepTitle)"
-            : runner.isFinished ? "✓ Installation complete" : runner.failed ? "✗ Build failed" : "Ready"
+            : runner.isFinished ? "✓ Installed: ~/Applications/RS Re-ARMed.app"
+            : runner.failed ? "✗ Build failed (see the log)" : "Ready"
         progressLabel.stringValue = runner.isRunning ? "\(Int(runner.progress * 100))%" : ""
         startButton.isEnabled = !runner.isRunning
-        startButton.title = runner.isFinished ? "Rebuild & Install" : "Build & Install"
+        startButton.title = runner.isFinished ? "Build Again" : "Build & Install"
+        playButton.isHidden = !runner.isFinished || runner.isRunning
+        if runner.isFinished && !runner.isRunning { playButton.keyEquivalent = "\r"; startButton.keyEquivalent = "" }
         browseButton.isEnabled = !runner.isRunning
         gameDirField.isEditable = !runner.isRunning
         buildBrowseButton.isEnabled = !runner.isRunning
@@ -977,7 +857,51 @@ class InstallerWindow: NSWindow {
         runner.cleanupAfterInstall = cleanupCheck.state == .on
         Task { @MainActor in
             await runner.run()
+            updateUI()
+            finished()
         }
+    }
+
+    // Say plainly what happened and where things are, instead of leaving it to the log.
+    private func finished() {
+        let logPath = runner.logFileURL.map { ($0.path as NSString).abbreviatingWithTildeInPath } ?? logsDir
+        if runner.isFinished {
+            let choice = showAlert(
+                title: "RS Re-ARMed is installed",
+                message: """
+                    Start it any time from Applications in your home folder (~/Applications/RS Re-ARMed.app), \
+                    or with Launchpad or Spotlight.
+
+                    The game build and your saves are in ~/Library/Application Support/RS Re-ARMed/. \
+                    To uninstall, delete both.
+
+                    The installer log is in \(logPath).
+                    """,
+                buttons: ["Start RS Re-ARMed", "Show in Finder", "Close"]
+            )
+            if choice == "Start RS Re-ARMed" { startGame() }
+            if choice == "Show in Finder" {
+                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: launcherApp)])
+            }
+        } else if runner.failed, let error = runner.failure, !(error is CancellationError) {
+            if case InstallerError.userCancelled = error { return }
+            let choice = showAlert(
+                title: "The build failed",
+                message: """
+                    \(error.localizedDescription)
+
+                    The full log is in \(logPath). Nothing was installed; fix the problem and click \
+                    Build & Install again.
+                    """,
+                buttons: ["Show Log File", "Close"]
+            )
+            if choice == "Show Log File" { revealLog() }
+        }
+    }
+
+    @objc func startGame() {
+        NSWorkspace.shared.openApplication(at: URL(fileURLWithPath: launcherApp),
+                                           configuration: NSWorkspace.OpenConfiguration())
     }
 
     @objc func revealLog() {

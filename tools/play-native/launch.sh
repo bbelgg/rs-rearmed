@@ -15,7 +15,9 @@
 # The install's own files (and the Rosetta game) are not changed.
 set -u
 HOME_DIR=${RS_NATIVE_HOME:-"$HOME/Library/Application Support/RS Re-ARMed"}
-GAME_DIR=${RS_GAME_DIR:-"$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014"}
+# The game folder: RS_GAME_DIR, else the one install.sh was given (game-dir), else Steam's default.
+GAME_DIR=${RS_GAME_DIR:-$(cat "$HOME_DIR/game-dir" 2>/dev/null)}
+GAME_DIR=${GAME_DIR:-"$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014"}
 stage=$HOME_DIR/game
 logs=$HOME_DIR/logs
 

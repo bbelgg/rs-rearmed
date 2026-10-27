@@ -1,0 +1,32 @@
+{
+  "$schema": "https://recomp.fyi/schema/v1.json",
+  "game": "Rocksmith 2014 Edition - Remastered",
+  "system": "Mac",
+  "type": "recomp",
+  "wikidata": "Q127951475",
+  "original": {
+    "region": "Worldwide",
+    "revision": "Steam, macOS (x86_64)",
+    "sha1": "b21643f3e61f450c1cc90f9cb0306535f97a72ce"
+  },
+  "project": "RS Re-ARMed",
+  "status": "released",
+  "targets": ["macOS"],
+  "toolchain": "Custom (Python + Capstone)",
+  "approach": "The x86_64 macOS binary is statically recompiled to C at build time and compiled for arm64; small native libraries replace Steam, Bink, Cg and the Intel-only parts.",
+  "maintainers": [
+    { "name": "bbelgg", "link": "https://github.com/bbelgg" }
+  ],
+  "links": [
+    { "label": "Releases", "url": "https://github.com/bbelgg/rs-rearmed/releases" },
+    { "label": "Building", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/BUILDING.md" },
+    { "label": "Issues", "url": "https://github.com/bbelgg/rs-rearmed/issues" }
+  ],
+  "help": [
+    "Testing on other Apple Silicon Macs, especially 120 Hz ProMotion displays",
+    "Audio interfaces and inputs other than the Real Tone cable",
+    "Bug reports from long play sessions, DLC and custom songs"
+  ],
+  "notes": "Native arm64 build for Apple Silicon Macs, no Rosetta at run time. Builds from your own Steam copy with an installer; ships no game code. Offline by design (a network guard refuses every non-local connection). Gameplay CPU is about that of the original under Rosetta at 60 fps; the frame rate follows the display (75/120 Hz). Songs, DLC, custom songs, Session Mode and lessons work.",
+  "tags": ["arm64", "apple-silicon", "music", "guitar", "offline"]
+}

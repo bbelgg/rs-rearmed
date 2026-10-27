@@ -5,7 +5,8 @@
 #
 # 1. builds the override libraries (tools/ws7/recomp/overrides/build.sh);
 # 2. makes the skip list: every override module including `online` (offline
-#    stub) and `mods` (the rsmacfixes and RSBypass patches), and un-drops, to
+#    stub), `mods` (the rsmacfixes and RSBypass patches) and `hooks` (hook
+#    points for mods loaded at run time, no code of its own), and un-drops, to
 #    a fixpoint, every dropped address that generated code still references;
 # 3. builds the image with that list (tools/ws7/recomp/build/build.sh) and links
 #    OUTDIR/app/Rocksmith2014.app (tools/ws7/recomp/app/build.sh).
@@ -42,7 +43,7 @@ lib=$out/ov/lib
 
 # RC_OV_MODULES selects the override modules (default: all of them); handy for
 # bisecting a regression to one module.
-modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp mods}
+modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp mods hooks}
 : > "$out/skip.txt"
 for m in $modules; do
   if [ "$m" = mods ]; then cat "$out/ov/mods.skip"; else cat "$ov/$m.skip"; fi
@@ -78,7 +79,7 @@ o=""
 o=""
 for m in $modules rt; do
   case " $modules " in *" mods "*) [ "$m" = crypto ] && m=crypto_mods ;; esac
-  o="$o $lib/liboverrides_$m.a"
+  [ -f "$lib/liboverrides_$m.a" ] && o="$o $lib/liboverrides_$m.a"
 done
 progress 0.85 "Linking the app"
 RC_OVERRIDES="$o $lib/librs_game.a $lib/librs_lua51.a $lib/librs_png15.a $lib/librs_jpeg8.a $lib/librs_online.a" \

@@ -86,6 +86,17 @@ It reads the game's `static.psarc`, changes only the two title-logo textures, an
 new file next to it. The original `static.psarc` is not changed, and the launcher uses the new file
 whenever it is there.
 
+### Mods loaded at startup
+
+From 1.2.0 the game loads every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` at startup, so
+mods can change how it works without a rebuild. A reinstall keeps that folder. The build gives them **hook
+points**, game functions they can run code before and after (`tools/ws7/recomp/overrides/hooks.skip`,
+`tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports its runtime to them.
+[rearmed-mods](https://github.com/glebb/rearmed-mods) uses this to bring many [RSMods](https://github.com/Lovrom8/RSMods)
+features to RS Re-ARMed.
+
+`RS_LOAD_MODS=0` starts the game without them; `RS_MODS_PATH` loads another folder or a single library.
+
 ### Works with your mods
 
 - A modified `cache.psarc` in your install (for example a fast-load mod) is used as-is.

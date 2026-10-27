@@ -15,6 +15,7 @@
 //   RC_TRACE_INITS=1   print each initializer before running it
 //   RS_STEAM_MODE      defaults to "stub" (the game must not call home)
 #include <CoreFoundation/CoreFoundation.h>
+#include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
@@ -139,6 +140,27 @@ static void *load_shim(const char *path, int required) {
   return h;
 }
 
+// Mods (step 3b of main): a library, or every .dylib in a folder, in name order.
+static int dylib_name(const struct dirent *d) {
+  size_t n = strlen(d->d_name);
+  return d->d_name[0] != '.' && n > 6 && !strcmp(d->d_name + n - 6, ".dylib");
+}
+static void load_mods(const char *where) {
+  struct dirent **names;
+  int n = scandir(where, &names, dylib_name, alphasort);
+  if (n < 0) {
+    if (exists(where)) load_shim(where, 0);
+    return;
+  }
+  for (int i = 0; i < n; i++) {
+    char p[1280];
+    snprintf(p, sizeof p, "%s/%s", where, names[i]->d_name);
+    if (load_shim(p, 0)) fprintf(stderr, "[rc] mod loaded: %s\n", names[i]->d_name);
+    free(names[i]);
+  }
+  free(names);
+}
+
 // ---------------------------------------------------------------------------
 // The image's ObjC classrefs that point at image-internal classes. The shell's
 // classes are not registered with the runtime when the image is mapped, so
@@ -252,6 +274,20 @@ int main(int argc, char **argv, char **envp, char **apple) {
   // 3. fix-ups that need the native shell classes (registered at exe load)
   g_phase = "objc_fixup";
   int fixed = fix_objc();
+
+  // 3b. mods: every .dylib in the mods folder next to the game app (the install's <home>/mods, which a
+  // reinstall keeps), or RS_MODS_PATH (a folder or one library); RS_LOAD_MODS=0 skips them. A mod's constructor
+  // registers its hooks (rc_hook.h) now that the image is mapped; the game runs them later.
+  g_phase = "mods";
+  e = getenv("RS_LOAD_MODS");
+  if (!(e && *e == '0')) {
+    const char *mods = getenv("RS_MODS_PATH");
+    if (!(mods && *mods) && have_bundle) {
+      snprintf(path, sizeof path, "%s/../../mods", bundle);  // <home>/game/Rocksmith2014.app -> <home>/mods
+      mods = path;
+    }
+    if (mods && *mods) load_mods(mods);
+  }
 
   // 4. initializers, translated, on the main thread's guest context. The
   // x86 initializers take (argc, argv, envp, apple).

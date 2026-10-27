@@ -77,7 +77,7 @@ void rc_objc_msgsend_stret(rc_ctx *c) {
   uint64_t ix[8] = {self, sel, 0, 0, 0, 0, 0, 0};
   for (int k = 2; k < 8; k++) ix[k] = rc_arg_i(&a);
   uint64_t dx[8], ret[6];
-  for (int k = 0; k < 8; k++) dx[k] = c->x[k].lo;
+  for (int k = 0; k < 8; k++) dx[k] = c->x[k][0];
   uint64_t fn = (uint64_t)(uintptr_t)&objc_msgSend;
   Class cls = object_getClass((id)(uintptr_t)self);
   Method m = cls ? class_getInstanceMethod(cls, (SEL)(uintptr_t)sel) : 0;

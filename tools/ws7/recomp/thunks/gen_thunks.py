@@ -486,8 +486,8 @@ class Gen:
             body.append("rc_native_call_x8(%s, ix, dx, ret, sret); c->r[0] = sret;" % fn)
         else:
             body += ["rc_native_call(%s, ix, dx, ret);" % fn,
-                     "c->r[0] = ret[0]; c->r[2] = ret[1]; c->x[0].lo = ret[2]; c->x[0].hi = 0; "
-                     "c->x[1].lo = ret[3]; c->x[1].hi = 0;"]
+                     "c->r[0] = ret[0]; c->r[2] = ret[1]; c->x[0] = (rc_v128){ret[2], 0}; "
+                     "c->x[1] = (rc_v128){ret[3], 0};"]
         return ("sret" if sret else "callback"), dem + (" [%s]" % CXX_SRET[n] if sret else ""), body
 
     # --- driver -----------------------------------------------------------------------

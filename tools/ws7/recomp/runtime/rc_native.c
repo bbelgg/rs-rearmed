@@ -49,7 +49,7 @@ static void native_sret(rc_ctx *c, uint64_t fn, unsigned stack_off) {
   uint64_t ix[8] = {c->r[6], c->r[2], c->r[1], c->r[8], c->r[9],
                     RC_LD(uint64_t, sp), RC_LD(uint64_t, sp + 8), RC_LD(uint64_t, sp + 16)};
   uint64_t dx[8], ret[4];
-  for (int k = 0; k < 8; k++) dx[k] = c->x[k].lo;
+  for (int k = 0; k < 8; k++) dx[k] = c->x[k][0];
   uint64_t res = c->r[7];
   rc_native_call_x8(fn, ix, dx, ret, res);
   rc_unwind_sync(c, &ret);
@@ -88,13 +88,13 @@ void rc_native_generic(rc_ctx *c, uint64_t fn, unsigned stack_off) {
   uint64_t ix[8] = {c->r[7], c->r[6], c->r[2], c->r[1], c->r[8], c->r[9],
                     RC_LD(uint64_t, sp), RC_LD(uint64_t, sp + 8)};
   uint64_t dx[8], ret[4];
-  for (int k = 0; k < 8; k++) dx[k] = c->x[k].lo;
+  for (int k = 0; k < 8; k++) dx[k] = c->x[k][0];
   rc_native_call(fn, ix, dx, ret);
   rc_unwind_sync(c, &ret);  // the callee may have longjmp'd over its own callbacks
   c->r[0] = ret[0];
   c->r[2] = ret[1];
-  c->x[0].lo = ret[2]; c->x[0].hi = 0;
-  c->x[1].lo = ret[3]; c->x[1].hi = 0;
+  c->x[0] = (rc_v128){ret[2], 0};
+  c->x[1] = (rc_v128){ret[3], 0};
 }
 
 // simd_float4x4 __invert_f4(simd_float4x4) (libsystem_m, behind simd_inverse).

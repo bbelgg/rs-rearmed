@@ -45,7 +45,7 @@ static inline uint64_t rc_arg_i(rc_args *a) {
 }
 // Low 64 bits of the next SSE argument (float in the low 32).
 static inline uint64_t rc_arg_f(rc_args *a) {
-  if (a->fi < 8) return a->c->x[a->fi++].lo;
+  if (a->fi < 8) return a->c->x[a->fi++][0];
   uint64_t v = RC_LD(uint64_t, a->sp);
   a->sp += 8;
   return v;
@@ -77,15 +77,15 @@ static inline void rc_arg_agg(rc_args *a, void *dst, uint32_t size, uint32_t ali
   a->sp += (size + 7) & ~7u;
 }
 // Results.
-static inline void rc_ret_f32(rc_ctx *c, float f) { c->x[0].lo = rc_u32f(f); c->x[0].hi = 0; }
-static inline void rc_ret_f64(rc_ctx *c, double d) { c->x[0].lo = rc_u64f(d); c->x[0].hi = 0; }
+static inline void rc_ret_f32(rc_ctx *c, float f) { c->x[0] = (rc_v128){rc_u32f(f), 0}; }
+static inline void rc_ret_f64(rc_ctx *c, double d) { c->x[0] = (rc_v128){rc_u64f(d), 0}; }
 static inline void rc_ret_v128(rc_ctx *c, rc_v128 v) { c->x[0] = v; }
 static inline void rc_ret_agg(rc_ctx *c, const void *src, uint32_t size, uint32_t cls) {
   uint32_t n = cls & 3, gi = 0, fi = 0;
   uint64_t w[2] = {0, 0};
   memcpy(w, src, size);
   for (uint32_t k = 0; k < n; k++) {
-    if ((cls >> (2 + k)) & 1) { c->x[fi].lo = w[k]; c->x[fi].hi = 0; fi++; }
+    if ((cls >> (2 + k)) & 1) { c->x[fi] = (rc_v128){w[k], 0}; fi++; }
     else { c->r[gi ? 2 : 0] = w[k]; gi++; }
   }
 }

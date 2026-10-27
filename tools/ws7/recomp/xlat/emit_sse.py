@@ -2,6 +2,9 @@
 
 Semantics live in runtime/rc_sse.h as `rc_<mnemonic>(dest, src[, imm])`
 helpers over rc_v128; most mnemonics are therefore one table entry here.
+rc_v128 is a vector type: x[0]/x[1] are its 64-bit halves, and scalar float
+operands are lane 0 (rc_lf32/rc_lf64, rc_setf32/rc_setf64), so the value never
+leaves its NEON register.
 """
 import re
 
@@ -78,10 +81,10 @@ class SseMixin:
         sx = self.xr(i, s_) if s_ is not None and s_.type == x86.X86_OP_REG else None
 
         def f32(op, x):
-            return "rc_f32((uint32_t)%s.lo)" % x if x else "rc_f32(%s(uint32_t, %s))" % (self.LD(op), self.ea(i, op))
+            return "rc_lf32(%s)" % x if x else "%s(float, %s)" % (self.LD(op), self.ea(i, op))
 
         def f64(op, x):
-            return "rc_f64(%s.lo)" % x if x else "rc_f64(%s(uint64_t, %s))" % (self.LD(op), self.ea(i, op))
+            return "rc_lf64(%s)" % x if x else "%s(double, %s)" % (self.LD(op), self.ea(i, op))
 
         def v128(op, x):
             return x if x else "%s(rc_v128, %s)" % (self.LD(op), self.ea(i, op))
@@ -93,8 +96,8 @@ class SseMixin:
                 return "%s(rc_v128, %s)" % (self.LD(s_), self.ea(i, s_))
             return "((rc_v128){%s(uint%d_t, %s), 0})" % (self.LD(s_), 32 if kind == "s4" else 64, self.ea(i, s_))
 
-        set32 = lambda x, v: "%s.lo = (%s.lo & 0xffffffff00000000ull) | rc_u32f(%s);" % (x, x, v)
-        set64 = lambda x, v: "%s.lo = rc_u64f(%s);" % (x, v)
+        set32 = lambda x, v: "%s = rc_setf32(%s, %s);" % (x, x, v)
+        set64 = lambda x, v: "%s = rc_setf64(%s, %s);" % (x, x, v)
 
         # --- table-driven: rc_<mnemonic>(dest, src[, imm]) ---------------------
         if cm and dx and s_ is not None:
@@ -123,12 +126,11 @@ class SseMixin:
         if m in ("movss", "movsd") and (dx or sx):
             n = 4 if m == "movss" else 8
             if dx and sx:
-                out.append("%s.lo = %s;" % (dx, "(%s.lo & 0xffffffff00000000ull) | (uint32_t)%s.lo" % (dx, sx)
-                                           if n == 4 else "%s.lo" % sx))
+                out.append("%s = rc_movss(%s, %s);" % (dx, dx, sx) if n == 4 else "%s[0] = %s[0];" % (dx, sx))
             elif dx:
-                out.append("%s.lo = %s(%s, %s); %s.hi = 0;" % (dx, self.LD(s_), CTYPE[n], self.ea(i, s_), dx))
+                out.append("%s = (rc_v128){%s(%s, %s), 0};" % (dx, self.LD(s_), CTYPE[n], self.ea(i, s_)))
             else:
-                out.append("%s(%s, %s, %s.lo);" % (self.ST(d), CTYPE[n], self.ea(i, d), sx))
+                out.append("%s(%s, %s, %s[0]);" % (self.ST(d), CTYPE[n], self.ea(i, d), sx))
             return True
         if m in ("movaps", "movups", "movapd", "movupd", "movdqa", "movdqu", "lddqu",
                  "movntps", "movntpd", "movntdq"):
@@ -142,27 +144,27 @@ class SseMixin:
         if m in ("movd", "movq"):
             n = 4 if m == "movd" else 8
             if dx and sx:
-                out.append("%s.lo = %s.lo; %s.hi = 0;" % (dx, sx, dx))
+                out.append("%s = (rc_v128){%s[0], 0};" % (dx, sx))
             elif dx:
-                out.append("%s.lo = (%s)%s; %s.hi = 0;" % (dx, CTYPE[n], self.rd(i, s_, n), dx))
+                out.append("%s = (rc_v128){(%s)%s, 0};" % (dx, CTYPE[n], self.rd(i, s_, n)))
             elif sx:
-                out.append(self.wr(i, d, "(%s)%s.lo" % (CTYPE[n], sx)))
+                out.append(self.wr(i, d, "(%s)%s[0]" % (CTYPE[n], sx)))
             else:
                 return False
             return True
         if m in ("movlps", "movlpd", "movhps", "movhpd"):
-            part = "lo" if m[3] == "l" else "hi"
+            part = 0 if m[3] == "l" else 1
             if dx and sx:   # movlps/movhps reg,reg are movhlps/movlhps
-                out.append("%s.%s = %s.%s;" % (dx, "lo" if part == "lo" else "hi", sx, "hi" if part == "lo" else "lo"))
+                out.append("%s[%d] = %s[%d];" % (dx, part, sx, 1 - part))
             elif dx:
-                out.append("%s.%s = %s(uint64_t, %s);" % (dx, part, self.LD(s_), self.ea(i, s_)))
+                out.append("%s[%d] = %s(uint64_t, %s);" % (dx, part, self.LD(s_), self.ea(i, s_)))
             elif sx:
-                out.append("%s(uint64_t, %s, %s.%s);" % (self.ST(d), self.ea(i, d), sx, part))
+                out.append("%s(uint64_t, %s, %s[%d]);" % (self.ST(d), self.ea(i, d), sx, part))
             else:
                 return False
             return True
         if m in ("movhlps", "movlhps") and dx and sx:
-            out.append("%s.lo = %s.hi;" % (dx, sx) if m == "movhlps" else "%s.hi = %s.lo;" % (dx, sx))
+            out.append("%s[0] = %s[1];" % (dx, sx) if m == "movhlps" else "%s[1] = %s[0];" % (dx, sx))
             return True
         if m in ("movmskps", "movmskpd", "pmovmskb") and sx:
             out.append(self.wr(i, d, "rc_%s(%s)" % (m, sx)))
@@ -179,12 +181,12 @@ class SseMixin:
                 "orps": "|", "orpd": "|", "por": "|"}
         if m in bitw and dx:
             if sx == dx and bitw[m] == "^":
-                out.append("%s.lo = 0; %s.hi = 0;" % (dx, dx))
+                out.append("%s = (rc_v128){0, 0};" % dx)
             else:
-                out.append("{ rc_v128 b = %s; %s.lo %s= b.lo; %s.hi %s= b.hi; }" % (v128(s_, sx), dx, bitw[m], dx, bitw[m]))
+                out.append("%s %s= %s;" % (dx, bitw[m], v128(s_, sx)))
             return True
         if m in ("andnps", "andnpd", "pandn") and dx:
-            out.append("{ rc_v128 b = %s; %s.lo = ~%s.lo & b.lo; %s.hi = ~%s.hi & b.hi; }" % (v128(s_, sx), dx, dx, dx, dx))
+            out.append("%s = ~%s & %s;" % (dx, dx, v128(s_, sx)))
             return True
 
         # --- scalar compare / conversions ------------------------------------------------

@@ -173,16 +173,13 @@ __attribute__((noinline)) void rc_call_guest_regs(uint64_t fn, const uint64_t gi
   c->r[4] = sp;
   for (int i = 0; i < 6 && i < ng; i++) c->r[argreg[i]] = gi[i];
   c->r[0] = (uint64_t)nd;  // al = number of vector registers used (variadic callees)
-  for (int i = 0; i < 8; i++) {
-    c->x[i].lo = i < nd ? dv[i] : 0;
-    c->x[i].hi = 0;
-  }
+  for (int i = 0; i < 8; i++) c->x[i] = (rc_v128){i < nd ? dv[i] : 0, 0};
   f(c);
   if (c->r[4] != sp + 8) rc_fail("guest stack imbalance after native call", fn - rc_slide);
   out[0] = c->r[0];
   out[1] = c->r[2];
-  out[2] = c->x[0].lo;
-  out[3] = c->x[1].lo;
+  out[2] = c->x[0][0];
+  out[3] = c->x[1][0];
   *c = t->cg[idx].saved;
   t->ncg = idx;  // also drops the records of calls a native longjmp skipped inside this one
   rc_cg_changed(t);

@@ -15,9 +15,11 @@
 #include <stdint.h>
 #include <string.h>
 
-typedef struct {
-  uint64_t lo, hi;
-} rc_v128;
+// An xmm register: a 16-byte vector, so values stay in NEON registers across
+// instructions; v[0] is the low 64 bits, v[1] the high ones (rc_sse.h has the
+// lane views). Aligned like the {lo, hi} struct it replaces: rc_ctx and the
+// structs holding one keep their layout.
+typedef uint64_t rc_v128 __attribute__((vector_size(16), aligned(8)));
 
 typedef struct rc_ctx {
   uint64_t r[16];  // rax rcx rdx rbx rsp rbp rsi rdi r8..r15 (x86 encoding order)

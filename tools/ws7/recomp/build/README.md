@@ -25,5 +25,8 @@ Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC
   `--skip FILE` (repeatable): `ADDR` = override provides `F_ADDR` (stays in `rc_table`);
   `ADDR drop` = not generated, not in the table. `--o1 FILE`: functions compiled alone at -O1.
   `--tso-ranges FILE`: TUs in those ranges get `-DRC_MO_TSO` (`RC_TSO`; default: the whole image).
+  Two kinds of access stay unfenced inside them: RIP-relative loads from sections nothing writes after
+  the image is loaded (`RC_LDC`), and the functions listed in `xlat/relaxed.py`, which fence only at
+  entry and exit (`RC_RELAXED=0` turns the list off when the C is generated; runtime/rc_int.h).
 - Undefined symbols at smoke link time are listed in `obj/undefined.txt` and stubbed with aborting
   functions so the test can still run.

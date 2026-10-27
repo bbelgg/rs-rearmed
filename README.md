@@ -32,6 +32,9 @@ This project does not include any game code or assets; you need your own copy of
 ## Features
 
 - **Native arm64.** The game runs as an arm64 app. No Rosetta, no x86 code at run time.
+- **As light as Rosetta.** In gameplay it uses about the same CPU as the original game under Rosetta,
+  a little less on average (about half a core at 60 fps, measured over a scripted song). It follows the
+  display's refresh rate, so 75 Hz and 120 Hz displays get 75 and 120 fps.
 - **Offline by design.** The Steam client is not needed while you play: an offline Steam layer stands in
   for it. A network guard (`tools/ws8/netguard`) is loaded into the game on every launch and refuses every
   connection that is not local, every host name lookup and every attempt to open a web page, and logs

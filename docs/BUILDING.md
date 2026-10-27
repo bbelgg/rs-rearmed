@@ -142,13 +142,18 @@ Environment variables the build reads:
 | `RC_PGO` | none | `gen`: an instrumented build that records a profile; `use:FILE.profdata`: optimise with it |
 | `RC_PGO_DIR` | `<output>/pgo` | where an instrumented game writes its profiles |
 | `RC_JOBS` | all cores | parallel compile jobs |
+| `RC_RELAXED` | on | `0`: fence every memory access of the audio kernels listed in `tools/ws7/recomp/xlat/relaxed.py` too, for tracking down a suspected memory-ordering problem |
 
-#### Optimised builds (experimental)
+#### Optimised builds (optional)
 
 The switches above change only how the C is compiled; leave them unset for the normal build. With
 `RC_LTO=thin` the objects are LLVM bitcode and the final link does the optimisation (and most of the
 work), so it takes longer; `<output>/lto-cache` makes relinks incremental. A changed switch recompiles
 everything in that output directory.
+
+What they gave in gameplay (CPU over a scripted song, alternating builds): `RC_LTO=thin` alone, no
+measurable change, for a build about 3.5 minutes longer; `RC_LTO=thin` with `RC_PGO` from a played
+profile, about 2% less CPU. `RC_OPT=-O3` changes little.
 
 Profile-guided optimisation takes two builds and some playing in between:
 

@@ -6,7 +6,7 @@
 # arm64 slices of the shims/game libraries the adapters call (OUTDIR/lib/librs_*.a), and OUTDIR/overrides.skip
 # (gen_image.py --skip). The generated adapters are in gen/ and are checked in.
 #
-# Modules (default set): lua png jpeg zlib efd efd_qi crypto online. Optional: efd_ds (DataStream: malloc
+# Modules (default set): lua png jpeg zlib efd efd_qi crypto online dsp. Optional: efd_ds (DataStream: malloc
 # vs the efd allocator), not in liboverrides.a and not in overrides.skip.
 # A link also needs: -lz, -lc++ (online), and CoreFoundation-free libc only; no network library.
 set -eu
@@ -60,12 +60,13 @@ build_module efd_qi "$SH" "$here/gen/efd_qi.c"
 build_module efd_ds "$SH" "$here/gen/efd_ds.c"
 build_module crypto "$SH" "$here/gen/crypto.c" "$here/src/crypto_glue.c"
 build_module online "$SH" "$here/gen/online.c" "$here/src/online_glue.c"
+build_module dsp "" "$here/src/dsp_glue.c"
 
 # one library with the default set
 rm -f "$out/lib/liboverrides.a"
-libtool -static -o "$out/lib/liboverrides.a" $(for m in rt lua png jpeg zlib efd efd_qi crypto online; do echo "$out/lib/liboverrides_$m.a"; done) 2>/dev/null
+libtool -static -o "$out/lib/liboverrides.a" $(for m in rt lua png jpeg zlib efd efd_qi crypto online dsp; do echo "$out/lib/liboverrides_$m.a"; done) 2>/dev/null
 
 # the skip file for gen_image.py: the default modules.
 cat "$here/lua.skip" "$here/png.skip" "$here/jpeg.skip" "$here/zlib.skip" "$here/efd.skip" "$here/efd_qi.skip" \
-    "$here/crypto.skip" "$here/online.skip" > "$out/overrides.skip"
+    "$here/crypto.skip" "$here/online.skip" "$here/dsp.skip" > "$out/overrides.skip"
 echo "overrides: $(grep -vc '^#' "$out/overrides.skip") skip entries; libraries in $out/lib"

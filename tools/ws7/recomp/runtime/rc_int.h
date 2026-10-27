@@ -58,4 +58,21 @@ static inline void rc_ldmxcsr(rc_ctx *c, uint32_t v) {
 #endif
 }
 
+// Accesses the translator emits without TSO fences besides the stack ones (RC_LDS/RC_STS, rc.h):
+//   RC_LDC  a RIP-relative load from a section nothing writes once the image is loaded (__TEXT,
+//           __DATA,__const, the GOT): a value that never changes needs no ordering;
+//   RC_LDR, RC_STR  the accesses of a function in xlat/relaxed.py, which fences only at its
+//           boundary: RC_RELAX_ENTER at entry and RC_RELAX_EXIT at every exit (the reasoning is
+//           in relaxed.py). Without RC_MO_TSO the fences are nothing, like those of RC_LD/RC_ST.
+#define RC_LDC(T, a) RC_LDS(T, a)
+#define RC_LDR(T, a) RC_LDS(T, a)
+#define RC_STR(T, a, v) RC_STS(T, a, v)
+#ifdef RC_MO_TSO
+#define RC_RELAX_ENTER() RC_FENCE_ST()
+#define RC_RELAX_EXIT() RC_FENCE_LD()
+#else
+#define RC_RELAX_ENTER() ((void)0)
+#define RC_RELAX_EXIT() ((void)0)
+#endif
+
 #endif

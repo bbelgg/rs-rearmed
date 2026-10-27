@@ -57,6 +57,16 @@ from .common import COND, CTYPE, MASK, NOPS, NORETURN, REGS, Unsupported  # noqa
 from .emit_int import IntMixin  # noqa: E402
 from .emit_sse import SseMixin  # noqa: E402
 from .jumptab import JumpTableMixin  # noqa: E402
+from .relaxed import PURE_IMPORTS, RELAXED  # noqa: E402
+
+# Sections that hold nothing a guest thread writes after rc_image_load has rebased and bound the
+# image (before any guest code runs): all of __TEXT, and the constant and pointer sections of __DATA.
+# A RIP-relative load from them needs no TSO fence (RC_LDC): its value never changes, so there is
+# no store of another thread it could be ordered against.
+RO_SECTS = {("__DATA", "__const"), ("__DATA", "__got"), ("__DATA", "__nl_symbol_ptr")}
+
+# RC_RELAXED=0: translate the RELAXED functions with the fences like everything else.
+RELAXED_ON = os.environ.get("RC_RELAXED", "1") != "0"
 
 class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
     def __init__(self, image_path):
@@ -80,6 +90,10 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
         self.fsorted = sorted(self.fset)
         self.translated = set()
         self.rbp_frame = False
+        self.relaxed = False
+        self.cur = None
+        self.ro = sorted((a, a + sz) for (seg, sect), (a, sz, _) in self.img.sects.items()
+                         if seg == "__TEXT" or (seg, sect) in RO_SECTS)
 
     def insn(self, a):
         o = self.text_fo + (a - self.text_lo)
@@ -223,11 +237,55 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 return False
         return True
 
+    def read_only(self, op):
+        """A RIP-relative operand of the current instruction inside a read-only section (RO_SECTS)."""
+        m = op.mem
+        if m.base != x86.X86_REG_RIP or m.index or self.cur is None:
+            return False
+        if not any(o.type == x86.X86_OP_MEM and o.mem.base == m.base and o.mem.disp == m.disp
+                   for o in self.cur.operands):
+            raise Unsupported("operand not of the current instruction at 0x%x" % self.cur.address)
+        a = (self.cur.address + self.cur.size + m.disp) & 0xffffffffffffffff
+        k = bisect.bisect_right(self.ro, (a, 1 << 64)) - 1
+        return k >= 0 and self.ro[k][0] <= a and a + max(op.size, 1) <= self.ro[k][1]
+
     def LD(self, op):
-        return "RC_LDS" if self.on_stack(op) else "RC_LD"
+        if self.on_stack(op):
+            return "RC_LDS"
+        if self.read_only(op):
+            return "RC_LDC"
+        return "RC_LDR" if self.relaxed else "RC_LD"
 
     def ST(self, op):
-        return "RC_STS" if self.on_stack(op) else "RC_ST"
+        if self.on_stack(op):
+            return "RC_STS"
+        return "RC_STR" if self.relaxed else "RC_ST"
+
+    # --- relaxed functions (relaxed.py) ------------------------------------
+    def relax_ok(self, entry, seen):
+        """The automatic part of the RELAXED check: no lock-prefixed, xchg or fence instruction,
+        and calls only to other relaxed functions or PURE_IMPORTS. None if fine, else the reason."""
+        for a, i in seen.items():
+            m = i.mnemonic
+            if i.prefix[0] == 0xf0 or m in ("xchg", "cmpxchg", "cmpxchg8b", "cmpxchg16b", "xadd", "mfence",
+                                             "lfence", "sfence", "pause"):
+                return "%s at 0x%x" % (m, a)
+            if m == "call" or x86.X86_GRP_JUMP in i.groups:
+                op = i.operands[0]
+                if op.type != x86.X86_OP_IMM:
+                    if m == "call" or a not in self.tables:
+                        return "indirect %s at 0x%x" % (m, a)
+                    continue
+                t = op.imm
+                if t in self.stubs:
+                    if self.stubs[t][1] not in PURE_IMPORTS or self.stub_local_target(self.stubs[t][0]) is not None:
+                        return "call of %s at 0x%x" % (self.stubs[t][1], a)
+                elif (m == "call" or (t in self.fset and t != entry)) and t not in RELAXED:
+                    return "call of 0x%x at 0x%x" % (t, a)
+        return None
+
+    def relax_exit(self):
+        return "RC_RELAX_EXIT(); " if self.relaxed else ""
 
     def rd(self, i, op, size=None):
         """C expression (uint64_t, zero-extended) for an operand's value."""
@@ -268,6 +326,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
 
     # --- one instruction ---------------------------------------------------
     def emit(self, i, out):
+        self.cur = i
         m = i.mnemonic
         if m in NOPS:
             return
@@ -314,7 +373,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
             else:
                 out.append("rsp -= 8; RC_STS(uint64_t, rsp, RC_A(0x%xull)); %s" % (ret, self.call_internal(t)))
         elif m == "ret":
-            out.append("rsp += 8; SPILL_RET(); return;")
+            out.append("rsp += 8; %sSPILL_RET(); return;" % self.relax_exit())
         elif m in ("ud2", "hlt"):
             out.append('rc_fail("%s", 0x%xull);' % (m, A))
         else:
@@ -322,9 +381,12 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
         return True
 
     def call_internal(self, t, tail=False):
+        """In a relaxed function a call or tail call leaves it (relax_ok admits only other relaxed
+        functions, which fence themselves): nothing is needed around it, except the exit fence before
+        a tail call, which ends this function."""
         self.callees.add(t)
         s = "SPILL_CALL(); F_%x(c); FILL_CALL();" % t
-        return ("SPILL_CALL(); F_%x(c); return;" % t) if tail else s
+        return ("%sSPILL_CALL(); F_%x(c); return;" % (self.relax_exit(), t)) if tail else s
 
     # --- one function ------------------------------------------------------
     def function(self, entry, name=None):
@@ -332,6 +394,12 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
         self.callees = set()
         seen, labels = self.discover(entry)
         self.rbp_frame = self.frame_pointer(entry, seen)
+        self.relaxed = False
+        if RELAXED_ON and entry in RELAXED:
+            why = self.relax_ok(entry, seen)
+            if why:
+                print("warning: 0x%x stays fenced (not relaxed): %s" % (entry, why), file=sys.stderr)
+            self.relaxed = not why
         body = []
         order = sorted(seen)
         bad = []
@@ -367,7 +435,9 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 "void F_%x(rc_ctx *c) {" % entry,
                 "  FILL_DECL();"] + (["  RC_ENTER(0x%xull);" % entry] if TRACE else []) + [
                 "  uint8_t zf = 0, sf = 0, cf = 0, of = 0, pf = 0;",
-                "  (void)zf; (void)sf; (void)cf; (void)of; (void)pf;"]
+                "  (void)zf; (void)sf; (void)cf; (void)of; (void)pf;"] + (
+                ["  RC_RELAX_ENTER();  // relaxed: %s" % RELAXED[entry]] if self.relaxed else [])
+        self.relaxed = False
         return head + body + ["}", ""]
 
 

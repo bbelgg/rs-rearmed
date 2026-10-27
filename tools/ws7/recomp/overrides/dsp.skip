@@ -1,0 +1,3 @@
+# Skip list of override module `dsp` (gen_image.py --skip): native DSP functions, bit-identical
+# to the translation of the original (src/dsp_glue.c).
+10010da10  # analysis window (ramp / Hamming / Hann), windows cached per thread

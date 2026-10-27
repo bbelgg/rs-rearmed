@@ -38,7 +38,7 @@ lib=$out/ov/lib
 
 # RC_OV_MODULES selects the override modules (default: all of them); handy for
 # bisecting a regression to one module.
-modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online mods}
+modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp mods}
 : > "$out/skip.txt"
 for m in $modules; do
   if [ "$m" = mods ]; then cat "$out/ov/mods.skip"; else cat "$ov/$m.skip"; fi

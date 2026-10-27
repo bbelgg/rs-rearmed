@@ -417,6 +417,7 @@ enum Steps {
         guard FileManager.default.fileExists(atPath: imagePath) else {
             throw InstallerError.fileNotFound("Decrypted binary was not created: \(imagePath)")
         }
+        r.appendLog("The game is decrypted: quit Rocksmith 2014 now. The build goes on without it.")
     }
 
     static func buildShims(_ r: BuildRunner) async throws {
@@ -451,6 +452,20 @@ enum Steps {
         let builtApp = r.repoRoot + "/build/m4/app/Rocksmith2014.app"
         guard FileManager.default.fileExists(atPath: builtApp + "/Contents/MacOS/Rocksmith2014") else {
             throw InstallerError.fileNotFound(builtApp)
+        }
+
+        // install.sh refuses to run while any Rocksmith2014 process is up, which is often still the Steam
+        // copy started for the decryption step: ask to quit it rather than fail at the last step.
+        while (try? await r.shell("pgrep -x Rocksmith2014")) != nil {
+            let choice = showAlert(
+                title: "Quit Rocksmith 2014",
+                message: """
+                    The app is built. Quit Rocksmith 2014 (still running from the decryption step, or \
+                    the native game) so the installer can install it, then click Continue.
+                    """,
+                buttons: ["Continue", "Cancel"]
+            )
+            if choice == "Cancel" { throw InstallerError.userCancelled }
         }
 
         // The same install as a manual build: the game goes into ~/Library/Application Support/RS Re-ARMed/game

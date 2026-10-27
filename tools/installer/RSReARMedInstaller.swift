@@ -30,6 +30,11 @@ final class BuildRunner {
     var totalSteps = 0
     var stepTitle = ""
     var progress: Double = 0
+    // Within the current step: what a command reports with "progress F LABEL" lines (build-m4.sh),
+    // and when the step started, so a long step visibly moves.
+    var stepFraction: Double = 0
+    var stepDetail = ""
+    var stepStart = Date()
     var isRunning = false
     var isFinished = false
     var failure: Error?
@@ -51,6 +56,27 @@ final class BuildRunner {
         if let data = line.data(using: .utf8) {
             logFileHandle?.write(data)
         }
+    }
+
+    // A command's output: "progress F LABEL" lines move the bar within the step (only a new LABEL
+    // goes to the log), the rest is logged as is.
+    func appendOutput(_ text: String) {
+        var rest: [Substring] = []
+        for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
+            let parts = line.split(separator: " ", maxSplits: 2)
+            if parts.count == 3, parts[0] == "progress", let f = Double(parts[1]) {
+                stepFraction = min(max(f, 0), 1)
+                progress = (Double(currentStep - 1) + stepFraction) / Double(max(totalSteps, 1))
+                let label = String(parts[2])
+                if label != stepDetail {
+                    stepDetail = label
+                    rest.append(Substring("→ \(label)…"))
+                }
+            } else {
+                rest.append(line)
+            }
+        }
+        if !rest.isEmpty { appendLog(rest.joined(separator: "\n")) }
     }
 
     func openLogFile() {
@@ -114,7 +140,7 @@ final class BuildRunner {
             output += str
             outputLock.unlock()
             DispatchQueue.main.async {
-                runner.appendLog(str.hasSuffix("\n") ? String(str.dropLast()) : str)
+                runner.appendOutput(str.hasSuffix("\n") ? String(str.dropLast()) : str)
             }
         }
 
@@ -130,7 +156,7 @@ final class BuildRunner {
                     output += str
                     outputLock.unlock()
                     DispatchQueue.main.async {
-                        runner.appendLog(str.hasSuffix("\n") ? String(str.dropLast()) : str)
+                        runner.appendOutput(str.hasSuffix("\n") ? String(str.dropLast()) : str)
                     }
                 }
                 cont.resume(returning: process.terminationStatus)
@@ -175,6 +201,9 @@ final class BuildRunner {
             for (i, (title, action)) in steps.enumerated() {
                 currentStep = i + 1
                 stepTitle = title
+                stepFraction = 0
+                stepDetail = ""
+                stepStart = Date()
                 progress = Double(i) / Double(steps.count)
                 appendLog("\n══════════════════════════════════════════")
                 appendLog("Step \(i + 1)/\(steps.count): \(title)")
@@ -629,6 +658,8 @@ class InstallerWindow: NSWindow {
         content.addSubview(progressBar)
 
         stepLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        stepLabel.lineBreakMode = .byTruncatingTail
+        stepLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         stepLabel.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(stepLabel)
 
@@ -740,6 +771,7 @@ class InstallerWindow: NSWindow {
 
             progressLabel.centerYAnchor.constraint(equalTo: stepLabel.centerYAnchor),
             progressLabel.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            stepLabel.trailingAnchor.constraint(lessThanOrEqualTo: progressLabel.leadingAnchor, constant: -12),
 
             scrollView.topAnchor.constraint(equalTo: stepLabel.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
@@ -770,7 +802,15 @@ class InstallerWindow: NSWindow {
             ? "Step \(runner.currentStep)/\(runner.totalSteps): \(runner.stepTitle)"
             : runner.isFinished ? "✓ Installed: ~/Applications/RS Re-ARMed.app"
             : runner.failed ? "✗ Build failed (see the log)" : "Ready"
-        progressLabel.stringValue = runner.isRunning ? "\(Int(runner.progress * 100))%" : ""
+        if runner.isRunning && !runner.stepDetail.isEmpty {
+            stepLabel.stringValue += " — \(runner.stepDetail) (\(Int(runner.stepFraction * 100))%)"
+        }
+        if runner.isRunning {
+            let t = Int(Date().timeIntervalSince(runner.stepStart))
+            progressLabel.stringValue = String(format: "%d%% · %d:%02d", Int(runner.progress * 100), t / 60, t % 60)
+        } else {
+            progressLabel.stringValue = ""
+        }
         startButton.isEnabled = !runner.isRunning
         startButton.title = runner.isFinished ? "Build Again" : "Build & Install"
         playButton.isHidden = !runner.isFinished || runner.isRunning

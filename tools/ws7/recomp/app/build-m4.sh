@@ -32,6 +32,10 @@ ov=$root/tools/ws7/recomp/overrides
 export RC_LTO_CACHE=${RC_LTO_CACHE:-$out/lto-cache} RC_PGO_DIR=${RC_PGO_DIR:-$out/pgo}
 echo "build: ${RC_OPT:--O2}${RC_LTO:+ lto=$RC_LTO}${RC_PGO:+ pgo=$RC_PGO}${RC_O1:+ o1=$RC_O1}"
 
+# Progress for the installer: "progress F LABEL" lines on stdout, F the fraction of the whole build
+# (the compilers' own output goes to the logs in OUTDIR).
+progress() { printf 'progress %s %s\n' "$1" "$2"; }
+progress 0.00 "Building the native libraries"
 sh "$ov/build.sh" "$out/ov" > "$out/ov.log" 2>&1 || { tail -20 "$out/ov.log"; exit 1; }
 sh "$ov/mods/build.sh" "$out/ov" > "$out/ov-mods.log" 2>&1 || { tail -20 "$out/ov-mods.log"; exit 1; }
 lib=$out/ov/lib
@@ -48,7 +52,17 @@ export RC_GEN_DIR=$out/gen RC_OBJ_DIR=$out/obj
 echo 100000000-110000000 > "$out/tso-all.txt"
 export RC_TSO=$out/tso-all.txt
 for it in 1 2 3 4 5 6 7 8; do
-  sh "$root/tools/ws7/recomp/build/build.sh" ${RC_JOBS:+--jobs $RC_JOBS} --skip "$out/skip.txt" ${RC_O1:+--o1 "$RC_O1"} > "$out/build.$it.log" 2>&1 || true
+  # Translation (gen_image.py: "  N/M functions") is 5-25% of the build, compiling (ninja: "[N/M]")
+  # 25-85%; only the first pass reports, later ones recompile a few TUs.
+  sh "$root/tools/ws7/recomp/build/build.sh" ${RC_JOBS:+--jobs $RC_JOBS} --skip "$out/skip.txt" ${RC_O1:+--o1 "$RC_O1"} 2>&1 |
+    awk -v logf="$out/build.$it.log" -v show=$((it == 1)) '
+      function report(f, what) {
+        p = int(f * 100)
+        if (show && p != last) { last = p; printf "progress %.2f %s\n", f, what; fflush() }
+      }
+      { print > logf; fflush(logf) }
+      /^  [0-9]+\/[0-9]+ functions/ { split($1, a, "/"); report(0.05 + 0.20 * a[1] / a[2], "Translating the game to C") }
+      /^\[[0-9]+\/[0-9]+\]/ { split(substr($1, 2), a, "[/\\]]"); report(0.25 + 0.60 * a[1] / a[2], "Compiling the game code") }' || true
   nm -u -A "$RC_OBJ_DIR/libgame_rc.a" 2>/dev/null | awk '{print $NF}' | grep '^_F_' | sed 's/^_F_//' | sort -u > "$out/refs.txt"
   awk '$2 == "drop" { print $1 }' "$out/skip.txt" | sort -u | comm -12 "$out/refs.txt" - > "$out/undrop.txt"
   n=$(wc -l < "$out/undrop.txt" | tr -d ' ')
@@ -66,12 +80,14 @@ for m in $modules rt; do
   case " $modules " in *" mods "*) [ "$m" = crypto ] && m=crypto_mods ;; esac
   o="$o $lib/liboverrides_$m.a"
 done
+progress 0.85 "Linking the app"
 RC_OVERRIDES="$o $lib/librs_game.a $lib/librs_lua51.a $lib/librs_png15.a $lib/librs_jpeg8.a $lib/librs_online.a" \
   sh "$here/build.sh" "$out/app" ${RC_JOBS:+--jobs $RC_JOBS}
 if [ -s "$out/app/work/undefined.txt" ]; then
   echo "link: undefined symbols, see $out/app/work/undefined.txt" >&2
   exit 1
 fi
+progress 0.97 "Checking the app"
 # (a gen build's self-test profile goes to work/, not into OUTDIR/pgo)
 LLVM_PROFILE_FILE=$out/app/work/init-only-%p%c.profraw \
   "$out/app/Rocksmith2014.app/Contents/MacOS/Rocksmith2014" --init-only 2>&1 | grep 'init-only:'

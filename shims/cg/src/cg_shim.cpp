@@ -135,8 +135,12 @@ std::set<void *> g_live;   // every valid handle, so stale/garbage handles are r
 // Direct-mapped cache of handles found in g_live: the game passes the same few
 // hundred parameters every frame, and a set lookup per cgGLSet* call shows in
 // profiles. An entry is cleared when its handle leaves g_live.
-void *g_live_cache[1024];
-inline void *&live_cache_slot(void *h) { return g_live_cache[((uintptr_t)h >> 4) & 1023]; }
+// Hashed rather than indexed by address bits: parameters are heap objects whose
+// low bits repeat, so a plain index left most of them missing in gameplay.
+void *g_live_cache[16384];
+inline void *&live_cache_slot(void *h) {
+    return g_live_cache[(((uintptr_t)h >> 4) * 0x9E3779B97F4A7C15ull) >> 50];
+}
 
 void live_insert(void *h) { g_live.insert(h); }
 void live_erase(void *h) {

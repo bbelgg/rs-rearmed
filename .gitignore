@@ -8,6 +8,7 @@ build-platform/
 
 # OS files
 .DS_Store
+._*
 
 # Compiled binaries
 *.dylib

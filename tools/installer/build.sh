@@ -51,5 +51,8 @@ cat > "$out/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
+# On a drive without extended attributes (exFAT, FAT) macOS writes a "._" file next to every file it
+# creates; codesign refuses a bundle that holds any.
+find "$out" -name '._*' -delete
 codesign --force -s - "$out" 2>/dev/null || true
 echo "built: $out"

@@ -101,7 +101,8 @@ static void load_login_user(const std::string &steam_root, CSteamID *id, std::st
 }
 
 // steamapps/appmanifest_<app>.acf. The game folder may be a stage of symlinks to the install (the native
-// launcher's), so the manifest is also looked up next to the real install, then in Steam's own library.
+// launcher's), so the manifest is also looked up next to the real install, then in Steam's own library and
+// in the other libraries libraryfolders.vdf lists (e.g. one on an external drive).
 static std::string appmanifest_path(const ShimConfig &c) {
     std::string name = "/appmanifest_" + std::to_string(c.app_id) + ".acf";
     std::vector<std::string> dirs = {dirname_of(dirname_of(c.game_dir))};
@@ -110,6 +111,9 @@ static std::string appmanifest_path(const ShimConfig &c) {
     if (realpath((c.game_dir + "/steam_appid.txt").c_str(), real))
         dirs.push_back(dirname_of(dirname_of(dirname_of(real))));
     dirs.push_back(c.steam_root + "/steamapps");
+    std::vector<std::string> t = vdf_tokens(read_file(c.steam_root + "/steamapps/libraryfolders.vdf"));
+    for (size_t i = 0; i + 1 < t.size(); i++)
+        if (t[i] == "path" && t[i + 1] != "{") dirs.push_back(t[i + 1] + "/steamapps");
     for (const std::string &d : dirs)
         if (file_exists(d + name)) return d + name;
     return std::string();

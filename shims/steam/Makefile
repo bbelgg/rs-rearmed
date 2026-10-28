@@ -40,7 +40,15 @@ test: build/test_shim build/test_vtables
 	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
 	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -x86_64 build/test_shim
 	RS_STEAM_MODE=stub RS_STEAM_DLC=all RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
-	RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
+	HOME=$(CURDIR)/build/emptyhome RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
+	@# A Steam library elsewhere: Steam's folder lists it in libraryfolders.vdf, its appmanifest has the DLC.
+	@mkdir -p "build/testhome/Library/Application Support/Steam/steamapps" build/testlib/steamapps
+	@printf '"libraryfolders" { "0" { "path" "%s" } "1" { "path" "%s" } }\n' \
+	    "$(CURDIR)/build/testhome/Library/Application Support/Steam" "$(CURDIR)/build/testlib" \
+	    > "build/testhome/Library/Application Support/Steam/steamapps/libraryfolders.vdf"
+	@printf '"AppState" { "appid" "221680" "UserConfig" { "language" "german" }\n  "InstalledDepots" { "258342" { "manifest" "1" "dlcappid" "258341" } } }\n' \
+	    > build/testlib/steamapps/appmanifest_221680.acf
+	HOME=$(CURDIR)/build/testhome RS_TEST_LIBRARY=1 RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
 
 check: $(LIB)
 	@nm -u -arch x86_64 "$(GAME_BIN)" | grep -E '^_Steam(API|Internal)_' | sort > build/imports.txt

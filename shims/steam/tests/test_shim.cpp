@@ -147,6 +147,11 @@ int main() {
         EXPECT(!vcall<bool>(apps, 11, 2, &dlc_id, &dlc_avail, dlc_name, (int)sizeof dlc_name));
     }
     EXPECT(strlen(vcall<const char *>(apps, 4)) > 0);              // GetCurrentGameLanguage
+    // The Makefile's last run: the game in a library outside Steam's folder, listed in libraryfolders.vdf
+    if (getenv("RS_TEST_LIBRARY")) {
+        EXPECT(vcall<bool>(apps, 7, (uint32_t)258341));            // its appmanifest's DLC
+        EXPECT(!strcmp(vcall<const char *>(apps, 4), "german"));   // and language
+    }
     EXPECT(vcall<uint64_t>(apps, 20) == sid);                      // GetAppOwner
     EXPECT(vcall<uint32_t>(http, 0, 1, "http://x") == 0);          // CreateHTTPRequest -> invalid
 

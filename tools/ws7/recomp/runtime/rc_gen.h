@@ -6,6 +6,8 @@
 #include "rc_int.h"
 #include "rc_sse.h"
 #include "rc_call.h"
+// the wrappers of hook points (gen_image.py `wrap`, rc_hook.h)
+void rc_hook_call(int index, rc_ctx *c, rc_fn orig);
 #pragma clang diagnostic ignored "-Wunused-label"
 #pragma clang diagnostic ignored "-Wunused-variable"
 #pragma clang diagnostic ignored "-Wunused-but-set-variable"

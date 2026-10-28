@@ -6,7 +6,10 @@ Usage: venv/bin/python -I gen_image.py IMAGE OUTDIR [options]
   --skip FILE       (repeatable) addresses (hex, one per line, # comments) an override
                     module defines F_<addr> for; not generated, but present in rc_table.
                     A line `ADDR drop` is not generated and NOT in rc_table either (dead
-                    code in a replaced range; a remaining direct reference fails to link)
+                    code in a replaced range; a remaining direct reference fails to link).
+                    A line `ADDR wrap` is a hook point: generated as W_<addr>, and F_<addr>
+                    (rc_table, direct calls) is a generated wrapper that runs the hooks
+                    registered for it at run time around W_<addr> (runtime/rc_hook.h)
   --tso-ranges FILE lo-hi (hex) per line; TUs whose functions fall
                     in a range are compiled with -DRC_MO_TSO
   --o1 FILE         addresses of functions clang compiles badly at -O2; each goes
@@ -72,9 +75,9 @@ def stub_text(a, reason):
             % (a, a, r, a))
 
 
-def read_addrs(path, drop=None):
-    """Hex addresses, one per line. With `drop` (a set), lines `ADDR drop` go
-    there instead of into the returned set."""
+def read_addrs(path, drop=None, wrap=None):
+    """Hex addresses, one per line. With `drop` / `wrap` (sets), lines `ADDR drop` /
+    `ADDR wrap` go there instead of into the returned set."""
     s = set()
     for ln in open(path):
         p = ln.split("#")[0].split()
@@ -82,6 +85,8 @@ def read_addrs(path, drop=None):
             continue
         if len(p) > 1 and p[1] == "drop" and drop is not None:
             drop.add(int(p[0], 16))
+        elif len(p) > 1 and p[1] == "wrap" and wrap is not None:
+            wrap.add(int(p[0], 16))
         else:
             s.add(int(p[0], 16))
     return s
@@ -113,8 +118,8 @@ class Chunker:
     perturbs nearby TUs: cut once `target/2` instructions are reached at a
     function whose address hashes to 0 mod 3, or at 1.5*target regardless."""
 
-    def __init__(self, outdir, target, tso, o1):
-        self.outdir, self.target, self.tso, self.o1 = outdir, target, tso, o1
+    def __init__(self, outdir, target, tso, o1, wrap=frozenset()):
+        self.outdir, self.target, self.tso, self.o1, self.wrap = outdir, target, tso, o1, wrap
         self.cur, self.n, self.cls, self.first = [], 0, None, None
         self.chunks = []   # (name, tso, o1, ninsn, nfuncs)
         self.files = set()
@@ -141,7 +146,8 @@ class Chunker:
         used = set()
         for _, _, t, cs in self.cur:
             used.update(SYM_RE.findall(t))
-        protos = sorted(used | {"F_%x" % a for a in defined})   # uses may precede definitions
+        protos = sorted(used | {"F_%x" % a for a in defined}   # uses may precede definitions
+                        | {"W_%x" % a for a in defined & self.wrap})
         name = "part_%x" % self.cur[0][0]
         txt = PRELUDE + "".join("void %s(rc_ctx *c);\n" % s for s in protos) + "\n" + \
             "\n".join(t for _, _, t, _ in self.cur) + "\n"
@@ -209,15 +215,18 @@ def main():
         lo, hi = (int(x, 16) for x in args.only.split("-"))
         starts = [f for f in starts if lo <= f < hi]
     del tr
-    skip, drop = set(), set()
+    skip, drop, wrap = set(), set(), set()
     for p in args.skip:
-        skip |= read_addrs(p, drop)
+        skip |= read_addrs(p, drop, wrap)
     skip -= drop
+    wrap -= drop
+    skip -= wrap
     tso = read_ranges(args.tso_ranges) if args.tso_ranges else []
     o1 = read_addrs(args.o1) if args.o1 else set()
     todo = [f for f in starts if f not in skip and f not in drop]
     batches = [todo[i:i + args.batch] for i in range(0, len(todo), args.batch)]
-    ch = Chunker(args.outdir, args.chunk_insns, tso, o1)
+    ch = Chunker(args.outdir, args.chunk_insns, tso, o1, wrap)
+    hook_index = {a: i for i, a in enumerate(sorted(wrap))}
     status = {}      # addr -> (status, reason, ninsn, chunk)
     callees = set()
     pending_stubs = []
@@ -225,6 +234,10 @@ def main():
     def place(a, st, reason, n, text, cs):
         if st == "stub":
             text = stub_text(a, reason)
+        if a in wrap:   # the original under another name, and F_<a> runs the hooks around it
+            text = text.replace("void F_%x(rc_ctx *c) {" % a, "void W_%x(rc_ctx *c) {" % a, 1)
+            text += "\nvoid F_%x(rc_ctx *c) { rc_hook_call(%d, c, W_%x); }\n" % (a, hook_index[a], a)
+            st = "wrapped" if st == "ok" else st
         ch.add(a, n, text, cs)
         status[a] = [st, reason, n, None]
         callees.update(cs)
@@ -251,12 +264,16 @@ def main():
     # table.c
     allf = sorted((set(starts) | skip | set(status)) - drop)
     decls = ["// generated: prototypes of every translated function",
-             '#include "rc.h"'] + ["void F_%x(rc_ctx *c);" % a for a in allf]
+             '#include "rc.h"'] + ["void F_%x(rc_ctx *c);" % a for a in allf] + \
+            ["void W_%x(rc_ctx *c);" % a for a in sorted(wrap)]
     write_if_changed(os.path.join(args.outdir, "decls.h"), "\n".join(decls) + "\n")
     tab = [PRELUDE.rstrip("\n"), '#include "decls.h"',
            "typedef struct { uint64_t vmaddr; rc_fn fn; } rc_entry;",
            "const rc_entry rc_table[] = {"] + ["  {0x%xull, F_%x}," % (a, a) for a in allf] + \
-          ["};", "const int rc_table_len = %d;" % len(allf), ""]
+          ["};", "const int rc_table_len = %d;" % len(allf),
+           "// hook points (`wrap`), in rc_hook_call's index order",
+           "const uint64_t rc_hook_points[] = {"] + ["  0x%xull," % a for a in sorted(wrap)] + \
+          ["  0", "};", "const int rc_hook_npoints = %d;" % len(wrap), ""]
     ch.changed += write_if_changed(os.path.join(args.outdir, "table.c"), "\n".join(tab))
     # chunk membership for the manifest
     for a, v in status.items():

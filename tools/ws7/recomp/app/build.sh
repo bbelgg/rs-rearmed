@@ -89,7 +89,8 @@ else
   ovr=${RC_OVERRIDES:-}
   [ -n "$ovr" ] || { [ -f "$root/tools/ws7/recomp/overrides/build/liboverrides.a" ] && ovr=$root/tools/ws7/recomp/overrides/build/liboverrides.a || true; }
   link() {  # extra objects...
-    clang -arch arm64 $LF $objs "$@" $ovr "$obj/libgame_rc.a" $FW -lc++ -Wl,-stack_size,0x10000000 -Wl,-undefined,error -o "$exe" 2> "$work/link.log"
+    # -export_dynamic: the runtime stays exported to the mods (rc_hook.h) also when RC_LTO would internalize it
+    clang -arch arm64 $LF $objs "$@" $ovr "$obj/libgame_rc.a" $FW -lc++ -Wl,-stack_size,0x10000000 -Wl,-export_dynamic -Wl,-undefined,error -o "$exe" 2> "$work/link.log"
   }
   if ! link; then
     grep -o '"_[A-Za-z0-9_$.]*"' "$work/link.log" | tr -d '"' | sed 's/^_//' | sort -u > "$work/undefined.txt"

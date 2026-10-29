@@ -69,10 +69,27 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   loading. So when `<game>/cache.psarc` is not the original (size, then MD5; `RS_METAL_SAFE_LOAD=1|0`
   forces it), the shell runs the second half of `MainController awakeFromNib` (from `rsp_game_bootstrap`
   on: before it the engine, its loading threads and the display link do not exist) only after
-  `rs_gfx_prepare(ctx, 120)` has returned on a background thread; the main run loop goes on meanwhile
-  and the window stays black. `rs_gfx_prepare` gives warming (started when the context was made) the
-  whole pool at user-initiated QoS and waits for it (milliseconds on a warm system Metal cache, about
-  the cold compile time otherwise), then throttles the pool for the rest of the run: at most 2 jobs at
+  `rs_gfx_prepare(ctx, 600)` has returned on a background thread; the main run loop goes on meanwhile
+  and the window stays black. From 0.5 s on it shows a centred white line, "Preparing shaders… 120 of
+  3880" (a `CATextLayer` on the view's `CAMetalLayer`, updated 4 times a second from
+  `rs_gfx_prepare_progress`, a second line when over 1000 libraries; removed before the bootstrap, so
+  nothing of it is left when the game draws). `rs_gfx_prepare` gives warming (started when the context
+  was made) the whole pool, every CPU, at user-initiated QoS and waits for it (milliseconds on a warm
+  system Metal cache, about the cold compile time otherwise). **Corpus warm** (first run): the manifest
+  only knows what earlier runs linked, so when it lists fewer than 32 libraries or the cache directory
+  has no record (`corpus-warmed`, the identity of the corpus's MSL set) that this corpus was compiled
+  completely there, it also compiles the MSL of every program of the offline shader corpus
+  (`rsmsl_corpus_count`/`rsmsl_corpus_msl`; 4081 programs, 3880 distinct texts, minus the manifest's).
+  Those libraries are not kept (some 60 KB each): the system's Metal cache keeps them, and the game's own
+  compile of one later is a cache hit (all 3880 again take 0.1 s). Pipelines are not warmed from the
+  corpus: they need draw state it does not have, cost far less, and the manifest has them from the next
+  run on. Cost on an M2 (8 cores, cold system Metal cache): 83 s once (666 s of compiles on 8 threads);
+  the next start (record written, the manifest's libraries only) 0.04 s; a forced corpus warm on a warm
+  system cache 0.1 s. A new corpus or translator, or a new cache directory (OS update,
+  GPU), warms again. At the timeout (600 s) the corpus libraries not started yet are skipped and no
+  record is written (the next start goes on where the system's cache stopped), the manifest's continue,
+  and the game starts and compiles what it lacks while it loads. `RS_METAL_CORPUS_WARM=0|1` turns the
+  corpus warm off / forces it. Then the pool is throttled for the rest of the run: at most 2 jobs at
   once (`RS_MTL_COMPILE_THREADS` when set), all at utility QoS, so libraries the manifest did not know
   cannot starve the loading threads; a draw that needs one still waits for it or compiles it itself.
   Pipelines are built on the drawing thread (warming: on the pool), archive adds on one serial utility

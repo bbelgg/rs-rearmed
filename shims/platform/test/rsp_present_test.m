@@ -6,9 +6,11 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+#import <QuartzCore/CATextLayer.h>
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
 #include <mach/mach_time.h>
+#include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -162,6 +164,45 @@ static int test_metal(void) {
   CHECK(now_s() - p0 < 1.0, "prepare with nothing to warm took %.3f s", now_s() - p0);
   rsp_mtl_hold_black(g_m);
   CHECK(layer.backgroundColor != NULL, "black behind the drawable");
+  int pdone = -1, ptotal = -1;
+  CHECK(rsp_mtl_prepare_progress(g_m, &pdone, &ptotal) == 0 && pdone == ptotal && pdone >= 0,
+        "progress after prepare: not running, %d of %d", pdone, ptotal);
+
+  // The progress line: a CATextLayer on the (unattached) layer, centred, replaced in place, removed.
+  char buf[256];
+  rsp_mtl_progress_text(buf, sizeof buf, 120, 4081);
+  CHECK(!strncmp(buf, "Preparing shaders\xe2\x80\xa6 120 of 4081\n", 31), "progress text: %s", buf);
+  rsp_mtl_progress_text(buf, sizeof buf, 5, 92);
+  CHECK(!strcmp(buf, "Preparing shaders\xe2\x80\xa6 5 of 92"), "short progress text: %s", buf);
+  rsp_mtl_progress_text(buf, sizeof buf, 0, 0);
+  CHECK(!strcmp(buf, "Preparing shaders\xe2\x80\xa6"), "progress text without a total: %s", buf);
+  layer.bounds = CGRectMake(0, 0, 640, 360);
+  NSUInteger before = layer.sublayers.count;
+  CHECK(rsp_mtl_status_layer(g_m) == NULL, "no status line at first");
+  rsp_mtl_status_text(g_m, "Preparing shaders\xe2\x80\xa6 1 of 2");
+  CATextLayer *st = (CATextLayer *)rsp_mtl_status_layer(g_m);
+  CHECK(st && st.superlayer == layer && layer.sublayers.count == before + 1, "status line added");
+  CHECK(st && [st.string isKindOfClass:[NSString class]] && [(NSString *)st.string hasSuffix:@"1 of 2"], "status text");
+  CHECK(st && fabs(CGRectGetMidX(st.frame) - 320) < 1 && fabs(CGRectGetMidY(st.frame) - 180) < 1, "status line centred");
+  rsp_mtl_status_text(g_m, "Preparing shaders\xe2\x80\xa6 2 of 2");
+  CHECK(rsp_mtl_status_layer(g_m) == st && layer.sublayers.count == before + 1 && [(NSString *)st.string hasSuffix:@"2 of 2"],
+        "status line updated in place");
+  rsp_mtl_status_text(g_m, NULL);
+  CHECK(rsp_mtl_status_layer(g_m) == NULL && layer.sublayers.count == before, "status line removed");
+
+  // The shell's path: prepare on a background queue, the completion on the main queue, no status
+  // line left behind (shown at once here; prepare has nothing to do, so it may never appear).
+  __block int called = 0, rc_seen = -9;
+  rsp_mtl_prepare_async(g_m, 5.0, 0.0, ^(int rc) {
+    called = 1;
+    rc_seen = rc;
+    CHECK([NSThread isMainThread], "completion on the main thread");
+  });
+  double a0 = now_s();
+  while (!called && now_s() - a0 < 10)
+    [[NSRunLoop mainRunLoop] runMode:NSDefaultRunLoopMode beforeDate:[NSDate dateWithTimeIntervalSinceNow:0.05]];
+  CHECK(called && rc_seen == 0, "prepare_async completed (rc %d)", rc_seen);
+  CHECK(rsp_mtl_status_layer(g_m) == NULL && layer.sublayers.count == before, "no status line after the completion");
   return 0;
 }
 

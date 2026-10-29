@@ -31,6 +31,7 @@ static struct {
   void (*unlock)(rs_gfx_context *);
   void *(*cgl)(rs_gfx_context *);
   int (*prepare)(rs_gfx_context *, double);  // optional: older libRSOpenGL builds lack it
+  int (*prepare_progress)(rs_gfx_context *, int *, int *);  // optional too
 } gfx;
 static int gfx_ok;
 
@@ -48,10 +49,12 @@ static void gfx_load(void) {
 #undef S
   gfx_ok = ok;
   *(void **)&gfx.prepare = dlsym(RTLD_DEFAULT, "rs_gfx_prepare");
+  *(void **)&gfx.prepare_progress = dlsym(RTLD_DEFAULT, "rs_gfx_prepare_progress");
 }
 
 struct rsp_mtl {
   CAMetalLayer *layer;  // retained
+  CATextLayer *status;  // safe load's progress line (a sublayer of `layer`); main thread
   rs_gfx_context *ctx;
   int w, h;                // drawable size; under the lock
   atomic_int want_swap;    // set by any thread
@@ -272,4 +275,88 @@ void rsp_mtl_hold_black(rsp_mtl *m) {
   m->layer.backgroundColor = black;
   CGColorRelease(black);
   [CATransaction commit];
+}
+
+int rsp_mtl_prepare_progress(rsp_mtl *m, int *done, int *total) {
+  *done = *total = 0;
+  if (!gfx.prepare_progress) return -2;
+  return gfx.prepare_progress(m->ctx, done, total);
+}
+
+void rsp_mtl_progress_text(char *buf, size_t n, int done, int total) {
+  if (total > 0)
+    snprintf(buf, n, "Preparing shaders… %d of %d%s", done < total ? done : total, total,
+             total >= RSP_SAFE_LOAD_LONG ? "\nOne-time setup after an install or update: this can take a few minutes"
+                                         : "");
+  else
+    snprintf(buf, n, "Preparing shaders…");
+}
+
+void rsp_mtl_status_text(rsp_mtl *m, const char *text) {
+  [CATransaction begin];
+  [CATransaction setDisableActions:YES];
+  if (!text) {
+    [m->status removeFromSuperlayer];
+    [m->status release];
+    m->status = nil;
+  } else {
+    if (!m->status) {
+      CATextLayer *t = [[CATextLayer alloc] init];
+      t.name = @"rsp.safe-load-status";
+      t.font = (CFTypeRef)[NSFont systemFontOfSize:0];
+      t.fontSize = 20;
+      t.alignmentMode = kCAAlignmentCenter;
+      t.wrapped = YES;
+      CGColorRef white = CGColorCreateGenericRGB(1, 1, 1, 1);
+      t.foregroundColor = white;
+      CGColorRelease(white);
+      // Sharp on a 2x screen whatever the drawable's scale (the text is the layer's own content).
+      CGFloat s = [[NSScreen mainScreen] backingScaleFactor];
+      t.contentsScale = s > 1 ? s : 1;
+      [m->layer addSublayer:t];
+      m->status = t;
+    }
+    // Centred, two lines high, re-laid out on each update (the window may have been resized).
+    CGRect b = m->layer.bounds;
+    CGFloat h = 2.6 * m->status.fontSize, w = b.size.width > 40 ? b.size.width - 32 : b.size.width;
+    m->status.frame = CGRectMake(b.origin.x + (b.size.width - w) / 2, b.origin.y + (b.size.height - h) / 2, w, h);
+    m->status.string = [NSString stringWithUTF8String:text] ?: @"";
+  }
+  [CATransaction commit];
+}
+
+void *rsp_mtl_status_layer(rsp_mtl *m) { return m->status; }
+
+void rsp_mtl_prepare_async(rsp_mtl *m, double max_seconds, double show_after, void (^then)(int rc)) {
+  // Main thread: a timer shows and updates the progress line while prepare runs on a background
+  // queue; the completion removes it before `then` (so nothing of it remains once the game draws).
+  __block int finished = 0;
+  CFAbsoluteTime t0 = CFAbsoluteTimeGetCurrent();
+  NSTimer *timer = [NSTimer timerWithTimeInterval:0.25
+                                          repeats:YES
+                                            block:^(NSTimer *tm) {
+                                              (void)tm;
+                                              if (finished || CFAbsoluteTimeGetCurrent() - t0 < show_after) return;
+                                              int done, total;
+                                              rsp_mtl_prepare_progress(m, &done, &total);
+                                              char buf[256];
+                                              rsp_mtl_progress_text(buf, sizeof buf, done, total);
+                                              rsp_mtl_status_text(m, buf);
+                                            }];
+  // Common modes: also while a menu is tracked or the window is moved.
+  [[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+  [timer retain];
+  dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+    int rc = rsp_mtl_prepare(m, max_seconds);
+    if (rc == 1)
+      fprintf(stderr, "[rsp] safe load: rs_gfx_prepare timed out after %g s: the game starts now and compiles the "
+                      "rest while it loads\n", max_seconds);
+    dispatch_async(dispatch_get_main_queue(), ^{
+      finished = 1;
+      [timer invalidate];
+      [timer release];
+      rsp_mtl_status_text(m, NULL);
+      then(rc);
+    });
+  });
 }

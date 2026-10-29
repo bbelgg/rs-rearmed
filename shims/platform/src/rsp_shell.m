@@ -29,9 +29,12 @@ static atomic_int rsp_quitting;
 // shaders known from earlier runs. Before the bootstrap the game has started nothing (no engine,
 // no loading threads, no display link), so its loading never shares the CPU with those compiles.
 // The wait runs on a background thread while the main thread's run loop goes on (the window is
-// shown, black, and handles events); set while it lasts.
+// shown, black, with a progress line after half a second, and handles events); set while it lasts.
+// The first start with a modded cache.psarc also compiles the whole shader corpus (83 s
+// cold on an M2), hence the limit; at the limit the game starts anyway and compiles the rest while
+// it loads (rs_gfx_prepare skips the corpus libraries not started yet).
 static atomic_int rsp_boot_deferred;
-enum { RSP_SAFE_LOAD_MAX_SECONDS = 120 };
+enum { RSP_SAFE_LOAD_MAX_SECONDS = 600 };
 
 // ===========================================================================
 @implementation AppDelegate
@@ -668,15 +671,13 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
     // Not in the original: the rest of this method after rs_gfx_prepare (see rsp_boot_deferred).
     atomic_store(&rsp_boot_deferred, 1);
     rsp_mtl_hold_black(rsp_g_mtl);
-    rsp_mtl *m = rsp_g_mtl;  // the blocks retain self, appDir and cwd
-    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-      rsp_mtl_prepare(m, RSP_SAFE_LOAD_MAX_SECONDS);
-      dispatch_async(dispatch_get_main_queue(), ^{
-        atomic_store(&rsp_boot_deferred, 0);
-        [self rsp_bootAppDir:appDir cwd:cwd];
-        // The app became active while the engine did not exist yet: tell the booted engine.
-        if (rsp_focused()) rsp_set_focus(1);
-      });
+    // The block retains self, appDir and cwd. A progress line shows after half a second.
+    rsp_mtl_prepare_async(rsp_g_mtl, RSP_SAFE_LOAD_MAX_SECONDS, 0.5, ^(int rc) {
+      (void)rc;
+      atomic_store(&rsp_boot_deferred, 0);
+      [self rsp_bootAppDir:appDir cwd:cwd];
+      // The app became active while the engine did not exist yet: tell the booted engine.
+      if (rsp_focused()) rsp_set_focus(1);
     });
     return;
   }

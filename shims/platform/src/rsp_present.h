@@ -91,6 +91,21 @@ int rsp_mtl_safe_load(const char *root);
 int rsp_mtl_prepare(rsp_mtl *m, double max_seconds);
 // Black behind the drawable until the first frame is presented (main thread).
 void rsp_mtl_hold_black(rsp_mtl *m);
+// rs_gfx_prepare_progress (any thread): 1 while rs_gfx_prepare runs, 0 not, -2 when libRSOpenGL
+// lacks it (done = total = 0 then).
+int rsp_mtl_prepare_progress(rsp_mtl *m, int *done, int *total);
+// The progress line: "Preparing shaders... <done> of <total>" (a second line from RSP_SAFE_LOAD_LONG
+// libraries on, the first start's corpus warm: a few minutes).
+#define RSP_SAFE_LOAD_LONG 1000
+void rsp_mtl_progress_text(char *buf, size_t n, int done, int total);
+// A centred line of white text (system font) on the layer, over the black; NULL removes it. Main
+// thread. rsp_mtl_status_layer: the CATextLayer, or NULL.
+void rsp_mtl_status_text(rsp_mtl *m, const char *text);
+void *rsp_mtl_status_layer(rsp_mtl *m);
+// Main thread: rs_gfx_prepare(max_seconds) on a background queue, then `then(rc)` on the main
+// queue. While it runs longer than show_after seconds the progress line is shown (updated 4 times
+// a second); it is removed before `then` runs.
+void rsp_mtl_prepare_async(rsp_mtl *m, double max_seconds, double show_after, void (^then)(int rc));
 
 #ifdef __cplusplus
 }

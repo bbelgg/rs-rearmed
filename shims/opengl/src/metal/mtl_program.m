@@ -332,6 +332,7 @@ void rsmtl_glLinkProgram(GLuint program) {
         p->ready = false;
         rsm_map_free(&p->pipelines);
         p->linked = false;
+        p->late_failed = false;
         p->attrib_mask = 0;
 
         int nb = (int)p->bound_attribs.count, k = 0;
@@ -425,6 +426,7 @@ bool rsm_program_ready(RSMContext *ctx, RSMProgram *p, bool wait) {
         return true;
     }
     p->linked = false;
+    p->late_failed = true;
     p->log = le->lib ? @"MSL has no rs_vs" : [NSString stringWithFormat:@"MSL compile failed: %@", le->error];
     rsm_log("program %u: %s (unlinked after the link reported success)\n--- MSL ---\n%s", p->name,
             p->log.UTF8String, le->msl.UTF8String);
@@ -438,7 +440,9 @@ void rsmtl_glUseProgram(GLuint program) {
         p = rsm_program(ctx, program);
         if (!p)
             return;
-        if (!p->linked) {
+        // A program whose compile failed after a successful link stays usable as GL's caller saw it
+        // (the Cg shim and rsgl's tracker take it as current); rsm_program_ready skips its draws.
+        if (!p->linked && !p->late_failed) {
             rsm_error(ctx, GL_INVALID_OPERATION);
             return;
         }

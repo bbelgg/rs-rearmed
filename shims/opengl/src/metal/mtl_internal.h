@@ -223,6 +223,7 @@ typedef struct {
     // glBindAttribLocation calls (name -> index), used at link.
     NSMutableDictionary<NSString *, NSNumber *> *bound_attribs;
     bool linked;
+    bool late_failed;      // linked, then its MSL failed to compile: still bindable, its draws skipped
     bool deleted;
     GLuint name;           // a deleted program keeps its name while current
     NSString *log;

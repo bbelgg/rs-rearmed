@@ -476,9 +476,12 @@ static void rs_glUseProgram(GLuint p) {
     int v = -1;
     if (p == 0)
         v = 0;
-    else if (p < RS_PT_NAMES &&
-             atomic_load_explicit(&s->g->st[p], memory_order_relaxed) == (RS_PT_CREATED | RS_PT_LINKED))
-        v = (int)p;
+    else {
+        struct rs_pt_group *g = s->g;  // rs_pt_forget may clear it (context teardown on the main thread)
+        if (g && p < RS_PT_NAMES &&
+            atomic_load_explicit(&g->st[p], memory_order_relaxed) == (RS_PT_CREATED | RS_PT_LINKED))
+            v = (int)p;
+    }
     atomic_store_explicit(&s->prog, v, memory_order_relaxed);
 }
 

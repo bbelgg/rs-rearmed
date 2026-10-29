@@ -415,7 +415,16 @@ static int child_async(int nonce, int sync) {
           "failing program's info log (%d): %.200s", loglen, log);
     glGetError();
     glUseProgram(bad);
-    check(glGetError() == GL_INVALID_OPERATION, "glUseProgram of the unlinked program: GL_INVALID_OPERATION");
+    if (sync) {
+        check(glGetError() == GL_INVALID_OPERATION, "glUseProgram of the unlinked program: GL_INVALID_OPERATION");
+    } else {
+        // Linked, then failed: still bindable (its callers saw the link succeed), and it draws nothing.
+        check(glGetError() == GL_NO_ERROR, "glUseProgram of the program that failed after its link: no error");
+        unsigned char bpx[4];
+        draw_px(bpx);
+        check(bpx[0] == 0 && bpx[1] == 0 && bpx[2] == 255, "failed program, bound, draws nothing: %d,%d,%d", bpx[0],
+              bpx[1], bpx[2]);
+    }
     // The good programs still work.
     glUseProgram(prog[3]);
     glUniform1f(ktab[3], 24 / 255.0f);

@@ -565,6 +565,7 @@ static int rsm_format_components(GLenum format) {
     switch (format) {
     case GL_RED: case GL_GREEN: case GL_BLUE: case GL_ALPHA: case GL_LUMINANCE:
     case GL_DEPTH_COMPONENT: case GL_STENCIL_INDEX: case GL_INTENSITY:
+    case 0x84F9 /* GL_DEPTH_STENCIL */:
         return 1;
     case GL_LUMINANCE_ALPHA: case GL_RG: return 2;
     case GL_RGB: case GL_BGR: return 3;
@@ -582,6 +583,8 @@ static int rsm_packed_components(GLenum type) {  // >0: packed type with that ma
     case GL_UNSIGNED_SHORT_1_5_5_5_REV: case GL_UNSIGNED_INT_8_8_8_8: case GL_UNSIGNED_INT_8_8_8_8_REV:
     case GL_UNSIGNED_INT_10_10_10_2: case GL_UNSIGNED_INT_2_10_10_10_REV:
         return 4;
+    case 0x84FA /* GL_UNSIGNED_INT_24_8 */:
+        return 2;
     }
     return 0;
 }
@@ -596,6 +599,7 @@ static int rsm_type_size(GLenum type) {
         return 2;
     case GL_UNSIGNED_INT: case GL_INT: case GL_FLOAT: case GL_UNSIGNED_INT_8_8_8_8:
     case GL_UNSIGNED_INT_8_8_8_8_REV: case GL_UNSIGNED_INT_10_10_10_2: case GL_UNSIGNED_INT_2_10_10_10_REV:
+    case 0x84FA /* GL_UNSIGNED_INT_24_8 */:
         return 4;
     }
     return 0;
@@ -1399,11 +1403,12 @@ void rsmtl_glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsize
     }
     rsm_texfmt f;
     if (!rsm_choose_format((GLenum)internalformat, format, &f) || f.compressed) {
-        rsm_error(ctx, GL_INVALID_ENUM);
+        rsm_bad_enum(ctx, "glTexImage2D internalformat", (GLenum)internalformat);
         return;
     }
     if (pixels && !rsm_pixel_size(format, type)) {
-        rsm_error(ctx, GL_INVALID_ENUM);
+        rsm_bad_enum(ctx, "glTexImage2D format", format);
+        rsm_log("glTexImage2D: type 0x%04x", type);
         return;
     }
     if (!width || !height)

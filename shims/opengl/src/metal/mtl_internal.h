@@ -184,6 +184,8 @@ typedef struct {
     NSString *source;
     bool compiled;
     bool deleted;
+    GLuint name;
+    int attached;  // programs it is attached to: a deleted shader keeps its name until 0
 }
 @end
 
@@ -211,6 +213,7 @@ typedef struct {
     NSMutableDictionary<NSString *, NSNumber *> *bound_attribs;
     bool linked;
     bool deleted;
+    GLuint name;           // a deleted program keeps its name while current
     NSString *log;
     uint64_t uid;          // unique per link: pipeline keys and "program changed"
     RSMLibEntry *entry;    // compiled MSL, shared by every program with the same MSL (mtl_cache.m)
@@ -387,6 +390,8 @@ extern __thread __unsafe_unretained RSMContext *rsm_tls;
         return __VA_ARGS__;
 
 void rsm_error(RSMContext *ctx, GLenum e);
+// GL_INVALID_ENUM for a value the core doesn't handle; logged (first 32) with RS_GL_VERBOSE=1.
+void rsm_bad_enum(RSMContext *ctx, const char *fn, GLenum v);
 void rsm_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 // Command buffers and passes (mtl_context.m / mtl_draw.m).

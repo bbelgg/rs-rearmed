@@ -635,7 +635,28 @@ static MTLCompileOptions *rsm_compile_options(void) {
     return o;
 }
 
+// RS_MTL_DUMP_MSL=<dir>: every library's MSL as <dir>/<hash>.metal before it is compiled
+// (a compile that never returns leaves its source behind).
+static void rsm_dump_msl(RSMLibEntry *e) {
+    static const char *dir;
+    static int init;
+    if (!init) {
+        init = 1;
+        dir = getenv("RS_MTL_DUMP_MSL");
+    }
+    if (!dir)
+        return;
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%016llx.metal", dir, (unsigned long long)e->hash);
+    FILE *f = fopen(path, "w");
+    if (f) {
+        fputs(e->msl.UTF8String, f);
+        fclose(f);
+    }
+}
+
 static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
+    rsm_dump_msl(e);
     uint64_t t0 = rsm_now_ns();
     NSError *err = nil;
     e->lib = [c->dev newLibraryWithSource:e->msl options:rsm_compile_options() error:&err];
@@ -646,6 +667,8 @@ static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
         st.lib_failed++;
     }
     uint64_t dt = rsm_now_ns() - t0;
+    if (dt > 1000000000ull)
+        rsm_log("slow library compile: %.1f s (%016llx)", dt / 1e9, (unsigned long long)e->hash);
     if (render) {
         st.lib_compiled++;
         st.lib_ns += dt;

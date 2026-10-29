@@ -41,7 +41,32 @@ GLuint rsmtl_glCreateShader(GLenum type) {
     s->source = @"";
     GLuint n = rsm_names_alloc(&ctx->objects);
     rsm_names_set(&ctx->objects, n, s);
+    s->name = n;
     return n;
+}
+
+// GL keeps a deleted object's name until nothing uses it: a shader while attached to a
+// program, a program while current. Freeing the name earlier lets a new object take it
+// while the game still refers to the old one (Scaleform deletes its shaders after
+// attaching them and attaches them again later).
+static void rsm_shader_reap(RSMContext *ctx, RSMShader *s) {
+    if (s->deleted && s->attached == 0 && s->name && rsm_get(&ctx->objects, s->name) == s) {
+        rsm_names_set(&ctx->objects, s->name, nil);
+        s->name = 0;
+    }
+}
+
+static void rsm_program_reap(RSMContext *ctx, RSMProgram *p) {
+    if (!p || !p->deleted || ctx->prog == p || !p->name)
+        return;
+    for (RSMShader *s in p->shaders) {
+        s->attached--;
+        rsm_shader_reap(ctx, s);
+    }
+    [p->shaders removeAllObjects];
+    if (rsm_get(&ctx->objects, p->name) == p)
+        rsm_names_set(&ctx->objects, p->name, nil);
+    p->name = 0;
 }
 
 static RSMShader *rsm_shader(RSMContext *ctx, GLuint name) {
@@ -102,7 +127,7 @@ void rsmtl_glDeleteShader(GLuint shader) {
     if (!s)
         return;
     s->deleted = true;
-    rsm_names_set(&ctx->objects, shader, nil);  // attached programs keep the object
+    rsm_shader_reap(ctx, s);
 }
 
 GLboolean rsmtl_glIsShader(GLuint shader) {
@@ -157,6 +182,7 @@ GLuint rsmtl_glCreateProgram(void) {
     rsm_map_init(&p->pipelines, sizeof(rsm_pkey));
     GLuint n = rsm_names_alloc(&ctx->objects);
     rsm_names_set(&ctx->objects, n, p);
+    p->name = n;
     return n;
 }
 
@@ -168,7 +194,7 @@ void rsmtl_glDeleteProgram(GLuint program) {
     if (!p)
         return;
     p->deleted = true;
-    rsm_names_set(&ctx->objects, program, nil);  // the current program stays alive in ctx->prog
+    rsm_program_reap(ctx, p);
 }
 
 GLboolean rsmtl_glIsProgram(GLuint program) {
@@ -187,14 +213,20 @@ void rsmtl_glAttachShader(GLuint program, GLuint shader) {
         return;
     }
     [p->shaders addObject:s];
+    s->attached++;
 }
 
 void rsmtl_glDetachShader(GLuint program, GLuint shader) {
     RSM_CTX()
     RSMProgram *p = rsm_program(ctx, program);
     RSMShader *s = p ? rsm_shader(ctx, shader) : nil;
-    if (s)
+    if (s && [p->shaders containsObject:s]) {
         [p->shaders removeObject:s];
+        s->attached--;
+        rsm_shader_reap(ctx, s);
+    } else if (s) {
+        rsm_error(ctx, GL_INVALID_OPERATION);
+    }
 }
 
 void rsmtl_glBindAttribLocation(GLuint program, GLuint index, const GLchar *name) {
@@ -401,7 +433,9 @@ void rsmtl_glUseProgram(GLuint program) {
     }
     ctx->prog_name = program;
     if (ctx->prog != p) {
+        RSMProgram *old = ctx->prog;
         ctx->prog = p;
+        rsm_program_reap(ctx, old);
         ctx->dirty |= RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX | RSM_DIRTY_TEXTURES | RSM_DIRTY_UNIFORMS;
     }
 }

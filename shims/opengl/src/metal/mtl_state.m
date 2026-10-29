@@ -44,6 +44,7 @@ static bool rsm_cap_ignored(GLenum cap) {
     case GL_CLIP_PLANE0: case GL_CLIP_PLANE1: case GL_CLIP_PLANE2: case GL_CLIP_PLANE3:
     case GL_TEXTURE_1D: case GL_TEXTURE_3D: case GL_TEXTURE_RECTANGLE_ARB:
     case GL_VERTEX_PROGRAM_ARB: case GL_FRAGMENT_PROGRAM_ARB:
+    case 0x8910 /* GL_STENCIL_TEST_TWO_SIDE_EXT: Scaleform disables it; nothing enables it */:
         return true;
     }
     return false;
@@ -66,7 +67,7 @@ static void rsm_enable(GLenum cap, bool on) {
         g_ignored_caps[cap & 0xFFFF] = on;
         return;
     }
-    rsm_error(ctx, GL_INVALID_ENUM);
+    rsm_bad_enum(ctx, on ? "glEnable" : "glDisable", cap);
 }
 
 void rsmtl_glEnable(GLenum cap) { rsm_enable(cap, true); }

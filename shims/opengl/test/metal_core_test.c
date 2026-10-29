@@ -1631,6 +1631,46 @@ static void case_errors(void) {
 }
 
 
+// GL keeps a deleted shader's name while it is attached and a deleted program's while it
+// is current. Scaleform deletes its shaders right after attaching them and attaches them
+// again to later programs; a name freed early goes to the next object created.
+static void case_object_lifetime(void) {
+    GLuint vs = shader(GL_VERTEX_SHADER, kVScol), fs = shader(GL_FRAGMENT_SHADER, kFSvcol);
+    GLuint p1 = glCreateProgram();
+    glAttachShader(p1, vs);
+    glAttachShader(p1, fs);
+    glLinkProgram(p1);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    GLuint p2 = glCreateProgram();
+    int distinct = p2 != vs && p2 != fs;
+    glAttachShader(p2, vs);
+    glAttachShader(p2, fs);
+    glLinkProgram(p2);
+    GLint deleted = 0, linked = 0;
+    glGetShaderiv(vs, GL_DELETE_STATUS, &deleted);
+    glGetProgramiv(p2, GL_LINK_STATUS, &linked);
+    GLenum e1 = glGetError();
+    glUseProgram(p2);
+    glDeleteProgram(p2);
+    GLint still = 0;
+    glGetProgramiv(p2, GL_LINK_STATUS, &still);  // current: the name still works
+    GLenum e2 = glGetError();
+    glUseProgram(0);
+    glDeleteProgram(p1);
+    glGetProgramiv(p2, GL_LINK_STATUS, &still);  // no longer current: gone
+    GLenum e3 = glGetError();
+    GLint dummy;
+    glGetShaderiv(vs, GL_DELETE_STATUS, &dummy);  // detached from both: gone
+    GLenum e4 = glGetError();
+    int r[] = {distinct, deleted, linked, (int)e1, (int)e2, (int)e3, (int)e4};
+    for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
+        dump_int(r[i]);
+    check(distinct && deleted && linked && !e1 && !e2, "deleted shader names live while attached (0x%x 0x%x)",
+          e1, e2);
+    check(e3 == GL_INVALID_VALUE && e4 == GL_INVALID_VALUE, "names freed once unused (0x%x 0x%x)", e3, e4);
+}
+
 // The imports no other case calls (program binaries, info logs, CGL, ...).
 static void case_api(void) {
     rs_gfx_context *ctx = rs_gfx_current();
@@ -1753,6 +1793,7 @@ static const test_case kCases[] = {
     {"rebind_attrib", case_rebind_attrib, 0},
     {"queries", case_queries, 0},
     {"errors", case_errors, 0},
+    {"object_lifetime", case_object_lifetime, 0},
     {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };

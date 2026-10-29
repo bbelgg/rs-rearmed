@@ -2,6 +2,7 @@
 // and errors (docs/METAL-DESIGN.md "Metal core").
 #include "mtl_internal.h"
 
+#include <ImageIO/ImageIO.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,6 +22,18 @@ void rsm_log(const char *fmt, ...) {
 void rsm_error(RSMContext *ctx, GLenum e) {
     if (ctx && ctx->error == GL_NO_ERROR)
         ctx->error = e;
+}
+
+void rsm_bad_enum(RSMContext *ctx, const char *fn, GLenum v) {
+    static int verbose = -1;
+    static _Atomic int logged;
+    if (verbose < 0) {
+        const char *e = getenv("RS_GL_VERBOSE");
+        verbose = e && *e && *e != '0';
+    }
+    if (verbose && logged++ < 32)
+        rsm_log("%s: unhandled enum 0x%04x", fn, v);
+    rsm_error(ctx, GL_INVALID_ENUM);
 }
 
 // --- Name tables ---------------------------------------------------------------
@@ -477,6 +490,65 @@ void rsmtl_gfx_resize(rs_gfx_context *c, int w, int h) {
     }
 }
 
+// RS_GL_SNAPSHOT_DIR=<dir>: the default framebuffer as PNG every RS_GL_SNAPSHOT_SECS
+// (default 5) seconds at present, as nsgl_hook.m does for GL's flushBuffer.
+static void rsm_snapshot(RSMContext *ctx) {
+    static const char *dir;
+    static double every = 5, last;
+    static int init;
+    static unsigned long seq;
+    if (!init) {
+        init = 1;
+        dir = getenv("RS_GL_SNAPSHOT_DIR");
+        const char *secs = getenv("RS_GL_SNAPSHOT_SECS");
+        if (secs && atof(secs) > 0)
+            every = atof(secs);
+    }
+    if (!dir)
+        return;
+    double now = CFAbsoluteTimeGetCurrent();
+    if (now - last < every)
+        return;
+    last = now;
+    int w = ctx->w, h = ctx->h;
+    uint8_t *px = malloc((size_t)w * h * 4);
+    if (!px)
+        return;
+    GLint read_fb = 0, pack = 4;
+    rsmtl_glGetIntegerv(0x8CAA /* GL_READ_FRAMEBUFFER_BINDING */, &read_fb);
+    rsmtl_glGetIntegerv(0x0D05 /* GL_PACK_ALIGNMENT */, &pack);
+    rsmtl_glBindFramebuffer(0x8CA8 /* GL_READ_FRAMEBUFFER */, 0);
+    rsmtl_glPixelStorei(0x0D05, 1);
+    rsmtl_glReadPixels(0, 0, w, h, 0x1908 /* GL_RGBA */, 0x1401 /* GL_UNSIGNED_BYTE */, px);
+    rsmtl_glPixelStorei(0x0D05, pack);
+    rsmtl_glBindFramebuffer(0x8CA8, (GLuint)read_fb);
+    rsmtl_glGetError();  // a snapshot must not leave errors for the game
+    // GL rows are bottom-up; PNG is top-down
+    CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
+    CGContextRef bc = CGBitmapContextCreate(NULL, w, h, 8, (size_t)w * 4, cs,
+                                            (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
+    if (bc) {
+        uint8_t *dst = CGBitmapContextGetData(bc);
+        for (int y = 0; y < h; y++)
+            memcpy(dst + (size_t)y * w * 4, px + (size_t)(h - 1 - y) * w * 4, (size_t)w * 4);
+        CGImageRef img = CGBitmapContextCreateImage(bc);
+        NSString *path = [NSString stringWithFormat:@"%s/metal_%06lu.png", dir, seq++];
+        CGImageDestinationRef d = CGImageDestinationCreateWithURL(
+            (__bridge CFURLRef)[NSURL fileURLWithPath:path], CFSTR("public.png"), 1, NULL);
+        if (d && img) {
+            CGImageDestinationAddImage(d, img, NULL);
+            CGImageDestinationFinalize(d);
+        }
+        if (d)
+            CFRelease(d);
+        if (img)
+            CGImageRelease(img);
+        CGContextRelease(bc);
+    }
+    CGColorSpaceRelease(cs);
+    free(px);
+}
+
 void rsmtl_gfx_present(rs_gfx_context *c) {
     RSMContext *ctx = (__bridge RSMContext *)c;
     if (!ctx)
@@ -484,6 +556,7 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
     @autoreleasepool {
         RSMContext *prev = rsm_tls;
         rsm_tls = ctx;
+        rsm_snapshot(ctx);
         rsm_end_pass(ctx);
         if (ctx->layer) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];

@@ -1140,8 +1140,8 @@ class InstallerWindow: NSWindow {
                     or with Launchpad or Spotlight.
 
                     The game build and your saves are in ~/Library/Application Support/RS Re-ARMed/. \
-                    To uninstall, delete both.
-                    \(runner.renderer != "metal" || runner.shadersReady ? "" : """
+                    To uninstall, delete both.\(runner.renderer != "metal" || runner.shadersReady ? "" : """
+
 
                     The game's Metal shaders are not prepared yet: its first start with Metal shows \
                     "Preparing shaders" for a few minutes.
@@ -1241,7 +1241,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             title: "Stop the installation?",
             message: "RS Re-ARMed is still being built and installed. Quitting stops it; click Build & "
                 + "Install again later to finish.",
-            buttons: ["Quit", "Continue"]
+            buttons: ["Continue", "Quit"]  // Return keeps it running
         )
         guard choice == "Quit" else { return .terminateCancel }
         runner.stopCurrentCommand()

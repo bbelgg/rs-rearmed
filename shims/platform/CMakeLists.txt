@@ -21,13 +21,24 @@ add_library(rsp_core STATIC src/rsp_engine.c src/rsp_paths.c src/rsp_config.c sr
 target_include_directories(rsp_core PUBLIC include)
 set_target_properties(rsp_core PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 
+# GL: libRSOpenGL (shims/opengl's `opengl` target, which re-exports OpenGL.framework) in the root build,
+# as in the app; the system framework when this directory builds on its own. libRSOpenGL has the root
+# build's architectures only, so what links it does too.
+if(TARGET opengl)
+  set(rsp_gl opengl)
+  set(rsp_gl_archs "${CMAKE_OSX_ARCHITECTURES}")
+else()
+  set(rsp_gl "-framework OpenGL")
+  set(rsp_gl_archs "${rsp_archs}")
+endif()
+
 # ObjC: AppDelegate, OpenGLView, MainController, MessageBox, the nib, main().
 # Manual retain/release like the original.
 add_library(rsp_shell STATIC src/rsp_shell.m src/rsp_overlay.c)
-target_link_libraries(rsp_shell PUBLIC rsp_core "-framework AppKit" "-framework OpenGL"
+target_link_libraries(rsp_shell PUBLIC rsp_core "-framework AppKit" ${rsp_gl}
   "-framework CoreVideo" "-framework IOKit")
 target_compile_options(rsp_shell PRIVATE $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc> -Wno-deprecated-declarations)
-set_target_properties(rsp_shell PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
+set_target_properties(rsp_shell PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
 
 # Unit tests of the portable half.
 add_executable(rsp_core_test test/rsp_core_test.c)
@@ -37,9 +48,9 @@ set_target_properties(rsp_core_test PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 # The overlay API (rsp_overlay.c) on an offscreen GL context: no window.
 add_executable(rsp_overlay_test test/rsp_overlay_test.c src/rsp_overlay.c)
 target_include_directories(rsp_overlay_test PRIVATE include)
-target_link_libraries(rsp_overlay_test PRIVATE "-framework OpenGL")
+target_link_libraries(rsp_overlay_test PRIVATE ${rsp_gl})
 target_compile_options(rsp_overlay_test PRIVATE -Wno-deprecated-declarations)
-set_target_properties(rsp_overlay_test PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
+set_target_properties(rsp_overlay_test PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
 
 # The window test, as an app bundle in its own "game root" folder.
 set(rsp_root "${CMAKE_CURRENT_BINARY_DIR}/root")
@@ -47,7 +58,7 @@ add_executable(rsp_shell_test MACOSX_BUNDLE test/rsp_shell_test.m)
 target_link_libraries(rsp_shell_test PRIVATE rsp_shell)
 target_compile_options(rsp_shell_test PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
 set_target_properties(rsp_shell_test PROPERTIES
-  OSX_ARCHITECTURES "${rsp_archs}"
+  OSX_ARCHITECTURES "${rsp_gl_archs}"
   OUTPUT_NAME RSPShellTest
   RUNTIME_OUTPUT_DIRECTORY "${rsp_root}"
   MACOSX_BUNDLE_BUNDLE_NAME RSPShellTest
@@ -69,9 +80,6 @@ foreach(arch arm64 x86_64)
   add_test(NAME platform.core.${arch} COMMAND arch -${arch} $<TARGET_FILE:rsp_core_test>)
   set_tests_properties(platform.core.${arch} PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
-  add_test(NAME platform.overlay.${arch} COMMAND arch -${arch} $<TARGET_FILE:rsp_overlay_test>)
-  set_tests_properties(platform.overlay.${arch} PROPERTIES
-    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
   # Needs a logged-in GUI session (opens a 1280x720 window for a few seconds): only in this
   # directory's own build, not in the root build's ctest.
   if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
@@ -80,6 +88,23 @@ foreach(arch arm64 x86_64)
       PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" RUN_SERIAL TRUE TIMEOUT 90)
   endif()
 endforeach()
+# The overlay through libRSOpenGL (whose install name is @executable_path/, next to the app's
+# executable: DYLD_LIBRARY_PATH finds it in its build directory). The Metal variant waits for the
+# Metal core (docs/METAL-PLAN.md step 5).
+if(TARGET opengl)
+  set(rsp_dyld -e "DYLD_LIBRARY_PATH=$<TARGET_FILE_DIR:opengl>")
+endif()
+foreach(arch IN LISTS rsp_gl_archs)
+  add_test(NAME platform.overlay.${arch} COMMAND arch -${arch} ${rsp_dyld} $<TARGET_FILE:rsp_overlay_test>)
+  set_tests_properties(platform.overlay.${arch} PROPERTIES
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
+endforeach()
+if(TARGET opengl)
+  add_test(NAME platform.overlay.metal COMMAND arch -arm64 ${rsp_dyld} -e RS_GL_BACKEND=metal
+    $<TARGET_FILE:rsp_overlay_test>)
+  set_tests_properties(platform.overlay.metal PROPERTIES
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" DISABLED TRUE)
+endif()
 if(EXISTS "${RS_GAME_PLAIN}")
   add_test(NAME platform.difftest.x86_64 COMMAND $<TARGET_FILE:rsp_platform_difftest> "${RS_GAME_PLAIN}")
   set_tests_properties(platform.difftest.x86_64 PROPERTIES

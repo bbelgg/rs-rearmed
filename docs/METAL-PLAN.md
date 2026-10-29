@@ -98,7 +98,7 @@ overlay do at 2x.
 | Step | State | Notes |
 |---|---|---|
 | 1 | done, game boot unchecked | App, shell (in the app) and Cg link `libRSOpenGL` (bundled as `Contents/MacOS/libRSOpenGL.dylib`); the image loader binds the game's OpenGL imports to it. Table = 107 game imports + `extra-gl-imports.txt`; `RS_GL_BACKEND=metal` routes all to weak `rsmtl_<name>` stubs; `rs_gfx` on GL (offscreen = CGL + FBO as framebuffer 0), test `opengl.gfx.offscreen.gl`. Checked: `gl_native_test` (no window), Cg tests, app relink, `otool -L`. Not checked: a game boot. |
-| 2 | not started | |
+| 2 | done, in-game check pending | `shims/include/rs_overlay.h` (version 1): register a callback that drawView runs after the frame, before `flushBuffer`; images (premultiplied RGBA), `draw_image`, `fill_rect`, `read_pixels`, top-left pixels. `rsp_overlay.c`: game-import GL calls only (plus `glGen/BindVertexArrayAPPLE` on Apple's legacy context, which rejects the core VAO calls), state read on first use per frame and restored. Test `platform.overlay.*` (offscreen, via libRSOpenGL: pixels, restored state, no GL errors); `platform.overlay.metal` disabled until step 5. rearmed-mods 0.2.0 (branch `overlay-api`) uses it when exported, old GL path otherwise; checked headless against `rsp_overlay.c`. Not checked: in the game. |
 | 3 | not started | |
 | 4 | not started | |
 | 5 | not started | |

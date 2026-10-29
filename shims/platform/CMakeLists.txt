@@ -103,8 +103,12 @@ endforeach()
 if(TARGET opengl)
   add_test(NAME platform.overlay.metal COMMAND arch -arm64 ${rsp_dyld} -e RS_GL_BACKEND=metal
     $<TARGET_FILE:rsp_overlay_test>)
+  # Needs the Metal core's shader translator (rsmsl, shims/opengl/msl.cmake).
   set_tests_properties(platform.overlay.metal PROPERTIES
-    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" DISABLED TRUE)
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
+  if(NOT TARGET rsmsl)
+    set_tests_properties(platform.overlay.metal PROPERTIES DISABLED TRUE)
+  endif()
 endif()
 # The Metal presentation path on a CAMetalLayer in no window (rsp_present_metal.m). Needs
 # libRSOpenGL; the Metal variant waits for the Metal core's rs_gfx_create_layer (step 5).

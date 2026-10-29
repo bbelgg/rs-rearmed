@@ -120,10 +120,9 @@ add_test(NAME opengl.gfx.offscreen.gl COMMAND gfx_offscreen_test)
 add_test(NAME opengl.gfx.offscreen.metal COMMAND gfx_offscreen_test)
 set_tests_properties(opengl.gfx.offscreen.gl PROPERTIES
   ENVIRONMENT "RS_GL_BACKEND=gl;RS_GL_CHECK=1" ${ogl_pass})
-# Disabled until the Metal core (src/metal/) implements rs_gfx and these calls;
-# the Metal core enables it.
+# Needs the shader translator: metal.cmake disables it in a build without one.
 set_tests_properties(opengl.gfx.offscreen.metal PROPERTIES
-  ENVIRONMENT "RS_GL_BACKEND=metal" ${ogl_pass} DISABLED TRUE)
+  ENVIRONMENT "RS_GL_BACKEND=metal;RS_GL_CHECK=1" ${ogl_pass})
 
 if(EXISTS "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014")
   # The checked-in import list still matches the game binary.

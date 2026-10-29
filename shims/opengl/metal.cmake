@@ -15,6 +15,7 @@ else()
   # No translator in this build: resolve it at run time (a test program may provide one).
   target_link_options(opengl PRIVATE "LINKER:-U,_rsmsl_translate" "LINKER:-U,_rsmsl_free" "LINKER:-U,_rsmsl_key")
   set_property(SOURCE src/metal/mtl_program.m APPEND PROPERTY COMPILE_DEFINITIONS RSM_MSL_DYNAMIC)
+  set_tests_properties(opengl.gfx.offscreen.metal PROPERTIES DISABLED TRUE)
 endif()
 
 # --- Tests ------------------------------------------------------------------------------

@@ -50,6 +50,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
 #include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <unistd.h>
@@ -514,20 +515,30 @@ static void rsm_archive_save(RSMShaderCache *c) {
     if (!c->fresh || !c->unsaved)
         return;
     uint64_t t0 = rsm_now_ns();
-    NSString *path = [c->dir stringByAppendingPathComponent:[NSString stringWithFormat:@"archive-%06d.bin", c->next_seq++]];
-    NSString *tmp = [path stringByAppendingFormat:@".tmp.%d", (int)getpid()];
+    NSString *tmp = [c->dir stringByAppendingPathComponent:[NSString stringWithFormat:@"archive-new.tmp.%d", (int)getpid()]];
+    NSString *path = nil;
     NSError *e = nil;
-    if ([c->fresh serializeToURL:[NSURL fileURLWithPath:tmp] error:&e] &&
-        !rename(tmp.fileSystemRepresentation, path.fileSystemRepresentation)) {
+    bool ok = [c->fresh serializeToURL:[NSURL fileURLWithPath:tmp] error:&e];
+    // link(), not rename(): another game instance on the same cache may have written this sequence
+    // number since we looked; take the next free one instead of replacing its file.
+    for (int tries = 0; ok && tries < 64; tries++) {
+        path = [c->dir stringByAppendingPathComponent:[NSString stringWithFormat:@"archive-%06d.bin", c->next_seq++]];
+        if (!link(tmp.fileSystemRepresentation, path.fileSystemRepresentation))
+            break;
+        if (errno != EEXIST)
+            ok = false;
+        path = nil;
+    }
+    ok = ok && path;
+    unlink(tmp.fileSystemRepresentation);
+    if (ok) {
         st.serialized++;
         struct stat sb;
         if (!stat(path.fileSystemRepresentation, &sb))
             c->archive_bytes += (uint64_t)sb.st_size;
         [c->files addObject:path];
     } else {
-        rsm_log("cache: writing %s failed: %s", path.lastPathComponent.UTF8String,
-                e ? e.localizedDescription.UTF8String : strerror(errno));
-        unlink(tmp.fileSystemRepresentation);
+        rsm_log("cache: writing an archive failed: %s", e ? e.localizedDescription.UTF8String : strerror(errno));
     }
     // Written (or not): the object stays for lookups, never gets more adds.
     [c->archives addObject:c->fresh];
@@ -912,13 +923,20 @@ static void rsm_open_disk(RSMShaderCache *c, warm_list *wl) {
         return;
     }
     rsm_clean_base(base, prefix);
-    // Leftovers of interrupted archive writes.
+    // Leftovers of interrupted archive writes (".tmp.<pid>"), unless that process still runs: a
+    // second game instance must not delete the first one's file while it is being written.
     DIR *d = opendir(dir.fileSystemRepresentation);
     if (d) {
         struct dirent *de;
-        while ((de = readdir(d)))
-            if (!strncmp(de->d_name, "archive-", 8) && strstr(de->d_name, ".tmp"))
-                unlink([dir stringByAppendingPathComponent:@(de->d_name)].fileSystemRepresentation);
+        while ((de = readdir(d))) {
+            const char *t = strstr(de->d_name, ".tmp");
+            if (strncmp(de->d_name, "archive-", 8) || !t)
+                continue;
+            int pid = t[4] == '.' ? atoi(t + 5) : 0;
+            if (pid > 0 && pid != getpid() && (kill(pid, 0) == 0 || errno == EPERM))
+                continue;
+            unlink([dir stringByAppendingPathComponent:@(de->d_name)].fileSystemRepresentation);
+        }
         closedir(d);
     }
     c->dir = dir;

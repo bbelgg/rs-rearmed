@@ -395,6 +395,17 @@ int main(int argc, char **argv) {
           "after the garbage manifest the cache is whole again (%d warmed, %d misses)", again.pipe_warmed,
           again.misses);
 
+    // Temp files of interrupted archive writes go, unless their process still runs (another
+    // instance writing right now).
+    sh("echo x > '%s/archive-new.tmp.%d' && echo x > '%s/archive-new.tmp.99999999'", sub, (int)getpid(), sub);
+    run_result tmps = run("tmp-files", NULL);
+    check(tmps.rc == 0 && tmps.bad == 0, "tmp-files run (rc %d)", tmps.rc);
+    snprintf(path, sizeof path, "%s/archive-new.tmp.%d", sub, (int)getpid());
+    check(file_size(path) > 0, "a running process's temp archive is left alone");
+    unlink(path);
+    snprintf(path, sizeof path, "%s/archive-new.tmp.99999999", sub);
+    check(file_size(path) < 0, "a dead process's temp archive is removed");
+
     // Stale directories: ours from another build go, other files stay.
     sh("mkdir -p '%s/rsm1-plantedold-0-gpu' '%s/rsm1-plantedother-0-gpu' && "
        "echo x > '%s/rsm1-plantedold-0-gpu/archive-000000.bin' && echo x > '%s/rsm1-plantedold-0-gpu/manifest.bin' && "

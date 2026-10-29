@@ -10,10 +10,12 @@
 //   <dir of libRSOpenGL>/../Resources/rsmsl-corpus.bin   (app bundle: Contents/MacOS -> Contents/Resources)
 //
 // File format (little-endian):
-//   char magic[8] "RSMSLC1\0"; u32 translator version (RSMSL_VERSION); u32 count
+//   char magic[8] "RSMSLC2\0"; u32 translator version (RSMSL_VERSION); u32 count;
+//   u32 pool_count; u32 pool_offset
 //   count x { u64 key (rsmsl_key); u32 vs_len; u32 fs_len; u32 offset; u32 size; u32 flags; u32 0 }
 //            sorted by key
-//   entries at `offset`: str msl;
+//   entries at `offset`: u32 n; n x u32 pool index        the MSL, as concatenated pool strings
+//            (prelude / vertex part / fragment part, shared between programs);
 //            u32 n; n x { str name; i32 location; i32 type }                       attributes
 //            u32 n; n x { str name; i32 type, array_size, stages, vs_offset, fs_offset, stride }
 //            u32 n; n x { str name; i32 type, stages, index }                       samplers
@@ -34,6 +36,7 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <map>
 #include <mutex>
 #include <set>
 #include <string>
@@ -41,7 +44,8 @@
 
 namespace {
 
-const char kMagic[8] = {'R', 'S', 'M', 'S', 'L', 'C', '1', 0};
+const char kMagic[8] = {'R', 'S', 'M', 'S', 'L', 'C', '2', 0};
+const size_t kHeader = 24;
 
 struct IndexEntry {
     uint64_t key;
@@ -58,6 +62,7 @@ struct Corpus {
     size_t size = 0;
     const IndexEntry *index = nullptr;
     uint32_t count = 0;
+    std::vector<std::pair<uint32_t, uint32_t>> pool;  // offset, length
 };
 Corpus g;
 
@@ -84,15 +89,27 @@ bool try_open(const std::string &path) {
     int fd = open(path.c_str(), O_RDONLY);
     if (fd < 0) return false;
     struct stat st;
-    if (fstat(fd, &st) || st.st_size < 16) { close(fd); return false; }
+    if (fstat(fd, &st) || st.st_size < (off_t)kHeader) { close(fd); return false; }
     void *m = mmap(nullptr, (size_t)st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
     close(fd);
     if (m == MAP_FAILED) return false;
     const unsigned char *d = (const unsigned char *)m;
-    uint32_t ver, count;
+    uint32_t ver, count, pool_count, pool_off;
     memcpy(&ver, d + 8, 4);
     memcpy(&count, d + 12, 4);
-    if (memcmp(d, kMagic, 8) || ver != RSMSL_VERSION || 16 + (uint64_t)count * sizeof(IndexEntry) > (uint64_t)st.st_size) {
+    memcpy(&pool_count, d + 16, 4);
+    memcpy(&pool_off, d + 20, 4);
+    bool ok = !memcmp(d, kMagic, 8) && ver == RSMSL_VERSION && kHeader + (uint64_t)count * sizeof(IndexEntry) <= (uint64_t)st.st_size;
+    std::vector<std::pair<uint32_t, uint32_t>> pool;
+    for (uint64_t o = pool_off, i = 0; ok && i < pool_count; i++) {
+        uint32_t n;
+        if (o + 4 > (uint64_t)st.st_size) { ok = false; break; }
+        memcpy(&n, d + o, 4);
+        if (o + 4 + n > (uint64_t)st.st_size) { ok = false; break; }
+        pool.push_back({(uint32_t)(o + 4), n});
+        o += 4 + n;
+    }
+    if (!ok) {
         logf("ignoring corpus %s (%s)", path.c_str(), memcmp(d, kMagic, 8) ? "not a corpus" : "other translator version");
         munmap(m, (size_t)st.st_size);
         return false;
@@ -100,8 +117,9 @@ bool try_open(const std::string &path) {
     g.path = path;
     g.data = d;
     g.size = (size_t)st.st_size;
-    g.index = (const IndexEntry *)(d + 16);
+    g.index = (const IndexEntry *)(d + kHeader);
     g.count = count;
+    g.pool = std::move(pool);
     logf("corpus %s: %u programs", path.c_str(), count);
     return true;
 }
@@ -165,8 +183,15 @@ struct Reader {
 rsmsl_program *decode(const IndexEntry *e) {
     Reader r{g.data + e->offset, g.data + e->offset + e->size};
     rsmsl_program *p = (rsmsl_program *)calloc(1, sizeof *p);
-    p->msl = r.str();
     uint32_t n = r.u32();
+    std::string msl;
+    for (uint32_t i = 0; r.ok && i < n; i++) {
+        uint32_t k = r.u32();
+        if (k >= g.pool.size()) { r.ok = false; break; }
+        msl.append((const char *)g.data + g.pool[k].first, g.pool[k].second);
+    }
+    p->msl = strdup(msl.c_str());
+    n = r.u32();
     if (n > 64) r.ok = false;
     p->attribs = (rsmsl_attrib *)calloc(r.ok && n ? n : 1, sizeof(rsmsl_attrib));
     for (uint32_t i = 0; r.ok && i < n; i++, p->n_attribs++) {
@@ -239,8 +264,17 @@ bool bindings_match(const rsmsl_program *p, const rsmsl_attrib *bound, int n_bou
 struct WEntry {
     uint64_t key;
     uint32_t vs_len, fs_len, flags;
-    std::string blob;
+    std::vector<std::string> segs;  // MSL pieces, pooled at write time
+    std::string blob;               // reflection
 };
+
+// Prelude / vertex part / fragment part: identical across many programs.
+std::vector<std::string> split_msl(const std::string &m) {
+    std::vector<std::string> v;
+    size_t a = m.find("\nstruct rs_vs_"), b = a == std::string::npos ? a : m.find("\nstruct rs_fs_", a);
+    if (a == std::string::npos || b == std::string::npos) return {m};
+    return {m.substr(0, a), m.substr(a, b - a), m.substr(b)};
+}
 
 void put_u32(std::string &b, uint32_t v) { b.append((const char *)&v, 4); }
 void put_str(std::string &b, const char *s) {
@@ -297,7 +331,7 @@ extern "C" void rsmsl_corpus_add(rsmsl_corpus_writer *w, const char *vs, const c
     e.fs_len = (uint32_t)strlen(fs ? fs : "");
     e.flags = flags;
     std::string &b = e.blob;
-    put_str(b, p->msl);
+    e.segs = split_msl(p->msl);
     put_u32(b, (uint32_t)p->n_attribs);
     for (int i = 0; i < p->n_attribs; i++) {
         put_str(b, p->attribs[i].name);
@@ -325,16 +359,32 @@ extern "C" void rsmsl_corpus_add(rsmsl_corpus_writer *w, const char *vs, const c
 
 extern "C" int rsmsl_corpus_finish(rsmsl_corpus_writer *w, const char *path) {
     std::sort(w->entries.begin(), w->entries.end(), [](const WEntry &a, const WEntry &b) { return a.key < b.key; });
+    std::map<std::string, uint32_t> pool_idx;
+    std::string pool;
+    uint32_t off = (uint32_t)(kHeader + w->entries.size() * sizeof(IndexEntry));
+    std::string index, blobs;
+    for (auto &e : w->entries) {
+        std::string b;
+        put_u32(b, (uint32_t)e.segs.size());
+        for (auto &sg : e.segs) {
+            auto it = pool_idx.find(sg);
+            if (it == pool_idx.end()) {
+                it = pool_idx.emplace(sg, (uint32_t)pool_idx.size()).first;
+                put_str(pool, sg.c_str());
+            }
+            put_u32(b, it->second);
+        }
+        b += e.blob;
+        IndexEntry ie = {e.key, e.vs_len, e.fs_len, off + (uint32_t)blobs.size(), (uint32_t)b.size(), e.flags, 0};
+        index.append((const char *)&ie, sizeof ie);
+        blobs += b;
+    }
     std::string head(kMagic, 8);
     put_u32(head, RSMSL_VERSION);
     put_u32(head, (uint32_t)w->entries.size());
-    uint32_t off = (uint32_t)(16 + w->entries.size() * sizeof(IndexEntry));
-    std::string index, blobs;
-    for (auto &e : w->entries) {
-        IndexEntry ie = {e.key, e.vs_len, e.fs_len, off + (uint32_t)blobs.size(), (uint32_t)e.blob.size(), e.flags, 0};
-        index.append((const char *)&ie, sizeof ie);
-        blobs += e.blob;
-    }
+    put_u32(head, (uint32_t)pool_idx.size());
+    put_u32(head, off + (uint32_t)blobs.size());
+    blobs += pool;
     delete w;
     std::string tmp = std::string(path) + ".tmp";
     FILE *f = fopen(tmp.c_str(), "wb");

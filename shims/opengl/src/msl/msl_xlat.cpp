@@ -1608,6 +1608,11 @@ struct Uni {
 const char *kPrelude =
     "#include <metal_stdlib>\n"
     "using namespace metal;\n"
+    "// IEEE semantics as GL (NaN / inf from the Cg shim's ARB rules, precise transcendentals); before\n"
+    "// MSL 3.2 the core compiles with fastMathEnabled = NO instead.\n"
+    "#if __METAL_VERSION__ >= 320\n"
+    "#pragma METAL fp math_mode(safe)\n"
+    "#endif\n"
     "\n"
     "// GLSL built-ins without a direct MSL equivalent.\n"
     "template<typename T, typename U> inline T rs_mod(T x, U y) { return x - y * floor(x / y); }\n"

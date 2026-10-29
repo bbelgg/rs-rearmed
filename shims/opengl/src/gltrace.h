@@ -14,8 +14,9 @@ struct rs_targ {
 
 // a[0] is a dummy; a[1..n] are the arguments, in call order.
 void rs_tr_call(int idx, const char *params, const struct rs_targ *a, uint64_t ret);
-// real: system implementation of every wrapped function by RS_GL_IDX_*.
-void rs_tr_init(void *const *real, const char *const *names);
+// real: the backend's implementation of every wrapped function by RS_GL_IDX_*.
+// sys_gl: the backend is the system framework (else it is never called directly).
+void rs_tr_init(void *const *real, const char *const *names, int sys_gl);
 // Called before flushBuffer. snap(ctx, path) saves the back buffer as a PNG.
 void rs_tr_frame_end(void *ctx, unsigned long frame, void (*snap)(void *, const char *));
 // rsgl.c: hand a GL error found by the tracer back to the game's glGetError.

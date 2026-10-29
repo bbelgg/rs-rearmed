@@ -17,13 +17,19 @@
 //                       The spy wraps only the game's imports and always uses
 //                       the system framework.
 //
-// Both count calls per function and, with RS_GL_CHECK=1, check glGetError after
-// every call. An error found that way is handed back on the caller's next
-// glGetError, so the game still sees it.
+// With RS_GL_LOG, RS_GL_CHECK, RS_GL_TRACE_DIR or RS_GL_STATS set, every call
+// takes a slow path that counts it per function (rs_gl_stats) and, with
+// RS_GL_CHECK=1, checks glGetError after it; an error found that way is handed
+// back on the caller's next glGetError, so the game still sees it. Otherwise a
+// wrapper is one flag test and a tail call (nothing is counted).
+//
+// The shim also tracks the program glUseProgram bound in each context, for the
+// Cg shim: rs_gl_current_program() (rs_gfx.h).
 //
 // Environment:
 //   RS_GL_LOG=<file>          write a report there every 2 s and at exit
 //   RS_GL_CHECK=1             glGetError after every call
+//   RS_GL_STATS=1             count calls (rs_gl_stats) without a report
 //   RS_GL_DUMP_SHADERS=<dir>  save each glShaderSource as <dir>/<seq>_<id>_<type>.glsl
 //   RS_GL_SNAPSHOT_DIR=<dir>  save the back buffer as PNG before a flushBuffer,
 //                             every RS_GL_SNAPSHOT_SECS (default 5) seconds; once
@@ -55,6 +61,12 @@
 #define GL_EXTENSIONS 0x1F03
 #define GL_FRAMEBUFFER_BINDING 0x8CA6
 #define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
+#define GL_FRAMEBUFFER 0x8D40
+#define GL_READ_FRAMEBUFFER 0x8CA8
+#define GL_DRAW_FRAMEBUFFER 0x8CA9
+#define GL_LINK_STATUS 0x8B82
+#define GL_FALSE 0
+#define GL_TRUE 1
 
 #ifdef RS_GL_SPY
 #include "../../include/interpose.h"
@@ -92,6 +104,8 @@ static unsigned char rs_is_cgl[RS_GL_COUNT];  // CGL*: no GL error state
 static _Atomic unsigned long rs_errors[RS_GL_COUNT];
 static _Atomic GLenum rs_first_error[RS_GL_COUNT];
 static int rs_check, rs_verbose;
+// Set once at load, before any call: count, check and trace (see the wrappers).
+static unsigned char rs_slow;
 static const char *rs_log_path, *rs_shader_dir;
 static __thread GLenum rs_pending_error;
 static __thread GLenum rs_last_pname;
@@ -136,10 +150,7 @@ static inline void rs_enter(int i) {
     atomic_fetch_add_explicit(&rs_calls[i], 1, memory_order_relaxed);
 }
 
-static void rs_leave(int i) {
-    // CGL calls have no GL error state; glGetError reports its own.
-    if (!rs_check || i == RS_GL_IDX_glGetError || rs_is_cgl[i])
-        return;
+static __attribute__((noinline)) void rs_leave_check(int i) {
     GLenum e = rs_real_glGetError();
     if (e == GL_NO_ERROR)
         return;
@@ -156,6 +167,12 @@ static void rs_leave(int i) {
     }
     if (rs_pending_error == GL_NO_ERROR)
         rs_pending_error = e;
+}
+
+static inline void rs_leave(int i) {
+    // CGL calls have no GL error state; glGetError reports its own.
+    if (rs_check && i != RS_GL_IDX_glGetError && !rs_is_cgl[i])
+        rs_leave_check(i);
 }
 
 // --- Specials -----------------------------------------------------------------
@@ -191,6 +208,51 @@ static void rs_glBindFramebuffer(GLenum target, GLuint fb) {
 static void rs_glBindFramebufferEXT(GLenum target, GLuint fb) {
     rs_real_glBindFramebufferEXT(target, fb ? fb : rs_gfx_gl_fbo());
 }
+
+// Deleting the bound framebuffer reverts the binding to the real 0, which has
+// no storage here: put the stand-in back. The stand-in itself is never deleted
+// (the caller can't have a name for it).
+static void rs_glDeleteFramebuffers(GLsizei n, const GLuint *fbs) {
+    GLuint own = rs_gfx_gl_fbo();
+    if (!own || n <= 0 || !fbs) {
+        rs_real_glDeleteFramebuffers(n, fbs);
+        return;
+    }
+    for (GLsizei i = 0; i < n; i++)
+        if (fbs[i] != own)
+            rs_real_glDeleteFramebuffers(1, &fbs[i]);
+    GLint draw = -1, read = -1;
+    rs_real_glGetIntegerv(GL_FRAMEBUFFER_BINDING, &draw);
+    rs_real_glGetIntegerv(GL_READ_FRAMEBUFFER_BINDING, &read);
+    if (draw == 0 && read == 0)
+        rs_real_glBindFramebuffer(GL_FRAMEBUFFER, own);
+    else if (draw == 0)
+        rs_real_glBindFramebuffer(GL_DRAW_FRAMEBUFFER, own);
+    else if (read == 0)
+        rs_real_glBindFramebuffer(GL_READ_FRAMEBUFFER, own);
+}
+
+static int rs_is_fb_binding(GLenum pname) {
+    return pname == GL_FRAMEBUFFER_BINDING || pname == GL_READ_FRAMEBUFFER_BINDING;
+}
+
+static void rs_glGetFloatv(GLenum pname, GLfloat *params) {
+    rs_real_glGetFloatv(pname, params);
+    GLuint own;
+    if (rs_is_fb_binding(pname) && params && *params != 0 && (own = rs_gfx_gl_fbo()) &&
+        *params == (GLfloat)own)
+        *params = 0;
+}
+
+static void rs_glGetBooleanv(GLenum pname, GLboolean *params) {
+    if (rs_is_fb_binding(pname) && params && rs_gfx_gl_fbo()) {
+        GLint v = 0;
+        rs_real_glGetIntegerv(pname, &v);
+        *params = v && (GLuint)v != rs_gfx_gl_fbo() ? GL_TRUE : GL_FALSE;
+        return;
+    }
+    rs_real_glGetBooleanv(pname, params);
+}
 #endif
 
 // Remember the pname so rs_leave can say which query failed (the game's only
@@ -199,8 +261,7 @@ static void rs_glGetIntegerv(GLenum pname, GLint *params) {
     rs_last_pname = pname;
     rs_real_glGetIntegerv(pname, params);
 #ifndef RS_GL_SPY
-    if ((pname == GL_FRAMEBUFFER_BINDING || pname == GL_READ_FRAMEBUFFER_BINDING) && params &&
-        *params && (GLuint)*params == rs_gfx_gl_fbo())
+    if (rs_is_fb_binding(pname) && params && *params && (GLuint)*params == rs_gfx_gl_fbo())
         *params = 0;
 #endif
 }
@@ -241,6 +302,240 @@ static void rs_glShaderSource(GLuint shader, GLsizei count, const GLchar *const 
     rs_real_glShaderSource(shader, count, string, length);
 }
 
+// --- Current program (rs_gl_current_program) --------------------------------------
+// The program glUseProgram bound, per GL context, so the Cg shim can skip
+// redundant binds without a glGetIntegerv (a sync with the multithreaded GL
+// engine). Exact or -1, never stale:
+//  - Keyed by the context current at the query (the backend's
+//    CGLGetCurrentContext), so a context switch the shim never sees
+//    (-[NSOpenGLContext makeCurrentContext] calls CGL inside AppKit) can't leave
+//    an old answer: a context nothing was bound in yet answers -1.
+//  - glUseProgram(p) records p only when it can't fail: 0, or a program created
+//    by glCreateProgram in this share group whose last glLinkProgram /
+//    glProgramBinary succeeded (GL_LINK_STATUS read right after it) and that
+//    wasn't deleted. Anything else (a failed bind keeps the old program) -> -1.
+//  - glDeleteProgram(p) and a relink of p turn p into -1 in every context that
+//    has it current (a deleted program stays current in GL until replaced, and
+//    its name can come back from glCreateProgram).
+//  - A created context (CGLCreateContext, rs_gfx_create_*, NSOpenGLContext
+//    init) starts unknown, and a new share group starts with no programs, so
+//    a reused address can't inherit state; a destroyed one frees its slot.
+// A context's prog is written only by the thread it's current on (GL allows one
+// at a time), except the delete/relink invalidation, a compare-and-swap; slots
+// and groups change under rs_pt_mu.
+// Assumes every GL call of the process goes through libRSOpenGL.
+#ifndef RS_GL_SPY
+#define RS_PT_CTX 64          // live contexts tracked; more answer -1
+#define RS_PT_GROUPS 32       // share groups
+#define RS_PT_NAMES 65536     // program names tracked per group; higher ones answer -1
+#define RS_PT_CREATED 1
+#define RS_PT_LINKED 2
+#define RS_PT_BUSY ((void *)1)
+
+#define RS_PT_DEAD ((void *)2)
+
+// Share groups and slots are claimed and released under rs_pt_mu. A group is
+// reassigned only when no slot refers to it, and cleared then.
+struct rs_pt_group {
+    void *key;                 // the CGLShareGroupObj (Metal: the context); RS_PT_DEAD
+    int refs;                  // slots pointing here
+    _Atomic unsigned char *st; // RS_PT_* per program name
+};
+struct rs_pt_ctx {
+    _Atomic(void *) ctx;      // NULL free, RS_PT_BUSY being claimed
+    _Atomic int prog;         // -1 unknown
+    struct rs_pt_group *g;
+};
+static struct rs_pt_group rs_pt_groups[RS_PT_GROUPS];
+static struct rs_pt_ctx rs_pt_ctxs[RS_PT_CTX];
+static pthread_mutex_t rs_pt_mu = PTHREAD_MUTEX_INITIALIZER;  // claiming slots
+static __thread struct rs_pt_ctx *rs_pt_tl;                     // this thread's last slot
+
+static void *rs_pt_current_ctx(void) { return (void *)rs_real_CGLGetCurrentContext(); }
+
+// rs_pt_mu held. The group record for key, or a cleared unreferenced one.
+static struct rs_pt_group *rs_pt_group_get(void *key) {
+    struct rs_pt_group *free_g = NULL;
+    for (int i = 0; i < RS_PT_GROUPS; i++) {
+        struct rs_pt_group *g = &rs_pt_groups[i];
+        if (g->key == key && key)
+            return g;
+        if (!g->refs && (!free_g || !g->key))
+            free_g = g;
+    }
+    if (!free_g)
+        return NULL;
+    if (!free_g->st)
+        free_g->st = calloc(RS_PT_NAMES, 1);
+    else
+        for (int n = 0; n < RS_PT_NAMES; n++)
+            atomic_store_explicit(&free_g->st[n], 0, memory_order_relaxed);
+    if (!free_g->st)
+        return NULL;
+    free_g->key = key;
+    return free_g;
+}
+
+// The slot of the context current on this thread; claim one if `claim`.
+static struct rs_pt_ctx *rs_pt_slot(void *ctx, int claim) {
+    struct rs_pt_ctx *t = rs_pt_tl;
+    if (t && atomic_load_explicit(&t->ctx, memory_order_relaxed) == ctx)
+        return t;
+    for (int i = 0; i < RS_PT_CTX; i++)
+        if (atomic_load_explicit(&rs_pt_ctxs[i].ctx, memory_order_acquire) == ctx)
+            return rs_pt_tl = &rs_pt_ctxs[i];
+    if (!claim)
+        return NULL;
+    pthread_mutex_lock(&rs_pt_mu);
+    struct rs_pt_ctx *s = NULL;
+    for (int i = 0; i < RS_PT_CTX && !s; i++)
+        if (!atomic_load_explicit(&rs_pt_ctxs[i].ctx, memory_order_relaxed))
+            s = &rs_pt_ctxs[i];
+    struct rs_pt_group *g = s ? rs_pt_group_get((void *)rs_real_CGLGetShareGroup(ctx)) : NULL;
+    if (g) {
+        atomic_store_explicit(&s->ctx, RS_PT_BUSY, memory_order_relaxed);
+        g->refs++;
+        s->g = g;
+        atomic_store_explicit(&s->prog, -1, memory_order_relaxed);
+        atomic_store_explicit(&s->ctx, ctx, memory_order_release);
+    } else {
+        s = NULL;
+    }
+    pthread_mutex_unlock(&rs_pt_mu);
+    return s ? (rs_pt_tl = s) : NULL;
+}
+
+static void rs_pt_forget(void *ctx) {
+    if (!ctx)
+        return;
+    pthread_mutex_lock(&rs_pt_mu);
+    for (int i = 0; i < RS_PT_CTX; i++)
+        if (atomic_load_explicit(&rs_pt_ctxs[i].ctx, memory_order_relaxed) == ctx) {
+            atomic_store_explicit(&rs_pt_ctxs[i].prog, -1, memory_order_relaxed);
+            atomic_store_explicit(&rs_pt_ctxs[i].ctx, NULL, memory_order_release);
+            if (rs_pt_ctxs[i].g && !--rs_pt_ctxs[i].g->refs)
+                rs_pt_ctxs[i].g->key = NULL;
+            rs_pt_ctxs[i].g = NULL;
+        }
+    pthread_mutex_unlock(&rs_pt_mu);
+}
+
+// p may no longer be what it was in group g: no context of g has it current.
+static void rs_pt_invalidate(struct rs_pt_group *g, GLuint p) {
+    pthread_mutex_lock(&rs_pt_mu);
+    for (int i = 0; i < RS_PT_CTX; i++) {
+        struct rs_pt_ctx *s = &rs_pt_ctxs[i];
+        int want = (int)p;
+        if (s->g == g)
+            atomic_compare_exchange_strong(&s->prog, &want, -1);
+    }
+    pthread_mutex_unlock(&rs_pt_mu);
+}
+
+static struct rs_pt_group *rs_pt_cur_group(void) {
+    void *c = rs_pt_current_ctx();
+    struct rs_pt_ctx *s = c ? rs_pt_slot(c, 1) : NULL;
+    return s ? s->g : NULL;
+}
+
+// Called for every context created / destroyed (rs_gfx.c, nsgl_hook.m, CGL wrappers).
+void rs_gl_ctx_created(void *ctx, int new_group) {
+    if (!ctx)
+        return;
+    rs_pt_forget(ctx);
+    if (!new_group)
+        return;
+    // A new group at the address of a dead one: never match the old record again.
+    void *key = (void *)rs_real_CGLGetShareGroup((CGLContextObj)ctx);
+    pthread_mutex_lock(&rs_pt_mu);
+    for (int i = 0; i < RS_PT_GROUPS; i++)
+        if (key && rs_pt_groups[i].key == key)
+            rs_pt_groups[i].key = rs_pt_groups[i].refs ? RS_PT_DEAD : NULL;
+    pthread_mutex_unlock(&rs_pt_mu);
+}
+void rs_gl_ctx_destroyed(void *ctx) { rs_pt_forget(ctx); }
+
+__attribute__((visibility("default"))) int rs_gl_current_program(void) {
+    void *c = rs_pt_current_ctx();
+    struct rs_pt_ctx *s = c ? rs_pt_slot(c, 0) : NULL;
+    return s ? atomic_load_explicit(&s->prog, memory_order_relaxed) : -1;
+}
+
+static void rs_glUseProgram(GLuint p) {
+    rs_real_glUseProgram(p);
+    void *c = rs_pt_current_ctx();
+    struct rs_pt_ctx *s = c ? rs_pt_slot(c, 1) : NULL;
+    if (!s)
+        return;
+    int v = -1;
+    if (p == 0)
+        v = 0;
+    else if (p < RS_PT_NAMES &&
+             atomic_load_explicit(&s->g->st[p], memory_order_relaxed) == (RS_PT_CREATED | RS_PT_LINKED))
+        v = (int)p;
+    atomic_store_explicit(&s->prog, v, memory_order_relaxed);
+}
+
+static GLuint rs_glCreateProgram(void) {
+    GLuint p = rs_real_glCreateProgram();
+    struct rs_pt_group *g;
+    if (p && p < RS_PT_NAMES && (g = rs_pt_cur_group())) {
+        rs_pt_invalidate(g, p);  // a name nothing should still have current
+        atomic_store_explicit(&g->st[p], RS_PT_CREATED, memory_order_relaxed);
+    }
+    return p;
+}
+
+// After a link or a binary load: is p usable now? Only asked for programs this
+// group created, so the query itself can't raise an error.
+static void rs_pt_linked(GLuint p) {
+    struct rs_pt_group *g;
+    if (!p || p >= RS_PT_NAMES || !(g = rs_pt_cur_group()))
+        return;
+    rs_pt_invalidate(g, p);  // a relinked current program: conservatively unknown
+    if (!(atomic_load_explicit(&g->st[p], memory_order_relaxed) & RS_PT_CREATED))
+        return;
+    GLint ok = GL_FALSE;
+    rs_real_glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    atomic_store_explicit(&g->st[p], ok ? RS_PT_CREATED | RS_PT_LINKED : RS_PT_CREATED,
+                          memory_order_relaxed);
+}
+
+static void rs_glLinkProgram(GLuint p) {
+    rs_real_glLinkProgram(p);
+    rs_pt_linked(p);
+}
+
+static void rs_glProgramBinary(GLuint p, GLenum format, const GLvoid *binary, GLsizei length) {
+    rs_real_glProgramBinary(p, format, binary, length);
+    rs_pt_linked(p);
+}
+
+static void rs_glDeleteProgram(GLuint p) {
+    rs_real_glDeleteProgram(p);
+    struct rs_pt_group *g;
+    if (p && p < RS_PT_NAMES && (g = rs_pt_cur_group())) {
+        atomic_store_explicit(&g->st[p], 0, memory_order_relaxed);
+        rs_pt_invalidate(g, p);
+    }
+}
+
+static CGLError rs_CGLCreateContext(CGLPixelFormatObj pix, CGLContextObj share, CGLContextObj *ctx) {
+    CGLError e = rs_real_CGLCreateContext(pix, share, ctx);
+    if (!e && ctx)
+        rs_gl_ctx_created(*ctx, share == NULL);
+    return e;
+}
+
+static CGLError rs_CGLDestroyContext(CGLContextObj ctx) {
+    rs_gl_ctx_destroyed(ctx);
+    return rs_real_CGLDestroyContext(ctx);
+}
+#else
+void rs_gl_ctx_created(void *ctx, int new_group) { (void)ctx, (void)new_group; }
+void rs_gl_ctx_destroyed(void *ctx) { (void)ctx; }
+#endif
+
 // The tracer stashes an error it found while reading state back (it must not
 // swallow one the game hasn't asked for yet).
 void rs_tr_stash_error(unsigned e) {
@@ -249,22 +544,37 @@ void rs_tr_stash_error(unsigned e) {
 }
 
 // --- Wrappers -----------------------------------------------------------------
-#define RS_GL_FN(ret, name, params, args)            \
-    RS_WRAP_LINKAGE ret RS_WRAP(name) params {       \
-        rs_enter(RS_GL_IDX_##name);                  \
-        ret r = rs_impl_##name args;                 \
-        rs_leave(RS_GL_IDX_##name);                  \
-        if (__builtin_expect(rs_tr_on, 0))           \
+// The fast path is a load of rs_slow and a tail call into the backend; the
+// slow one (out of line, so the fast one needs no stack frame) counts, checks
+// and traces.
+#define RS_GL_FN(ret, name, params, args)                                                  \
+    static __attribute__((noinline)) ret rs_slow_##name params {                           \
+        rs_enter(RS_GL_IDX_##name);                                                        \
+        ret r = rs_impl_##name args;                                                       \
+        rs_leave(RS_GL_IDX_##name);                                                        \
+        if (rs_tr_on)                                                                      \
             rs_tr_call(RS_GL_IDX_##name, #params, RS_TR_PACK args, (uint64_t)(uintptr_t)r); \
-        return r;                                    \
+        return r;                                                                          \
+    }                                                                                      \
+    RS_WRAP_LINKAGE ret RS_WRAP(name) params {                                             \
+        if (__builtin_expect(rs_slow, 0))                                                  \
+            return rs_slow_##name args;                                                    \
+        return rs_impl_##name args;                                                        \
     }
-#define RS_GL_VOID(name, params, args)               \
-    RS_WRAP_LINKAGE void RS_WRAP(name) params {      \
-        rs_enter(RS_GL_IDX_##name);                  \
-        rs_impl_##name args;                         \
-        rs_leave(RS_GL_IDX_##name);                  \
-        if (__builtin_expect(rs_tr_on, 0))           \
-            rs_tr_call(RS_GL_IDX_##name, #params, RS_TR_PACK args, 0); \
+#define RS_GL_VOID(name, params, args)                                                     \
+    static __attribute__((noinline)) void rs_slow_##name params {                          \
+        rs_enter(RS_GL_IDX_##name);                                                        \
+        rs_impl_##name args;                                                               \
+        rs_leave(RS_GL_IDX_##name);                                                        \
+        if (rs_tr_on)                                                                      \
+            rs_tr_call(RS_GL_IDX_##name, #params, RS_TR_PACK args, 0);                     \
+    }                                                                                      \
+    RS_WRAP_LINKAGE void RS_WRAP(name) params {                                            \
+        if (__builtin_expect(rs_slow, 0)) {                                                \
+            rs_slow_##name args;                                                           \
+            return;                                                                        \
+        }                                                                                  \
+        rs_impl_##name args;                                                               \
     }
 #include "gl_api.inc"
 #undef RS_GL_FN
@@ -433,7 +743,11 @@ __attribute__((constructor)) static void rs_gl_init(void) {
 #include "gl_api.inc"
 #undef RS_GL_FN
 #undef RS_GL_VOID
-    rs_tr_init(real_tab, rs_names);
+#ifdef RS_GL_SPY
+    rs_tr_init(real_tab, rs_names, 1);
+#else
+    rs_tr_init(real_tab, rs_names, backend == RS_GFX_GL);
+#endif
     rs_impl_glGetError = rs_glGetError;
     rs_impl_glGetString = rs_glGetString;
     rs_impl_glGetIntegerv = rs_glGetIntegerv;
@@ -442,7 +756,18 @@ __attribute__((constructor)) static void rs_gl_init(void) {
 #ifndef RS_GL_SPY
     rs_impl_glBindFramebuffer = rs_glBindFramebuffer;
     rs_impl_glBindFramebufferEXT = rs_glBindFramebufferEXT;
+    rs_impl_glDeleteFramebuffers = rs_glDeleteFramebuffers;
+    rs_impl_glGetFloatv = rs_glGetFloatv;
+    rs_impl_glGetBooleanv = rs_glGetBooleanv;
+    rs_impl_glUseProgram = rs_glUseProgram;
+    rs_impl_glCreateProgram = rs_glCreateProgram;
+    rs_impl_glLinkProgram = rs_glLinkProgram;
+    rs_impl_glProgramBinary = rs_glProgramBinary;
+    rs_impl_glDeleteProgram = rs_glDeleteProgram;
+    rs_impl_CGLCreateContext = rs_CGLCreateContext;
+    rs_impl_CGLDestroyContext = rs_CGLDestroyContext;
 #endif
+    rs_slow = rs_check || rs_log_path || rs_tr_on || ((e = getenv("RS_GL_STATS")) && *e == '1');
 
     if (rs_verbose || rs_log_path)
         fprintf(stderr, "[rs-gl] %s loaded (%s), %d functions, backend %s, check=%d\n", RS_MODE,

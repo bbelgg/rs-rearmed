@@ -90,12 +90,26 @@ static id rs_pf_init(id self, SEL _cmd, const NSOpenGLPixelFormatAttribute *attr
     return r;
 }
 
+// rsgl.c: rs_gl_current_program's per-context state.
+void rs_gl_ctx_created(void *ctx, int new_group);
+void rs_gl_ctx_destroyed(void *ctx);
+
 static id (*rs_orig_ctx_init)(id, SEL, NSOpenGLPixelFormat *, NSOpenGLContext *);
 static id rs_ctx_init(id self, SEL _cmd, NSOpenGLPixelFormat *pf, NSOpenGLContext *share) {
     id r = rs_orig_ctx_init(self, _cmd, pf, share);
+    if (r)
+        rs_gl_ctx_created([(NSOpenGLContext *)r CGLContextObj], share == nil);
     rs_gl_note("NSOpenGLContext initWithFormat:%p shareContext:%p -> %p (CGL %p)", pf, share, r,
                r ? [(NSOpenGLContext *)r CGLContextObj] : NULL);
     return r;
+}
+
+// The CGL context may outlive this (initWithCGLContextObj: retains one): then
+// rs_gl_current_program just starts over at -1 in it.
+static void (*rs_orig_ctx_dealloc)(id, SEL);
+static void rs_ctx_dealloc(id self, SEL _cmd) {
+    rs_gl_ctx_destroyed([(NSOpenGLContext *)self CGLContextObj]);
+    rs_orig_ctx_dealloc(self, _cmd);
 }
 
 static void (*rs_orig_ctx_setvals)(id, SEL, const GLint *, NSOpenGLContextParameter);
@@ -438,6 +452,17 @@ __attribute__((constructor)) static void rs_nsgl_init(void) {
     rs_swizzle([NSOpenGLContext class], @selector(setView:), (IMP)rs_ctx_setview,
                &rs_orig_ctx_setview);
     rs_swizzle([NSOpenGLContext class], @selector(flushBuffer), (IMP)rs_flush, &rs_orig_flush);
+    // Only NSOpenGLContext's own dealloc: an inherited one is NSObject's, for every object.
+    {
+        unsigned n = 0;
+        Method *ms = class_copyMethodList([NSOpenGLContext class], &n);
+        for (unsigned i = 0; i < n; i++)
+            if (method_getName(ms[i]) == NSSelectorFromString(@"dealloc")) {
+                rs_orig_ctx_dealloc = (void (*)(id, SEL))method_setImplementation(ms[i], (IMP)rs_ctx_dealloc);
+                break;
+            }
+        free(ms);
+    }
 
     const char *ft = getenv("RS_GL_FRAMETIMES");
     if (!ft || !*ft)

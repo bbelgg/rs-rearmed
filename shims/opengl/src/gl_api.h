@@ -14,6 +14,7 @@
 #pragma once
 #include <OpenGL/gltypes.h>
 #include <OpenGL/CGLTypes.h>
+#include <OpenGL/CGLDevice.h>  // CGLShareGroupObj
 
 #if defined(RS_GL_SPY) && !defined(RS_GL_GAME_ONLY)
 #define RS_GL_GAME_ONLY

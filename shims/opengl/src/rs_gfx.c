@@ -209,15 +209,27 @@ static rs_gfx_context *gl_create_offscreen(int w, int h) {
 // --- API ---------------------------------------------------------------------------
 #define METAL (rs_gfx_backend() == RS_GFX_METAL)
 
+// rsgl.c: rs_gl_current_program's per-context state (a new context shares nothing).
+void rs_gl_ctx_created(void *ctx, int new_group);
+void rs_gl_ctx_destroyed(void *ctx);
+
+static rs_gfx_context *created(rs_gfx_context *c) {
+    if (c)
+        rs_gl_ctx_created(rs_gfx_cgl(c), 1);
+    return c;
+}
+
 RS_EXPORT rs_gfx_context *rs_gfx_create_offscreen(int w, int h) {
-    return METAL ? rsmtl_gfx_create_offscreen(w, h) : gl_create_offscreen(w, h);
+    return created(METAL ? rsmtl_gfx_create_offscreen(w, h) : gl_create_offscreen(w, h));
 }
 
 RS_EXPORT rs_gfx_context *rs_gfx_create_layer(void *layer, int w, int h) {
-    return METAL ? rsmtl_gfx_create_layer(layer, w, h) : NULL;
+    return created(METAL ? rsmtl_gfx_create_layer(layer, w, h) : NULL);
 }
 
 RS_EXPORT void rs_gfx_destroy(rs_gfx_context *c) {
+    if (c)
+        rs_gl_ctx_destroyed(rs_gfx_cgl(c));
     if (METAL) {
         rsmtl_gfx_destroy(c);
         return;

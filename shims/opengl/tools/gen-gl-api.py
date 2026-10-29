@@ -30,13 +30,21 @@ import sys
 # Headers that declare the functions themselves (gl3.h duplicates gl.h's core
 # prototypes; glext.h adds the ARB/extension entry points the game uses).
 # OpenGL.h declares CGLErrorString without "extern", hence the optional prefix.
-HEADERS = ["gl.h", "glext.h", "gl3.h", "CGLCurrent.h", "OpenGL.h", "CGLContext.h"]
+HEADERS = ["gl.h", "glext.h", "gl3.h", "CGLCurrent.h", "OpenGL.h", "CGLContext.h", "CGLDevice.h"]
 
 PROTO = re.compile(
     r"^\s*(?:(?:extern|GLAPI)\s+)?(?P<ret>[\w\s\*]+?)\s*(?:APIENTRY\s+)?\b(?P<name>(?:gl|CGL)\w+)\s*"
     r"\((?P<params>[^)]*)\)")
 
 NULLABILITY = re.compile(r"\bOPENGL_(?:NULLABLE|NONNULL)\b")
+
+# Weak Metal defaults that are right as they are (no "unimplemented" report): the
+# Metal core shares nothing between contexts, so each is its own share group, and
+# CGL engine switches are no-ops there.
+METAL_DEFAULTS = {
+    "CGLGetShareGroup": "return (CGLShareGroupObj)ctx;",
+    "CGLDisable": "(void)ctx;\n    (void)pname;\n    return kCGLNoError;",
+}
 
 
 def arg_names(params):
@@ -112,6 +120,9 @@ def main():
                 ret, params = protos[n]
                 names, params = arg_names(params)
                 out.write(f"RSMTL_STUB {ret} rsmtl_{n}({params or 'void'}) {{\n")
+                if n in METAL_DEFAULTS:
+                    out.write(f"    {METAL_DEFAULTS[n]}\n}}\n")
+                    continue
                 for a in names:
                     out.write(f"    (void){a};\n")
                 out.write(f"    rsmtl_unimplemented(RS_GL_IDX_{n}, \"{n}\");\n")

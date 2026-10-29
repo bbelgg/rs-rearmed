@@ -11,7 +11,8 @@
 #   libglspy.dylib     the game-import wrappers as a DYLD_INSERT_LIBRARIES
 #                      interposer, for tracing the real game under Rosetta
 #   gl_native_test     arm64 test of every import through a real NSOpenGLContext
-#   gfx_offscreen_test rs_gfx offscreen context: draw, read back, exact pixels
+#   gfx_offscreen_test rs_gfx offscreen context: draw, read back, exact pixels;
+#                      rs_gl_current_program, framebuffer 0 emulation
 
 set(ogl_dir "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ogl_imports "${ogl_dir}/game-gl-imports.txt")
@@ -123,6 +124,12 @@ set_tests_properties(opengl.gfx.offscreen.gl PROPERTIES
 # Needs the shader translator: metal.cmake disables it in a build without one.
 set_tests_properties(opengl.gfx.offscreen.metal PROPERTIES
   ENVIRONMENT "RS_GL_BACKEND=metal;RS_GL_CHECK=1" ${ogl_pass})
+
+# Every gl*/CGL* name a client of the shim imports is wrapped (else on Metal it reaches
+# Apple's GL through the re-export, with no context). Checks whatever is built.
+add_test(NAME opengl.table.clients
+  COMMAND python3 "${ogl_dir}/tools/check-gl-clients.py" "${ogl_inc}" "${CMAKE_BINARY_DIR}/shims")
+set_tests_properties(opengl.table.clients PROPERTIES PASS_REGULAR_EXPRESSION "clients ok")
 
 if(EXISTS "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014")
   # The checked-in import list still matches the game binary.

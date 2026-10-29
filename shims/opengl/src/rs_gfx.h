@@ -34,6 +34,14 @@ void rs_gfx_unlock(rs_gfx_context *ctx);
 // The CGLContextObj the game and CGL calls see: the real one on GL, a token on Metal.
 CGLContextObj rs_gfx_cgl(rs_gfx_context *ctx);
 
+// The program glUseProgram last bound in the calling thread's current context
+// (0 for none), tracked by libRSOpenGL's wrappers on both backends, so no GL
+// query is made. -1 when not known exactly: nothing bound through the shim yet
+// in this context, a program that wasn't created and successfully linked
+// through the shim, or the bound program was deleted or relinked since. Never
+// stale. For the Cg shim (skip a redundant glUseProgram).
+int rs_gl_current_program(void);
+
 #ifdef __cplusplus
 }
 #endif

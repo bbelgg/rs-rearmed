@@ -61,6 +61,7 @@
 //   RS_MTL_SALT_COMPILE=<text>  diagnostics only: the same, but only in the source handed to the
 //                             compiler (cache keys and the manifest keep the plain MSL), so a run
 //                             can meet a known manifest with a cold system Metal cache
+//   RS_METAL_CORPUS_LIMIT=<n>  tests only: warm at most the first n corpus entries
 //   RS_METAL_CORPUS_WARM=0|1  safe load's corpus warm: never / always (default: by the rule in
 //                             "Corpus warm")
 //   RS_MTL_TEST_FAIL=<text>   tests only: MSL containing <text> gets an #error (compile failure path)
@@ -1420,6 +1421,12 @@ static NSArray<NSString *> *rsm_corpus_list(RSMShaderCache *c, uint64_t *id) {
     int n = rsmsl_corpus_count();
     if (n <= 0)
         return @[];
+    // RS_METAL_CORPUS_LIMIT=<n>: tests only, warm at most the first n corpus entries (a full cold
+    // corpus takes minutes). The corpus identity then covers only those, so a later run without
+    // the limit warms the rest.
+    const char *lim = getenv("RS_METAL_CORPUS_LIMIT");
+    if (lim && atoi(lim) > 0 && atoi(lim) < n)
+        n = atoi(lim);
     NSMutableArray<NSString *> *out = [NSMutableArray new];
     NSMutableSet<NSString *> *seen = [NSMutableSet new];
     uint64_t h = 0xcbf29ce484222325ull;

@@ -727,7 +727,13 @@ class InstallerWindow: NSWindow {
         self.contentView = content
         content.wantsLayer = true
 
-        let defaultGameDir = NSHomeDirectory() + "/Library/Application Support/Steam/steamapps/common/Rocksmith2014"
+        // The game folder the current install uses (install.sh's game-dir), else Steam's default library.
+        let installedGameDir = (try? String(contentsOfFile: nativeHome + "/game-dir", encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        var isDir: ObjCBool = false
+        let defaultGameDir = installedGameDir.flatMap {
+            FileManager.default.fileExists(atPath: $0, isDirectory: &isDir) && isDir.boolValue ? $0 : nil
+        } ?? NSHomeDirectory() + "/Library/Application Support/Steam/steamapps/common/Rocksmith2014"
         runner.gameDir = defaultGameDir
 
         let titleLabel = NSTextField(labelWithString: "RS Re-ARMed Installer")

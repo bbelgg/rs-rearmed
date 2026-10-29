@@ -21,7 +21,7 @@ add_custom_command(TARGET cg POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E create_symlink "$<TARGET_FILE:opengl>" "${CMAKE_CURRENT_BINARY_DIR}/libRSOpenGL.dylib"
   VERBATIM)
 
-foreach(t render_test param_dump corpus_load diff_render)
+foreach(t render_test param_dump corpus_load diff_render stress_test)
   add_executable(cg_${t} tests/${t}.c)
   target_link_libraries(cg_${t} PRIVATE cg opengl)
   target_compile_options(cg_${t} PRIVATE -Wno-deprecated-declarations)
@@ -41,6 +41,9 @@ foreach(backend glsl arb)
   set_tests_properties(cg.render.${backend} PROPERTIES ENVIRONMENT "RS_CG_BACKEND=${backend}")
 endforeach()
 
+# The game's call patterns (bind caching, Scaleform's programs in between,
+# several contexts), with the corpus when it is there (below).
+set(cg_stress_args "")
 # Against the game's shader corpus (tools/extract_corpus.py) and NVIDIA's own
 # answers for it (tools/cg_reference.c). Skipped when they haven't been made.
 set(RS_CG_CORPUS "${CMAKE_SOURCE_DIR}/analysis/cg" CACHE PATH "Output of shims/cg/tools/extract_corpus.py")
@@ -57,10 +60,19 @@ if(EXISTS "${RS_CG_CORPUS}/corpus")
               ${CMAKE_CURRENT_SOURCE_DIR}/tests/compare_params.py ${RS_CG_CORPUS}/corpus
               ${RS_CG_CORPUS}/reference.jsonl)
   endif()
+  # GLSL of every corpus program, as input for the GLSL -> MSL translator.
+  add_test(NAME cg.corpus.glsl_dump
+    COMMAND cg_corpus_load --dump-glsl ${CMAKE_CURRENT_BINARY_DIR}/glsl-corpus ${cg_corpus})
+  set(cg_stress_args ${cg_corpus})
   add_test(NAME cg.corpus.render
     COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tests/run_diff_render.sh $<TARGET_FILE:cg_diff_render>
             ${RS_CG_CORPUS}/corpus ${CMAKE_CURRENT_BINARY_DIR}/renders)
 endif()
+
+foreach(backend glsl arb)
+  add_test(NAME cg.stress.${backend} COMMAND cg_stress_test ${cg_stress_args})
+  set_tests_properties(cg.stress.${backend} PROPERTIES ENVIRONMENT "RS_CG_BACKEND=${backend}")
+endforeach()
 
 # x86_64 tool that records NVIDIA's runtime's answers for the corpus
 # (tools/make_reference.sh); links the Cg.framework from the game install.

@@ -9,14 +9,17 @@
 //   glsl            translate to GLSL (arb_glsl.cpp), link each bound
 //                   vertex/fragment pair into a GL program, keep program.local
 //                   in a uniform array. Works on GL contexts without
-//                   ARB_vertex_program, e.g. ANGLE. In the game it sometimes
-//                   never leaves the loading screen.
+//                   ARB_vertex_program: ANGLE, and the Metal backend of
+//                   libRSOpenGL, which translates its GLSL to MSL.
 //
 // Environment:
-//   RS_CG_BACKEND=arb|glsl      backend (default arb)
+//   RS_CG_BACKEND=arb|glsl      backend (default arb; always glsl when
+//                               RS_GL_BACKEND=metal, which has no ARB programs)
 //   RS_CG_GLSL_DIALECT=120|100es
+//   RS_CG_GLSL_EAGER=1          glsl: link a pair at bind time, not at first use
 //   RS_CG_LOG=1                 log errors and program creation to stderr
-//   RS_CG_DUMP_DIR=<dir>        write every translated shader there
+//   RS_CG_DUMP_GLSL=<dir>       write every generated GLSL shader there
+//                               (RS_CG_DUMP_DIR is the old name)
 #define GL_SILENCE_DEPRECATION
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
@@ -30,6 +33,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <pthread.h>
 #include <set>
 #include <string>
 #include <vector>
@@ -37,6 +41,7 @@
 #include "arb_program.h"
 #include "cg_api.h"
 #include "cg_key.h"
+#include "cg_stats.h"
 
 #define CG_EXPORT extern "C" __attribute__((visibility("default")))
 
@@ -57,17 +62,28 @@ enum {
     CG_PROGRAM_NOT_LOADED_ERROR = 34,
 };
 
+bool env_on(const char *name) {
+    const char *v = getenv(name);
+    return v && *v && strcmp(v, "0");
+}
+
 struct Config {
     bool glsl = false;
+    bool glsl_eager = false;
     std::string dialect = "120";
     bool log = false;
     std::string dump_dir;
     Config() {
         const char *b = getenv("RS_CG_BACKEND");
         if (b && !strcmp(b, "glsl")) glsl = true;
+        // libRSOpenGL's Metal core implements no ARB programs.
+        const char *gl = getenv("RS_GL_BACKEND");
+        if (gl && !strcmp(gl, "metal")) glsl = true;
         if (const char *d = getenv("RS_CG_GLSL_DIALECT")) dialect = d;
-        log = getenv("RS_CG_LOG") && *getenv("RS_CG_LOG") && strcmp(getenv("RS_CG_LOG"), "0");
+        glsl_eager = env_on("RS_CG_GLSL_EAGER");
+        log = env_on("RS_CG_LOG");
         if (const char *d = getenv("RS_CG_DUMP_DIR")) dump_dir = d;
+        if (const char *d = getenv("RS_CG_DUMP_GLSL")) dump_dir = d;
     }
 };
 
@@ -84,6 +100,54 @@ void logf(const char *fmt, ...) {
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
     va_end(ap);
+}
+
+// GL calls the shim makes, by kind (rs_cg_gl_stats, cg_stats.h). Every GL call
+// below goes through one of these macros.
+unsigned long long g_stats[RS_CG_STAT_COUNT];
+#define RS_GL_COUNTED(name, stat) \
+    template <class... A> inline void name##_c(A... a) { g_stats[stat]++; ::name(a...); }
+RS_GL_COUNTED(glUseProgram, ST_UseProgram)
+RS_GL_COUNTED(glUniform4fv, ST_Uniform)
+RS_GL_COUNTED(glUniform1i, ST_Uniform)
+RS_GL_COUNTED(glGetIntegerv, ST_Get)
+RS_GL_COUNTED(glCompileShader, ST_Compile)
+RS_GL_COUNTED(glBindProgramARB, ST_BindProgramARB)
+RS_GL_COUNTED(glProgramLocalParameters4fvEXT, ST_ProgramLocal)
+RS_GL_COUNTED(glProgramLocalParameter4fvARB, ST_ProgramLocal)
+RS_GL_COUNTED(glEnable, ST_Enable)
+RS_GL_COUNTED(glDisable, ST_Enable)
+RS_GL_COUNTED(glActiveTexture, ST_Texture)
+RS_GL_COUNTED(glBindTexture, ST_Texture)
+RS_GL_COUNTED(glVertexAttribPointer, ST_Attrib)
+RS_GL_COUNTED(glEnableVertexAttribArray, ST_Attrib)
+RS_GL_COUNTED(glDisableVertexAttribArray, ST_Attrib)
+#undef RS_GL_COUNTED
+#define glUseProgram glUseProgram_c
+#define glUniform4fv glUniform4fv_c
+#define glUniform1i glUniform1i_c
+#define glGetIntegerv glGetIntegerv_c
+#define glCompileShader glCompileShader_c
+#define glBindProgramARB glBindProgramARB_c
+#define glProgramLocalParameters4fvEXT glProgramLocalParameters4fvEXT_c
+#define glProgramLocalParameter4fvARB glProgramLocalParameter4fvARB_c
+#define glEnable glEnable_c
+#define glDisable glDisable_c
+#define glActiveTexture glActiveTexture_c
+#define glBindTexture glBindTexture_c
+#define glVertexAttribPointer glVertexAttribPointer_c
+#define glEnableVertexAttribArray glEnableVertexAttribArray_c
+#define glDisableVertexAttribArray glDisableVertexAttribArray_c
+
+// The shim keeps no locks: the game makes every Cg call on its render thread.
+// Log (once) if that ever stops being true.
+void check_thread(const char *fn) {
+    static pthread_t first = pthread_self();
+    static bool warned = false;
+    if (!warned && !pthread_equal(first, pthread_self())) {
+        warned = true;
+        fprintf(stderr, "[cg-shim] %s called from a second thread; the shim is not thread-safe\n", fn);
+    }
 }
 
 int g_error = CG_NO_ERROR;
@@ -121,9 +185,7 @@ struct Program {
 
     bool loaded = false;
     GLuint arb_id = 0;               // arb backend
-    uint64_t arb_uploaded = 0;
-    GLuint fs = 0;                   // glsl backend: fragment shader object
-    std::map<unsigned, GLuint> vs;   // glsl backend: vertex shader per FS input set
+    uint64_t arb_uploaded = 0;       // (glsl backend: shaders and links in Gpu)
 };
 
 struct Context {
@@ -162,6 +224,28 @@ template <class T> T *check(void *h, int err) {
 uint64_t g_clock = 1;   // monotonically increasing stamp for slot writes
 
 // --- GLSL backend -------------------------------------------------------------
+//
+// The game binds a Cg program only when it differs from the one it bound last
+// for that stage (it keeps that in two globals for the whole run) and never
+// disables a profile or unbinds. Between its Cg draws Scaleform makes its own
+// GLSL programs current and ends every frame with glUseProgram(0). With ARB
+// programs that is harmless (program 0 brings the ARB bindings back); with one
+// GLSL program per pair the shim has to take GL back itself: every Cg call that
+// prepares a draw (bind, a changed parameter, cgGLEnableClientState, which the
+// game issues for every vertex stream of every draw) checks GL_CURRENT_PROGRAM
+// and makes the pair's program current again unless a program of the game's own
+// is current (that one wins, as it does over ARB programs).
+//
+// The check is one glGetIntegerv: per changed parameter (its upload needs our
+// program current) and once per run of cgGLEnableClientState calls (the game's
+// stream setup loop issues nothing else in between).
+//
+// Pairs are linked lazily: binding a vertex program whose new pair has no GL
+// program yet only marks it pending, and the next Cg call (the fragment bind, a
+// parameter, a stream, a texture) links it. The game binds the vertex program
+// and then the fragment program, so linking at the first bind would build a
+// pair (new vertex, previous fragment) that is never drawn.
+// RS_CG_GLSL_EAGER=1 links at bind time instead.
 
 struct Link {
     GLuint program = 0;
@@ -171,18 +255,47 @@ struct Link {
     uint64_t vp_seen = 0, fp_seen = 0;
 };
 
-std::map<std::pair<Program *, Program *>, std::unique_ptr<Link>> g_links;
+struct Shaders {
+    GLuint fs = 0;
+    bool fs_done = false;                // compiled (or failed) once
+    std::map<unsigned, GLuint> vs;       // per varying set (see vs_key)
+};
+
+// GL objects live in a share group; everything the backend created for one is
+// kept here. The game has a single context, tests use several.
+struct Gpu {
+    CGLShareGroupObj group = nullptr;
+    std::map<std::pair<Program *, Program *>, std::unique_ptr<Link>> links;
+    std::map<const Program *, Shaders> shaders;   // nullptr: the passthrough shaders
+    std::set<GLuint> ours;                        // GL program names of `links`
+    uint64_t pair_serial = 0;                     // g_pair_serial `active` is for
+    Link *active = nullptr;                       // linked program of the bound pair
+    bool pending = false;                         // bound pair not linked yet
+};
+
+std::vector<std::unique_ptr<Gpu>> g_gpus;
+CGLContextObj g_gpu_ctx = nullptr;
+Gpu *g_gpu = nullptr;
+
+Gpu &gpu() {
+    CGLContextObj c = CGLGetCurrentContext();
+    if (g_gpu && c == g_gpu_ctx) return *g_gpu;
+    CGLShareGroupObj sg = c ? CGLGetShareGroup(c) : nullptr;
+    g_gpu_ctx = c;
+    for (auto &g : g_gpus)
+        if (g->group == sg) return *(g_gpu = g.get());
+    g_gpus.push_back(std::make_unique<Gpu>());
+    g_gpu = g_gpus.back().get();
+    g_gpu->group = sg;
+    return *g_gpu;
+}
+
 Program *g_bound_vp = nullptr, *g_bound_fp = nullptr;
 bool g_vp_enabled = false, g_fp_enabled = false;   // cgGLEnableProfile state
-Link *g_current = nullptr;
+uint64_t g_pair_serial = 1;                        // bumped when the bound pair changes
 
-// The game also drives GL itself (its own GLSL programs, glUseProgram(0) for
-// fixed function), so whether our program is still in use is asked of GL.
-bool is_current(const Link *l) {
-    GLint cur = 0;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
-    return l && (GLuint)cur == l->program;
-}
+Program *active_vp() { return g_vp_enabled ? g_bound_vp : nullptr; }
+Program *active_fp() { return g_fp_enabled ? g_bound_fp : nullptr; }
 
 void dump(const std::string &name, const std::string &text) {
     if (cfg().dump_dir.empty()) return;
@@ -230,28 +343,35 @@ const ArbProgram &passthrough(Stage s) {
     return s == Stage::Vertex ? vp : fp;
 }
 
-GLuint vertex_shader(Program *vp, unsigned fs_inputs) {
-    if (vp) {
-        auto it = vp->vs.find(fs_inputs);
-        if (it != vp->vs.end()) return it->second;
-    }
+// A vertex shader declares and writes every varying it has a value for plus
+// those the fragment shader reads (the rest at their (0,0,0,1) default), so one
+// shader per vertex program serves every fragment program whose inputs it
+// writes: varyings the fragment shader doesn't read are allowed.
+unsigned vs_key(const Program *vp, unsigned fs_inputs) {
+    return (vp ? vp->arb.outputs : passthrough(Stage::Vertex).outputs) | fs_inputs;
+}
+
+GLuint vertex_shader(Gpu &g, Program *vp, unsigned fs_inputs) {
+    unsigned key = vs_key(vp, fs_inputs);
+    Shaders &sh = g.shaders[vp];
+    auto it = sh.vs.find(key);
+    if (it != sh.vs.end()) return it->second;
     const ArbProgram &a = vp ? vp->arb : passthrough(Stage::Vertex);
     char tag[64];
-    snprintf(tag, sizeof tag, "%s.%03x.vert", vp ? program_tag(vp).c_str() : "passthrough", fs_inputs);
-    GLuint s = compile(GL_VERTEX_SHADER, emit_glsl(a, cfg().dialect, fs_inputs), tag);
-    if (vp) vp->vs[fs_inputs] = s;
+    snprintf(tag, sizeof tag, "%s.%03x.vert", vp ? program_tag(vp).c_str() : "passthrough", key);
+    GLuint s = compile(GL_VERTEX_SHADER, emit_glsl(a, cfg().dialect, key), tag);
+    sh.vs[key] = s;
     return s;
 }
 
-GLuint fragment_shader(Program *fp) {
-    if (fp && fp->fs) return fp->fs;
-    static GLuint pass = 0;
-    if (!fp && pass) return pass;
+GLuint fragment_shader(Gpu &g, Program *fp) {
+    Shaders &sh = g.shaders[fp];
+    if (sh.fs_done) return sh.fs;
     const ArbProgram &a = fp ? fp->arb : passthrough(Stage::Fragment);
     std::string tag = (fp ? program_tag(fp) : std::string("passthrough")) + ".frag";
-    GLuint s = compile(GL_FRAGMENT_SHADER, emit_glsl(a, cfg().dialect, 0), tag);
-    (fp ? fp->fs : pass) = s;
-    return s;
+    sh.fs = compile(GL_FRAGMENT_SHADER, emit_glsl(a, cfg().dialect, 0), tag);
+    sh.fs_done = true;
+    return sh.fs;
 }
 
 std::vector<GLint> slot_locations(GLuint prog, const char *array, int n) {
@@ -264,15 +384,17 @@ std::vector<GLint> slot_locations(GLuint prog, const char *array, int n) {
     return loc;
 }
 
-Link *get_link(Program *vp, Program *fp) {
+// Link the pair (cached, failures included). Leaves GL's current program as it
+// found it.
+Link *get_link(Gpu &g, Program *vp, Program *fp) {
     auto key = std::make_pair(vp, fp);
-    auto it = g_links.find(key);
-    if (it != g_links.end()) return it->second.get();
+    auto it = g.links.find(key);
+    if (it != g.links.end()) return it->second.get();
     auto l = std::make_unique<Link>();
     l->vp = vp;
     l->fp = fp;
     unsigned fs_inputs = (fp ? fp->arb : passthrough(Stage::Fragment)).outputs;
-    GLuint v = vertex_shader(vp, fs_inputs), f = fragment_shader(fp);
+    GLuint v = vertex_shader(g, vp, fs_inputs), f = fragment_shader(g, fp);
     if (v && f) {
         l->program = glCreateProgram();
         glAttachShader(l->program, v);
@@ -285,6 +407,8 @@ Link *get_link(Program *vp, Program *fp) {
         glLinkProgram(l->program);
         GLint ok = 0;
         glGetProgramiv(l->program, GL_LINK_STATUS, &ok);
+        g.ours.insert(l->program);
+        g_stats[ST_Links]++;
         if (!ok) {
             char log[4096] = {0};
             glGetProgramInfoLog(l->program, sizeof log, nullptr, log);
@@ -292,8 +416,9 @@ Link *get_link(Program *vp, Program *fp) {
             logf("GLSL link failed (%s + %s):\n%s", vp ? program_tag(vp).c_str() : "-",
                  fp ? program_tag(fp).c_str() : "-", log);
         } else {
-            // Left current: get_link is only called to activate this pair.
             l->ok = true;
+            GLint prev = 0;
+            glGetIntegerv(GL_CURRENT_PROGRAM, &prev);
             glUseProgram(l->program);
             for (unsigned unit = 0; unit < 16; unit++)
                 for (const char *t : {"1D", "2D", "3D", "CUBE", "RECT"}) {
@@ -304,57 +429,129 @@ Link *get_link(Program *vp, Program *fp) {
                 }
             if (vp) l->vp_loc = slot_locations(l->program, "rs_vp_local", vp->arb.uniform_slots);
             if (fp) l->fp_loc = slot_locations(l->program, "rs_fp_local", fp->arb.uniform_slots);
+            if ((GLuint)prev != l->program) glUseProgram(prev);
         }
     }
     Link *raw = l.get();
-    g_links[key] = std::move(l);
+    g.links[key] = std::move(l);
     return raw;
 }
 
-// Upload slots of `p` written after `*seen` into the current GL program.
+// Upload the slots of `p` written after `*seen` into the current GL program,
+// one glUniform4fv per run of changed slots. A uniform array loads `count`
+// elements from the one `loc[i]` names whatever the other locations are; a run
+// stops at an element the linker dropped (location -1: past the highest one used).
 void upload_slots(Program *p, const std::vector<GLint> &loc, uint64_t *seen) {
     if (!p || *seen >= p->stamp) return;
     int n = (int)loc.size();
+    const uint64_t *st = p->slot_stamp.data(), s = *seen;
     for (int i = 0; i < n; i++) {
-        if (p->slot_stamp[i] <= *seen || loc[i] < 0) continue;
-        // Coalesce a run whose uniform locations are consecutive.
+        if (st[i] <= s || loc[i] < 0) continue;
         int j = i + 1;
-        while (j < n && p->slot_stamp[j] > *seen && loc[j] == loc[i] + (j - i)) j++;
+        while (j < n && st[j] > s && loc[j] >= 0) j++;
         glUniform4fv(loc[i], j - i, &p->slots[4 * i]);
         i = j - 1;
     }
     *seen = p->stamp;
 }
 
-// Use the program for the bound pair, counting a stage only while its profile is
-// enabled (as GL_{VERTEX,FRAGMENT}_PROGRAM_ARB do for the arb backend). With
-// neither stage active, fixed function (program 0) is back, unless the game has
-// made a program of its own current since.
-void glsl_activate() {
-    Program *vp = g_vp_enabled ? g_bound_vp : nullptr;
-    Program *fp = g_fp_enabled ? g_bound_fp : nullptr;
-    if (!vp && !fp) {
-        if (is_current(g_current)) glUseProgram(0);
-        g_current = nullptr;
-        return;
+// The bound pair's linked program in `g`. With `defer`, a pair that has no GL
+// program yet is left pending instead of being linked.
+Link *bound_link(Gpu &g, bool defer) {
+    if (g.pair_serial == g_pair_serial && !(g.pending && !defer)) return g.active;
+    g.pair_serial = g_pair_serial;
+    g.pending = false;
+    g.active = nullptr;
+    Program *vp = active_vp(), *fp = active_fp();
+    if (!vp && !fp) return nullptr;
+    if (defer && !g.links.count(std::make_pair(vp, fp))) {
+        g.pending = true;
+        return nullptr;
     }
-    Link *l = get_link(vp, fp);
-    g_current = l->ok ? l : nullptr;
-    if (!g_current) return;
-    glUseProgram(l->program);
-    upload_slots(l->vp, l->vp_loc, &l->vp_seen);
-    upload_slots(l->fp, l->fp_loc, &l->fp_seen);
+    Link *l = get_link(g, vp, fp);
+    g.active = l->ok ? l : nullptr;
+    return g.active;
 }
 
-void forget_program_links(Program *p) {
-    for (auto it = g_links.begin(); it != g_links.end();) {
-        if (it->first.first == p || it->first.second == p) {
-            if (it->second.get() == g_current) g_current = nullptr;
-            if (it->second->program) glDeleteProgram(it->second->program);
-            it = g_links.erase(it);
-        } else {
-            ++it;
+// Make the bound pair's program current and bring its uniforms up to date (see
+// the top of this section). Returns the link when its program is current.
+Link *glsl_sync(bool defer = false) {
+    Gpu &g = gpu();
+    Link *l = bound_link(g, defer);
+    if (g.pending) return nullptr;
+    GLint cur = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
+    bool cur_ours = cur && g.ours.count((GLuint)cur);
+    if (!l) {
+        // No pair: fixed function, unless the game has a program of its own
+        // current. A pair that failed to link leaves GL as it is.
+        if (!active_vp() && !active_fp() && cur_ours) glUseProgram(0);
+        return nullptr;
+    }
+    if ((GLuint)cur != l->program) {
+        if (cur && !cur_ours) return nullptr;   // the game's own program wins
+        glUseProgram(l->program);
+    }
+    upload_slots(l->vp, l->vp_loc, &l->vp_seen);
+    upload_slots(l->fp, l->fp_loc, &l->fp_seen);
+    return l;
+}
+
+bool g_streams_synced = false;   // a cgGLEnableClientState synced, no other Cg call since
+
+void glsl_pair_changed(bool may_defer) {
+    ++g_pair_serial;
+    g_streams_synced = false;
+    glsl_sync(may_defer && !cfg().glsl_eager);
+}
+
+// A pending link is made at the next Cg call that can precede a draw.
+void glsl_resolve_pending() {
+    g_streams_synced = false;
+    if (gpu().pending) glsl_sync();
+}
+
+// Drop everything built from `p`. GL objects of other share groups can't be
+// deleted from here (their context isn't current); they are only forgotten.
+void glsl_forget_program(Program *p) {
+    CGLContextObj c = CGLGetCurrentContext();
+    CGLShareGroupObj cur = c ? CGLGetShareGroup(c) : nullptr;
+    GLint cur_prog = 0;
+    if (c) glGetIntegerv(GL_CURRENT_PROGRAM, &cur_prog);
+    for (auto &gp : g_gpus) {
+        Gpu &g = *gp;
+        bool live = g.group == cur;
+        // A deleted program stays current until replaced, and then its name is
+        // gone: leave it first, as glDeleteProgramsARB unbinds for the arb backend.
+        if (live && cur_prog)
+            for (auto &l : g.links)
+                if ((l.first.first == p || l.first.second == p) && l.second->program == (GLuint)cur_prog) {
+                    glUseProgram(0);
+                    cur_prog = 0;
+                    break;
+                }
+        for (auto it = g.links.begin(); it != g.links.end();) {
+            if (it->first.first == p || it->first.second == p) {
+                if (it->second.get() == g.active) g.active = nullptr;
+                if (it->second->program) {
+                    g.ours.erase(it->second->program);
+                    if (live) glDeleteProgram(it->second->program);
+                }
+                it = g.links.erase(it);
+            } else {
+                ++it;
+            }
         }
+        auto s = g.shaders.find(p);
+        if (s != g.shaders.end()) {
+            if (live) {
+                if (s->second.fs) glDeleteShader(s->second.fs);
+                for (auto &v : s->second.vs)
+                    if (v.second) glDeleteShader(v.second);
+            }
+            g.shaders.erase(s);
+        }
+        g.pair_serial = 0;   // recompute the active link
     }
 }
 
@@ -437,7 +634,10 @@ void write_slots(Param *q, int first_row, const float *rows, int nrows) {
     const uint64_t *st = &p->slot_stamp[base];
     int lo = 0;
     while (lo < n && st[lo] && !memcmp(dst + 4 * lo, rows + 4 * lo, 16)) lo++;
-    if (lo >= n) return;
+    if (lo >= n) {
+        if (cfg().glsl && (p == active_vp() || p == active_fp())) glsl_resolve_pending();
+        return;
+    }
     int hi = n;
     while (st[hi - 1] && !memcmp(dst + 4 * (hi - 1), rows + 4 * (hi - 1), 16)) hi--;
     memcpy(dst + 4 * lo, rows + 4 * lo, 16 * (hi - lo));
@@ -445,12 +645,10 @@ void write_slots(Param *q, int first_row, const float *rows, int nrows) {
     for (int r = base + lo; r < base + hi; r++) p->slot_stamp[r] = t;
     p->stamp = t;
     if (cfg().glsl) {
-        // glUniform goes to whatever program is current: if that isn't ours any
-        // more, the values wait for the pair's next activation.
-        if (g_current && (g_current->vp == p || g_current->fp == p) && is_current(g_current)) {
-            if (g_current->vp == p) upload_slots(p, g_current->vp_loc, &g_current->vp_seen);
-            if (g_current->fp == p) upload_slots(p, g_current->fp_loc, &g_current->fp_seen);
-        }
+        // Uploaded now if `p` is part of the bound pair and GL has its program
+        // current (or can be given it back); otherwise at the pair's next sync.
+        g_streams_synced = false;
+        if (p == active_vp() || p == active_fp()) glsl_sync();
     } else if (p->loaded && arb_is_bound(p)) {
         if (p->arb_uploaded < prev) {
             arb_upload(p);   // older writes still pending
@@ -473,8 +671,8 @@ bool load_program(Program *p) {
     if (cfg().glsl) {
         // Vertex shaders are compiled per pairing; compile the common variant now
         // so translation errors surface at load time as they do with NVIDIA's runtime.
-        bool ok = p->stage == Stage::Fragment ? fragment_shader(p) != 0
-                                              : vertex_shader(p, passthrough(Stage::Fragment).outputs) != 0;
+        Gpu &g = gpu();
+        bool ok = p->stage == Stage::Fragment ? fragment_shader(g, p) != 0 : vertex_shader(g, p, 0) != 0;
         if (!ok) {
             set_error(CG_PROGRAM_LOAD_ERROR, "GLSL compilation failed");
             return false;
@@ -604,12 +802,10 @@ CG_EXPORT CGprogram cgCreateProgram(CGcontext handle, CGenum type, const char *t
 CG_EXPORT void cgDestroyProgram(CGprogram handle) {
     Program *p = check<Program>(handle, CG_INVALID_PROGRAM_HANDLE_ERROR);
     if (!p) return;
+    if (g_bound_vp == p || g_bound_fp == p) ++g_pair_serial;
     if (g_bound_vp == p) g_bound_vp = nullptr;
     if (g_bound_fp == p) g_bound_fp = nullptr;
-    forget_program_links(p);
-    if (p->fs) glDeleteShader(p->fs);
-    for (auto &v : p->vs)
-        if (v.second) glDeleteShader(v.second);
+    glsl_forget_program(p);
     if (p->arb_id) {
         glDeleteProgramsARB(1, &p->arb_id);   // unbinds it if bound; the name may come back
         for (GLuint &b : g_arb.bound)
@@ -705,15 +901,7 @@ static void set_profile_enabled(CGprofile profile, bool on, const char *what) {
         bool &enabled = vertex ? g_vp_enabled : g_fp_enabled;
         if (enabled == on) return;
         enabled = on;
-        // A program the game made current wins over ARB programs, and a profile
-        // change doesn't replace it; the next cgGLBindProgram activates ours.
-        GLint cur = 0;
-        glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
-        if (cur && !(g_current && (GLuint)cur == g_current->program)) {
-            g_current = nullptr;
-            return;
-        }
-        glsl_activate();
+        glsl_pair_changed(on);   // the game enables a profile right before binding
     } else {
         GLenum cap = vertex ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB;
         int &e = arb_state().enabled[!vertex];
@@ -732,6 +920,7 @@ CG_EXPORT void cgGLDisableProfile(CGprofile profile) {
 }
 
 CG_EXPORT void cgGLLoadProgram(CGprogram handle) {
+    check_thread("cgGLLoadProgram");
     Program *p = check<Program>(handle, CG_INVALID_PROGRAM_HANDLE_ERROR);
     if (p) load_program(p);
 }
@@ -743,20 +932,34 @@ CG_EXPORT void cgGLBindProgram(CGprogram handle) {
         set_error(CG_PROGRAM_NOT_LOADED_ERROR, "cgGLBindProgram before cgGLLoadProgram");
         return;
     }
-    (p->stage == Stage::Vertex ? g_bound_vp : g_bound_fp) = p;
+    check_thread("cgGLBindProgram");
     if (cfg().glsl) {
-        glsl_activate();
+        Program *&b = p->stage == Stage::Vertex ? g_bound_vp : g_bound_fp;
+        if (b != p) {
+            b = p;
+            glsl_pair_changed(p->stage == Stage::Vertex);
+        } else {
+            g_streams_synced = false;
+            glsl_sync();
+        }
     } else {
+        (p->stage == Stage::Vertex ? g_bound_vp : g_bound_fp) = p;
         arb_bind(arb_target(p), p->arb_id);
         arb_upload(p);
     }
 }
 
 CG_EXPORT void cgGLUnbindProgram(CGprofile profile) {
-    if (is_vertex_profile(profile)) g_bound_vp = nullptr;
-    else g_bound_fp = nullptr;
-    if (cfg().glsl) glsl_activate();
-    else arb_bind(is_vertex_profile(profile) ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB, 0);
+    Program *&b = is_vertex_profile(profile) ? g_bound_vp : g_bound_fp;
+    if (cfg().glsl) {
+        if (b) {
+            b = nullptr;
+            glsl_pair_changed(false);
+        }
+        return;
+    }
+    b = nullptr;
+    arb_bind(is_vertex_profile(profile) ? GL_VERTEX_PROGRAM_ARB : GL_FRAGMENT_PROGRAM_ARB, 0);
 }
 
 CG_EXPORT void cgGLSetParameter4fv(CGparameter handle, const float *v) {
@@ -821,10 +1024,19 @@ static void client_state(Param *q, bool enable) {
 }
 
 CG_EXPORT void cgGLEnableClientState(CGparameter handle) {
-    if (Param *q = check<Param>(handle, CG_INVALID_PARAM_HANDLE_ERROR)) client_state(q, true);
+    Param *q = check<Param>(handle, CG_INVALID_PARAM_HANDLE_ERROR);
+    if (!q) return;
+    // The game enables every vertex stream before each draw: the point where the
+    // bound pair has to be current (see the GLSL backend section).
+    if (cfg().glsl && !g_streams_synced) {
+        glsl_sync();
+        g_streams_synced = true;
+    }
+    client_state(q, true);
 }
 
 CG_EXPORT void cgGLDisableClientState(CGparameter handle) {
+    g_streams_synced = false;
     if (Param *q = check<Param>(handle, CG_INVALID_PARAM_HANDLE_ERROR)) client_state(q, false);
 }
 
@@ -892,7 +1104,9 @@ CG_EXPORT void cgGLSetupSampler(CGparameter handle, CGGLuint_t texobj) {
 
 CG_EXPORT void cgGLEnableTextureParameter(CGparameter handle) {
     Param *q = sampler_param(handle);
-    if (!q || q->info.texunit < 0) return;   // unused sampler: no unit assigned
+    if (!q) return;
+    if (cfg().glsl) glsl_resolve_pending();
+    if (q->info.texunit < 0) return;   // unused sampler: no unit assigned
     // The game sets the active unit itself, so it is asked of GL (client-side
     // state, no round trip) and only switched when it differs.
     GLint prev = GL_TEXTURE0;
@@ -943,3 +1157,7 @@ CG_EXPORT const char *cgGetErrorString(int error) {
 }
 
 CG_EXPORT const char *cgGetLastListing(CGcontext) { return g_listing.c_str(); }
+
+CG_EXPORT void rs_cg_gl_stats(unsigned long long *out) {
+    memcpy(out, g_stats, sizeof g_stats);
+}

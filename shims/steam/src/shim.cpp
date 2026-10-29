@@ -101,14 +101,17 @@ static void load_login_user(const std::string &steam_root, CSteamID *id, std::st
 }
 
 // steamapps/appmanifest_<app>.acf. The game folder may be a stage of symlinks to the install (the native
-// launcher's), so the manifest is also looked up next to the real install, then in Steam's own library.
+// launcher's), so the manifest is also looked up next to the real install, through a link the stage has
+// (static.psarc: the launcher always links it), wherever that is (e.g. a Steam library on an external
+// drive), then in Steam's own library.
 static std::string appmanifest_path(const ShimConfig &c) {
     std::string name = "/appmanifest_" + std::to_string(c.app_id) + ".acf";
     std::vector<std::string> dirs = {dirname_of(dirname_of(c.game_dir))};
     char real[PATH_MAX];
     if (realpath(c.game_dir.c_str(), real)) dirs.push_back(dirname_of(dirname_of(real)));
-    if (realpath((c.game_dir + "/steam_appid.txt").c_str(), real))
-        dirs.push_back(dirname_of(dirname_of(dirname_of(real))));
+    for (const char *link : {"/steam_appid.txt", "/static.psarc"})
+        if (realpath((c.game_dir + link).c_str(), real))
+            dirs.push_back(dirname_of(dirname_of(dirname_of(real))));
     dirs.push_back(c.steam_root + "/steamapps");
     for (const std::string &d : dirs)
         if (file_exists(d + name)) return d + name;

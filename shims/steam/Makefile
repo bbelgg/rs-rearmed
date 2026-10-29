@@ -34,13 +34,34 @@ build/test_shim: tests/test_shim.cpp $(LIB)
 build/test_vtables: tests/test_vtables.cpp $(SRCS) $(HDRS)
 	$(CXX) $(ARCHS) $(CXXFLAGS) -fvisibility=default tests/test_vtables.cpp $(SRCS) -o $@
 
+# The tests run with a HOME of their own (no Steam there, unless a run makes one) and without the
+# settings the developer's environment may have for the game (README: launchctl setenv).
+unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSONA RS_STEAM_LOG \
+    RS_STEAM_DATA_DIR RS_STEAM_REAL_LIB SteamAppId
+TEST_ENV := RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata
+NO_STEAM := HOME=$(CURDIR)/build/emptyhome
+
 test: build/test_shim build/test_vtables
+	@if [ -e build/steam_shim.ini ]; then echo "build/steam_shim.ini would change the tests' settings: move it away" >&2; exit 1; fi
 	arch -arm64 build/test_vtables
 	arch -x86_64 build/test_vtables
-	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
-	RS_STEAM_MODE=stub RS_STEAM_DLC=248750,258341 RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -x86_64 build/test_shim
-	RS_STEAM_MODE=stub RS_STEAM_DLC=all RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
-	RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata arch -arm64 build/test_shim
+	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -arm64 build/test_shim
+	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -x86_64 build/test_shim
+	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=all arch -arm64 build/test_shim
+	$(TEST_ENV) $(NO_STEAM) arch -arm64 build/test_shim
+	@# The native launcher's stage: symlinks to an install in another Steam library (e.g. on an external
+	@# drive), whose appmanifest has the DLC and language. Steam's own folder has another appmanifest.
+	@rm -rf build/stage build/testlib build/stagehome
+	@mkdir -p build/stage/Rocksmith2014.app/Contents/MacOS build/testlib/steamapps/common/Rocksmith2014 \
+	    "build/stagehome/Library/Application Support/Steam/steamapps"
+	@cp build/test_shim $(LIB) build/stage/Rocksmith2014.app/Contents/MacOS/
+	@touch build/testlib/steamapps/common/Rocksmith2014/static.psarc
+	@ln -s $(CURDIR)/build/testlib/steamapps/common/Rocksmith2014/static.psarc build/stage/static.psarc
+	@printf '"AppState" { "appid" "221680" "UserConfig" { "language" "german" }\n  "InstalledDepots" { "258342" { "manifest" "1" "dlcappid" "258341" } } }\n' \
+	    > build/testlib/steamapps/appmanifest_221680.acf
+	@printf '"AppState" { "appid" "221680" "UserConfig" { "language" "french" }\n  "InstalledDepots" { "258344" { "manifest" "1" "dlcappid" "258343" } } }\n' \
+	    > "build/stagehome/Library/Application Support/Steam/steamapps/appmanifest_221680.acf"
+	$(TEST_ENV) HOME=$(CURDIR)/build/stagehome RS_TEST_STAGE=1 arch -arm64 build/stage/Rocksmith2014.app/Contents/MacOS/test_shim
 
 check: $(LIB)
 	@nm -u -arch x86_64 "$(GAME_BIN)" | grep -E '^_Steam(API|Internal)_' | sort > build/imports.txt

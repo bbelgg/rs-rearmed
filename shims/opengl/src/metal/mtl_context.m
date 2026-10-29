@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 __thread __unsafe_unretained RSMContext *rsm_tls;
 
@@ -491,48 +492,22 @@ void rsmtl_gfx_resize(rs_gfx_context *c, int w, int h) {
 }
 
 // RS_GL_SNAPSHOT_DIR=<dir>: the default framebuffer as PNG every RS_GL_SNAPSHOT_SECS
-// (default 5) seconds at present, as nsgl_hook.m does for GL's flushBuffer.
-static void rsm_snapshot(RSMContext *ctx) {
-    static const char *dir;
-    static double every = 5, last;
-    static int init;
-    static unsigned long seq;
-    if (!init) {
-        init = 1;
-        dir = getenv("RS_GL_SNAPSHOT_DIR");
-        const char *secs = getenv("RS_GL_SNAPSHOT_SECS");
-        if (secs && atof(secs) > 0)
-            every = atof(secs);
-    }
-    if (!dir)
-        return;
-    double now = CFAbsoluteTimeGetCurrent();
-    if (now - last < every)
-        return;
-    last = now;
-    int w = ctx->w, h = ctx->h;
-    uint8_t *px = malloc((size_t)w * h * 4);
-    if (!px)
-        return;
-    GLint read_fb = 0, pack = 4;
-    rsmtl_glGetIntegerv(0x8CAA /* GL_READ_FRAMEBUFFER_BINDING */, &read_fb);
-    rsmtl_glGetIntegerv(0x0D05 /* GL_PACK_ALIGNMENT */, &pack);
-    rsmtl_glBindFramebuffer(0x8CA8 /* GL_READ_FRAMEBUFFER */, 0);
-    rsmtl_glPixelStorei(0x0D05, 1);
-    rsmtl_glReadPixels(0, 0, w, h, 0x1908 /* GL_RGBA */, 0x1401 /* GL_UNSIGNED_BYTE */, px);
-    rsmtl_glPixelStorei(0x0D05, pack);
-    rsmtl_glBindFramebuffer(0x8CA8, (GLuint)read_fb);
-    rsmtl_glGetError();  // a snapshot must not leave errors for the game
+// (default 5) seconds at present, as nsgl_hook.m does for GL's flushBuffer; none once
+// <dir>/stop exists (checked when one is due). The frame's command buffer copies the
+// pixels into a buffer; the PNG is written on a background queue after it completes, so
+// the render thread doesn't wait for the GPU or the encoder.
+static dispatch_queue_t g_snap_queue;
+
+static void rsm_snapshot_write(const uint8_t *px, int w, int h, NSString *path) {
     // GL rows are bottom-up; PNG is top-down
     CGColorSpaceRef cs = CGColorSpaceCreateDeviceRGB();
-    CGContextRef bc = CGBitmapContextCreate(NULL, w, h, 8, (size_t)w * 4, cs,
+    CGContextRef bc = CGBitmapContextCreate(NULL, (size_t)w, (size_t)h, 8, (size_t)w * 4, cs,
                                             (CGBitmapInfo)kCGImageAlphaNoneSkipLast);
     if (bc) {
         uint8_t *dst = CGBitmapContextGetData(bc);
         for (int y = 0; y < h; y++)
-            memcpy(dst + (size_t)y * w * 4, px + (size_t)(h - 1 - y) * w * 4, (size_t)w * 4);
+            memcpy(dst + (size_t)y * (size_t)w * 4, px + (size_t)(h - 1 - y) * (size_t)w * 4, (size_t)w * 4);
         CGImageRef img = CGBitmapContextCreateImage(bc);
-        NSString *path = [NSString stringWithFormat:@"%s/metal_%06lu.png", dir, seq++];
         CGImageDestinationRef d = CGImageDestinationCreateWithURL(
             (__bridge CFURLRef)[NSURL fileURLWithPath:path], CFSTR("public.png"), 1, NULL);
         if (d && img) {
@@ -546,7 +521,65 @@ static void rsm_snapshot(RSMContext *ctx) {
         CGContextRelease(bc);
     }
     CGColorSpaceRelease(cs);
-    free(px);
+}
+
+static void rsm_snapshot_drain(void) {
+    if (g_snap_queue)
+        dispatch_sync(g_snap_queue, ^{});  // PNGs already queued
+}
+
+static void rsm_snapshot(RSMContext *ctx) {
+    static const char *dir;
+    static double every = 5, last;
+    static int init;
+    static unsigned long seq;
+    if (!init) {
+        init = 1;
+        dir = getenv("RS_GL_SNAPSHOT_DIR");
+        const char *secs = getenv("RS_GL_SNAPSHOT_SECS");
+        if (secs && atof(secs) > 0)
+            every = atof(secs);
+        if (dir) {
+            g_snap_queue = dispatch_queue_create(
+                "rs.metal.snapshot", dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
+            atexit(rsm_snapshot_drain);
+        }
+    }
+    if (!dir)
+        return;
+    double now = CFAbsoluteTimeGetCurrent();
+    if (now - last < every)
+        return;
+    last = now;
+    char stop[1024];
+    snprintf(stop, sizeof stop, "%s/stop", dir);
+    if (!access(stop, F_OK)) {
+        dir = NULL;
+        return;
+    }
+    int w = (int)ctx->def_color.width, h = (int)ctx->def_color.height;
+    size_t row = (size_t)w * 4;
+    id<MTLBuffer> buf = [ctx->dev newBufferWithLength:row * (size_t)h options:MTLResourceStorageModeShared];
+    if (!buf)
+        return;
+    rsm_end_pass(ctx);  // pending clears land first
+    id<MTLCommandBuffer> cb = rsm_cmd(ctx);
+    id<MTLBlitCommandEncoder> b = [cb blitCommandEncoder];
+    [b copyFromTexture:ctx->def_color sourceSlice:0 sourceLevel:0 sourceOrigin:MTLOriginMake(0, 0, 0)
+              sourceSize:MTLSizeMake((NSUInteger)w, (NSUInteger)h, 1) toBuffer:buf destinationOffset:0
+    destinationBytesPerRow:row destinationBytesPerImage:row * (size_t)h];
+    [b endEncoding];
+    NSString *path = [NSString stringWithFormat:@"%s/metal_%06lu.png", dir, seq++];
+    dispatch_queue_t q = g_snap_queue;
+    [cb addCompletedHandler:^(id<MTLCommandBuffer> done) {
+      if (done.status != MTLCommandBufferStatusCompleted)
+          return;
+      dispatch_async(q, ^{
+        @autoreleasepool {
+            rsm_snapshot_write(buf.contents, w, h, path);
+        }
+      });
+    }];
 }
 
 void rsmtl_gfx_present(rs_gfx_context *c) {

@@ -1741,7 +1741,8 @@ static int run_case(const test_case *c, const char *dump_path) {
             fclose(f);
         }
     }
-    printf("%s on %s: %d passed, %d failed\n", c->name, g_backend, passed, failed);
+    // Not "N passed": only the --compare summary may match the ctest pass pattern.
+    printf("%s on %s: %d checks ok, %d failed\n", c->name, g_backend, passed, failed);
     return failed != 0;
 }
 

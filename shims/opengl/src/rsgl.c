@@ -26,7 +26,8 @@
 //   RS_GL_CHECK=1             glGetError after every call
 //   RS_GL_DUMP_SHADERS=<dir>  save each glShaderSource as <dir>/<seq>_<id>_<type>.glsl
 //   RS_GL_SNAPSHOT_DIR=<dir>  save the back buffer as PNG before a flushBuffer,
-//                             every RS_GL_SNAPSHOT_SECS (default 5) seconds
+//                             every RS_GL_SNAPSHOT_SECS (default 5) seconds; once
+//                             <dir>/stop exists, no more (checked when one is due)
 //   RS_GL_VERBOSE=1           log load and every first error to stderr
 //   RS_GL_TRACE_DIR=<dir>     per-frame call trace (gltrace.c; RS_GL_TRACE_START / _KEY / _FRAMES)
 //   RS_GL_FRAMETIMES=<file>   timestamp every present, drawView and display-link callback

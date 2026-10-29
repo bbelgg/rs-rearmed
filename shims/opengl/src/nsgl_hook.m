@@ -399,9 +399,18 @@ static void rs_flush(id self, SEL _cmd) {
         double now = CFAbsoluteTimeGetCurrent();
         if (now - rs_snap_last >= rs_snap_every) {
             rs_snap_last = now;
-            ftflags |= 1;
-            @autoreleasepool {
-                rs_snapshot(self, frame);
+            // <dir>/stop ends snapshots (benchmarks); one stat per due snapshot.
+            char stop[1100];
+            struct stat st;
+            snprintf(stop, sizeof stop, "%s/stop", rs_snap_dir);
+            if (stat(stop, &st) == 0) {
+                rs_gl_note("snapshots stopped (%s exists)", stop);
+                rs_snap_dir = NULL;
+            } else {
+                ftflags |= 1;
+                @autoreleasepool {
+                    rs_snapshot(self, frame);
+                }
             }
         }
     }

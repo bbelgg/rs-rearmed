@@ -468,6 +468,14 @@ void rsmtl_gfx_destroy(rs_gfx_context *c) {
     }
 }
 
+int rsmtl_gfx_prepare(rs_gfx_context *c, double max_seconds) {
+    if (!c)
+        return -1;
+    @autoreleasepool {
+        return rsm_cache_prepare((__bridge RSMContext *)c, max_seconds);
+    }
+}
+
 void rsmtl_gfx_make_current(rs_gfx_context *c) { rsm_tls = (__bridge RSMContext *)c; }
 
 rs_gfx_context *rsmtl_gfx_current(void) { return (__bridge rs_gfx_context *)rsm_tls; }

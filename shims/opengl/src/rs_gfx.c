@@ -42,6 +42,7 @@ RSMTL_WEAK void rsmtl_gfx_present(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK void rsmtl_gfx_lock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK void rsmtl_gfx_unlock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx) { (void)ctx; return NULL; }
+RSMTL_WEAK int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds) { (void)ctx, (void)max_seconds; return 0; }
 
 // --- GL ----------------------------------------------------------------------------
 struct rs_gfx_context {
@@ -298,6 +299,10 @@ RS_EXPORT void rs_gfx_unlock(rs_gfx_context *c) {
         rsmtl_gfx_unlock(c);
     else if (c)
         sys.UnlockContext(c->cgl);
+}
+
+RS_EXPORT int rs_gfx_prepare(rs_gfx_context *c, double max_seconds) {
+    return METAL ? rsmtl_gfx_prepare(c, max_seconds) : 0;
 }
 
 RS_EXPORT CGLContextObj rs_gfx_cgl(rs_gfx_context *c) {

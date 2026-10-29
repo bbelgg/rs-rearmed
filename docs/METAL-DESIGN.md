@@ -63,6 +63,20 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   the next start behind the game's own links). The disk cache's key is the cache format, a
   core-conventions constant, the OS build and the GPU, not the build of libRSOpenGL: libraries are keyed
   by their MSL text, and ones the game has not linked for 8 runs leave the manifest.
+- **Safe load** (`rs_gfx_prepare`): with a community "fast-load" `cache.psarc` the game's loading can
+  stall for good on its loading screen when the CPU is busy (a race in the game, seen on GL under load
+  too), and a cold Metal start (first run, OS update, new translator) keeps every core compiling during
+  loading. So when `<game>/cache.psarc` is not the original (size, then MD5; `RS_METAL_SAFE_LOAD=1|0`
+  forces it), the shell runs the second half of `MainController awakeFromNib` (from `rsp_game_bootstrap`
+  on: before it the engine, its loading threads and the display link do not exist) only after
+  `rs_gfx_prepare(ctx, 120)` has returned on a background thread; the main run loop goes on meanwhile
+  and the window stays black. `rs_gfx_prepare` gives warming (started when the context was made) the
+  whole pool at user-initiated QoS and waits for it (milliseconds on a warm system Metal cache, about
+  the cold compile time otherwise), then throttles the pool for the rest of the run: at most 2 jobs at
+  once (`RS_MTL_COMPILE_THREADS` when set), all at utility QoS, so libraries the manifest did not know
+  cannot starve the loading threads; a draw that needs one still waits for it or compiles it itself.
+  Pipelines are built on the drawing thread (warming: on the pool), archive adds on one serial utility
+  queue. With the original `cache.psarc` nothing of this applies. GL: `rs_gfx_prepare` is a no-op.
   Uniforms live in CPU shadow blocks per stage, uploaded per draw with `setVertexBytes`/`setFragmentBytes`
   (or a ring buffer when over 4 KB).
 - **Pipelines**: key = program, vertex layout (formats, strides, step functions), colour/depth formats,

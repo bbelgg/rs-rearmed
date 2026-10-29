@@ -194,6 +194,9 @@ int main(void) {
         return 1;
     }
     check(rs_gfx_current() == NULL, "not current before make_current");
+    // Safe load: GL does nothing; Metal without a disk cache (not an app bundle) has nothing to warm.
+    check(rs_gfx_prepare(ctx, 1.0) == 0, "rs_gfx_prepare with nothing to warm");
+    check(rs_gfx_prepare(NULL, 1.0) == (rs_gfx_backend() == RS_GFX_METAL ? -1 : 0), "rs_gfx_prepare(NULL)");
     rs_gfx_make_current(ctx);
     check(rs_gfx_current() == ctx, "rs_gfx_current");
     check(rs_gl_current_program() == -1, "current program: unknown before any bind");

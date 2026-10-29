@@ -8,7 +8,8 @@
 //                                          compile that fails after the link reported success)
 //   metal_cache_test --bench <dir> [N]     not a test: time from the first link to all N programs
 //                                          drawn, cold (RS_MTL_SALT: no system Metal cache) and
-//                                          warm, synchronous compiles vs the compile pool
+//                                          warm, synchronous compiles vs the compile pool, and
+//                                          safe load (rs_gfx_prepare, throttled pool)
 //
 // Scenario (fresh MSL per invocation via <nonce>, so the system's Metal cache starts cold too):
 //   cold        empty cache: every pipeline is an archive miss
@@ -16,6 +17,9 @@
 //               manifest, all archive hits, nothing compiled on the drawing thread
 //   warm-async  as the game sees it: warming races the first draws; no misses
 //   no-cache    RS_METAL_CACHE=0, same MSL: what the system Metal cache alone gives
+//   prepare     RSM_TEST_PREPARE (rs_gfx_prepare before the links, the shell's safe load): warm,
+//               with a cold system Metal cache (RS_MTL_SALT_COMPILE), and timing out; then the
+//               throttled pool on a cold first run (2 workers, utility QoS; RS_MTL_COMPILE_THREADS)
 //   corrupt     garbage archive and a torn manifest; then a garbage manifest: discarded, no crash
 //   stale       directories of other formats/OS/GPUs are removed, foreign files left alone
 //   async       --async children with the compile pool and with RS_MTL_COMPILE_THREADS=0
@@ -68,6 +72,22 @@ static double now_ms(void) {
 }
 
 // --- Child ---------------------------------------------------------------------------------
+// RSM_TEST_PREPARE=<seconds>: rs_gfx_prepare before the first link, as the shell's safe load does.
+// Warming starts with the context: total_ms is from rs_gfx_create_offscreen to prepare's return.
+static double g_created_ms;
+static rs_gfx_context *create_ctx(void) {
+    g_created_ms = now_ms();
+    return rs_gfx_create_offscreen(W, H);
+}
+static void maybe_prepare(rs_gfx_context *c) {
+    const char *e = getenv("RSM_TEST_PREPARE");
+    if (!e || !*e)
+        return;
+    double t0 = now_ms();
+    int rc = rs_gfx_prepare(c, atof(e));
+    printf("PREPARE rc=%d ms=%.1f total_ms=%.1f\n", rc, now_ms() - t0, now_ms() - g_created_ms);
+}
+
 static GLuint shader(GLenum type, const char *src) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, NULL);
@@ -76,11 +96,12 @@ static GLuint shader(GLenum type, const char *src) {
 }
 
 static int child(int nonce) {
-    rs_gfx_context *c = rs_gfx_create_offscreen(W, H);
+    rs_gfx_context *c = create_ctx();
     if (!c) {
         printf("no context\n");
         return 1;
     }
+    maybe_prepare(c);
     rs_gfx_make_current(c);
     static const char *vs =
         "attribute vec2 pos;\n"
@@ -231,11 +252,12 @@ static void draw_px(unsigned char px[4]) {
 }
 
 static int child_async(int nonce, int sync) {
-    rs_gfx_context *c = rs_gfx_create_offscreen(W, H);
+    rs_gfx_context *c = create_ctx();
     if (!c) {
         printf("no context\n");
         return 1;
     }
+    maybe_prepare(c);
     rs_gfx_make_current(c);
     quad_buffers();
     static const char *vs =
@@ -358,9 +380,10 @@ static int child_async(int nonce, int sync) {
 // N programs with fragment shaders of a size like the game's (loops over texture fetches and
 // some arithmetic); time from the first link to the last one drawn.
 static int child_bench(int n) {
-    rs_gfx_context *c = rs_gfx_create_offscreen(W, H);
+    rs_gfx_context *c = create_ctx();
     if (!c)
         return 1;
+    maybe_prepare(c);
     rs_gfx_make_current(c);
     quad_buffers();
     static const char *vs =
@@ -574,8 +597,15 @@ static double bench_one(const char *name, int n, const char *salt, const char *c
     g_arg2 = ns;
     run_result r = run(name, e);
     double t = num(strstr(r.log, "CHILD bench"), "total_ms=");
-    printf("  => %-22s first link to all %d drawn: %8.1f ms (links %.1f ms) rc=%d\n", name, n, t,
-           num(strstr(r.log, "CHILD bench"), "link_ms="), r.rc);
+    printf("  => %-22s first link to all %d drawn: %8.1f ms (links %.1f ms) rc=%d | pool: %d threads, limit %d, "
+           "peak %d, compiled on the pool %d, by the drawing thread %d\n",
+           name, n, t, num(strstr(r.log, "CHILD bench"), "link_ms="), r.rc, (int)num(r.log, "pool_threads="),
+           (int)num(r.log, "pool_limit="), (int)num(r.log, "pool_peak="), (int)num(r.log, "lib_async="),
+           (int)num(r.log, "lib_stolen="));
+    const char *pl = strstr(r.log, "PREPARE ");
+    if (pl)
+        printf("     prepare: rc %d, %.1f ms in rs_gfx_prepare, %.1f ms from context creation; warmed %d libraries\n",
+               (int)num(pl, "rc="), num(pl, "ms="), num(pl, "total_ms="), r.lib_warmed);
     return t;
 }
 
@@ -599,6 +629,16 @@ static int bench(const char *self, const char *dir, int n) {
     bench_one("warm pool, sys cache", n, s2, (const char *[]){"RS_METAL_CACHE=0", NULL});
     bench_one("warm sync, +disk", n, s2, sync_cache);
     bench_one("warm pool, +disk", n, s2, NULL);
+    // Safe load (rs_gfx_prepare before the first link, as with a modded cache.psarc): a cold first
+    // run on the throttled pool; then a second start (manifest known) with a warm system Metal
+    // cache, and with a cold one (RS_MTL_SALT_COMPILE: as after an OS update).
+    char s3[64], s4[80];
+    snprintf(s3, sizeof s3, "b%d-%ld-safe", (int)getpid(), (long)time(NULL));
+    snprintf(s4, sizeof s4, "RS_MTL_SALT_COMPILE=%s-os", s3);
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+    bench_one("cold safe (throttled)", n, s3, (const char *[]){"RSM_TEST_PREPARE=120", NULL});
+    bench_one("warm safe, +disk", n, s3, (const char *[]){"RSM_TEST_PREPARE=120", NULL});
+    bench_one("cold-sys safe, +disk", n, s3, (const char *[]){"RSM_TEST_PREPARE=120", s4, NULL});
     return 0;
 }
 
@@ -656,6 +696,66 @@ int main(int argc, char **argv) {
     run_result off = run("no-cache", off_env);
     check(off.rc == 0 && off.bad == 0, "no-cache run draws correctly (rc %d)", off.rc);
     check(off.hits == 0 && off.misses == 0 && off.lib_warmed == 0, "no-cache: no archive, no warming");
+    // Safe load (rs_gfx_prepare before the first link). Warm: the manifest's libraries and
+    // pipelines are ready when it returns, nothing compiles on the drawing thread, and the pool is
+    // throttled afterwards.
+    const char *prep_env[] = {"RSM_TEST_PREPARE=60", NULL};
+    run_result prep = run("prepare", prep_env);
+    const char *pl = strstr(prep.log, "PREPARE ");
+    check(prep.rc == 0 && prep.bad == 0, "prepare run draws correctly (rc %d)", prep.rc);
+    check(pl && num(pl, "rc=") == 0, "prepare: everything ready (rc %d)", (int)num(pl, "rc="));
+    check(prep.lib_warmed == NPROG && prep.pipe_warmed == P && prep.lib_compiled <= 1 && prep.pipe_built == 0 &&
+              prep.misses == 0,
+          "prepare: warmed %d libraries + %d pipelines, drawing thread compiled %d + %d", prep.lib_warmed,
+          prep.pipe_warmed, prep.lib_compiled, prep.pipe_built);
+    check(num(prep.log, "pool_limit=") == 2, "prepare: pool throttled to 2 (%d)", (int)num(prep.log, "pool_limit="));
+    printf("prepare (warm system Metal cache): %.1f ms, %.1f ms from context creation, %d libraries\n",
+           num(pl, "ms="), num(pl, "total_ms="), prep.lib_warmed);
+    // The manifest is known but the system Metal cache is cold (a new salt in the compiled source
+    // only, like after an OS update): prepare compiles it all (warming started with the context).
+    // With a 1 ms limit it times out and the rest compiles while the program draws.
+    char csalt[96];
+    snprintf(csalt, sizeof csalt, "RS_MTL_SALT_COMPILE=c%d-%d", g_nonce, (int)getpid());
+    const char *prep_cold[] = {"RSM_TEST_PREPARE=60", csalt, NULL};
+    run_result pc = run("prepare-cold", prep_cold);
+    pl = strstr(pc.log, "PREPARE ");
+    check(pc.rc == 0 && pc.bad == 0 && pl && num(pl, "rc=") == 0 && pc.lib_warmed == NPROG && pc.lib_compiled <= 1,
+          "prepare-cold: rc %d, warmed %d, drawing thread compiled %d", (int)num(pl, "rc="), pc.lib_warmed,
+          pc.lib_compiled);
+    printf("prepare (cold system Metal cache, manifest known): %.1f ms, %.1f ms from context creation, "
+           "%d libraries\n", num(pl, "ms="), num(pl, "total_ms="), pc.lib_warmed);
+    snprintf(csalt, sizeof csalt, "RS_MTL_SALT_COMPILE=t%d-%d", g_nonce, (int)getpid());
+    // One worker, so warming outlasts the context's own setup.
+    const char *prep_to[] = {"RSM_TEST_PREPARE=0.001", "RS_MTL_COMPILE_THREADS=1", csalt, NULL};
+    run_result pt = run("prepare-timeout", prep_to);
+    pl = strstr(pt.log, "PREPARE ");
+    check(pt.rc == 0 && pt.bad == 0, "prepare-timeout run draws correctly (rc %d)", pt.rc);
+    check(pl && num(pl, "rc=") == 1 && num(pl, "ms=") < 500, "prepare-timeout: rc %d after %.1f ms",
+          (int)num(pl, "rc="), num(pl, "ms="));
+    // Throttle: a cold first run (new MSL, no disk cache) after prepare uses at most 2 workers, at
+    // utility QoS; RS_MTL_COMPILE_THREADS overrides the size.
+    char tsalt[96];
+    snprintf(tsalt, sizeof tsalt, "RS_MTL_SALT=th%d-%d", g_nonce, (int)getpid());
+    const char *thr_env[] = {"RSM_TEST_PREPARE=60", "RS_METAL_CACHE=0", tsalt, NULL};
+    run_result th = run("throttle", thr_env);
+    check(th.rc == 0 && th.bad == 0, "throttle run draws correctly (rc %d)", th.rc);
+    check(num(th.log, "pool_limit=") == 2 && num(th.log, "pool_threads=") <= 2 && num(th.log, "pool_peak=") >= 1 &&
+              num(th.log, "pool_peak=") <= 2,
+          "throttle: limit %d, %d threads, peak %d", (int)num(th.log, "pool_limit="), (int)num(th.log, "pool_threads="),
+          (int)num(th.log, "pool_peak="));
+    check(strstr(th.log, "pool_qos=utility") != NULL, "throttle: link compiles at utility QoS");
+    check(th.lib_compiled >= NPROG, "throttle: %d libraries compiled (%d on the pool, %d by the drawing thread)",
+          th.lib_compiled, (int)num(th.log, "lib_async="), (int)num(th.log, "lib_stolen="));
+    snprintf(tsalt, sizeof tsalt, "RS_MTL_SALT=to%d-%d", g_nonce, (int)getpid());
+    const char *thr3_env[] = {"RSM_TEST_PREPARE=60", "RS_METAL_CACHE=0", "RS_MTL_COMPILE_THREADS=3", tsalt, NULL};
+    run_result th3 = run("throttle-3", thr3_env);
+    check(th3.rc == 0 && th3.bad == 0 && num(th3.log, "pool_limit=") == 3 && num(th3.log, "pool_peak=") <= 3,
+          "RS_MTL_COMPILE_THREADS=3 overrides the throttled size (limit %d, peak %d)", (int)num(th3.log, "pool_limit="),
+          (int)num(th3.log, "pool_peak="));
+    // Without prepare (the original cache.psarc) the pool is not throttled.
+    check(num(async.log, "pool_limit=") >= 2 && strstr(async.log, "prepare_ms=0.0"),
+          "no prepare: pool not throttled (limit %d)", (int)num(async.log, "pool_limit="));
+
     printf("pipeline compile on the drawing thread: cold %.1f ms, no-cache (system Metal cache only) %.1f ms, "
            "warm 0 builds (archive lookups in warming: %.1f ms for %d libraries + %d pipelines)\n",
            cold.pipe_ms, off.pipe_ms, warm.warm_ms, warm.lib_warmed, warm.pipe_warmed);

@@ -8,6 +8,8 @@
 // run on a pool of worker threads ("Compile pool" below): glLinkProgram queues the compile and
 // returns; the first pipeline needed for that library waits for it, or compiles it on the calling
 // thread if no worker has started it yet. Warming (below) uses the same pool at a lower priority.
+// rs_gfx_prepare (the shell's safe load, before the game starts loading) waits for warming on the
+// whole pool and then throttles the pool for the rest of the run ("Safe load" below).
 //
 // On disk (one directory per cache format, core conventions, OS build and GPU; not per build of
 // libRSOpenGL: rebuilding the app keeps the cache, and libraries are keyed by their MSL text):
@@ -49,9 +51,13 @@
 //                             goes and at exit; 2: also log every archive hit and miss
 //   RS_METAL_CACHE_WARM_SYNC=1  wait for warming before the first context returns (tests)
 //   RS_MTL_COMPILE_THREADS=<n>  compile pool size (default: CPUs - 2, 2..8); 0: every library is
-//                             compiled synchronously in glLinkProgram (the old behaviour; benchmarks)
+//                             compiled synchronously in glLinkProgram (the old behaviour; benchmarks).
+//                             Also the throttled pool's size after rs_gfx_prepare (default 2)
 //   RS_MTL_SALT=<text>        diagnostics only: append "// salt <text>" to every MSL, so the system's
 //                             Metal cache cannot help (cold-compile measurements)
+//   RS_MTL_SALT_COMPILE=<text>  diagnostics only: the same, but only in the source handed to the
+//                             compiler (cache keys and the manifest keep the plain MSL), so a run
+//                             can meet a known manifest with a cold system Metal cache
 //   RS_MTL_TEST_FAIL=<text>   tests only: MSL containing <text> gets an #error (compile failure path)
 //   RS_METAL_CACHE_KEEP_RUNS=<n>  tests only: RSM_KEEP_RUNS
 #include "mtl_internal.h"
@@ -114,6 +120,10 @@ static struct {
     _Atomic int pipe_hits, pipe_misses, pipe_built, pipe_warmed, pipe_reused, pipe_waited;
     _Atomic uint64_t lib_ns, pipe_ns, wait_ns, warm_ns, serialize_ns;
     _Atomic int serialized, discarded, compacted;
+    // Compile pool: peak of jobs running at once and the highest QoS class a job ran at, both
+    // since the throttle started (rs_gfx_prepare); time spent in rs_gfx_prepare.
+    int pool_peak, pool_qos;
+    _Atomic uint64_t prepare_ns;
     bool verbose;  // RS_METAL_CACHE_STATS=2: every hit and miss
 } st;
 
@@ -170,6 +180,8 @@ static uint64_t rsm_now_ns(void) {
 
     // Warming.
     dispatch_group_t warm;
+    int warm_total;                // libraries queued for warming
+    _Atomic int warm_done;
     _Atomic bool closing;
 }
 @end
@@ -778,7 +790,15 @@ static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
     rsm_dump_msl(e);
     uint64_t t0 = rsm_now_ns();
     NSError *err = nil;
-    id<MTLLibrary> lib = [c->dev newLibraryWithSource:e->msl options:rsm_compile_options() error:&err];
+    static NSString *csalt;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        const char *s = getenv("RS_MTL_SALT_COMPILE");
+        if (s && *s && !strpbrk(s, "\r\n"))
+            csalt = [NSString stringWithFormat:@"\n// salt %s\n", s];
+    });
+    NSString *src = csalt ? [e->msl stringByAppendingString:csalt] : e->msl;
+    id<MTLLibrary> lib = [c->dev newLibraryWithSource:src options:rsm_compile_options() error:&err];
     if (lib) {
         e->vs = [lib newFunctionWithName:@"rs_vs"];
     } else {
@@ -853,7 +873,8 @@ static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntr
 // waiting thread may have taken it, or the other FIFO's job for the same entry); a warming job
 // then prebuilds that library's pipelines from the manifest. Workers run link jobs at
 // user-initiated QoS and warming at utility (the compile itself runs in Metal's compiler
-// service, which inherits the requester's QoS).
+// service, which inherits the requester's QoS). After rs_gfx_prepare at most g_pool_limit jobs
+// run at once, all at utility ("Safe load" below).
 @interface RSMJob : NSObject {
 @public
     RSMShaderCache *c;
@@ -868,7 +889,18 @@ static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntr
 static pthread_mutex_t g_pool_m = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_pool_cv = PTHREAD_COND_INITIALIZER;
 static NSMutableArray<RSMJob *> *g_jobs[2];  // [0] links, [1] warming
-static int g_pool_threads, g_pool_idle;
+static int g_pool_threads, g_pool_idle;      // idle: waiting for a job or for a free slot
+static int g_pool_running;                   // jobs running now
+// Safe load (rs_gfx_prepare): warming at user-initiated QoS while it waits; afterwards at most
+// g_pool_limit jobs run at once, all at utility QoS.
+static _Atomic bool g_warm_boost;
+static bool g_throttled;
+static int g_pool_limit = 1 << 30;
+
+static bool rsm_pool_explicit(void) {
+    const char *e = getenv("RS_MTL_COMPILE_THREADS");
+    return e && *e;
+}
 
 static int rsm_pool_max(void) {
     static int n = -1;
@@ -896,7 +928,17 @@ static void rsm_run_job(RSMJob *j) {
     RSMShaderCache *c = j->c;
     RSMLibEntry *e = j->e;
     if (!(j->warm && c->closing)) {
-        pthread_set_qos_class_self_np(j->warm ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED, 0);
+        // Read without the lock: a job that starts as the mode changes runs at either QoS.
+        bool throttled = __atomic_load_n(&g_throttled, __ATOMIC_RELAXED);
+        qos_class_t q = throttled || (j->warm && !g_warm_boost) ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED;
+        pthread_set_qos_class_self_np(q, 0);
+        if (throttled) {
+            int now = (int)qos_class_self();
+            pthread_mutex_lock(&g_pool_m);
+            if (now > st.pool_qos)
+                st.pool_qos = now;
+            pthread_mutex_unlock(&g_pool_m);
+        }
         pthread_mutex_lock(&c->m);
         bool mine = e->state == RSM_QUEUED || e->state == RSM_NEW;
         if (mine)
@@ -914,8 +956,10 @@ static void rsm_run_job(RSMJob *j) {
             rsm_pipeline_for(c, e, kd.bytes, false);
         }
     }
-    if (j->warm)
+    if (j->warm) {
+        c->warm_done++;
         dispatch_group_leave(c->warm);
+    }
 }
 
 static void *rsm_worker(void *arg) {
@@ -924,7 +968,7 @@ static void *rsm_worker(void *arg) {
     for (;;) {
         RSMJob *j;
         pthread_mutex_lock(&g_pool_m);
-        while (!g_jobs[0].count && !g_jobs[1].count) {
+        while ((!g_jobs[0].count && !g_jobs[1].count) || g_pool_running >= g_pool_limit) {
             g_pool_idle++;
             pthread_cond_wait(&g_pool_cv, &g_pool_m);
             g_pool_idle--;
@@ -932,11 +976,18 @@ static void *rsm_worker(void *arg) {
         NSMutableArray *q = g_jobs[0].count ? g_jobs[0] : g_jobs[1];
         j = q[0];
         [q removeObjectAtIndex:0];
+        if (++g_pool_running > st.pool_peak && g_throttled)
+            st.pool_peak = g_pool_running;
         pthread_mutex_unlock(&g_pool_m);
         @autoreleasepool {
             rsm_run_job(j);
             j = nil;
         }
+        pthread_mutex_lock(&g_pool_m);
+        g_pool_running--;
+        if (g_jobs[0].count || g_jobs[1].count)
+            pthread_cond_signal(&g_pool_cv);  // a worker held back by the limit
+        pthread_mutex_unlock(&g_pool_m);
     }
     return NULL;
 }
@@ -952,6 +1003,8 @@ static void rsm_pool_push(NSArray<RSMJob *> *jobs, bool warm) {
     [g_jobs[warm] addObjectsFromArray:jobs];
     int want = (int)(g_jobs[0].count + g_jobs[1].count);
     int max = rsm_pool_max() ?: (g_jobs[1].count ? 2 : 0);  // 0: warming still runs in the background
+    if (g_throttled && max > g_pool_limit)
+        max = g_pool_limit;
     while (g_pool_idle < want && g_pool_threads < max) {
         pthread_attr_t attr;
         pthread_attr_init(&attr);
@@ -976,8 +1029,25 @@ static void rsm_pool_drain(void) {
     [g_jobs[0] removeAllObjects];
     [g_jobs[1] removeAllObjects];
     pthread_mutex_unlock(&g_pool_m);
-    for (RSMJob *j in warm)
+    for (RSMJob *j in warm) {
+        j->c->warm_done++;
         dispatch_group_leave(j->c->warm);
+    }
+}
+
+// The throttled pool's size: RS_MTL_COMPILE_THREADS when set (at least 1), else 2.
+static int rsm_pool_throttle_limit(void) {
+    if (rsm_pool_explicit())
+        return rsm_pool_max() > 0 ? rsm_pool_max() : 1;
+    return 2;
+}
+
+static void rsm_pool_throttle(void) {
+    pthread_mutex_lock(&g_pool_m);
+    g_throttled = true;
+    g_pool_limit = rsm_pool_throttle_limit();
+    st.pool_peak = g_pool_running < g_pool_limit ? g_pool_running : g_pool_limit;
+    pthread_mutex_unlock(&g_pool_m);
 }
 
 static NSString *rsm_msl_string(const char *msl) {
@@ -1179,6 +1249,7 @@ static void rsm_warm_start(RSMShaderCache *c, warm_list *wl) {
         [jobs addObject:j];
         dispatch_group_enter(c->warm);
     }
+    c->warm_total = (int)jobs.count;
     pthread_mutex_unlock(&c->m);
     rsm_pool_push(jobs, true);
     // After the blocks above (a notify on an empty group would run at once).
@@ -1192,6 +1263,63 @@ static void rsm_warm_start(RSMShaderCache *c, warm_list *wl) {
     }
 }
 
+// --- Safe load -------------------------------------------------------------------------------
+// The shell calls rs_gfx_prepare before the game starts loading when the game's loading is known
+// to stall while the CPU is busy (a modded cache.psarc). Warming, started when the first context
+// was made, gets the whole pool at user-initiated QoS and is waited for (at most max_s): on a warm
+// system Metal cache that is milliseconds, after a cold start (new OS, new translator) the
+// compile happens here, behind a black window, instead of during the game's loading. Then the
+// pool is throttled for the rest of the run: libraries the manifest did not know (a first run)
+// compile on at most rsm_pool_throttle_limit() workers at utility QoS; a draw that needs one
+// right away still compiles it on its own thread (rsm_library_wait).
+static const char *rsm_qos_name(int q) {
+    switch (q) {
+    case QOS_CLASS_USER_INTERACTIVE: return "user-interactive";
+    case QOS_CLASS_USER_INITIATED: return "user-initiated";
+    case QOS_CLASS_DEFAULT: return "default";
+    case QOS_CLASS_UTILITY: return "utility";
+    case QOS_CLASS_BACKGROUND: return "background";
+    default: return "none";
+    }
+}
+
+int rsm_cache_prepare(RSMContext *ctx, double max_s) {
+    RSMShaderCache *c = rsm_cache_for(ctx->dev);
+    uint64_t t0 = rsm_now_ns();
+    int rc = 0;
+    if (c->warm) {
+        g_warm_boost = true;
+        int total = c->warm_total;
+        rsm_log("safe load: compiling the %d libraries of the cache manifest before the game loads "
+                "(%d threads, at most %g s)", total, g_pool_threads, max_s);
+        double next_log = 2.0;
+        for (;;) {
+            double el = (rsm_now_ns() - t0) / 1e9, left = max_s - el;
+            if (left <= 0) {
+                rc = 1;
+                break;
+            }
+            double step = left < 0.25 ? left : 0.25;
+            if (!dispatch_group_wait(c->warm, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(step * 1e9))))
+                break;
+            if (el >= next_log) {
+                rsm_log("safe load: %d of %d libraries (%.0f s)", (int)c->warm_done, total, el);
+                next_log += 2.0;
+            }
+        }
+        g_warm_boost = false;
+        if (rc)
+            rsm_log("safe load: timed out after %g s with %d of %d libraries; the rest compiles while "
+                    "the game loads", max_s, (int)c->warm_done, total);
+    }
+    rsm_pool_throttle();
+    uint64_t dt = rsm_now_ns() - t0;
+    st.prepare_ns += dt;
+    rsm_log("safe load: %d libraries ready in %.1f ms; compile pool now %d at a time, utility QoS",
+            c->warm ? (int)c->warm_done : 0, dt / 1e6, g_pool_limit);
+    return rc;
+}
+
 // --- Setup ---------------------------------------------------------------------------------
 static void rsm_print_stats(const char *when) {
     if (!rsm_env_on("RS_METAL_CACHE_STATS"))
@@ -1200,11 +1328,12 @@ static void rsm_print_stats(const char *when) {
             "[rs-mtl] cache stats (%s): lib_compiled=%d lib_ms=%.1f lib_async=%d lib_stolen=%d lib_reused=%d "
             "lib_waited=%d lib_warmed=%d lib_failed=%d pipe_built=%d pipe_ms=%.1f pipe_reused=%d pipe_waited=%d pipe_warmed=%d "
             "archive_hits=%d archive_misses=%d wait_ms=%.1f warm_ms=%.1f archive_writes=%d write_ms=%.1f "
-            "discarded=%d compacted=%d\n",
+            "discarded=%d compacted=%d pool_threads=%d pool_limit=%d pool_peak=%d pool_qos=%s prepare_ms=%.1f\n",
             when, st.lib_compiled, st.lib_ns / 1e6, st.lib_async, st.lib_stolen, st.lib_reused, st.lib_waited, st.lib_warmed, st.lib_failed,
             st.pipe_built, st.pipe_ns / 1e6, st.pipe_reused, st.pipe_waited, st.pipe_warmed, st.pipe_hits,
             st.pipe_misses, st.wait_ns / 1e6, st.warm_ns / 1e6, st.serialized, st.serialize_ns / 1e6, st.discarded,
-            st.compacted);
+            st.compacted, g_pool_threads, g_throttled ? g_pool_limit : rsm_pool_max(), st.pool_peak,
+            rsm_qos_name(st.pool_qos), st.prepare_ns / 1e6);
 }
 
 static void rsm_flush(RSMShaderCache *c) {

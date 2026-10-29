@@ -31,6 +31,15 @@ void rs_gfx_present(rs_gfx_context *ctx);
 // The CGLLockContext / CGLUnlockContext pair (recursive).
 void rs_gfx_lock(rs_gfx_context *ctx);
 void rs_gfx_unlock(rs_gfx_context *ctx);
+// Safe load: call once, before the game starts loading, from any thread (blocks; the context
+// need not be current). Metal: compiles every shader library and pipeline the disk cache's
+// manifest lists (libraries linked in earlier runs) on the whole compile pool and waits for them,
+// at most max_seconds; then throttles the compile pool for the rest of the run, so compiles of
+// libraries not known in advance cannot starve the game's loading threads (at most 2 workers at
+// utility QoS, or RS_MTL_COMPILE_THREADS; a draw that needs a library at once still compiles it
+// on its own thread). Returns 0 when everything is ready (or there was nothing to warm), 1 on
+// timeout (the rest goes on in the throttled pool), -1 for no context. GL: no-op, 0.
+int rs_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
 // The CGLContextObj the game and CGL calls see: the real one on GL, a token on Metal.
 CGLContextObj rs_gfx_cgl(rs_gfx_context *ctx);
 

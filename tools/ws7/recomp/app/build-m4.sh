@@ -5,7 +5,8 @@
 #
 # 1. builds the override libraries (tools/ws7/recomp/overrides/build.sh);
 # 2. makes the skip list: every override module including `online` (offline
-#    stub), `mods` (the rsmacfixes and RSBypass patches) and `hooks` (hook
+#    stub), `audio` (lower guitar latency, overrides/src/audio.h), `mods` (the
+#    rsmacfixes and RSBypass patches) and `hooks` (hook
 #    points for mods loaded at run time, no code of its own), and un-drops, to
 #    a fixpoint, every dropped address that generated code still references;
 # 3. builds the image with that list (tools/ws7/recomp/build/build.sh) and links
@@ -43,7 +44,7 @@ lib=$out/ov/lib
 
 # RC_OV_MODULES selects the override modules (default: all of them); handy for
 # bisecting a regression to one module.
-modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp mods hooks}
+modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp audio mods hooks}
 : > "$out/skip.txt"
 for m in $modules; do
   if [ "$m" = mods ]; then cat "$out/ov/mods.skip"; else cat "$ov/$m.skip"; fi

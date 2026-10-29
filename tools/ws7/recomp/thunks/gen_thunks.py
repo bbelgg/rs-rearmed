@@ -60,11 +60,25 @@ HOOKS = {
     "AUGraphSetNodeInputCallback": lambda p: [
         "uint64_t cb_tmp[2];",
         "if (%s) { memcpy(cb_tmp, %s, 16); cb_tmp[0] = (uint64_t)rc_tramp_get(cb_tmp[0]); %s = cb_tmp; }" % (p[3], p[3], p[3])],
-    # kAudioUnitProperty_SetRenderCallback (23) / kAudioOutputUnitProperty_SetInputCallback (2005): same struct
+    # kAudioUnitProperty_SetRenderCallback (23) / kAudioOutputUnitProperty_SetInputCallback (2005): same struct.
+    # kAudioOutputUnitProperty_CurrentDevice (2000), the Wwise sink choosing its output device: the audio
+    # override module sets the device's I/O buffer size first (overrides/src/audio_out.c; weak, so a build
+    # without that module still links).
     "AudioUnitSetProperty": lambda p: [
+        "extern void rs_audio_output_device(uint32_t) __attribute__((weak_import));",
+        "if (%s == 2000 && %s && %s == 4 && rs_audio_output_device) rs_audio_output_device(*(const uint32_t *)%s);"
+        % (p[1], p[4], p[5], p[4]),
         "uint64_t cb_tmp[2];",
         "if ((%s == 23 || %s == 2005) && %s && %s == 16) { memcpy(cb_tmp, %s, 16); "
         "cb_tmp[0] = (uint64_t)rc_tramp_get(cb_tmp[0]); %s = cb_tmp; }" % (p[1], p[1], p[4], p[5], p[4], p[4])],
+    # kAudioHardwarePropertyDevices ('dev#') of the system object: the audio override module makes the call and
+    # puts the input devices first (overrides/src/audio_devs.c: the game opens only the first 10 as inputs).
+    "AudioObjectGetPropertyData": lambda p: [
+        "extern int32_t rs_audio_get_property_data(uint32_t, const void *, uint32_t, const void *, uint32_t *, void *)"
+        " __attribute__((weak_import));",
+        "if (%s == 1 && %s && *(const uint32_t *)%s == 0x64657623u && rs_audio_get_property_data) { "
+        "c->r[0] = (uint64_t)(uint32_t)rs_audio_get_property_data(%s, %s, %s, %s, %s, %s); return; }"
+        % ((p[0], p[1], p[1]) + tuple(p))],
 }
 # Steam (the stub shim calls back into these natively):
 #   SteamInternal_ContextInit(data): data->pFn(ctx) is a guest function

@@ -69,7 +69,7 @@ objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-decla
 objs="$objs $(cc_obj "$here/seam_platform.c")"
 for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done
 for s in "$rt"/rc_*.S; do objs="$objs $(cc_obj "$s")"; done
-FW="-framework AppKit -framework OpenGL -framework CoreVideo -framework IOKit -framework Foundation -framework CoreFoundation -lobjc -lz"
+FW="-framework AppKit -framework OpenGL -framework CoreVideo -framework IOKit -framework CoreAudio -framework Foundation -framework CoreFoundation -lobjc -lz"
 exe=$app/Contents/MacOS/Rocksmith2014
 # rc_main.o names the profile file of a gen build (the image TUs carry the counters only)
 pgo_main=$(rc_pgo_main "$out/pgo")

@@ -3,7 +3,8 @@
 # the executable of ~/Applications/RS Re-ARMed.app). Offline:
 #   - the game folder is mirrored with symlinks into $HOME_DIR/game (the shell takes the folder that
 #     holds the .app as the game root), with this build's Rocksmith2014.app, an offline copy of the
-#     install's Rocksmith.ini ([Net] AutoLogin=0, [Renderer.MacOS] DisableBrowser=1) and the
+#     install's Rocksmith.ini ([Net] AutoLogin=0, [Renderer.MacOS] DisableBrowser=1, [Audio]
+#     LatencyBuffer from $RS_LATENCY_BUFFER or the game's own saved choice) and the
 #     "Re-ARMed 2026" title logo (static.psarc.rearmed) when it is there;
 #   - the Steam shim runs in stub mode with its cloud in $HOME_DIR/steam: on the first launch it is
 #     seeded with a copy of the real Steam/userdata/<account>/221680/remote (profiles,
@@ -50,13 +51,22 @@ if [[ -f "$GAME_DIR/static.psarc.rearmed" && "${RS_REARMED:-1}" != 0 ]]; then
 else
     ln -sfn "$GAME_DIR/static.psarc" "$stage/static.psarc"
 fi
+# [Audio] LatencyBuffer, the game's output buffer in steps of 256 frames (see README, FAQ): RS_LATENCY_BUFFER=N
+# (1-16) when set, else the value in the copy, which the game's Audio settings save there, else the install's.
+lb=${RS_LATENCY_BUFFER:-}
+[[ $lb =~ ^([1-9]|1[0-6])$ ]] ||
+    lb=$(awk '{ sub(/\r$/, "") } /^\[/ { sec = $0 }
+              sec == "[Audio]" && sub(/^LatencyBuffer=/, "") { print; exit }' "$stage/Rocksmith.ini" 2>/dev/null)
+[[ $lb =~ ^([1-9]|1[0-6])$ ]] || lb=
 if [[ -f "$GAME_DIR/Rocksmith.ini" ]]; then
-    awk '{ sub(/\r$/, "") }
+    awk -v lb="$lb" '{ sub(/\r$/, "") }
          /^\[/ { sec = $0 }
          sec == "[Net]" && /^AutoLogin=/ { next }
          sec == "[Renderer.MacOS]" && /^DisableBrowser=/ { print "DisableBrowser=1"; next }
+         sec == "[Audio]" && lb != "" && /^LatencyBuffer=/ { next }
          { print }
-         $0 == "[Net]" { print "AutoLogin=0" }' "$GAME_DIR/Rocksmith.ini" > "$stage/Rocksmith.ini.new" &&
+         $0 == "[Net]" { print "AutoLogin=0" }
+         $0 == "[Audio]" && lb != "" { print "LatencyBuffer=" lb }' "$GAME_DIR/Rocksmith.ini" > "$stage/Rocksmith.ini.new" &&
         mv -f "$stage/Rocksmith.ini.new" "$stage/Rocksmith.ini"
 fi
 

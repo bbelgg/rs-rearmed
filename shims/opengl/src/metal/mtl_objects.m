@@ -178,7 +178,8 @@ static RSMBuffer *rsm_bound_buffer(RSMContext *ctx, GLenum target) {
     GLuint *slot = rsm_buffer_binding(ctx, target);
     if (!slot)
         return nil;
-    RSMBuffer *b = rsm_get(&ctx->buffers, *slot);
+    // The VAO's element buffer is the object it bound (its name may have been deleted and reused since).
+    RSMBuffer *b = target == GL_ELEMENT_ARRAY_BUFFER ? ctx->vao->element_obj : rsm_get(&ctx->buffers, *slot);
     if (!b)
         rsm_error(ctx, GL_INVALID_OPERATION);
     return b;
@@ -194,6 +195,8 @@ static void rsm_buffer_modified(RSMContext *ctx, RSMBuffer *b, size_t off, size_
 static void rsm_buffer_rename(RSMContext *ctx, RSMBuffer *b, size_t skip_off, size_t skip_len) {
     id<MTLBuffer> old = b->mtl;
     id<MTLBuffer> nb = rsm_new_buffer(ctx, old.length);
+    if (!nb)
+        return;  // out of memory: written in place (the GPU may see part of the new data)
     uint8_t *d = nb.contents;
     const uint8_t *s = old.contents;
     if (skip_off)
@@ -219,9 +222,14 @@ void rsmtl_glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data, GLen
     if (b->mtl && b->mtl.length == alloc && !rsm_in_flight(ctx, b->last_use)) {
         // same storage, reusable
     } else {
+        id<MTLBuffer> nb = rsm_new_buffer(ctx, alloc);
+        if (!nb) {
+            rsm_error(ctx, GL_OUT_OF_MEMORY);  // the buffer keeps its old storage
+            return;
+        }
         if (b->mtl)
             rsm_retire_buffer(ctx, b->mtl, b->last_use);
-        b->mtl = rsm_new_buffer(ctx, alloc);
+        b->mtl = nb;
     }
     rsm_buffer_reset_reads(b);
     b->size = (size_t)size;
@@ -1461,6 +1469,10 @@ static void rsm_tex_write(RSMContext *ctx, RSMTexture *t, int level, int slice, 
     bool comp = rsm_fmt_compressed(t->fmt);
     size_t rows = comp ? (size_t)(h + 3) / 4 : (size_t)h;
     MTLRegion r = MTLRegionMake2D((NSUInteger)x, (NSUInteger)y, (NSUInteger)w, (NSUInteger)h);
+    // A clear still pending on this target (a load action of the pass to come) goes first, as in GL.
+    if (ctx->pending_clear && !ctx->enc &&
+        (t->mtl == ctx->pass_color || t->mtl == ctx->pass_depth || t->mtl == ctx->pass_stencil))
+        rsm_end_pass(ctx);
     if (!rsm_in_flight(ctx, t->last_use) && t->mtl.storageMode != MTLStorageModePrivate) {
         [t->mtl replaceRegion:r mipmapLevel:(NSUInteger)level slice:(NSUInteger)slice withBytes:bytes
                   bytesPerRow:pitch bytesPerImage:pitch * rows];

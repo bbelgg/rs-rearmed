@@ -54,8 +54,8 @@ void rsm_draw_init(RSMContext *ctx) {
 }
 
 // --- Render pass ------------------------------------------------------------------------
-static RSMTexture *rsm_att_object(RSMContext *ctx, const rsm_attachment *a) {
-    return a->type == GL_TEXTURE ? rsm_get(&ctx->textures, a->name) : nil;
+static RSMTexture *rsm_att_object(const rsm_attachment *a) {
+    return a->type == GL_TEXTURE ? a->obj : nil;
 }
 
 // Resolve the draw framebuffer's attachments into ctx->pass_*.
@@ -112,7 +112,7 @@ static void rsm_mark_targets(RSMContext *ctx) {
         return;
     RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, ctx->draw_fb);
     for (int i = 0; fb && i < RSM_ATT_COUNT; i++) {
-        RSMTexture *t = rsm_att_object(ctx, &fb->att[i]);
+        RSMTexture *t = rsm_att_object(&fb->att[i]);
         if (t)
             t->last_use = ctx->serial;
     }
@@ -268,9 +268,12 @@ static bool rsm_apply_dynamic(RSMContext *ctx) {
         [e setFrontFacingWinding:ctx->front_face == GL_CCW ? MTLWindingClockwise : MTLWindingCounterClockwise];
         [e setTriangleFillMode:ctx->polygon_mode[0] == GL_FILL ? MTLTriangleFillModeFill : MTLTriangleFillModeLines];
     }
-    if (d & RSM_DIRTY_STENCIL_REF)
-        [e setStencilFrontReferenceValue:(uint32_t)ctx->stencil[0].ref & 0xFF
-                      backReferenceValue:(uint32_t)ctx->stencil[1].ref & 0xFF];
+    if (d & RSM_DIRTY_STENCIL_REF) {
+        // GL clamps the reference to [0, 2^bits - 1].
+        GLint f = ctx->stencil[0].ref, b = ctx->stencil[1].ref;
+        [e setStencilFrontReferenceValue:(uint32_t)(f < 0 ? 0 : f > 255 ? 255 : f)
+                      backReferenceValue:(uint32_t)(b < 0 ? 0 : b > 255 ? 255 : b)];
+    }
     if (d & RSM_DIRTY_BLEND_COLOR)
         [e setBlendColorRed:ctx->blend_color[0] green:ctx->blend_color[1] blue:ctx->blend_color[2]
                       alpha:ctx->blend_color[3]];
@@ -332,8 +335,9 @@ static void rsm_clear_quad(RSMContext *ctx, unsigned mask) {
         uint64_t k = MTLCompareFunctionAlways | (uint64_t)MTLStencilOperationReplace << 3 |
                      (uint64_t)MTLStencilOperationReplace << 6 | (uint64_t)MTLStencilOperationReplace << 9 |
                      (uint64_t)0xFF << 12;
-        key |= 1u << 4 | (k | (uint64_t)(ctx->stencil[0].writemask & 0xFF) << 20) << 5 |
-               (k | (uint64_t)(ctx->stencil[1].writemask & 0xFF) << 20) << 33;
+        // glClear uses the front write mask for the whole buffer (the quad may face either way).
+        uint64_t f = k | (uint64_t)(ctx->stencil[0].writemask & 0xFF) << 20;
+        key |= 1u << 4 | f << 5 | f << 33;
     }
     [e setRenderPipelineState:ps];
     [e setDepthStencilState:rsm_ds_state(ctx, key)];
@@ -396,8 +400,7 @@ void rsmtl_glClear(GLbitfield mask) {
             } else if (mask & GL_DEPTH_BUFFER_BIT) {
                 quad &= ~(unsigned)GL_DEPTH_BUFFER_BIT;  // masked: nothing to write
             }
-            if ((mask & GL_STENCIL_BUFFER_BIT) && (ctx->stencil[0].writemask & 0xFF) == 0xFF &&
-                (ctx->stencil[1].writemask & 0xFF) == 0xFF) {
+            if ((mask & GL_STENCIL_BUFFER_BIT) && (ctx->stencil[0].writemask & 0xFF) == 0xFF) {
                 ctx->pending_clear |= GL_STENCIL_BUFFER_BIT;
                 ctx->pending_stencil = ctx->clear_stencil;
                 quad &= ~(unsigned)GL_STENCIL_BUFFER_BIT;
@@ -567,6 +570,25 @@ static size_t rsm_index_size(GLenum type) {
     return type == GL_UNSIGNED_BYTE ? 1 : type == GL_UNSIGNED_SHORT ? 2 : 4;
 }
 
+static void rsm_index_range(const void *isrc, GLenum itype, GLsizei count, uint32_t *lo, uint32_t *hi) {
+    uint32_t mn = UINT32_MAX, mx = 0;
+    if (itype == GL_UNSIGNED_SHORT) {
+        const uint16_t *p = isrc;
+        for (GLsizei i = 0; i < count; i++) {
+            mn = p[i] < mn ? p[i] : mn;
+            mx = p[i] > mx ? p[i] : mx;
+        }
+    } else {
+        for (GLsizei i = 0; i < count; i++) {
+            uint32_t v = rsm_index(isrc, itype, (size_t)i);
+            mn = v < mn ? v : mn;
+            mx = v > mx ? v : mx;
+        }
+    }
+    *lo = mn;
+    *hi = mx;
+}
+
 static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, GLenum itype, const void *indices,
                      GLsizei instances, bool indexed) {
     rsm_prim pr;
@@ -593,7 +615,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
         NSUInteger ioff = 0;
         RSMBuffer *eb = nil;
         if (indexed) {
-            eb = rsm_get(&ctx->buffers, ctx->vao->element_buffer);
+            eb = ctx->vao->element_obj;
             if (eb) {
                 if (!eb->mtl || (size_t)indices + (size_t)count * rsm_index_size(itype) > eb->size) {
                     rsm_error(ctx, GL_INVALID_OPERATION);
@@ -606,9 +628,11 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                 isrc = indices;
             }
         }
-        // Does any attribute need its data copied (client arrays, misaligned)?
+        // Does any attribute need its data copied (client arrays, misaligned)? Could an index
+        // of 0xFFFF (Metal's primitive restart for 16-bit indices, a vertex in GL) be in range?
+        // Does a buffer written while in flight need the exact vertex range a draw reads?
         uint32_t used = p->attrib_mask;
-        bool copy = false;
+        bool copy = false, big = false, streamed = false;
         for (int i = 0; i < RSM_MAX_ATTRIBS; i++) {
             if (!(used & (1u << i)))
                 continue;
@@ -616,20 +640,23 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             if (!a->enabled)
                 continue;
             size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
-            if (!a->buffer || ((uintptr_t)a->ptr & 3) || (stride & 3))
+            RSMBuffer *b = a->bo;
+            if (!b || ((uintptr_t)a->ptr & 3) || (stride & 3)) {
                 copy = true;
-        }
-        // Vertex range (only needed for copies).
-        uint32_t vmin = (uint32_t)first, vmax = (uint32_t)first + (uint32_t)count - 1;
-        if (indexed && copy) {
-            vmin = UINT32_MAX;
-            vmax = 0;
-            for (GLsizei i = 0; i < count; i++) {
-                uint32_t v = rsm_index(isrc, itype, (size_t)i);
-                vmin = v < vmin ? v : vmin;
-                vmax = v > vmax ? v : vmax;
+            } else if (!a->divisor) {
+                big |= b->size > (size_t)a->ptr && (b->size - (size_t)a->ptr) / stride > 0xFFFF;
+                streamed |= b->streamed;
             }
         }
+        // Vertex range: always known for array draws; for indexed draws worked out when needed.
+        uint32_t vmin = (uint32_t)first, vmax = (uint32_t)first + (uint32_t)count - 1;
+        bool have_range = !indexed;
+        bool restart_risk = indexed && !pr.convert && itype == GL_UNSIGNED_SHORT && (copy || big);
+        if (indexed && (copy || restart_risk || streamed)) {
+            rsm_index_range(isrc, itype, count, &vmin, &vmax);
+            have_range = true;
+        }
+        bool widen = restart_risk && vmax == 0xFFFF;
         // Indices for Metal.
         MTLIndexType mit = MTLIndexTypeUInt16;
         NSUInteger icount = (NSUInteger)count;
@@ -669,7 +696,13 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             mit = MTLIndexTypeUInt32;
             icount = o;
         } else if (indexed) {
-            if (itype == GL_UNSIGNED_BYTE || !eb || ((size_t)indices & 3)) {
+            if (widen) {
+                // 0xFFFF is a vertex here: 32-bit indices, where it isn't the restart value.
+                uint32_t *d = rsm_transient(ctx, (size_t)count * 4, 4, &ibuf, &ioff);
+                for (GLsizei k = 0; k < count; k++)
+                    d[k] = ((const uint16_t *)isrc)[k];
+                mit = MTLIndexTypeUInt32;
+            } else if (itype == GL_UNSIGNED_BYTE || !eb || ((size_t)indices & 3)) {
                 size_t is = itype == GL_UNSIGNED_INT ? 4 : 2;
                 uint8_t *d = rsm_transient(ctx, (size_t)count * is, 4, &ibuf, &ioff);
                 if (itype == GL_UNSIGNED_BYTE)
@@ -682,7 +715,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                 ibuf = eb->mtl;
                 ioff = (NSUInteger)(size_t)indices;
                 mit = itype == GL_UNSIGNED_INT ? MTLIndexTypeUInt32 : MTLIndexTypeUInt16;
-                eb->last_use = ctx->serial;
+                rsm_buffer_gpu_read(ctx, eb, (size_t)indices, (size_t)indices + (size_t)count * rsm_index_size(itype));
             }
         }
 
@@ -708,7 +741,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             k.vl.fmt[i] = (uint8_t)f;
             k.vl.step[i] = a->divisor ? RSM_STEP_INSTANCE : RSM_STEP_VERTEX;
             k.vl.rate[i] = a->divisor ? a->divisor : 1;
-            bool direct = a->buffer && !((uintptr_t)a->ptr & 3) && !(stride & 3) && (a->divisor || !copy);
+            bool direct = a->bo && !((uintptr_t)a->ptr & 3) && !(stride & 3) && (a->divisor || !copy);
             k.vl.stride[i] = (uint16_t)(direct ? stride : (es + 3) & ~(size_t)3);
         }
         k.color_fmt = (uint16_t)ctx->pass_color_fmt;
@@ -755,8 +788,8 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                 continue;
             }
             size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
-            RSMBuffer *b = a->buffer ? rsm_get(&ctx->buffers, a->buffer) : nil;
-            if (a->buffer && (!b || !b->mtl)) {
+            RSMBuffer *b = a->bo;
+            if (b && !b->mtl) {
                 [e setVertexBytes:ctx->vattr[i] length:16 atIndex:(NSUInteger)slot];
                 ctx->enc_vb[i] = nil;
                 continue;
@@ -774,7 +807,16 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                     [e setVertexBufferOffset:off atIndex:(NSUInteger)slot];
                     ctx->enc_vb_off[i] = off;
                 }
-                b->last_use = ctx->serial;
+                // What the GPU reads from the buffer (writes elsewhere need no new storage).
+                size_t lo = (size_t)a->ptr, hi = b->size;
+                if (inst) {
+                    size_t n = ((size_t)instances + a->divisor - 1) / a->divisor;
+                    hi = lo + (n - 1) * stride + es;
+                } else if (have_range) {
+                    hi = lo + (size_t)vmax * stride + es;
+                    lo += (size_t)vmin * stride;
+                }
+                rsm_buffer_gpu_read(ctx, b, lo, hi);
                 continue;
             }
             // Copy the elements the draw reads into transient memory, packed.
@@ -790,9 +832,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             for (uint32_t v = 0; v < n; v++)
                 memcpy(d + (size_t)v * ns, src + (size_t)(lo + v) * stride, es);
             [e setVertexBuffer:tb offset:toff atIndex:(NSUInteger)slot];
-            ctx->enc_vb[i] = nil;
-            if (b)
-                b->last_use = ctx->serial;
+            ctx->enc_vb[i] = nil;  // copied now: the GPU never reads b for this draw
         }
 
         // Uniforms.

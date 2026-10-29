@@ -241,6 +241,10 @@ void rsmtl_glStencilOp(GLenum fail, GLenum zfail, GLenum zpass) {
 
 void rsmtl_glStencilMaskSeparate(GLenum face, GLuint mask) {
     RSM_CTX()
+    if (face != GL_FRONT && face != GL_BACK && face != GL_FRONT_AND_BACK) {
+        rsm_error(ctx, GL_INVALID_ENUM);
+        return;
+    }
     int lo, hi;
     rsm_faces(face, &lo, &hi);
     for (int f = lo; f <= hi; f++)

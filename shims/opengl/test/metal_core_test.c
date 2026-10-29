@@ -1756,6 +1756,316 @@ static void case_api(void) {
     glok("api");
 }
 
+// Level 0 of a mipmapped texture redefined smaller: the old mip count doesn't fit the new size.
+static void case_mip_redefine(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    static unsigned char big[64 * 64 * 4], small[16 * 16 * 4];
+    memset(big, 255, sizeof big);
+    for (int i = 0; i < 16 * 16; i++) {
+        small[i * 4] = 0;
+        small[i * 4 + 1] = (unsigned char)(i * 3);
+        small[i * 4 + 2] = 200;
+        small[i * 4 + 3] = 255;
+    }
+    GLuint t = texture_rgba(64, 64, big, GL_LINEAR_MIPMAP_LINEAR);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, small);
+    GLint w = 0;
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_WIDTH, &w);
+    dump_int(w);
+    GLuint p = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(p, "tex"), 0);
+    draw_tex_rect(0, 0, 64, 64);
+    snap();
+    check(w == 16, "level 0 is 16 wide (%d)", w);
+    check_px(2, 2, 0, 0, 200, 255, "the 16x16 image is sampled");
+    glDeleteTextures(1, &t);
+    glok("mip redefine");
+}
+
+// glGenerateMipmap on a texture attached to the bound framebuffer, then more drawing into it.
+static void case_fbo_mipmap(void) {
+    GLuint color, ds;
+    GLuint fbo = make_fbo(&color, &ds, 32, 32);
+    glViewport(0, 0, 32, 32);
+    glClearColor(1, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glBindTexture(GL_TEXTURE_2D, color);
+    glGenerateMipmap(GL_TEXTURE_2D);
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    uniform4(p, "color", 0, 1, 0, 1);
+    float v[8] = {-1, -1, 0, -1, -1, 1, 0, 1};  // left half
+    glGenBuffers(1, &g_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof v, v, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    unsigned char fb_px[4] = {0};
+    glReadPixels(4, 4, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, fb_px);
+    dump(fb_px, 4);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, W, H);
+    GLuint pt = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(pt, "tex"), 0);
+    glBindTexture(GL_TEXTURE_2D, color);
+    draw_tex_rect(0, 0, 64, 64);
+    snap();
+    check(fb_px[0] == 0 && fb_px[1] == 255, "read back from the FBO after the mipmaps (%d,%d)", fb_px[0], fb_px[1]);
+    check_px(8, 32, 0, 255, 0, 255, "drawn after glGenerateMipmap: in the texture");
+    check_px(56, 32, 255, 0, 0, 255, "cleared before");
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &ds);
+    glDeleteTextures(1, &color);
+    glok("fbo mipmap");
+}
+
+// Objects deleted while a framebuffer / VAO that isn't bound still uses them: GL keeps them
+// alive there, and their names may go to new objects, which must not be affected.
+static void case_orphans(void) {
+    // A texture attached to an unbound FBO, deleted; a new texture probably reuses the name.
+    GLuint t1, ds;
+    GLuint fbo = make_fbo(&t1, &ds, 16, 16);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteTextures(1, &t1);
+    static unsigned char blue[16 * 16 * 4];
+    for (int i = 0; i < 16 * 16; i++) {
+        blue[i * 4 + 2] = 255;
+        blue[i * 4 + 3] = 255;
+    }
+    GLuint t2 = texture_rgba(16, 16, blue, GL_NEAREST);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glViewport(0, 0, 16, 16);
+    glClearColor(1, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);  // into the deleted texture (or nothing): not into t2
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, W, H);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint pt = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(pt, "tex"), 0);
+    glBindTexture(GL_TEXTURE_2D, t2);
+    draw_tex_rect(0, 0, 32, 64);
+    // A buffer used by an unbound VAO, deleted; a new buffer probably reuses the name.
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    uniform4(p, "color", 0, 1, 0, 1);
+    float v[8];
+    rect(v, 32, 0, 64, 32);
+    GLuint vao, b1, b2;
+    glGenVertexArraysAPPLE(1, &vao);
+    glBindVertexArrayAPPLE(vao);
+    glGenBuffers(1, &b1);
+    glBindBuffer(GL_ARRAY_BUFFER, b1);
+    glBufferData(GL_ARRAY_BUFFER, sizeof v, v, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArrayAPPLE(0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glDeleteBuffers(1, &b1);
+    float w[8];
+    rect(w, 32, 32, 64, 64);
+    glGenBuffers(1, &b2);
+    glBindBuffer(GL_ARRAY_BUFFER, b2);
+    glBufferData(GL_ARRAY_BUFFER, sizeof w, w, GL_STATIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glBindVertexArrayAPPLE(vao);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);  // the deleted buffer's rectangle
+    glBindVertexArrayAPPLE(0);
+    snap();
+    printf("INFO names: texture %u -> %u, buffer %u -> %u\n", t1, t2, b1, b2);
+    check_px(16, 32, 0, 0, 255, 255, "the new texture is untouched");
+    check_px(48, 16, 0, 255, 0, 255, "the VAO draws from the deleted buffer");
+    check_px(48, 48, 0, 0, 0, 255, "not from the new one");
+    glDeleteBuffers(1, &b2);
+    glDeleteTextures(1, &t2);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &ds);
+    glok("orphans");
+}
+
+// 16-bit index 0xFFFF is a vertex in GL 2.1 (Metal restarts primitives there).
+static void case_restart_index(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    enum { N = 65536 };
+    float *v = calloc(N * 2, sizeof(float));
+    float r[8];
+    rect(r, 0, 0, 32, 32);
+    memcpy(v, r, 3 * 2 * sizeof(float));                  // vertices 0..2
+    memcpy(v + (N - 1) * 2, r + 6, 2 * sizeof(float));    // vertex 65535: the 4th corner
+    rect(r, 32, 32, 64, 64);
+    memcpy(v + 3 * 2, r, 3 * 2 * sizeof(float));          // vertices 3..5
+    memcpy(v + (N - 2) * 2, r + 6, 2 * sizeof(float));    // vertex 65534
+    GLuint vbo, ibo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, N * 2 * sizeof(float), v, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    // Strip 0,1,2,65535 (a quad); a list 3,4,5 + 4,65534,5 next to it.
+    static const unsigned short strip[4] = {0, 1, 2, 65535};
+    static const unsigned short list[6] = {3, 4, 5, 4, 65534, 5};
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof strip + sizeof list, NULL, GL_STATIC_DRAW);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, 0, sizeof strip, strip);
+    glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, sizeof strip, sizeof list, list);
+    uniform4(p, "color", 1, 0, 0, 1);
+    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, 0);
+    uniform4(p, "color", 0, 1, 0, 1);
+    glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void *)sizeof strip);
+    // The same strip from client memory (copied path).
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    for (int i = 0; i < N * 2; i += 2)
+        v[i] += 1.0f;  // shifted right by half the viewport
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, v);
+    uniform4(p, "color", 0, 0, 1, 1);
+    glDrawElements(GL_TRIANGLE_STRIP, 4, GL_UNSIGNED_SHORT, strip);
+    snap();
+    free(v);
+    check_px(28, 28, 255, 0, 0, 255, "strip through index 65535");
+    check_px(60, 60, 0, 255, 0, 255, "list through index 65534");
+    check_px(60, 28, 0, 0, 255, 255, "client strip through index 65535");
+    glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &ibo);
+    glok("restart index");
+}
+
+// Streaming: glBufferSubData into parts of a buffer the GPU has (or hasn't) read this frame;
+// array and indexed draws, overwrites of read ranges, an orphaning glBufferData in between.
+static void case_stream_subdata(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    program(kVScol, kFSvcol, "pos", "col", NULL);
+    struct V {
+        float x, y;
+        unsigned char c[4];
+    } v[4];
+    enum { SLOTS = 8 };
+    GLuint vbo, ibo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof v * SLOTS, NULL, GL_DYNAMIC_DRAW);
+    glGenBuffers(1, &ibo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, 6 * 2 * SLOTS, NULL, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(struct V), 0);
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, sizeof(struct V), (void *)8);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    for (int i = 0; i < 64; i++) {
+        float r[8];
+        rect(r, (i % 8) * 8, (i / 8) * 8, (i % 8) * 8 + 8, (i / 8) * 8 + 8);
+        for (int k = 0; k < 4; k++) {
+            v[k].x = r[k * 2];
+            v[k].y = r[k * 2 + 1];
+            v[k].c[0] = (unsigned char)(i * 4);
+            v[k].c[1] = (unsigned char)(255 - i * 4);
+            v[k].c[2] = (unsigned char)(i & 1 ? 255 : 0);
+            v[k].c[3] = 255;
+        }
+        // Slots in a scrambled order: some writes hit ranges read earlier, some don't.
+        int slot = (i * 3 + i / 8) % SLOTS;
+        if (i == 40)
+            glBufferData(GL_ARRAY_BUFFER, sizeof v * SLOTS, NULL, GL_DYNAMIC_DRAW);
+        glBufferSubData(GL_ARRAY_BUFFER, slot * (GLintptr)sizeof v, sizeof v, v);
+        if (i % 2) {
+            unsigned short idx[6];
+            for (int k = 0; k < 6; k++)
+                idx[k] = (unsigned short)(slot * 4 + (k < 3 ? k : k - 2));
+            int islot = (i / 2) % SLOTS;
+            glBufferSubData(GL_ELEMENT_ARRAY_BUFFER, islot * 12, sizeof idx, idx);
+            glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_SHORT, (void *)(intptr_t)(islot * 12));
+        } else {
+            glDrawArrays(GL_TRIANGLE_STRIP, slot * 4, 4);
+        }
+        if (i == 20)
+            rs_gfx_present(rs_gfx_current());  // some reads by a committed command buffer
+    }
+    snap();
+    int bad = 0;
+    for (int i = 0; i < 64; i++) {
+        const unsigned char *q = px((i % 8) * 8 + 4, (i / 8) * 8 + 4);
+        if (q[0] != i * 4 || q[1] != 255 - i * 4 || q[2] != (i & 1 ? 255 : 0))
+            bad++;
+    }
+    check(!bad, "64 streamed draws see their own data (%d wrong)", bad);
+    glDeleteBuffers(1, &vbo);
+    glDeleteBuffers(1, &ibo);
+    glok("stream subdata");
+}
+
+// Stencil: the reference is clamped, not wrapped.
+static void case_stencil_clear_ref(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glStencilMask(0xFF);
+    glClearStencil(0xFF);
+    glClear(GL_STENCIL_BUFFER_BIT);  // load action path
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    glEnable(GL_STENCIL_TEST);
+    glStencilOp(GL_KEEP, GL_KEEP, GL_KEEP);
+    glStencilFunc(GL_EQUAL, 300, 0xFF);  // clamped to 255: passes
+    uniform4(p, "color", 1, 0, 0, 1);
+    draw_rect(0, 0, 32, 32);
+    glStencilFunc(GL_EQUAL, -1, 0xFF);  // clamped to 0: fails
+    uniform4(p, "color", 0, 1, 0, 1);
+    draw_rect(32, 0, 64, 32);
+    // A scissored clear (drawn as a quad).
+    glClearStencil(0x0F);
+    glEnable(GL_SCISSOR_TEST);
+    glScissor(0, 32, 64, 32);
+    glClear(GL_STENCIL_BUFFER_BIT);
+    glDisable(GL_SCISSOR_TEST);
+    glStencilFunc(GL_EQUAL, 0x0F, 0xFF);
+    uniform4(p, "color", 0, 0, 1, 1);
+    draw_rect(0, 32, 64, 64);
+    glStencilMask(0xFF);
+    glDisable(GL_STENCIL_TEST);
+    snap();
+    check_px(16, 16, 255, 0, 0, 255, "reference 300 clamps to 255");
+    check_px(48, 16, 0, 0, 0, 255, "reference -1 clamps to 0");
+    check_px(32, 48, 0, 0, 255, 255, "scissored stencil clear");
+    glok("stencil clear/ref");
+}
+
+// Pixel buffer offsets past the buffer's end: errors, no crash.
+static void case_pbo_bounds(void) {
+    GLuint pbo, t;
+    glGenBuffers(1, &pbo);
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+    glBufferData(GL_PIXEL_UNPACK_BUFFER, 16 * 16 * 4, NULL, GL_STREAM_DRAW);
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
+    GLenum e0 = glGetError();
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
+    GLenum e1 = glGetError();
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 16, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
+    GLenum e2 = glGetError();
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
+    glReadPixels(0, 0, 32, 32, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
+    GLenum e3 = glGetError();
+    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    // Within range: fine.
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 15, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
+    GLenum e4 = glGetError();
+    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+    int r[] = {e0 == 0, e1 != 0, e2 != 0, e3 != 0, e4 == 0};
+    for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
+        dump_int(r[i]);
+    printf("INFO errors 0x%x 0x%x 0x%x 0x%x 0x%x\n", e0, e1, e2, e3, e4);
+    check(r[0] && r[1] && r[2] && r[3] && r[4], "out-of-range pixel buffer calls fail");
+    glDeleteTextures(1, &t);
+    glDeleteBuffers(1, &pbo);
+}
+
 typedef struct {
     const char *name;
     void (*fn)(void);
@@ -1794,6 +2104,13 @@ static const test_case kCases[] = {
     {"queries", case_queries, 0},
     {"errors", case_errors, 0},
     {"object_lifetime", case_object_lifetime, 0},
+    {"mip_redefine", case_mip_redefine, 0},
+    {"fbo_mipmap", case_fbo_mipmap, 0},
+    {"orphans", case_orphans, 0},
+    {"restart_index", case_restart_index, 0},
+    {"stream_subdata", case_stream_subdata, 0},
+    {"stencil_clear_ref", case_stencil_clear_ref, 0},
+    {"pbo_bounds", case_pbo_bounds, 0},
     {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };

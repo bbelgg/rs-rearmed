@@ -104,6 +104,12 @@ uint64_t rsm_hash(const void *p, size_t n);
     size_t size;
     GLenum usage;
     uint64_t last_use;  // serial of the last command buffer that read it
+    // Byte ranges the GPU reads (draws binding the buffer directly): [rd_lo, rd_hi) by command
+    // buffer rd_serial, [old_lo, old_hi) by older ones up to old_serial. A write outside both
+    // needs no rename even while the buffer is in flight (rsm_buffer_gpu_read).
+    uint64_t rd_serial, old_serial;
+    size_t rd_lo, rd_hi, old_lo, old_hi;
+    bool streamed;      // written while in flight: indexed draws work out the vertex range they read
     bool mapped;
     GLenum map_access;
     bool bound;
@@ -150,6 +156,9 @@ typedef struct {
     GLuint name;
     GLint level;
     GLint face;   // cube face / slice
+    // The object itself (RSMTexture / RSMRenderbuffer): GL keeps a deleted object alive while a
+    // framebuffer that isn't bound still has it attached, and its name may go to a new object.
+    __strong id obj;
 } rsm_attachment;
 
 @interface RSMFramebuffer : NSObject {
@@ -167,6 +176,7 @@ typedef struct {
     GLsizei stride;    // as given (0 = packed)
     const void *ptr;   // offset into buffer, or client pointer when buffer == 0
     GLuint buffer;
+    __strong RSMBuffer *bo;  // the object (a deleted buffer stays alive while a VAO uses it)
     GLuint divisor;
 } rsm_attrib;
 
@@ -174,6 +184,7 @@ typedef struct {
 @public
     rsm_attrib a[RSM_MAX_ATTRIBS];
     GLuint element_buffer;
+    RSMBuffer *element_obj;
     bool bound;
 }
 @end
@@ -402,14 +413,18 @@ static inline bool rsm_in_flight(RSMContext *ctx, uint64_t last_use) {
     return last_use > atomic_load_explicit(&ctx->completed, memory_order_acquire);
 }
 void *rsm_transient(RSMContext *ctx, size_t size, size_t align, id<MTLBuffer> *buf, NSUInteger *off);
+// The GPU reads [lo, hi) of b in the command buffer being recorded.
+void rsm_buffer_gpu_read(RSMContext *ctx, RSMBuffer *b, size_t lo, size_t hi);
 id<MTLBuffer> rsm_new_buffer(RSMContext *ctx, size_t size);       // pooled
 void rsm_retire_buffer(RSMContext *ctx, id<MTLBuffer> b, uint64_t serial);
 
 // Objects (mtl_objects.m).
 RSMBuffer *rsm_buffer(RSMContext *ctx, GLuint name);
 // Client pointer of pixel data: an offset into the bound pixel pack/unpack buffer, if any.
-const void *rsm_unpack_ptr(RSMContext *ctx, const void *p);
-void *rsm_pack_ptr(RSMContext *ctx, void *p);
+// `bytes` is how much the call reads/writes from there; NULL (GL_INVALID_OPERATION recorded)
+// when that runs past the buffer's end.
+const void *rsm_unpack_ptr(RSMContext *ctx, const void *p, size_t bytes);
+void *rsm_pack_ptr(RSMContext *ctx, void *p, size_t bytes);
 RSMTexture *rsm_texture(RSMContext *ctx, GLuint name);
 RSMRenderbuffer *rsm_renderbuffer(RSMContext *ctx, GLuint name);
 void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t);  // build t->sampler

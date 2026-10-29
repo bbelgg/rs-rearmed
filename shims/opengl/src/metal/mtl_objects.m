@@ -16,26 +16,92 @@ RSMBuffer *rsm_buffer(RSMContext *ctx, GLuint name) {
     return b;
 }
 
-const void *rsm_unpack_ptr(RSMContext *ctx, const void *p) {
-    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_unpack_buffer);
-    return b && b->mtl ? (const uint8_t *)b->mtl.contents + (size_t)p : p;
+// GL_INVALID_OPERATION unless [off, off + bytes) lies inside b's data store.
+static bool rsm_pbo_range_ok(RSMContext *ctx, RSMBuffer *b, size_t off, size_t bytes) {
+    if (!b || !b->mtl || b->mapped || off > b->size || bytes > b->size - off) {
+        rsm_error(ctx, GL_INVALID_OPERATION);
+        return false;
+    }
+    return true;
 }
 
-void *rsm_pack_ptr(RSMContext *ctx, void *p) {
-    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_pack_buffer);
-    if (!b || !b->mtl)
+const void *rsm_unpack_ptr(RSMContext *ctx, const void *p, size_t bytes) {
+    if (!ctx->pixel_unpack_buffer)
         return p;
-    // The GPU may still read the buffer: it gets new storage first.
-    if (rsm_in_flight(ctx, b->last_use)) {
-        id<MTLBuffer> nb = rsm_new_buffer(ctx, b->mtl.length);
-        memcpy(nb.contents, b->mtl.contents, b->size);
-        rsm_retire_buffer(ctx, b->mtl, b->last_use);
-        b->mtl = nb;
-        b->last_use = 0;
-    }
+    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_unpack_buffer);
+    if (!rsm_pbo_range_ok(ctx, b, (size_t)p, bytes))
+        return NULL;
+    return (const uint8_t *)b->mtl.contents + (size_t)p;
+}
+
+static bool rsm_buffer_gpu_overlap(RSMContext *ctx, RSMBuffer *b, size_t off, size_t len);
+static void rsm_buffer_rename(RSMContext *ctx, RSMBuffer *b, size_t skip_off, size_t skip_len);
+
+void *rsm_pack_ptr(RSMContext *ctx, void *p, size_t bytes) {
+    if (!ctx->pixel_pack_buffer)
+        return p;
+    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_pack_buffer);
+    if (!rsm_pbo_range_ok(ctx, b, (size_t)p, bytes))
+        return NULL;
+    // The GPU may still read the range: the buffer gets new storage first.
+    if (rsm_buffer_gpu_overlap(ctx, b, (size_t)p, bytes))
+        rsm_buffer_rename(ctx, b, (size_t)p, bytes);
     if (ctx->buf_opts & MTLResourceStorageModeManaged)
-        [b->mtl didModifyRange:NSMakeRange(0, b->size)];
+        [b->mtl didModifyRange:NSMakeRange((size_t)p, bytes)];
     return (uint8_t *)b->mtl.contents + (size_t)p;
+}
+
+// --- GPU read ranges --------------------------------------------------------------------
+void rsm_buffer_gpu_read(RSMContext *ctx, RSMBuffer *b, size_t lo, size_t hi) {
+    if (hi > b->size)
+        hi = b->size;
+    if (lo > hi)
+        lo = hi;
+    if (b->rd_serial != ctx->serial) {
+        // A new command buffer: the previous one's reads join the older ones still in flight.
+        if (b->rd_hi > b->rd_lo) {
+            if (b->old_hi > b->old_lo && rsm_in_flight(ctx, b->old_serial)) {
+                b->old_lo = b->rd_lo < b->old_lo ? b->rd_lo : b->old_lo;
+                b->old_hi = b->rd_hi > b->old_hi ? b->rd_hi : b->old_hi;
+            } else {
+                b->old_lo = b->rd_lo;
+                b->old_hi = b->rd_hi;
+            }
+            b->old_serial = b->rd_serial;
+        }
+        b->rd_serial = ctx->serial;
+        b->rd_lo = lo;
+        b->rd_hi = hi;
+    } else if (lo < hi) {
+        if (b->rd_hi <= b->rd_lo) {
+            b->rd_lo = lo;
+            b->rd_hi = hi;
+        } else {
+            b->rd_lo = lo < b->rd_lo ? lo : b->rd_lo;
+            b->rd_hi = hi > b->rd_hi ? hi : b->rd_hi;
+        }
+    }
+    b->last_use = ctx->serial;
+}
+
+// May a GPU command recorded or in flight read [off, off + len)?
+static bool rsm_buffer_gpu_overlap(RSMContext *ctx, RSMBuffer *b, size_t off, size_t len) {
+    if (!rsm_in_flight(ctx, b->last_use))
+        return false;
+    b->streamed = true;
+    if (ctx->buf_opts & MTLResourceStorageModeManaged)
+        return true;  // managed storage syncs whole ranges at commit: no writes under the GPU
+    size_t end = off + len;
+    if (b->rd_hi > b->rd_lo && off < b->rd_hi && b->rd_lo < end && rsm_in_flight(ctx, b->rd_serial))
+        return true;
+    if (b->old_hi > b->old_lo && off < b->old_hi && b->old_lo < end && rsm_in_flight(ctx, b->old_serial))
+        return true;
+    return false;
+}
+
+static void rsm_buffer_reset_reads(RSMBuffer *b) {
+    b->last_use = b->rd_serial = b->old_serial = 0;
+    b->rd_lo = b->rd_hi = b->old_lo = b->old_hi = 0;
 }
 
 void rsmtl_glGenBuffers(GLsizei n, GLuint *buffers) {
@@ -62,11 +128,15 @@ void rsmtl_glDeleteBuffers(GLsizei n, const GLuint *buffers) {
             ctx->pixel_pack_buffer = 0;
         if (ctx->pixel_unpack_buffer == b)
             ctx->pixel_unpack_buffer = 0;
-        if (ctx->vao->element_buffer == b)
+        if (ctx->vao->element_buffer == b) {
             ctx->vao->element_buffer = 0;
+            ctx->vao->element_obj = nil;
+        }
         for (int a = 0; a < RSM_MAX_ATTRIBS; a++)
-            if (ctx->vao->a[a].buffer == b)
+            if (ctx->vao->a[a].buffer == b) {
                 ctx->vao->a[a].buffer = 0;
+                ctx->vao->a[a].bo = nil;
+            }
         rsm_names_set(&ctx->buffers, b, nil);
     }
     ctx->dirty |= RSM_DIRTY_VERTEX;
@@ -94,11 +164,14 @@ void rsmtl_glBindBuffer(GLenum target, GLuint buffer) {
     GLuint *slot = rsm_buffer_binding(ctx, target);
     if (!slot)
         return;
+    RSMBuffer *b = nil;
     if (buffer) {
-        RSMBuffer *b = rsm_buffer(ctx, buffer);
+        b = rsm_buffer(ctx, buffer);
         b->bound = true;
     }
     *slot = buffer;
+    if (target == GL_ELEMENT_ARRAY_BUFFER)
+        ctx->vao->element_obj = b;
 }
 
 static RSMBuffer *rsm_bound_buffer(RSMContext *ctx, GLenum target) {
@@ -129,7 +202,7 @@ static void rsm_buffer_rename(RSMContext *ctx, RSMBuffer *b, size_t skip_off, si
         memcpy(d + skip_off + skip_len, s + skip_off + skip_len, b->size - skip_off - skip_len);
     rsm_retire_buffer(ctx, old, b->last_use);
     b->mtl = nb;
-    b->last_use = 0;
+    rsm_buffer_reset_reads(b);
     rsm_buffer_modified(ctx, b, 0, b->size);
 }
 
@@ -149,8 +222,8 @@ void rsmtl_glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data, GLen
         if (b->mtl)
             rsm_retire_buffer(ctx, b->mtl, b->last_use);
         b->mtl = rsm_new_buffer(ctx, alloc);
-        b->last_use = 0;
     }
+    rsm_buffer_reset_reads(b);
     b->size = (size_t)size;
     b->usage = usage;
     b->mapped = false;
@@ -176,7 +249,8 @@ void rsmtl_glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, cons
     }
     if (!size || !data)
         return;
-    if (rsm_in_flight(ctx, b->last_use))
+    // Only a range the GPU may still read forces new storage (streaming into one buffer).
+    if (rsm_buffer_gpu_overlap(ctx, b, (size_t)offset, (size_t)size))
         rsm_buffer_rename(ctx, b, (size_t)offset, (size_t)size);
     memcpy((uint8_t *)b->mtl.contents + offset, data, (size_t)size);
     rsm_buffer_modified(ctx, b, (size_t)offset, (size_t)size);
@@ -196,7 +270,7 @@ GLvoid *rsmtl_glMapBuffer(GLenum target, GLenum access) {
         return NULL;
     }
     // The GPU never writes buffers here, so reads need no wait.
-    if (access != GL_READ_ONLY && rsm_in_flight(ctx, b->last_use))
+    if (access != GL_READ_ONLY && rsm_buffer_gpu_overlap(ctx, b, 0, b->size))
         rsm_buffer_rename(ctx, b, 0, 0);
     b->mapped = true;
     b->map_access = access;
@@ -292,6 +366,7 @@ static void rsm_attrib_pointer(RSMContext *ctx, GLuint index, GLint size, GLenum
     a->stride = stride;
     a->ptr = ptr;
     a->buffer = ctx->array_buffer;
+    a->bo = ctx->array_buffer ? rsm_get(&ctx->buffers, ctx->array_buffer) : nil;
     ctx->dirty |= RSM_DIRTY_VERTEX;
 }
 
@@ -620,6 +695,20 @@ static size_t rsm_row_pitch(GLenum format, GLenum type, int width, int row_lengt
     if (rsm_packed_components(type) || s < (size_t)alignment)
         bytes = (bytes + (size_t)alignment - 1) / (size_t)alignment * (size_t)alignment;
     return bytes;
+}
+
+// Bytes of client memory a w x h image spans with this pack/unpack state.
+static size_t rsm_image_bytes(GLenum format, GLenum type, int w, int h, int row_length, int alignment,
+                              int skip_rows, int skip_pixels) {
+    if (w <= 0 || h <= 0)
+        return 0;
+    size_t sp = rsm_row_pitch(format, type, w, row_length, alignment);
+    return sp * ((size_t)skip_rows + (size_t)h - 1) + rsm_pixel_size(format, type) * ((size_t)skip_pixels + (size_t)w);
+}
+
+static size_t rsm_unpack_bytes(RSMContext *ctx, GLenum format, GLenum type, int w, int h) {
+    return rsm_image_bytes(format, type, w, h, ctx->unpack_row_length, ctx->unpack_alignment,
+                           ctx->unpack_skip_rows, ctx->unpack_skip_pixels);
 }
 
 static float rsm_half_to_float(uint16_t h) {
@@ -1016,13 +1105,15 @@ void rsmtl_glDeleteTextures(GLsizei n, const GLuint *textures) {
             if (ctx->texcube[u] == t)
                 ctx->texcube[u] = 0;
         }
+        // Detached from the bound framebuffers only; others keep the object (GL rules).
+        id obj = rsm_get(&ctx->textures, t);
         GLuint fbs[2] = {ctx->draw_fb, ctx->read_fb};
         for (int k = 0; k < 2; k++) {
             RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, fbs[k]);
             for (int a = 0; fb && a < RSM_ATT_COUNT; a++)
-                if (fb->att[a].type == GL_TEXTURE && fb->att[a].name == t) {
+                if (fb->att[a].obj == obj) {
                     fb->att[a] = (rsm_attachment){0};
-                    if (k == 0)
+                    if (fbs[k] == ctx->draw_fb)
                         rsm_fb_changed(ctx);
                 }
         }
@@ -1312,6 +1403,9 @@ static void rsm_tex_grow(RSMContext *ctx, RSMTexture *t, int levels) {
     t->view = nil;
     t->levels = levels;
     t->last_use = ctx->serial;
+    // New storage: a framebuffer with it attached must render into the new texture.
+    ctx->fb_dirty = true;
+    ctx->dirty |= RSM_DIRTY_TEXTURES;
 }
 
 // Make storage for (level, w, h) of `fmt`. Level 0 decides the texture; other
@@ -1321,11 +1415,13 @@ static bool rsm_tex_define(RSMContext *ctx, RSMTexture *t, int level, GLenum int
     if (level == 0) {
         bool same = t->mtl && t->fmt == f->fmt && t->w == w && t->h == h && t->swz == f->swz;
         if (!same) {
+            // Keep the mip chain only for the same size (a format change): a smaller level 0
+            // can't hold the old level count.
+            int levels = t->mtl && t->levels > 1 && t->w == w && t->h == h ? t->levels : 1;
             t->fmt = f->fmt;
             t->swz = f->swz;
             t->w = w;
             t->h = h;
-            int levels = t->levels > 1 && t->w == w && t->h == h ? t->levels : 1;
             t->mtl = rsm_tex_new(ctx, t, f->fmt, w, h, levels);
             t->view = nil;
             t->levels = levels;
@@ -1413,8 +1509,10 @@ void rsmtl_glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsize
     }
     if (!width || !height)
         return;
+    if (ctx->pixel_unpack_buffer &&
+        !(pixels = rsm_unpack_ptr(ctx, pixels, rsm_unpack_bytes(ctx, format, type, width, height))))
+        return;
     @autoreleasepool {
-        pixels = rsm_unpack_ptr(ctx, pixels);
         if (!rsm_tex_define(ctx, t, level, (GLenum)internalformat, &f, width, height) || !pixels || f.stencil)
             return;
         size_t pitch;
@@ -1460,8 +1558,10 @@ void rsmtl_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
         rsm_error(ctx, GL_INVALID_OPERATION);
         return;
     }
-    pixels = rsm_unpack_ptr(ctx, pixels);
-    if (!pixels || !width || !height)
+    if (!width || !height)
+        return;
+    pixels = rsm_unpack_ptr(ctx, pixels, rsm_unpack_bytes(ctx, format, type, width, height));
+    if (!pixels)
         return;
     @autoreleasepool {
         size_t pitch;
@@ -1498,8 +1598,9 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
+    if (ctx->pixel_unpack_buffer && !(data = rsm_unpack_ptr(ctx, data, need)))
+        return;
     @autoreleasepool {
-        data = rsm_unpack_ptr(ctx, data);
         if (!rsm_tex_define(ctx, t, level, internalformat, &f, width, height) || !data)
             return;
         rsm_tex_write(ctx, t, level, face, 0, 0, width, height, data, pitch);
@@ -1513,18 +1614,33 @@ void rsmtl_glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, 
     RSMTexture *t = rsm_bound_texture(ctx, target, &face);
     if (!t)
         return;
-    if (!t->mtl || !rsm_fmt_compressed(t->fmt) || level >= t->levels || (xoffset & 3) || (yoffset & 3)) {
+    if (level < 0 || xoffset < 0 || yoffset < 0 || width < 0 || height < 0 || imageSize < 0) {
+        rsm_error(ctx, GL_INVALID_VALUE);
+        return;
+    }
+    if (!t->mtl || !rsm_fmt_compressed(t->fmt) || level >= t->levels || !(t->defined & (1u << level)) ||
+        (xoffset & 3) || (yoffset & 3)) {
+        rsm_error(ctx, GL_INVALID_OPERATION);
+        return;
+    }
+    // Inside the level, whole blocks except at its right / top edge.
+    int lw = t->w >> level ? t->w >> level : 1, lh = t->h >> level ? t->h >> level : 1;
+    if (xoffset + width > lw || yoffset + height > lh || ((width & 3) && xoffset + width != lw) ||
+        ((height & 3) && yoffset + height != lh)) {
         rsm_error(ctx, GL_INVALID_OPERATION);
         return;
     }
     (void)format;
     size_t pitch = (size_t)(width + 3) / 4 * rsm_fmt_bytes(t->fmt);
-    if ((size_t)imageSize < pitch * (size_t)((height + 3) / 4)) {
+    size_t need = pitch * (size_t)((height + 3) / 4);
+    if ((size_t)imageSize < need) {
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
+    if (!width || !height || !(data = rsm_unpack_ptr(ctx, data, need)))
+        return;
     @autoreleasepool {
-        rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, rsm_unpack_ptr(ctx, data), pitch);
+        rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, data, pitch);
     }
 }
 
@@ -1640,7 +1756,11 @@ void rsmtl_glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type,
         return;
     }
     int lw = t->w >> level ? t->w >> level : 1, lh = t->h >> level ? t->h >> level : 1;
-    pixels = rsm_pack_ptr(ctx, pixels);
+    pixels = rsm_pack_ptr(ctx, pixels,
+                          rsm_image_bytes(format, type, lw, lh, ctx->pack_row_length, ctx->pack_alignment,
+                                          ctx->pack_skip_rows, ctx->pack_skip_pixels));
+    if (!pixels)
+        return;
     @autoreleasepool {
         size_t bpp;
         MTLBlitOption opt = t->fmt == MTLPixelFormatDepth32Float_Stencil8
@@ -1699,13 +1819,14 @@ void rsmtl_glDeleteRenderbuffers(GLsizei n, const GLuint *renderbuffers) {
             continue;
         if (ctx->renderbuffer == r)
             ctx->renderbuffer = 0;
+        id obj = rsm_get(&ctx->renderbuffers, r);
         GLuint fbs[2] = {ctx->draw_fb, ctx->read_fb};
         for (int k = 0; k < 2; k++) {
             RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, fbs[k]);
             for (int a = 0; fb && a < RSM_ATT_COUNT; a++)
-                if (fb->att[a].type == GL_RENDERBUFFER && fb->att[a].name == r) {
+                if (fb->att[a].obj == obj) {
                     fb->att[a] = (rsm_attachment){0};
-                    if (k == 0)
+                    if (fbs[k] == ctx->draw_fb)
                         rsm_fb_changed(ctx);
                 }
         }
@@ -1918,7 +2039,11 @@ void rsmtl_glFramebufferTexture2D(GLenum target, GLenum attachment, GLenum texta
             rsm_error(ctx, GL_INVALID_ENUM);
             return;
         }
-        a = (rsm_attachment){GL_TEXTURE, texture, level, face};
+        if (level < 0 || level > 14) {
+            rsm_error(ctx, GL_INVALID_VALUE);
+            return;
+        }
+        a = (rsm_attachment){GL_TEXTURE, texture, level, face, t};
     }
     rsm_attach(ctx, target, attachment, a);
 }
@@ -1932,11 +2057,12 @@ void rsmtl_glFramebufferRenderbuffer(GLenum target, GLenum attachment, GLenum re
     }
     rsm_attachment a = {0};
     if (renderbuffer) {
-        if (!rsm_get(&ctx->renderbuffers, renderbuffer)) {
+        RSMRenderbuffer *r = rsm_get(&ctx->renderbuffers, renderbuffer);
+        if (!r) {
             rsm_error(ctx, GL_INVALID_OPERATION);
             return;
         }
-        a = (rsm_attachment){GL_RENDERBUFFER, renderbuffer, 0, 0};
+        a = (rsm_attachment){GL_RENDERBUFFER, renderbuffer, 0, 0, r};
     }
     rsm_attach(ctx, target, attachment, a);
 }
@@ -1945,9 +2071,10 @@ bool rsm_attachment_texture(RSMContext *ctx, const rsm_attachment *a, id<MTLText
                             int *slice) {
     *tex = nil;
     *level = *slice = 0;
+    (void)ctx;
     if (a->type == GL_TEXTURE) {
-        RSMTexture *t = rsm_get(&ctx->textures, a->name);
-        if (!t || !t->mtl || a->level >= t->levels)
+        RSMTexture *t = a->obj;
+        if (!t || !t->mtl || a->level < 0 || a->level >= t->levels)
             return false;
         *tex = t->mtl;
         *level = a->level;
@@ -1956,7 +2083,7 @@ bool rsm_attachment_texture(RSMContext *ctx, const rsm_attachment *a, id<MTLText
         return true;
     }
     if (a->type == GL_RENDERBUFFER) {
-        RSMRenderbuffer *r = rsm_get(&ctx->renderbuffers, a->name);
+        RSMRenderbuffer *r = a->obj;
         if (!r || !r->mtl)
             return false;
         *tex = r->mtl;
@@ -1976,7 +2103,7 @@ GLenum rsmtl_glCheckFramebufferStatus(GLenum target) {
         return GL_FRAMEBUFFER_COMPLETE;
     RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, name);
     int n = 0;
-    for (int i = 0; i < RSM_ATT_COUNT; i++) {
+    for (int i = 0; fb && i < RSM_ATT_COUNT; i++) {
         if (!fb->att[i].type)
             continue;
         id<MTLTexture> t;
@@ -2055,8 +2182,12 @@ void rsmtl_glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum 
     int tw = (int)tex.width >> level, th = (int)tex.height >> level;
     int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
     int x1 = x + width > tw ? tw : x + width, y1 = y + height > th ? th : y + height;
-    pixels = rsm_pack_ptr(ctx, pixels);
-    if (x1 <= x0 || y1 <= y0 || !pixels)
+    if (x1 <= x0 || y1 <= y0)
+        return;
+    pixels = rsm_pack_ptr(ctx, pixels,
+                          rsm_image_bytes(format, type, width, height, ctx->pack_row_length, ctx->pack_alignment,
+                                          ctx->pack_skip_rows, ctx->pack_skip_pixels));
+    if (!pixels)
         return;
     @autoreleasepool {
         MTLPixelFormat f = tex.pixelFormat;

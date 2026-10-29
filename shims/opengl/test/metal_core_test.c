@@ -1878,6 +1878,7 @@ static void case_orphans(void) {
     check_px(16, 32, 0, 0, 255, 255, "the new texture is untouched");
     check_px(48, 16, 0, 255, 0, 255, "the VAO draws from the deleted buffer");
     check_px(48, 48, 0, 0, 0, 255, "not from the new one");
+    glDeleteVertexArraysAPPLE(1, &vao);
     glDeleteBuffers(1, &b2);
     glDeleteTextures(1, &t2);
     glDeleteFramebuffers(1, &fbo);
@@ -1999,11 +2000,12 @@ static void case_stream_subdata(void) {
     glok("stream subdata");
 }
 
-// Stencil: the reference is clamped, not wrapped.
+// Stencil: glClear uses the front write mask only; the reference is clamped, not wrapped.
 static void case_stencil_clear_ref(void) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
-    glStencilMask(0xFF);
+    glStencilMaskSeparate(GL_FRONT, 0xFF);
+    glStencilMaskSeparate(GL_BACK, 0x00);
     glClearStencil(0xFF);
     glClear(GL_STENCIL_BUFFER_BIT);  // load action path
     GLuint p = program(kVS, kFScolor, "pos", NULL);
@@ -2015,7 +2017,7 @@ static void case_stencil_clear_ref(void) {
     glStencilFunc(GL_EQUAL, -1, 0xFF);  // clamped to 0: fails
     uniform4(p, "color", 0, 1, 0, 1);
     draw_rect(32, 0, 64, 32);
-    // A scissored clear (drawn as a quad).
+    // A scissored clear (drawn as a quad) with the same masks.
     glClearStencil(0x0F);
     glEnable(GL_SCISSOR_TEST);
     glScissor(0, 32, 64, 32);
@@ -2029,7 +2031,7 @@ static void case_stencil_clear_ref(void) {
     snap();
     check_px(16, 16, 255, 0, 0, 255, "reference 300 clamps to 255");
     check_px(48, 16, 0, 0, 0, 255, "reference -1 clamps to 0");
-    check_px(32, 48, 0, 0, 255, 255, "scissored stencil clear");
+    check_px(32, 48, 0, 0, 255, 255, "scissored clear with the front mask");
     glok("stencil clear/ref");
 }
 
@@ -2057,11 +2059,28 @@ static void case_pbo_bounds(void) {
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 15, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
     GLenum e4 = glGetError();
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    int r[] = {e0 == 0, e1 != 0, e2 != 0, e3 != 0, e4 == 0};
+    // Compressed sub-images outside the level or at a negative level.
+    GLuint c;
+    glGenTextures(1, &c);
+    glBindTexture(GL_TEXTURE_2D, c);
+    static unsigned char blocks[8 * 4 * 4];
+    glCompressedTexImage2D(GL_TEXTURE_2D, 0, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 16, 16, 0, sizeof blocks, blocks);
+    GLenum e5 = glGetError();
+    glCompressedTexSubImage2D(GL_TEXTURE_2D, 0, 12, 12, 8, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 32, blocks);
+    GLenum e6 = glGetError();
+    glCompressedTexSubImage2D(GL_TEXTURE_2D, -1, 0, 0, 4, 4, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 8, blocks);
+    GLenum e7 = glGetError();
+    glCompressedTexSubImage2D(GL_TEXTURE_2D, 0, 4, 4, 8, 8, GL_COMPRESSED_RGBA_S3TC_DXT1_EXT, 32, blocks);
+    GLenum e8 = glGetError();
+    int r[] = {e0 == 0, e1 != 0, e2 != 0, e3 != 0, e4 == 0, e5 == 0, e6 != 0, e7 != 0, e8 == 0};
     for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
         dump_int(r[i]);
-    printf("INFO errors 0x%x 0x%x 0x%x 0x%x 0x%x\n", e0, e1, e2, e3, e4);
-    check(r[0] && r[1] && r[2] && r[3] && r[4], "out-of-range pixel buffer calls fail");
+    printf("INFO errors 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", e0, e1, e2, e3, e4, e5, e6, e7, e8);
+    int ok = 1;
+    for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
+        ok &= r[i];
+    check(ok, "out-of-range pixel buffer and sub-image calls fail, in-range ones work");
+    glDeleteTextures(1, &c);
     glDeleteTextures(1, &t);
     glDeleteBuffers(1, &pbo);
 }
@@ -2236,6 +2255,13 @@ static double now_ms(void) {
     return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
 }
 
+// CPU time of the calling (drawing) thread: what the GL calls cost, without GPU waits.
+static double cpu_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_THREAD_CPUTIME_ID, &t);
+    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+}
+
 static int bench(int frames, int draws, int subdata) {
     g_backend = rs_gfx_backend() == RS_GFX_METAL ? "metal" : "gl";
     rs_gfx_context *ctx = rs_gfx_create_offscreen(1280, 720);
@@ -2260,10 +2286,12 @@ static int bench(int frames, int draws, int subdata) {
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     GLint lc = glGetUniformLocation(p, "tex");
-    double t0 = 0;
+    double t0 = 0, c0 = 0;
     for (int f = 0; f < frames + 10; f++) {
-        if (f == 10)
+        if (f == 10) {
             t0 = now_ms();
+            c0 = cpu_ms();
+        }
         glClear(GL_COLOR_BUFFER_BIT);
         for (int d = 0; d < draws; d++) {
             float v[16] = {-0.1f, -0.1f, 0, 0, 0.1f, -0.1f, 1, 0, -0.1f, 0.1f, 0, 1, 0.1f, 0.1f, 1, 1};
@@ -2281,10 +2309,10 @@ static int bench(int frames, int draws, int subdata) {
     }
     unsigned char sync[4];
     glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, sync);  // waits for the GPU
-    double ms = now_ms() - t0;
-    printf("%s: %d frames x %d draws (%s): %.3f ms/frame wall, %.2f us/draw\n", g_backend, frames, draws,
-           subdata ? "glBufferSubData per draw" : "static buffer",
-           ms / frames, ms * 1000 / frames / draws);
+    double ms = now_ms() - t0, cpu = cpu_ms() - c0;
+    printf("%s: %d frames x %d draws (%s): %.3f ms/frame wall, %.2f us/draw, cpu %.3f us/draw\n", g_backend,
+           frames, draws, subdata ? "glBufferSubData per draw" : "static buffer", ms / frames,
+           ms * 1000 / frames / draws, cpu * 1000 / frames / draws);
     rs_gfx_make_current(NULL);
     rs_gfx_destroy(ctx);
     return 0;

@@ -1467,7 +1467,7 @@ static void rsm_tex_write(RSMContext *ctx, RSMTexture *t, int level, int slice, 
         return;
     }
     size_t row_bytes = comp ? ((size_t)w + 3) / 4 * rsm_fmt_bytes(t->fmt) : (size_t)w * rsm_fmt_bytes(t->fmt);
-    id<MTLBuffer> sb;
+    __unsafe_unretained id<MTLBuffer> sb;
     NSUInteger off;
     uint8_t *d = rsm_transient(ctx, row_bytes * rows, 16, &sb, &off);
     for (size_t i = 0; i < rows; i++)

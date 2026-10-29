@@ -233,7 +233,7 @@ void rsm_commit(RSMContext *ctx, bool wait) { rsm_commit_ex(ctx, wait, false); }
 // --- Transient memory -------------------------------------------------------------
 enum { RSM_CHUNK = 4 << 20 };
 
-void *rsm_transient(RSMContext *ctx, size_t size, size_t align, id<MTLBuffer> *buf,
+void *rsm_transient(RSMContext *ctx, size_t size, size_t align, __unsafe_unretained id<MTLBuffer> *buf,
                     NSUInteger *off) {
     size_t o = (ctx->chunk_off + align - 1) & ~(align - 1);
     if (!ctx->cur_chunk.buf || o + size > RSM_CHUNK_BUF(ctx->cur_chunk).length) {
@@ -264,7 +264,7 @@ void *rsm_transient(RSMContext *ctx, size_t size, size_t align, id<MTLBuffer> *b
     }
     ctx->cur_chunk.serial = ctx->serial;
     ctx->chunk_off = o + size;
-    id<MTLBuffer> b = RSM_CHUNK_BUF(ctx->cur_chunk);
+    __unsafe_unretained id<MTLBuffer> b = RSM_CHUNK_BUF(ctx->cur_chunk);
     *buf = b;
     *off = o;
     return (uint8_t *)b.contents + o;

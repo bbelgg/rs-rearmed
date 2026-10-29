@@ -7,6 +7,7 @@
 // --- Aliases -------------------------------------------------------------------------
 void rsmtl_glGenVertexArraysAPPLE(GLsizei n, GLuint *arrays) { rsmtl_glGenVertexArrays(n, arrays); }
 void rsmtl_glBindVertexArrayAPPLE(GLuint array) { rsmtl_glBindVertexArray(array); }
+void rsmtl_glDeleteVertexArraysAPPLE(GLsizei n, const GLuint *arrays) { rsmtl_glDeleteVertexArrays(n, arrays); }
 
 void rsmtl_glBindFramebufferEXT(GLenum target, GLuint framebuffer) { rsmtl_glBindFramebuffer(target, framebuffer); }
 void rsmtl_glGenFramebuffersEXT(GLsizei n, GLuint *framebuffers) { rsmtl_glGenFramebuffers(n, framebuffers); }

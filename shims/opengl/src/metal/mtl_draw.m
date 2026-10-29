@@ -239,7 +239,7 @@ static uint64_t rsm_ds_key(RSMContext *ctx) {
 
 // --- Dynamic state ------------------------------------------------------------------------
 static bool rsm_apply_dynamic(RSMContext *ctx) {
-    id<MTLRenderCommandEncoder> e = ctx->enc;
+    __unsafe_unretained id<MTLRenderCommandEncoder> e = ctx->enc;
     unsigned d = ctx->dirty;
     if (d & RSM_DIRTY_VIEWPORT) {
         MTLViewport v = {ctx->viewport[0], ctx->viewport[1], ctx->viewport[2], ctx->viewport[3],
@@ -601,7 +601,9 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
-    RSMProgram *p = ctx->prog;
+    // Locals below are __unsafe_unretained: the context, its name tables and the encoder keep
+    // these objects alive for the whole draw (no retain/release per draw).
+    __unsafe_unretained RSMProgram *p = ctx->prog;
     if (!count || !instances || !p || !p->linked)
         return;
     if (mode == GL_QUAD_STRIP)
@@ -611,9 +613,9 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
     @autoreleasepool {
         // Index source.
         const uint8_t *isrc = NULL;
-        id<MTLBuffer> ibuf = nil;
+        __unsafe_unretained id<MTLBuffer> ibuf = nil;
         NSUInteger ioff = 0;
-        RSMBuffer *eb = nil;
+        __unsafe_unretained RSMBuffer *eb = nil;
         if (indexed) {
             eb = ctx->vao->element_obj;
             if (eb) {
@@ -640,7 +642,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             if (!a->enabled)
                 continue;
             size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
-            RSMBuffer *b = a->bo;
+            __unsafe_unretained RSMBuffer *b = a->bo;
             if (!b || ((uintptr_t)a->ptr & 3) || (stride & 3)) {
                 copy = true;
             } else if (!a->divisor) {
@@ -721,7 +723,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
 
         if (!rsm_begin_pass(ctx))
             return;
-        id<MTLRenderCommandEncoder> e = ctx->enc;
+        __unsafe_unretained id<MTLRenderCommandEncoder> e = ctx->enc;
 
         // Pipeline key.
         rsm_pkey k;
@@ -788,7 +790,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                 continue;
             }
             size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
-            RSMBuffer *b = a->bo;
+            __unsafe_unretained RSMBuffer *b = a->bo;
             if (b && !b->mtl) {
                 [e setVertexBytes:ctx->vattr[i] length:16 atIndex:(NSUInteger)slot];
                 ctx->enc_vb[i] = nil;
@@ -826,7 +828,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             if (b && (size_t)a->ptr + (size_t)(lo + n - 1) * stride + es > b->size) {
                 n = 0;  // out of range: GL would read garbage; draw nothing from it
             }
-            id<MTLBuffer> tb;
+            __unsafe_unretained id<MTLBuffer> tb;
             NSUInteger toff;
             uint8_t *d = rsm_transient(ctx, (size_t)(n ? n : 1) * ns, 4, &tb, &toff);
             for (uint32_t v = 0; v < n; v++)
@@ -850,7 +852,7 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                     else
                         [e setVertexBytes:blk length:n atIndex:0];
                 } else {
-                    id<MTLBuffer> ub;
+                    __unsafe_unretained id<MTLBuffer> ub;
                     NSUInteger uo;
                     memcpy(rsm_transient(ctx, n, 256, &ub, &uo), blk, n);
                     if (st)
@@ -876,9 +878,12 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             if (unit < 0 || unit >= RSM_MAX_UNITS || tb->slot < 0 || tb->slot >= RSM_MAX_UNITS)
                 continue;
             bool cube = tb->type == RSMSL_SAMPLER_CUBE;
-            RSMTexture *t = rsm_get(&ctx->textures, cube ? ctx->texcube[unit] : ctx->tex2d[unit]);
-            id<MTLTexture> mt = t && t->mtl ? rsm_texture_view(t) : cube ? ctx->dummy_cube : ctx->dummy_tex;
-            id<MTLSamplerState> ms = ctx->present_sampler;
+            __unsafe_unretained RSMTexture *t = rsm_get(&ctx->textures, cube ? ctx->texcube[unit] : ctx->tex2d[unit]);
+            __unsafe_unretained id<MTLTexture> mt = !t || !t->mtl              ? (cube ? ctx->dummy_cube : ctx->dummy_tex)
+                                                    : t->swz == RSM_SWZ_NONE ? t->mtl
+                                                    : t->view                ? t->view
+                                                                             : rsm_texture_view(t);
+            __unsafe_unretained id<MTLSamplerState> ms = ctx->present_sampler;
             if (t && t->mtl) {
                 if (!t->sampler)
                     rsm_texture_sampler(ctx, t);

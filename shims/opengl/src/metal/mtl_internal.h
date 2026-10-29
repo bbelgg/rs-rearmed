@@ -395,8 +395,9 @@ typedef struct {
 @end
 
 extern __thread __unsafe_unretained RSMContext *rsm_tls;
+// Unretained: the current context outlives any GL call made on it (no retain/release per call).
 #define RSM_CTX(...)                       \
-    RSMContext *ctx = rsm_tls;             \
+    __unsafe_unretained RSMContext *ctx = rsm_tls; \
     if (__builtin_expect(!ctx, 0))         \
         return __VA_ARGS__;
 
@@ -412,7 +413,9 @@ void rsm_commit(RSMContext *ctx, bool wait);       // ends the pass
 static inline bool rsm_in_flight(RSMContext *ctx, uint64_t last_use) {
     return last_use > atomic_load_explicit(&ctx->completed, memory_order_acquire);
 }
-void *rsm_transient(RSMContext *ctx, size_t size, size_t align, id<MTLBuffer> *buf, NSUInteger *off);
+// *buf stays valid until the command buffer being recorded completes (the context holds it).
+void *rsm_transient(RSMContext *ctx, size_t size, size_t align, __unsafe_unretained id<MTLBuffer> *buf,
+                    NSUInteger *off);
 // The GPU reads [lo, hi) of b in the command buffer being recorded.
 void rsm_buffer_gpu_read(RSMContext *ctx, RSMBuffer *b, size_t lo, size_t hi);
 id<MTLBuffer> rsm_new_buffer(RSMContext *ctx, size_t size);       // pooled

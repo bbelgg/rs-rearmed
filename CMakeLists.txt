@@ -49,6 +49,6 @@ include(RSShim)
 enable_testing()
 
 # shims/steam builds with its own Makefile (make -C shims/steam).
-foreach(shim libstdcxx bink opengl cg game)
+foreach(shim libstdcxx bink opengl cg game platform)
   add_subdirectory(shims/${shim})
 endforeach()

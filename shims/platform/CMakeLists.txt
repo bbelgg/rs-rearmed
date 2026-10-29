@@ -23,16 +23,23 @@ set_target_properties(rsp_core PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 
 # ObjC: AppDelegate, OpenGLView, MainController, MessageBox, the nib, main().
 # Manual retain/release like the original.
-add_library(rsp_shell STATIC src/rsp_shell.m)
+add_library(rsp_shell STATIC src/rsp_shell.m src/rsp_overlay.c)
 target_link_libraries(rsp_shell PUBLIC rsp_core "-framework AppKit" "-framework OpenGL"
   "-framework CoreVideo" "-framework IOKit")
-target_compile_options(rsp_shell PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
+target_compile_options(rsp_shell PRIVATE $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc> -Wno-deprecated-declarations)
 set_target_properties(rsp_shell PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 
 # Unit tests of the portable half.
 add_executable(rsp_core_test test/rsp_core_test.c)
 target_link_libraries(rsp_core_test PRIVATE rsp_core)
 set_target_properties(rsp_core_test PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
+
+# The overlay API (rsp_overlay.c) on an offscreen GL context: no window.
+add_executable(rsp_overlay_test test/rsp_overlay_test.c src/rsp_overlay.c)
+target_include_directories(rsp_overlay_test PRIVATE include)
+target_link_libraries(rsp_overlay_test PRIVATE "-framework OpenGL")
+target_compile_options(rsp_overlay_test PRIVATE -Wno-deprecated-declarations)
+set_target_properties(rsp_overlay_test PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 
 # The window test, as an app bundle in its own "game root" folder.
 set(rsp_root "${CMAKE_CURRENT_BINARY_DIR}/root")
@@ -62,10 +69,16 @@ foreach(arch arm64 x86_64)
   add_test(NAME platform.core.${arch} COMMAND arch -${arch} $<TARGET_FILE:rsp_core_test>)
   set_tests_properties(platform.core.${arch} PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
-  # Needs a logged-in GUI session (opens a 1280x720 window for a few seconds).
-  add_test(NAME platform.shell.${arch} COMMAND arch -${arch} "${rsp_shell_exe}")
-  set_tests_properties(platform.shell.${arch} PROPERTIES
-    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" RUN_SERIAL TRUE TIMEOUT 90)
+  add_test(NAME platform.overlay.${arch} COMMAND arch -${arch} $<TARGET_FILE:rsp_overlay_test>)
+  set_tests_properties(platform.overlay.${arch} PROPERTIES
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
+  # Needs a logged-in GUI session (opens a 1280x720 window for a few seconds): only in this
+  # directory's own build, not in the root build's ctest.
+  if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    add_test(NAME platform.shell.${arch} COMMAND arch -${arch} "${rsp_shell_exe}")
+    set_tests_properties(platform.shell.${arch} PROPERTIES
+      PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" RUN_SERIAL TRUE TIMEOUT 90)
+  endif()
 endforeach()
 if(EXISTS "${RS_GAME_PLAIN}")
   add_test(NAME platform.difftest.x86_64 COMMAND $<TARGET_FILE:rsp_platform_difftest> "${RS_GAME_PLAIN}")

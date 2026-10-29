@@ -305,6 +305,11 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [controller updateScreenSize];
   done = (BOOL)rsp_game_frame();
   if (ft0) rsp_ft_mark_fn()('G', ft0, mach_absolute_time(), 0, 0);
+  // Not in the original: the mods' overlays (rs_overlay.h), on the frame about to be shown.
+  if (!done && rsp_overlay_active()) {
+    NSSize px = [self convertRectToBacking:[self bounds]].size;
+    rsp_overlay_run((int)px.width, (int)px.height);
+  }
   [[self openGLContext] flushBuffer];
   CGLUnlockContext((CGLContextObj)[[self openGLContext] CGLContextObj]);
   if (done) [self dealloc];  // the original's exit path (ends in _Exit(0))

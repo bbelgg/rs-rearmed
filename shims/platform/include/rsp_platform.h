@@ -254,6 +254,14 @@ int rsp_timer_window_adopt(double content_w, double content_h, int engine_w, int
 // 4. Swap interval: returns the new numSwapBuffers, or -1 if unchanged.
 int rsp_timer_swap(int no_vsync, int num_swap_buffers);
 
+// ---------------------------------------------------------------------------
+// The overlay API for mods (shims/include/rs_overlay.h, rsp_overlay.c; not in the original).
+// drawView runs the registered callbacks after the game's frame, before flushBuffer, with the GL context
+// current; width and height are the framebuffer's size in pixels.
+int rsp_overlay_active(void);  // a callback is registered
+void rsp_overlay_run(int width, int height);
+void rsp_overlay_set_target(unsigned fb);  // GL framebuffer to draw to; 0 (the window's) unless a test sets it
+
 #ifdef __cplusplus
 }
 #endif

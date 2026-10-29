@@ -51,5 +51,11 @@ cat > "$out/Contents/Info.plist" <<EOF
 </plist>
 EOF
 
-codesign --force -s - "$out" 2>/dev/null || true
+# On a drive without extended attributes (exFAT, FAT) macOS writes a "._" file next to every file it
+# creates; codesign refuses a bundle that holds any. Signing writes new ones (next to the executable
+# and _CodeSignature), so they go again after it: the bundle still verifies where it is, but a copy
+# of it would not.
+find "$out" -name '._*' -delete
+codesign --force -s - "$out" || true  # the executable is already signed by the linker
+find "$out" -name '._*' -delete
 echo "built: $out"

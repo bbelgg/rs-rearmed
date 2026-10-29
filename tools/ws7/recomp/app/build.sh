@@ -121,7 +121,13 @@ for f in "$app/Contents/MacOS/libsteam_api.dylib" "$app/Contents/MacOS/libBink2M
   [ -f "$f" ] && [ "$(lipo -archs "$f")" != arm64 ] && lipo -thin arm64 "$f" -output "$f.thin" && mv "$f.thin" "$f"
 done
 codesign --force -s - "$app/Contents/MacOS/libsteam_api.dylib" "$app/Contents/MacOS/libBink2Macx64.dylib" "$app/Contents/Frameworks/Cg.framework/Cg" 2>/dev/null || true
-codesign --force -s - "$exe" 2>/dev/null
+# On a drive without extended attributes (exFAT, FAT) macOS writes a "._" file next to every file it
+# creates, the shims signed just above included; codesign refuses a bundle that holds any. Signing
+# writes new ones (next to the executable and _CodeSignature), so they go again after it: the bundle
+# still verifies where it is, but a copy of it would not.
+find "$app" -name '._*' -delete
+codesign --force -s - "$exe"  # its errors stay visible: under set -e a failure ends the build here
+find "$app" -name '._*' -delete
 echo "built $app"
 lipo -archs "$exe"
 

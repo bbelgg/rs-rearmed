@@ -340,7 +340,12 @@ enum Steps {
         } else {
             try await r.shell("python3 -m venv build/venv")
         }
+        // On a drive without extended attributes (exFAT, FAT) macOS writes a "._" file next to every file it
+        // creates, and Python reads ._distutils-precedence.pth as a .pth file and fails to start.
+        let removeAppleDouble = "find build/venv -name '._*' -delete"
+        try await r.shell(removeAppleDouble)
         try await r.shell("build/venv/bin/pip install -r requirements.txt")
+        try await r.shell(removeAppleDouble)
     }
 
     static func obtainGameImage(_ r: BuildRunner) async throws {

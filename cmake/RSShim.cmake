@@ -83,3 +83,13 @@ function(rs_add_shim target)
     COMMAND "${CMAKE_SOURCE_DIR}/tools/check-shim.sh"
             "$<TARGET_FILE:${target}>" "${S_INSTALL_NAME}" "${archs_csv}")
 endfunction()
+
+# rs_glob(<var> <globbing-expression>...)
+#
+# file(GLOB) without the "._" files macOS writes next to every file on a drive
+# without extended attributes (exFAT, FAT).
+function(rs_glob var)
+  file(GLOB found ${ARGN})
+  list(FILTER found EXCLUDE REGEX "/\\._[^/]*$")
+  set(${var} ${found} PARENT_SCOPE)
+endfunction()

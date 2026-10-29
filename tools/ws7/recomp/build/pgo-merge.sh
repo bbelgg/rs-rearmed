@@ -9,7 +9,7 @@ shift
 list=$(mktemp -t pgo-merge)
 trap 'rm -f "$list"' EXIT
 for a in "$@"; do
-  if [ -d "$a" ]; then find "$a" -name '*.profraw' -size +0; else echo "$a"; fi
+  if [ -d "$a" ]; then find "$a" -name '*.profraw' ! -name '._*' -size +0; else echo "$a"; fi
 done > "$list"
 [ -s "$list" ] || { echo "no .profraw files in $*" >&2; exit 1; }
 echo "merging $(wc -l < "$list" | tr -d ' ') profiles"

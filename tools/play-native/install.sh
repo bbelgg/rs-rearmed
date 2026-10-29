@@ -29,6 +29,8 @@ cp -R "$app" "$home/game/Rocksmith2014.app.new"
 for r in RS2014.icns en.lproj; do  # the original app's icon and strings
     [[ -e "$RS_GAME_APP/Contents/Resources/$r" ]] && cp -R "$RS_GAME_APP/Contents/Resources/$r" "$home/game/Rocksmith2014.app.new/Contents/Resources/"
 done
+# From a drive without extended attributes (exFAT, FAT), cp copies the "._" file macOS keeps next to each file.
+find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
 # Builds from before CFBundleIconFile was in app/Info.plist: add it (the Dock icon), re-sign the executable.
 plist="$home/game/Rocksmith2014.app.new/Contents/Info.plist"
 if ! /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$plist" >/dev/null 2>&1; then

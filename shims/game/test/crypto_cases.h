@@ -452,6 +452,7 @@ static void cr_add_dir(const char *dir, int dlc) {
   struct dirent *e;
   while ((e = readdir(d))) {
     size_t n = strlen(e->d_name);
+    if (e->d_name[0] == '.') continue;  // "._x.psarc": macOS metadata on exFAT/FAT, not an archive
     if (n < 7 || strcmp(e->d_name + n - 6, ".psarc") != 0) continue;
     if (dlc && !(n > 8 && (strcmp(e->d_name + n - 8, "_m.psarc") == 0 || strcmp(e->d_name + n - 8, "_p.psarc") == 0)))
       continue;

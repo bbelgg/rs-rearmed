@@ -97,7 +97,7 @@ overlay do at 2x.
 
 | Step | State | Notes |
 |---|---|---|
-| 1 | not started | |
+| 1 | done, game boot unchecked | App, shell (in the app) and Cg link `libRSOpenGL` (bundled as `Contents/MacOS/libRSOpenGL.dylib`); the image loader binds the game's OpenGL imports to it. Table = 107 game imports + `extra-gl-imports.txt`; `RS_GL_BACKEND=metal` routes all to weak `rsmtl_<name>` stubs; `rs_gfx` on GL (offscreen = CGL + FBO as framebuffer 0), test `opengl.gfx.offscreen.gl`. Checked: `gl_native_test` (no window), Cg tests, app relink, `otool -L`. Not checked: a game boot. |
 | 2 | not started | |
 | 3 | not started | |
 | 4 | not started | |

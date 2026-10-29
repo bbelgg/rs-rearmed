@@ -6,10 +6,16 @@
 //                       __interpose entry per function rebinds the game *and*
 //                       Cg.framework (which calls GL itself) to the wrappers.
 //   otherwise           libRSOpenGL.dylib: the OpenGL.framework replacement. It
-//                       exports the 107 names itself, forwards to the system
-//                       framework (Apple's Metal-backed GL) through dlsym, and
-//                       re-exports the rest of it. This is where a different
-//                       backend (ANGLE) or per-call compatibility fixes go.
+//                       exports the table's names itself (the game's 107 imports
+//                       plus extra-gl-imports.txt), forwards them to the backend
+//                       and re-exports the rest of the system framework.
+//                       Backends (RS_GL_BACKEND, read once at load):
+//                         gl     the system framework (Apple's Metal-backed GL),
+//                                through dlsym; the default
+//                         metal  rsmtl_<name> (src/metal/; a weak generated stub
+//                                reports "unimplemented <name>" and returns 0)
+//                       The spy wraps only the game's imports and always uses
+//                       the system framework.
 //
 // Both count calls per function and, with RS_GL_CHECK=1, check glGetError after
 // every call. An error found that way is handed back on the caller's next
@@ -25,8 +31,10 @@
 //   RS_GL_TRACE_DIR=<dir>     per-frame call trace (gltrace.c; RS_GL_TRACE_START / _KEY / _FRAMES)
 //   RS_GL_FRAMETIMES=<file>   timestamp every present, drawView and display-link callback
 //                             (nsgl_hook.m). No call tracing
+//   RS_GL_BACKEND=gl|metal    the shim's backend (default gl); rs_gfx_backend() reports it
 #include "gl_api.h"
 #include "gltrace.h"
+#include "rs_gfx.h"
 
 #include <dlfcn.h>
 #include <errno.h>
@@ -44,6 +52,8 @@
 #define GL_FRAGMENT_SHADER 0x8B30
 #define GL_GEOMETRY_SHADER 0x8DD9
 #define GL_EXTENSIONS 0x1F03
+#define GL_FRAMEBUFFER_BINDING 0x8CA6
+#define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
 
 #ifdef RS_GL_SPY
 #include "../../include/interpose.h"
@@ -57,8 +67,9 @@
 static const char kSystemGL[] = "/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL";
 #endif
 
-// rs_real_<name>: the system implementation. rs_impl_<name>: what the wrapper
-// calls; the same unless a function below needs special handling.
+// rs_real_<name>: the backend's implementation (the system framework, or
+// rsmtl_<name> on Metal). rs_impl_<name>: what the wrapper calls; the same
+// unless a function below needs special handling (the specials call rs_real_).
 #define RS_GL_FN(ret, name, params, args) \
     static ret(*rs_real_##name) params;   \
     static ret(*rs_impl_##name) params;
@@ -76,6 +87,7 @@ static const char *const rs_names[RS_GL_COUNT] = {
 };
 
 static _Atomic unsigned long rs_calls[RS_GL_COUNT];
+static unsigned char rs_is_cgl[RS_GL_COUNT];  // CGL*: no GL error state
 static _Atomic unsigned long rs_errors[RS_GL_COUNT];
 static _Atomic GLenum rs_first_error[RS_GL_COUNT];
 static int rs_check, rs_verbose;
@@ -125,8 +137,7 @@ static inline void rs_enter(int i) {
 
 static void rs_leave(int i) {
     // CGL calls have no GL error state; glGetError reports its own.
-    if (!rs_check || i == RS_GL_IDX_glGetError || i == RS_GL_IDX_CGLLockContext ||
-        i == RS_GL_IDX_CGLUnlockContext)
+    if (!rs_check || i == RS_GL_IDX_glGetError || rs_is_cgl[i])
         return;
     GLenum e = rs_real_glGetError();
     if (e == GL_NO_ERROR)
@@ -166,11 +177,31 @@ static const GLubyte *rs_glGetString(GLenum name) {
     return s;
 }
 
+#ifndef RS_GL_SPY
+// Offscreen GL contexts (rs_gfx.c) have no drawable, so their framebuffer 0
+// is an FBO of their own: binding 0 binds it, and the binding queries report it
+// as 0. rs_gfx_gl_fbo() is that FBO when such a context is current, else 0.
+GLuint rs_gfx_gl_fbo(void);
+
+static void rs_glBindFramebuffer(GLenum target, GLuint fb) {
+    rs_real_glBindFramebuffer(target, fb ? fb : rs_gfx_gl_fbo());
+}
+
+static void rs_glBindFramebufferEXT(GLenum target, GLuint fb) {
+    rs_real_glBindFramebufferEXT(target, fb ? fb : rs_gfx_gl_fbo());
+}
+#endif
+
 // Remember the pname so rs_leave can say which query failed (the game's only
 // GL error is a glGetIntegerv).
 static void rs_glGetIntegerv(GLenum pname, GLint *params) {
     rs_last_pname = pname;
     rs_real_glGetIntegerv(pname, params);
+#ifndef RS_GL_SPY
+    if ((pname == GL_FRAMEBUFFER_BINDING || pname == GL_READ_FRAMEBUFFER_BINDING) && params &&
+        *params && (GLuint)*params == rs_gfx_gl_fbo())
+        *params = 0;
+#endif
 }
 
 static _Atomic GLenum rs_shader_types[4096];
@@ -276,7 +307,7 @@ static void rs_write_report(void) {
     for (int i = 0; i < notes; i++)
         if (rs_notes[i])
             fprintf(f, "note %s\n", rs_notes[i]);
-    int order[RS_GL_COUNT], used = 0;
+    int order[RS_GL_COUNT], used = 0, used_extra = 0;
     for (int i = 0; i < RS_GL_COUNT; i++)
         order[i] = i;
     qsort(order, RS_GL_COUNT, sizeof order[0], rs_by_calls);
@@ -284,15 +315,20 @@ static void rs_write_report(void) {
         int i = order[k];
         if (!rs_calls[i])
             continue;
-        used++;
+        if (i < RS_GL_GAME_COUNT)
+            used++;
+        else
+            used_extra++;
         fprintf(f, "call %-40s %12lu", rs_names[i], (unsigned long)rs_calls[i]);
         if (rs_errors[i])
             fprintf(f, "  errors %lu first %s", (unsigned long)rs_errors[i],
                     rs_error_name(rs_first_error[i]));
         fputc('\n', f);
     }
-    fprintf(f, "used %d/%d\n", used, RS_GL_COUNT);
-    for (int i = 0; i < RS_GL_COUNT; i++)
+    fprintf(f, "used %d/%d\n", used, RS_GL_GAME_COUNT);  // the game's imports
+    if (RS_GL_COUNT > RS_GL_GAME_COUNT)
+        fprintf(f, "used-extra %d/%d\n", used_extra, RS_GL_COUNT - RS_GL_GAME_COUNT);
+    for (int i = 0; i < RS_GL_GAME_COUNT; i++)
         if (!rs_calls[i])
             fprintf(f, "unused %s\n", rs_names[i]);
     fclose(f);
@@ -308,9 +344,43 @@ static void *rs_report_thread(void *arg) {
     return NULL;
 }
 
+// --- Backend --------------------------------------------------------------------
+static _Atomic int rs_backend = -1;
+
+// RS_GL_BACKEND, parsed once (also when asked before the constructor ran).
+static rs_gfx_backend_t rs_backend_get(void) {
+    int b = rs_backend;
+    if (b < 0) {
+        const char *e = getenv("RS_GL_BACKEND");
+        b = RS_GFX_GL;
+        if (e && !strcmp(e, "metal"))
+            b = RS_GFX_METAL;
+        else if (e && *e && strcmp(e, "gl"))
+            fprintf(stderr, "[rs-gl] unknown RS_GL_BACKEND=%s, using gl\n", e);
+        rs_backend = b;
+    }
+    return (rs_gfx_backend_t)b;
+}
+
+#ifndef RS_GL_SPY
+__attribute__((visibility("default"))) rs_gfx_backend_t rs_gfx_backend(void) {
+    return rs_backend_get();
+}
+
+// Called by the generated weak rsmtl_<name> stubs (rsmtl_stubs.c).
+void rsmtl_unimplemented(int idx, const char *name) {
+    static _Atomic unsigned char told[RS_GL_COUNT];
+    if (idx < 0 || idx >= RS_GL_COUNT || atomic_exchange(&told[idx], 1))
+        return;
+    fprintf(stderr, "[rs-gl] metal: unimplemented %s\n", name);
+    rs_gl_note("metal: unimplemented %s", name);
+}
+#endif
+
 // --- Load ---------------------------------------------------------------------
 __attribute__((constructor)) static void rs_gl_init(void) {
     const char *e;
+    rs_gfx_backend_t backend = rs_backend_get();
     rs_check = (e = getenv("RS_GL_CHECK")) && *e == '1';
     rs_verbose = (e = getenv("RS_GL_VERBOSE")) && *e == '1';
     rs_log_path = getenv("RS_GL_LOG");
@@ -318,9 +388,20 @@ __attribute__((constructor)) static void rs_gl_init(void) {
     if (rs_shader_dir)
         mkdir(rs_shader_dir, 0755);
 
+    for (int i = 0; i < RS_GL_COUNT; i++)
+        rs_is_cgl[i] = !strncmp(rs_names[i], "CGL", 3);
+
 #ifdef RS_GL_SPY
+    (void)backend;
 #define RS_GL_FN(ret, name, params, args) rs_real_##name = name;
 #else
+    if (backend == RS_GFX_METAL) {
+#define RS_GL_FN(ret, name, params, args) rs_real_##name = rsmtl_##name;
+#define RS_GL_VOID(name, params, args) RS_GL_FN(void, name, params, args)
+#include "gl_api.inc"
+#undef RS_GL_FN
+#undef RS_GL_VOID
+    } else {
     void *sys = dlopen(kSystemGL, RTLD_NOW | RTLD_LOCAL);
     if (!sys) {
         fprintf(stderr, "[rs-gl] can't load %s: %s\n", kSystemGL, dlerror());
@@ -336,6 +417,9 @@ __attribute__((constructor)) static void rs_gl_init(void) {
 #include "gl_api.inc"
 #undef RS_GL_FN
 #undef RS_GL_VOID
+#ifndef RS_GL_SPY
+    }
+#endif
 
 #define RS_GL_FN(ret, name, params, args) rs_impl_##name = rs_real_##name;
 #define RS_GL_VOID(name, params, args) RS_GL_FN(void, name, params, args)
@@ -354,15 +438,19 @@ __attribute__((constructor)) static void rs_gl_init(void) {
     rs_impl_glGetIntegerv = rs_glGetIntegerv;
     rs_impl_glCreateShader = rs_glCreateShader;
     rs_impl_glShaderSource = rs_glShaderSource;
+#ifndef RS_GL_SPY
+    rs_impl_glBindFramebuffer = rs_glBindFramebuffer;
+    rs_impl_glBindFramebufferEXT = rs_glBindFramebufferEXT;
+#endif
 
     if (rs_verbose || rs_log_path)
-        fprintf(stderr, "[rs-gl] %s loaded (%s), %d functions, check=%d\n", RS_MODE,
+        fprintf(stderr, "[rs-gl] %s loaded (%s), %d functions, backend %s, check=%d\n", RS_MODE,
 #if defined(__arm64__)
                 "arm64",
 #else
                 "x86_64",
 #endif
-                RS_GL_COUNT, rs_check);
+                RS_GL_COUNT, backend == RS_GFX_METAL ? "metal" : "gl", rs_check);
     if (rs_log_path) {
         pthread_t t;
         pthread_create(&t, NULL, rs_report_thread, NULL);

@@ -2,22 +2,32 @@
 # by Apple (AppleMetalOpenGLRenderer), and it provides all 107 GL/CGL functions
 # the game imports. This directory ships:
 #   libRSOpenGL.dylib  OpenGL.framework replacement: wrappers for the game's 107
-#                      imports forwarding to the system framework (+ re-export of
-#                      the rest). The seam for compatibility fixes.
-#   libglspy.dylib     the same wrappers as a DYLD_INSERT_LIBRARIES interposer,
-#                      for tracing the real game under Rosetta
+#                      imports and the extra functions the Cg shim, the shell and
+#                      the tests call (extra-gl-imports.txt), forwarding to the
+#                      backend (RS_GL_BACKEND=gl: the system framework, the
+#                      default; metal: rsmtl_<name>, docs/METAL-DESIGN.md), plus
+#                      re-export of the rest of the framework and rs_gfx.h.
+#                      The app, the shell and Cg link it (@executable_path).
+#   libglspy.dylib     the game-import wrappers as a DYLD_INSERT_LIBRARIES
+#                      interposer, for tracing the real game under Rosetta
 #   gl_native_test     arm64 test of every import through a real NSOpenGLContext
+#   gfx_offscreen_test rs_gfx offscreen context: draw, read back, exact pixels
 
 set(ogl_dir "${CMAKE_CURRENT_SOURCE_DIR}")
 set(ogl_imports "${ogl_dir}/game-gl-imports.txt")
+set(ogl_extra "${ogl_dir}/extra-gl-imports.txt")
 set(ogl_inc "${CMAKE_CURRENT_BINARY_DIR}/gl_api.inc")
+# Weak rsmtl_<name> for every table entry ("unimplemented", returns 0); the
+# Metal core's strong definitions (src/metal/) replace them at link time.
+set(ogl_mtl_stubs "${CMAKE_CURRENT_BINARY_DIR}/rsmtl_stubs.c")
 execute_process(COMMAND xcrun --show-sdk-path OUTPUT_VARIABLE ogl_sdk OUTPUT_STRIP_TRAILING_WHITESPACE)
 set(ogl_gl_headers "${ogl_sdk}/System/Library/Frameworks/OpenGL.framework/Headers")
 
-add_custom_command(OUTPUT "${ogl_inc}"
-  COMMAND python3 "${ogl_dir}/tools/gen-gl-api.py" "${ogl_imports}" "${ogl_gl_headers}" "${ogl_inc}"
-  DEPENDS "${ogl_dir}/tools/gen-gl-api.py" "${ogl_imports}"
-  COMMENT "Generating gl_api.inc from the game's OpenGL imports"
+add_custom_command(OUTPUT "${ogl_inc}" "${ogl_mtl_stubs}"
+  COMMAND python3 "${ogl_dir}/tools/gen-gl-api.py" "${ogl_imports}" "${ogl_extra}" "${ogl_gl_headers}"
+          "${ogl_inc}" "${ogl_mtl_stubs}"
+  DEPENDS "${ogl_dir}/tools/gen-gl-api.py" "${ogl_imports}" "${ogl_extra}"
+  COMMENT "Generating gl_api.inc and rsmtl_stubs.c from the OpenGL import lists"
   VERBATIM)
 add_custom_target(opengl_api DEPENDS "${ogl_inc}")
 
@@ -39,7 +49,7 @@ set(ogl_frameworks "-framework OpenGL" "-framework AppKit" "-framework ImageIO")
 # the libstdc++ shim).
 rs_add_shim(opengl
   INSTALL_NAME @executable_path/libRSOpenGL.dylib
-  SOURCES ${ogl_sources}
+  SOURCES ${ogl_sources} src/rs_gfx.c "${ogl_mtl_stubs}"
   ARCHITECTURES arm64 x86_64
   LINK ${ogl_frameworks})
 add_dependencies(opengl opengl_api opengl_enums)
@@ -74,6 +84,12 @@ target_link_libraries(gl_native_test_system PRIVATE "-framework OpenGL")
 # The shim re-exports OpenGL.framework, so the test links nothing else for GL.
 target_link_libraries(gl_native_test_shim PRIVATE opengl)
 
+add_executable(gfx_offscreen_test test/gfx_offscreen_test.c)
+add_dependencies(gfx_offscreen_test opengl_api)
+target_include_directories(gfx_offscreen_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" src)
+target_compile_options(gfx_offscreen_test PRIVATE -Wno-deprecated-declarations)
+target_link_libraries(gfx_offscreen_test PRIVATE opengl)
+
 set(ogl_pass PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
 foreach(arch arm64 x86_64)
   add_test(NAME opengl.system.core.${arch}
@@ -98,6 +114,16 @@ foreach(arch arm64 x86_64)
   set_tests_properties(opengl.spy.${arch} PROPERTIES
     PASS_REGULAR_EXPRESSION "SPY-OK" RUN_SERIAL TRUE)
 endforeach()
+
+# Offscreen, no window: the same draw and exact pixels on each backend.
+add_test(NAME opengl.gfx.offscreen.gl COMMAND gfx_offscreen_test)
+add_test(NAME opengl.gfx.offscreen.metal COMMAND gfx_offscreen_test)
+set_tests_properties(opengl.gfx.offscreen.gl PROPERTIES
+  ENVIRONMENT "RS_GL_BACKEND=gl;RS_GL_CHECK=1" ${ogl_pass})
+# Disabled until the Metal core (src/metal/) implements rs_gfx and these calls;
+# the Metal core enables it.
+set_tests_properties(opengl.gfx.offscreen.metal PROPERTIES
+  ENVIRONMENT "RS_GL_BACKEND=metal" ${ogl_pass} DISABLED TRUE)
 
 if(EXISTS "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014")
   # The checked-in import list still matches the game binary.

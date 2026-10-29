@@ -518,6 +518,8 @@ static void report_coverage(int must_cover_all) {
         return;
     struct rs_gl_stat st[RS_GL_COUNT];
     int n = stats(st), used = 0;
+    if (n > RS_GL_GAME_COUNT)  // the game's imports come first; the extras don't count here
+        n = RS_GL_GAME_COUNT;
     for (int i = 0; i < n; i++) {
         if (st[i].calls)
             used++;

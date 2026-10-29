@@ -23,6 +23,9 @@
 //                         (default 8 of 3 x 4096)
 //   --check-corpus <file> only check that rsmsl_translate finds every pair in this corpus with the
 //                         MSL a fresh translation gives (no rendering)
+//   --translate-only      translate only (no MSL compile, no GL, no rendering): status TRANSLATED;
+//                         with --corpus-out the quick corpus of a user's build (entries not flagged
+//                         verified; the MSL is the same as a checked run's)
 //   --verbose             print the first differing pixels of each variant
 //
 // Conventions checked (msl_xlat.h): row 0 of the Metal target is GL's bottom row, so glReadPixels
@@ -952,6 +955,7 @@ static rsmsl_corpus_writer *g_corpus;
 static FILE *g_report;
 
 static const char *g_check_corpus;
+static int g_translate_only;
 
 static void run_pair(const char *tag, const char *vs, const char *fs, const char *bindings, stats *st) {
     st->total++;
@@ -990,6 +994,13 @@ static void run_pair(const char *tag, const char *vs, const char *fs, const char
         st->translate_fail++;
         fprintf(g_report, "TRANSLATE\t-\t-\t-\t-\t%s\t%s\n", tag, xerr);
         free(xerr);
+        return;
+    }
+    if (g_translate_only) {
+        st->pass++;
+        fprintf(g_report, "TRANSLATED\t-\t-\t-\t-\t-\t%s\t\n", tag);
+        if (g_corpus) rsmsl_corpus_add(g_corpus, vs, fs, p, 0);
+        rsmsl_free(p);
         return;
     }
     char err[4096] = "";
@@ -1148,6 +1159,7 @@ int main(int argc, char **argv) {
             else if (!strcmp(argv[i], "--verbose")) g_verbose = 1;
             else if (!strcmp(argv[i], "--check-corpus") && i + 1 < argc) g_check_corpus = argv[++i];
             else if (!strcmp(argv[i], "--outliers") && i + 1 < argc) g_outliers = atoi(argv[++i]);
+            else if (!strcmp(argv[i], "--translate-only")) g_translate_only = 1;
             else if (argv[i][0] != '-') pairs = argv[i];
             else { fprintf(stderr, "unknown option %s\n", argv[i]); return 2; }
         }
@@ -1159,6 +1171,7 @@ int main(int argc, char **argv) {
         if (!gl_init()) { fprintf(stderr, "no GL context\n"); return 1; }
         g_report = report ? fopen(report, "w") : stdout;
         if (!g_report) { perror(report); return 1; }
+        setvbuf(g_report, NULL, _IOLBF, 0);  // a line per pair as it is done (build-msl-corpus.sh --progress)
         if (g_dump) mkdir(g_dump, 0755);
         if (corpus_out) g_corpus = rsmsl_corpus_begin();
         stats st = {0};

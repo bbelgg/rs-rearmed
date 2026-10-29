@@ -8,8 +8,9 @@
 #    stub), `mods` (the rsmacfixes and RSBypass patches) and `hooks` (hook
 #    points for mods loaded at run time, no code of its own), and un-drops, to
 #    a fixpoint, every dropped address that generated code still references;
-# 3. builds the image with that list (tools/ws7/recomp/build/build.sh) and links
-#    OUTDIR/app/Rocksmith2014.app (tools/ws7/recomp/app/build.sh).
+# 3. builds the image with that list (tools/ws7/recomp/build/build.sh), makes the Metal shader
+#    corpus from the game files (tools/metal/make-corpus.sh, OUTDIR/shaders) and links
+#    OUTDIR/app/Rocksmith2014.app (tools/ws7/recomp/app/build.sh), which bundles the corpus.
 # Memory order: the whole image is compiled with -DRC_MO_TSO (x86 total store
 # order): with only the threaded components fenced (Wwise, Scaleform, efd)
 # song loading hangs or reaches a ud2, i.e. game code relies on TSO elsewhere too.
@@ -81,7 +82,20 @@ for m in $modules rt; do
   case " $modules " in *" mods "*) [ "$m" = crypto ] && m=crypto_mods ;; esac
   [ -f "$lib/liboverrides_$m.a" ] && o="$o $lib/liboverrides_$m.a"
 done
-progress 0.85 "Linking the app"
+# The Metal backend's shader corpus, made from the game files (tools/metal/make-corpus.sh, under a
+# minute): build.sh bundles it, the install's shader warm-up compiles it. RS_MSL_CORPUS_FILE: bundle
+# that file instead; RS_SHADER_CORPUS=0: none (Metal then translates every shader at run time).
+if [ -z "${RS_MSL_CORPUS_FILE:-}" ] && [ "${RS_SHADER_CORPUS:-1}" != 0 ]; then
+  progress 0.85 "Preparing the shader corpus"
+  if sh "$root/tools/metal/make-corpus.sh" "$out/shaders" > "$out/shaders.log" 2>&1; then
+    export RS_MSL_CORPUS_FILE=$out/shaders/msl/rsmsl-corpus.bin
+    grep '^programs:\|^scaleform:\|programs in' "$out/shaders.log" || true
+  else
+    echo "shader corpus: not made (not fatal: Metal translates shaders at run time); see $out/shaders.log"
+    tail -3 "$out/shaders.log"
+  fi
+fi
+progress 0.87 "Linking the app"
 RC_OVERRIDES="$o $lib/librs_game.a $lib/librs_lua51.a $lib/librs_png15.a $lib/librs_jpeg8.a $lib/librs_online.a" \
   sh "$here/build.sh" "$out/app" ${RC_JOBS:+--jobs $RC_JOBS}
 if [ -s "$out/app/work/undefined.txt" ]; then

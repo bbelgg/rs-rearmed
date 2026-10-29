@@ -132,8 +132,18 @@ final class BuildRunner {
     var cleanupAfterInstall = false
     var renderer = "metal"  // rendererChoices' value
     var logFileURL: URL?
+    // The command shell() is running, so Skip and Quit can stop it (with what it started).
+    var currentProcess: Process?
+    var shadersSkipped = false
 
     private var logFileHandle: FileHandle?
+
+    // Stops the running command and every process it started (warm-shaders.sh runs the game's
+    // executable, which would otherwise keep running after the installer quits).
+    func stopCurrentCommand() {
+        guard let p = currentProcess, p.isRunning else { return }
+        terminateTree(p.processIdentifier)
+    }
 
     func appendLog(_ text: String) {
         let line = text.hasSuffix("\n") ? text : text + "\n"
@@ -213,31 +223,40 @@ final class BuildRunner {
 
         let handle = pipe.fileHandleForReading
         var output = ""
+        var pending = Data()  // bytes after the last newline: a read can end mid-line or mid-character
         let outputLock = NSLock()
 
         let runner = self
+        // Complete lines only (all of it when `flush`), decoded leniently.
+        let take: (Data, Bool) -> String? = { data, flush in
+            outputLock.lock()
+            defer { outputLock.unlock() }
+            pending.append(data)
+            let end = flush ? pending.endIndex : pending.lastIndex(of: UInt8(ascii: "\n")).map { $0 + 1 }
+            guard let end = end, end > pending.startIndex else { return nil }
+            let str = String(decoding: pending[pending.startIndex..<end], as: UTF8.self)
+            pending = Data(pending[end...])
+            output += str
+            return str
+        }
         handle.readabilityHandler = { fh in
             let data = fh.availableData
-            guard !data.isEmpty, let str = String(data: data, encoding: .utf8) else { return }
-            outputLock.lock()
-            output += str
-            outputLock.unlock()
+            guard !data.isEmpty, let str = take(data, false) else { return }
             DispatchQueue.main.async {
                 runner.appendOutput(str.hasSuffix("\n") ? String(str.dropLast()) : str)
             }
         }
 
         try process.run()
+        currentProcess = process
+        defer { currentProcess = nil }
 
         let status: Int32 = await withCheckedContinuation { (cont: CheckedContinuation<Int32, Never>) in
             DispatchQueue.global().async {
                 process.waitUntilExit()
                 handle.readabilityHandler = nil
                 let rest = handle.readDataToEndOfFile()
-                if !rest.isEmpty, let str = String(data: rest, encoding: .utf8) {
-                    outputLock.lock()
-                    output += str
-                    outputLock.unlock()
+                if let str = take(rest, true), !str.isEmpty {
                     DispatchQueue.main.async {
                         runner.appendOutput(str.hasSuffix("\n") ? String(str.dropLast()) : str)
                     }
@@ -588,8 +607,17 @@ enum Steps {
     static func prepareShaders(_ r: BuildRunner) async throws {
         r.appendLog("Compiling the game's Metal shaders, so its first start with Metal is quick. "
             + "The first time this takes a few minutes; after an update usually seconds.")
-        let out = try await r.shell("tools/play-native/warm-shaders.sh")
-        r.shadersReady = out.contains("shader libraries ready")
+        r.shadersSkipped = false
+        do {
+            let out = try await r.shell("tools/play-native/warm-shaders.sh")
+            r.shadersReady = out.contains("shader libraries ready")
+        } catch {
+            // Skipped (Skip stops it) or failed: the game prepares the rest on its first Metal start.
+            r.appendLog(r.shadersSkipped
+                ? "Shader preparation skipped: the game prepares the rest on its first start with Metal."
+                : "Shader preparation stopped (\(error.localizedDescription)); the game prepares them on its "
+                    + "first start with Metal.")
+        }
     }
 
     static func cleanup(_ r: BuildRunner) async throws {
@@ -598,6 +626,26 @@ enum Steps {
         try? FileManager.default.removeItem(atPath: srcDir)
         r.appendLog("Done. Freed disk space from the downloaded source and build artifacts.")
     }
+}
+
+// MARK: - Process helpers
+
+// SIGTERM to pid and all its descendants, children first.
+func terminateTree(_ pid: pid_t) {
+    let pgrep = Process()
+    pgrep.executableURL = URL(fileURLWithPath: "/usr/bin/pgrep")
+    pgrep.arguments = ["-P", String(pid)]
+    let pipe = Pipe()
+    pgrep.standardOutput = pipe
+    pgrep.standardError = FileHandle.nullDevice
+    if (try? pgrep.run()) != nil {
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        pgrep.waitUntilExit()
+        for line in String(decoding: data, as: UTF8.self).split(separator: "\n") {
+            if let child = pid_t(line.trimmingCharacters(in: .whitespaces)) { terminateTree(child) }
+        }
+    }
+    kill(pid, SIGTERM)
 }
 
 // MARK: - Alert helper
@@ -750,7 +798,8 @@ class InstallerWindow: NSWindow {
             content.addSubview(buildBrowseButton)
         }
 
-        // Renderer: remembered like the build folder; else what the current install uses; else Metal.
+        // Renderer: what the current install uses (the game may have fallen back to OpenGL, or the user
+        // switched with the file); else the one chosen last time; else Metal.
         let rendererLabel = NSTextField(labelWithString: "Renderer:")
         rendererLabel.font = .systemFont(ofSize: 12, weight: .medium)
         rendererLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -759,7 +808,9 @@ class InstallerWindow: NSWindow {
         rendererPopup.addItems(withTitles: rendererChoices.map { $0.title })
         let installed = (try? String(contentsOfFile: nativeHome + "/renderer", encoding: .utf8))?
             .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        let saved = UserDefaults.standard.string(forKey: rendererDefaultsKey) ?? (installed == "gl" ? "opengl" : installed)
+        let current = installed == "gl" ? "opengl" : installed
+        let saved = rendererChoices.contains(where: { $0.value == current })
+            ? current : UserDefaults.standard.string(forKey: rendererDefaultsKey)
         rendererPopup.selectItem(at: rendererChoices.firstIndex(where: { $0.value == saved }) ?? 0)
         rendererPopup.font = .systemFont(ofSize: 12)
         rendererPopup.translatesAutoresizingMaskIntoConstraints = false
@@ -969,8 +1020,10 @@ class InstallerWindow: NSWindow {
         } else {
             progressLabel.stringValue = ""
         }
-        startButton.isEnabled = !runner.isRunning
-        startButton.title = runner.isFinished ? "Build Again" : "Build & Install"
+        // While the shaders are prepared the button skips that (optional) step.
+        let canSkip = runner.isRunning && runner.stepTitle == "Preparing shaders" && !runner.shadersSkipped
+        startButton.isEnabled = !runner.isRunning || canSkip
+        startButton.title = canSkip ? "Skip" : runner.isFinished ? "Build Again" : "Build & Install"
         playButton.isHidden = !runner.isFinished || runner.isRunning
         if runner.isFinished && !runner.isRunning { playButton.keyEquivalent = "\r"; startButton.keyEquivalent = "" }
         browseButton.isEnabled = !runner.isRunning
@@ -1027,6 +1080,13 @@ class InstallerWindow: NSWindow {
     }
 
     @objc func startBuild() {
+        if runner.isRunning {
+            if runner.stepTitle == "Preparing shaders" {
+                runner.shadersSkipped = true
+                runner.stopCurrentCommand()
+            }
+            return
+        }
         runner.gameDir = gameDirField.stringValue
         if !runner.embeddedInRepo {
             runner.buildBase = buildBase(in: buildDirField.stringValue)
@@ -1166,6 +1226,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+
+    // Quitting mid-build stops the running command too: an orphaned warm-up (the game's executable)
+    // would keep the launcher and install.sh saying "Rocksmith 2014 is already running".
+    func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        guard let runner = window?.runner, runner.isRunning else { return .terminateNow }
+        let choice = showAlert(
+            title: "Stop the installation?",
+            message: "RS Re-ARMed is still being built and installed. Quitting stops it; click Build & "
+                + "Install again later to finish.",
+            buttons: ["Quit", "Continue"]
+        )
+        guard choice == "Quit" else { return .terminateCancel }
+        runner.stopCurrentCommand()
+        return .terminateNow
+    }
 }
 
 // Main menu: without one there is no ⌘Q, and ⌘C/⌘A do nothing in the log and text fields.

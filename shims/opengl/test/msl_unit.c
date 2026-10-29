@@ -1,9 +1,12 @@
 // Unit tests of the GLSL -> MSL translator (src/msl/): reflection, attribute locations,
 // unsupported input, the corpus file and its lookup. Rendering is checked by msl_verify.
 //   msl_unit <scratch corpus path>
+#include <pthread.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "msl_internal.h"
 
@@ -89,6 +92,12 @@ static void test_errors(void) {
         {"#version 120\n#define X 1\nvoid main() { gl_Position = vec4(0.0); }\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
         {"#version 120\nvoid foo() {}\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
         {"#version 120\nvoid main() { gl_Position = gl_LightSource[0].position; }\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
+        // Used to loop forever at the end of the input.
+        {"#version 120\nvoid main() { gl_Position = vec4(0.0); }\ninvariant gl_Position,", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
+        // Sizes: an absurd array, a uniform block over the limit, a constant out of int range.
+        {"#version 120\nvoid main() { float a[100000000]; gl_Position = vec4(0.0); }\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
+        {"#version 120\nuniform mat4 m[40000];\nvoid main() { gl_Position = m[1] * m[39999][0]; }\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
+        {"#version 120\nconst int K = 99999 * 99999 * 99999;\nvoid main() { float a[K]; gl_Position = vec4(0.0); }\n", "#version 120\nvoid main() { gl_FragColor = vec4(1.0); }\n"},
     };
     for (size_t i = 0; i < sizeof bad / sizeof bad[0]; i++) {
         char *err = NULL;
@@ -104,6 +113,51 @@ static void test_key(void) {
     CHECK(rsmsl_key("ab", "") != rsmsl_key("a", "b"));
     CHECK(rsmsl_key(NULL, NULL) == rsmsl_key("", ""));
     CHECK(rsmsl_key("", "") == 0x08328807b4eb6fedull);  // FNV-1a 64 of two 0 bytes: stable across builds
+}
+
+// Deeply nested input fails with a message, within a 512 KB stack (a secondary thread's default).
+static const char *g_deep;
+static void *deep_thread(void *arg) {
+    char *err = NULL;
+    rsmsl_program *p = rsmsl_translate_direct("void main() { gl_Position = vec4(0.0); }", g_deep, NULL, 0, &err);
+    *(int *)arg = !p && err && strstr(err, "nesting too deep");
+    rsmsl_free(p);
+    free(err);
+    return NULL;
+}
+static void test_nesting(void) {
+    for (int open_ch = 0; open_ch < 2; open_ch++) {
+        int n = 100000;
+        char *fs = malloc((size_t)n * 8 + 100);
+        char *o = fs + sprintf(fs, "void main() { %s", open_ch ? "" : "gl_FragColor = vec4(");
+        for (int i = 0; i < n; i++) *o++ = open_ch ? '{' : '(';
+        o += sprintf(o, "%s", open_ch ? "" : "1.0");
+        for (int i = 0; i < n; i++) o += sprintf(o, "%s", open_ch ? "}" : ")");
+        sprintf(o, "%s }", open_ch ? "" : ");");
+        g_deep = fs;
+        pthread_attr_t at;
+        pthread_attr_init(&at);
+        pthread_attr_setstacksize(&at, 512 * 1024);
+        pthread_t t;
+        int ok = 0;
+        CHECK(pthread_create(&t, &at, deep_thread, &ok) == 0);
+        pthread_join(t, NULL);
+        CHECK(ok);
+        free(fs);
+    }
+    // Nesting the game's shaders use (at most ~20 levels) still translates.
+    char fs[4096];
+    char *o = fs + sprintf(fs, "void main() { float x = 0.5; gl_FragColor = vec4(");
+    for (int i = 0; i < 40; i++) *o++ = '(';
+    o += sprintf(o, "x");
+    for (int i = 0; i < 40; i++) o += sprintf(o, " * 1.0)");
+    sprintf(o, "); }");
+    char *err = NULL;
+    rsmsl_program *p = rsmsl_translate_direct("void main() { gl_Position = vec4(0.0); }", fs, NULL, 0, &err);
+    CHECK(p != NULL);
+    if (!p) fprintf(stderr, "%s\n", err);
+    rsmsl_free(p);
+    free(err);
 }
 
 static void test_corpus(const char *path) {
@@ -156,8 +210,10 @@ static void test_corpus(const char *path) {
 }
 
 int main(int argc, char **argv) {
+    alarm(120);  // a hang is a failure
     test_reflection();
     test_errors();
+    test_nesting();
     test_key();
     test_corpus(argc > 1 ? argv[1] : "msl_unit_corpus.bin");
     printf("%d passed, %d failed\n", passed, failed);

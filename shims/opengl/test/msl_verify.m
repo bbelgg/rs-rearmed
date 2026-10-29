@@ -453,6 +453,10 @@ typedef struct {
 } image;
 
 // probe_buf != 0: capture the vertex outputs with transform feedback instead of drawing.
+// Programs whose vertex shader writes gl_PointSize are drawn as point sprites (one per vertex),
+// the rest as triangles.
+static int draws_points(const rsmsl_program *p) { return strstr(p->msl, "[[point_size]]") != NULL; }
+
 static int gl_render(GLuint prog, inputs *in, image *out, GLuint probe_buf) {
     const rsmsl_program *p = in->p;
     glBindFramebuffer(GL_FRAMEBUFFER, g_fbo);
@@ -498,6 +502,14 @@ static int gl_render(GLuint prog, inputs *in, image *out, GLuint probe_buf) {
         glDrawArrays(GL_POINTS, 0, NVERT);
         glEndTransformFeedbackEXT();
         glDisable(GL_RASTERIZER_DISCARD_EXT);
+    } else if (draws_points(p)) {
+        glEnable(GL_POINT_SPRITE);  // gl_PointCoord (origin upper left, GL's default)
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glDrawArrays(GL_POINTS, 0, NVERT);
+        glDisable(GL_POINT_SPRITE);
+        glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, out->color);
+        glReadPixels(0, 0, W, H, GL_DEPTH_COMPONENT, GL_FLOAT, out->depth);
     } else {
         glDrawArrays(GL_TRIANGLES, 0, NVERT);
         glReadPixels(0, 0, W, H, GL_RGBA, GL_UNSIGNED_BYTE, out->color);
@@ -691,7 +703,7 @@ static int mtl_render(id<MTLLibrary> lib, inputs *in, image *out, int check, id<
         if (s->stages & RSMSL_STAGE_FS) { [enc setFragmentTexture:t atIndex:s->index]; [enc setFragmentSamplerState:ss atIndex:s->index]; }
     }
     if (probe) [enc setVertexBuffer:probe offset:0 atIndex:30];
-    [enc drawPrimitives:probe ? MTLPrimitiveTypePoint : MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:NVERT];
+    [enc drawPrimitives:probe || draws_points(p) ? MTLPrimitiveTypePoint : MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:NVERT];
     [enc endEncoding];
     id<MTLBuffer> dbuf = [g_dev newBufferWithLength:W * H * 4 options:MTLResourceStorageModeShared];
     id<MTLBlitCommandEncoder> bl = [cb blitCommandEncoder];

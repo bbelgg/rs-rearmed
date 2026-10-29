@@ -208,4 +208,95 @@ static const msl_case msl_cases[] = {
      "  gl_FragColor = v * 0.9 + vec4(t, -t) * 0.05 + vec4(1.0 - 2.0 - 3.0, 8.0 / 2.0 / 2.0, -(-0.5), 0.0) * 0.1;\n"
      "}\n",
      "pos=0,col=1,uv=2"},
+    // GLSL's copy-in / copy-out of out and inout arguments: swizzles and components (which can't
+    // bind to an MSL reference), a global the callee also writes, gl_FragColor, a global array.
+    {"out-inout-copy", MSL_CASE_VS_BASIC,
+     "#version 120\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "float G = 0.0;\nfloat A[3];\n"
+     "void f(out vec2 r) { r = vec2(0.2, 0.7) + v_uv * 0.1; }\n"
+     "float g(inout float x) { x *= 0.5; return x + 0.1; }\n"
+     "void h(inout float x) { x = 0.3 * v_col.r; G = 0.4; x += G; }\n"
+     "void fill(out float a[3], float x) { a[0] = x; a[1] = x * 0.5; a[2] = 0.25; }\n"
+     "void sw(inout float a, inout float b) { float t = a; a = b; b = t; }\n"
+     "void paint(out vec4 c) { c = v_col.bgra; }\n"
+     "void main() {\n"
+     "  vec4 c = v_col;\n"
+     "  f(c.yx); float r = 0.2 + g(c.z) * 0.5 + g(c[3]);\n"
+     "  G = 0.1; h(G);\n"
+     "  fill(A, v_col.r);\n"
+     "  float b = 0.25; sw(G, b);\n"
+     "  paint(gl_FragColor);\n"
+     "  gl_FragColor = gl_FragColor * 0.25 + c * 0.25 + vec4(r, G, b, A[1]) * 0.4;\n"
+     "}\n",
+     "pos=0,col=1,uv=2"},
+    {"vs-out-args",
+     "#version 120\nattribute vec4 pos;\nattribute vec4 col;\nvarying vec4 v_col;\nvarying vec2 w;\n"
+     "void set(out vec4 c, out vec2 x, inout float s) { c = col; x = col.zw; s += 0.1; }\n"
+     "vec4 tx(mat4 m[8], vec4 v) { return m[1] * v; }\n"
+     "void main() { gl_Position = pos; vec4 k = vec4(0.0, 0.0, col.z, 1.0); set(v_col, w, k.z); v_col.a = w.x + k.z;\n"
+     "  v_col += tx(gl_TextureMatrix, gl_MultiTexCoord0) * 0.1; }\n",
+     "#version 120\nvarying vec4 v_col;\nvarying vec2 w;\nvoid main() { gl_FragColor = v_col + vec4(w, 0.0, 0.0) * 0.1; }\n",
+     "pos=0,col=1"},
+    // Arrays: uniform arrays as `in` arguments (constant address space), parameters the callee
+    // writes (passed by value), array assignment, .length() of a parameter.
+    {"array-params-assign", MSL_CASE_VS_BASIC,
+     "#version 120\nuniform float fs[3];\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "float sum(float a[3]) { return a[0] + a[1] + a[2]; }\n"
+     "float sum2(float a[3]) { a[1] = 0.0; a[0] += 0.5; return a[0] + a[1]; }\n"
+     "float len(vec2 a[2]) { float t = 0.0; for (int i = 0; i < a.length(); i++) t += a[i].x + a[i].y; return t; }\n"
+     "void main() {\n"
+     "  float l[3]; l[0] = v_col.r; l[1] = v_col.g; l[2] = 0.1;\n"
+     "  float m[3]; m = l; float c[3]; c = fs;\n"
+     "  vec2 v[2]; v[0] = v_uv; v[1] = v_col.xy;\n"
+     "  gl_FragColor = vec4(sum(fs) * 0.2 + 0.5, sum(l) * 0.3, sum2(l) * 0.5 + l[0] * 0.1, (m[1] + c[2]) * 0.25 + len(v) * 0.1);\n"
+     "}\n",
+     "pos=0,col=1,uv=2"},
+    // Matrix arithmetic MSL has no operator for: unary minus, ++/--, + - / with a scalar,
+    // matrix / matrix, and their compound assignments; vector *= matrix.
+    {"matrix-componentwise", MSL_CASE_VS_BASIC,
+     "#version 120\nuniform mat2 m2;\nuniform mat4 m4;\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "void main() {\n"
+     "  mat2 a = -m2; mat2 b = m2 + 0.5; mat2 c = 1.0 - m2; mat2 d = 0.5 / m2; mat2 e = m2 / mat2(2.0, 3.0, 4.0, 5.0);\n"
+     "  mat2 m = m2; m += 0.5; m /= 2.0; m -= 0.25; m /= mat2(2.0); m *= 2.0; m++; ++m; mat2 o = m--;\n"
+     "  vec4 v = v_col; v *= m4; vec2 q = v_uv; q *= m2;\n"
+     "  gl_FragColor = vec4(a[0] + b[1], c[0] + e[1]) * 0.25 + vec4(d[1], m[0]) * 0.1 + vec4(o[1], q) * 0.1 + v * 0.1 + 0.5;\n"
+     "}\n",
+     "pos=0,col=1,uv=2"},
+    // Constructors from any mix of scalars, vectors and matrices (consumed column by column).
+    {"constructor-forms", MSL_CASE_VS_BASIC,
+     "#version 120\nuniform mat2 m2;\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "void main() {\n"
+     "  vec4 a = vec4(m2); vec3 b = vec3(v_col); float e = float(v_col);\n"
+     "  mat2 c = mat2(v_col.xyz, 0.5); mat3 d = mat3(v_uv, v_col, 0.1, v_col.wzy); vec3 f = vec3(d); vec2 g = vec2(c);\n"
+     "  mat3 h = mat3(vec2(0.1, 0.2), 0.3, vec3(0.4), 0.5, vec2(0.6));\n"
+     "  gl_FragColor = (a + vec4(b, e)) * 0.25 + vec4(c[1], d[2].xz) * 0.25 + vec4(f, g.y) * 0.25 + vec4(h[1], h[2].z) * 0.1;\n"
+     "}\n",
+     "pos=0,col=1,uv=2"},
+    // Scopes: a local initialised from the outer variable it shadows (C++ would read the new one),
+    // a for body redeclaring a function parameter's name, several for-init declarators, global
+    // struct variables and global initialisers that read uniforms.
+    {"scopes-globals", MSL_CASE_VS_BASIC,
+     "#version 120\nuniform vec4 u0;\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "struct S { vec3 a; float b[2]; };\nS gs;\nS arr[2];\n"
+     "float x = 0.25;\nvec4 gi = u0 * 0.5 + 0.5;\nconst float K = 2.0;\nfloat h = K * 0.1;\n"
+     "float f(float x) { { float x = x * 0.5 + 0.125; return x; } }\n"
+     "void main() {\n"
+     "  float y = x; { float x = x + 0.5; y += x; }\n"
+     "  float s = 0.0; for (int i = 0, j = 3; i < j; i++) s += 0.05;\n"
+     "  gs.a = v_col.rgb; gs.b[1] = v_col.a; arr[1] = gs; arr[0].b[0] = 0.5;\n"
+     "  gl_FragColor = vec4(y * 0.5, f(v_col.r), s, x) * 0.5 + gi * 0.25 * h + vec4(arr[1].a.xy, arr[1].b[1], arr[0].b[0]) * 0.25;\n"
+     "}\n",
+     "pos=0,col=1,uv=2"},
+    {"swizzle-incdec", MSL_CASE_VS_BASIC,
+     "#version 120\nvarying vec4 v_col;\nvarying vec2 v_uv;\n"
+     "void main() { vec4 c = v_col; vec2 o = c.xy++; ++c.zw; c.y--; ivec2 i = ivec2(2, 3); ivec2 j = i--;\n"
+     "  gl_FragColor = vec4(o, c.zw) * 0.4 + vec4(c.x, c.y, vec2(i + j) * 0.05) * 0.1; }\n",
+     "pos=0,col=1,uv=2"},
+    // Drawn as point sprites (the vertex shader writes gl_PointSize): gl_PointCoord's origin is
+    // the upper left in GL, the top of the target (GL's bottom) in Metal.
+    {"point-coord",
+     "#version 120\nattribute vec4 pos;\nattribute vec4 col;\nvarying vec4 v_col;\n"
+     "void main() { gl_Position = vec4(pos.xy, 0.0, 1.0); gl_PointSize = 7.0; v_col = col; }\n",
+     "#version 120\nvarying vec4 v_col;\nvoid main() { gl_FragColor = vec4(gl_PointCoord, v_col.b, 1.0); }\n",
+     "pos=0,col=1"},
 };

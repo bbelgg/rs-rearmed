@@ -20,9 +20,14 @@
 //   ... the same for the fragment stage, plus the alpha test (function constant 0, buffer(1))
 //
 // Every GLSL identifier is renamed v_<name> (so no GLSL name can collide with MSL keywords,
-// functions or the translator's own rs_* names); swizzles are written as xyzw. GLSL's implicit
-// int -> float conversions are made explicit, scalar arguments of genType built-ins are
-// broadcast, and integer-to-float literal conversions are folded.
+// functions or the translator's own rs_* names; a local that shadows a visible name becomes
+// rs_l<n>_<name>, since C++ puts a variable in scope in its own initialiser); swizzles are written
+// as xyzw. GLSL's implicit int -> float conversions are made explicit, scalar arguments of genType
+// built-ins are broadcast, and integer-to-float literal conversions are folded. out / inout
+// arguments are copied in and out (user_call); matrix arithmetic MSL lacks (unary minus, + - /
+// with a scalar, / with a matrix) goes through helpers; array assignment through rs_acopy.
+// Uniform initialisers are ignored (the core starts every uniform at 0; neither shader family
+// uses them).
 //
 // Conventions the Metal core relies on (in addition to msl_xlat.h):
 //   - sampler1D is a texture2d (the core creates GL_TEXTURE_1D as a 2D texture of height 1),
@@ -175,13 +180,21 @@ struct Tok {
     int line;
 };
 
+// Length of the operator at p: <<= >>= ++ -- <= >= == != && || ^^ += -= *= /= %= &= |= ^= << >> or 1.
+size_t punct_len(const char *p) {
+    char c = p[0], d = p[1];
+    if ((c == '<' || c == '>') && d == c) return p[2] == '=' ? 3 : 2;
+    if ((c == '+' || c == '-' || c == '&' || c == '|' || c == '^') && d == c) return 2;
+    if (d == '=' && strchr("<>=!+-*/%&|^", c)) return 2;
+    return 1;
+}
+
 std::vector<Tok> tokenize(const char *src) {
     std::vector<Tok> v;
+    v.reserve(strlen(src) / 3 + 16);
     int line = 1;
     bool line_start = true;
     const char *p = src;
-    static const char *multi[] = {"<<=", ">>=", "++", "--", "<=", ">=", "==", "!=", "&&", "||", "^^",
-                                  "+=",  "-=",  "*=", "/=", "%=", "&=", "|=", "^=", "<<", ">>"};
     while (*p) {
         char c = *p;
         if (c == '\n') { line++; line_start = true; p++; continue; }
@@ -234,11 +247,9 @@ std::vector<Tok> tokenize(const char *src) {
             v.push_back({flt ? K_FLOAT : K_INT, std::string(s, p), line});
             continue;
         }
-        std::string op(1, c);
-        for (const char *m : multi)
-            if (!strncmp(p, m, strlen(m))) { op = m; break; }
-        p += op.size();
-        v.push_back({K_PUNCT, op, line});
+        size_t n = punct_len(p);
+        v.push_back({K_PUNCT, std::string(p, n), line});
+        p += n;
     }
     v.push_back({K_END, "", line});
     return v;
@@ -256,6 +267,7 @@ struct Var {
     VarKind kind = V_LOCAL;
     bool lvalue = true;
     bool used = false;
+    bool written = false;  // assigned or passed as out / inout (array parameters)
     int decl_order = 0;
     int loc = -1;        // attributes: fixed (built-in) location
     bool has_cv = false;
@@ -285,11 +297,21 @@ struct E {
     bool cst = false;    // compile-time scalar constant
     double cv = 0;
     bool lit = false;    // a bare literal (int literals convert to float literals)
-    Var *var = nullptr;  // the variable this expression names (for gl_TexCoord / gl_FragData indexing)
+    Var *var = nullptr;   // the variable this expression names (for gl_TexCoord / gl_FragData indexing)
+    Var *root = nullptr;  // l-values: the variable at the root of the access chain (v in v.xy, v[i].a)
 };
 
+// A folded constant as a GLSL int (saturated: float -> int conversion of out-of-range values is
+// undefined in C++, and such constants only come from nonsense input).
+long long ival(double v) {
+    if (!(v == v)) return 0;
+    if (v >= 2147483647.0) return 2147483647;
+    if (v <= -2147483648.0) return -2147483648LL;
+    return (long long)v;
+}
+
 std::string fmt_num(double v, bool flt) {
-    if (!flt) return std::to_string((long long)v);
+    if (!flt) return std::to_string(ival(v));
     char b[64];
     snprintf(b, sizeof b, "%.9g", v);
     std::string s = b;
@@ -298,6 +320,23 @@ std::string fmt_num(double v, bool flt) {
 }
 
 // --- Per-stage parser / emitter -----------------------------------------------------------------
+
+// Nesting limit (counted in assign / unary / statement): one level takes ~1.8 KB of stack in an
+// optimised build. The translator runs on the GL thread, which may be a secondary thread with a
+// 512 KB stack, so deep input must fail with a message instead of overflowing it: 128 levels are
+// ~230 KB. The game's shaders nest at most 18.
+const int kMaxNest = 128;
+// Arrays and uniform blocks: far beyond any GL implementation's limits (Apple: 4096 uniform
+// components per stage), small enough that sizes and offsets can't overflow.
+const int kMaxArray = 1 << 16;
+const int kMaxBlock = 1 << 20;
+
+struct Stage;
+struct Nest {
+    int *d;
+    Nest(Stage *s, int ln);
+    ~Nest() { --*d; }
+};
 
 struct Stage {
     int stage;  // RSMSL_STAGE_VS / _FS
@@ -314,6 +353,8 @@ struct Stage {
     std::string structs_text, funcs_text;
     const Func *cur_func = nullptr;
     int order = 0;
+    int uniq = 0;   // temporaries / renamed locals
+    int depth = 0;  // expression / statement nesting (bounded: deep input must fail, not overflow the stack)
 
     // Built-ins seen.
     bool uses_fragcoord = false, uses_frontfacing = false, uses_pointcoord = false;
@@ -333,7 +374,13 @@ struct Stage {
     bool vs() const { return stage == RSMSL_STAGE_VS; }
     const Tok &peek(int o = 0) const { return toks[std::min(pos + o, toks.size() - 1)]; }
     const Tok &next() { const Tok &t = toks[pos]; if (pos < toks.size() - 1) pos++; return t; }
-    bool is(const char *s, int o = 0) const { const Tok &t = peek(o); return (t.k == K_PUNCT || t.k == K_IDENT) && t.s == s; }
+    bool is(const char *s, int o = 0) const {
+        const Tok &t = peek(o);
+        if (t.k != K_PUNCT && t.k != K_IDENT) return false;
+        const char *a = t.s.c_str();
+        while (*a && *a == *s) a++, s++;
+        return *a == *s;
+    }
     bool accept(const char *s) { if (is(s)) { next(); return true; } return false; }
     void expect(const char *s) {
         if (!accept(s)) fail(peek().line, "expected '%s' before '%s'", s, peek().s.c_str());
@@ -345,6 +392,7 @@ struct Stage {
         const Tok &t = peek(o);
         if (t.k != K_IDENT) return false;
         const std::string &s = t.s;
+        if (!strchr("vfibms", s[0]) && structs.empty()) return false;  // quick reject (most identifiers)
         Type r;
         if (s == "void") r = T_VOID;
         else if (s == "float") r = T_FLOAT;
@@ -386,13 +434,13 @@ struct Stage {
     // --- constants
     int const_int(const E &e, int ln) {
         if (!e.cst || e.t.base != B_INT || !e.t.scalar()) fail(ln, "expected an integer constant expression");
-        return (int)e.cv;
+        return (int)ival(e.cv);
     }
     int array_size() {
         int ln = line();
         E e = assign();
         int n = const_int(e, ln);
-        if (n <= 0) fail(ln, "array size must be positive");
+        if (n <= 0 || n > kMaxArray) fail(ln, "array size must be 1..%d", kMaxArray);
         expect("]");
         return n;
     }
@@ -558,25 +606,34 @@ struct Stage {
 
     E assign() {
         int ln = line();
+        Nest nest(this, ln);
         E lhs = cond();
-        static const char *ops[] = {"=", "+=", "-=", "*=", "/=", "%=", "<<=", ">>=", "&=", "|=", "^="};
-        for (const char *op : ops) {
-            if (!is(op)) continue;
-            next();
+        // Assignment operators: the punctuators ending in '=' except the comparisons.
+        const Tok &t = peek();
+        if (t.k == K_PUNCT && t.s.back() == '=' && t.s != "==" && t.s != "!=" && t.s != "<=" && t.s != ">=") {
+            const std::string op_s = next().s;
+            const char *op = op_s.c_str();
             E rhs = assign();
             if (!lhs.lvalue) fail(ln, "assignment to a read-only value");
+            if (lhs.root) lhs.root->written = true;
             E r;
             r.t = lhs.t;
             if (!strcmp(op, "=")) {
                 if (lhs.t.base == B_SAMPLER) fail(ln, "samplers cannot be assigned");
+                if (lhs.t.is_array()) {  // C arrays don't assign; the value of the expression is void
+                    if (rhs.t != lhs.t) fail(ln, "cannot assign %s to %s", glsl_name(rhs.t).c_str(), glsl_name(lhs.t).c_str());
+                    r.t = T_VOID;
+                    r.s = "rs_acopy(" + lhs.s + ", " + rhs.s + ")";
+                    return r;
+                }
                 r.s = "(" + lhs.s + " = " + conv(rhs, lhs.t, ln) + ")";
                 return r;
             }
             std::string bop(op, strlen(op) - 1);
             E res = binary(lhs, bop, rhs, ln);
             if (res.t != lhs.t) fail(ln, "'%s': result type %s does not match %s", op, glsl_name(res.t).c_str(), glsl_name(lhs.t).c_str());
-            if (bop == "/" && lhs.t.mat() && rhs.t.scalar())
-                r.s = "(" + lhs.s + " *= (1.0f / " + conv(rhs, T_FLOAT, ln) + "))";
+            if (lhs.t.mat() && (rhs.t.scalar() ? bop != "*" : bop == "/"))
+                r.s = "(" + lhs.s + " = " + res.s + ")";  // component-wise matrix ops: helpers, no MSL operator
             else
                 r.s = "(" + lhs.s + " " + op + " " + conv(rhs, with_base(rhs.t, rhs.t.base == B_INT && lhs.t.base == B_FLOAT ? B_FLOAT : rhs.t.base), ln) + ")";
             return r;
@@ -607,12 +664,21 @@ struct Stage {
         fail(ln, "type mismatch: %s and %s", glsl_name(a).c_str(), glsl_name(b).c_str());
     }
 
+    // Binary operator precedence (higher binds tighter), -1 for anything else.
     static int prec(const std::string &op) {
-        static const std::map<std::string, int> p = {{"||", 1}, {"^^", 2}, {"&&", 3}, {"|", 4}, {"^", 5}, {"&", 6},
-                                                     {"==", 7}, {"!=", 7}, {"<", 8}, {">", 8}, {"<=", 8}, {">=", 8},
-                                                     {"<<", 9}, {">>", 9}, {"+", 10}, {"-", 10}, {"*", 11}, {"/", 11}, {"%", 11}};
-        auto it = p.find(op);
-        return it == p.end() ? -1 : it->second;
+        char a = op[0], b = op.size() > 1 ? op[1] : 0;
+        if (op.size() > 2) return -1;
+        switch (a) {
+        case '|': return b == '|' ? 1 : b ? -1 : 4;
+        case '^': return b == '^' ? 2 : b ? -1 : 5;
+        case '&': return b == '&' ? 3 : b ? -1 : 6;
+        case '=': return b == '=' ? 7 : -1;
+        case '!': return b == '=' ? 7 : -1;
+        case '<': case '>': return !b || b == '=' ? 8 : b == a ? 9 : -1;
+        case '+': case '-': return b ? -1 : 10;
+        case '*': case '/': case '%': return b ? -1 : 11;
+        default: return -1;
+        }
     }
 
     E binop_level(int minp) {
@@ -635,7 +701,7 @@ struct Stage {
         if (op == "+") return a + b;
         if (op == "-") return a - b;
         if (op == "*") return a * b;
-        if (op == "/") return isint ? (b != 0 ? (double)((long long)a / (long long)b) : 0) : a / b;
+        if (op == "/") return isint ? (b != 0 ? (double)(ival(a) / ival(b)) : 0) : a / b;
         return 0;
     }
 
@@ -681,11 +747,9 @@ struct Stage {
         if (ta.scalar() && tb.scalar()) rt = ta;
         else if (ta.scalar() || tb.scalar()) {
             rt = ta.scalar() ? tb : ta;
-            if (rt.mat() && op != "*" && op != "/") fail(ln, "'%s' between a matrix and a scalar is not supported", op.c_str());
-            if (rt.mat() && op == "/") {
-                if (!tb.scalar()) fail(ln, "scalar / matrix is not supported");
+            if (rt.mat() && op != "*") {  // component-wise; MSL has no operator for these
                 r.t = rt;
-                r.s = "(" + x + " * (1.0f / " + y + "))";
+                r.s = std::string(op == "+" ? "rs_madd(" : op == "-" ? "rs_msub(" : "rs_mdiv(") + x + ", " + y + ")";
                 return r;
             }
         } else if (ta.vec() && tb.vec()) {
@@ -700,8 +764,13 @@ struct Stage {
         } else if (op == "*" && ta.mat() && tb.mat()) {
             if (ta.cols != tb.rows) fail(ln, "matrix * matrix size mismatch");
             rt = mk(B_FLOAT, ta.rows, tb.cols);
-        } else if (ta.mat() && tb.mat() && (op == "+" || op == "-")) {
+        } else if (ta.mat() && tb.mat() && (op == "+" || op == "-" || op == "/")) {
             if (ta != tb) fail(ln, "matrix size mismatch in '%s'", op.c_str());
+            if (op == "/") {  // component-wise
+                r.t = ta;
+                r.s = "rs_mdiv(" + x + ", " + y + ")";
+                return r;
+            }
             rt = ta;
         } else {
             fail(ln, "'%s' is not supported between %s and %s", op.c_str(), glsl_name(ta).c_str(), glsl_name(tb).c_str());
@@ -717,6 +786,7 @@ struct Stage {
 
     E unary() {
         int ln = line();
+        Nest nest(this, ln);
         if (is("+") || is("-") || is("!") || is("~")) {
             std::string op = next().s;
             E e = unary();
@@ -734,8 +804,8 @@ struct Stage {
             if (op == "+") return e;
             E r = e;
             r.lvalue = false;
-            r.var = nullptr;
-            r.s = "(-" + e.s + ")";
+            r.var = r.root = nullptr;
+            r.s = e.t.mat() ? "(" + e.s + " * -1.0f)" : "(-" + e.s + ")";  // MSL matrices have no unary minus
             if (e.cst) { r.cv = -e.cv; r.cst = true; }
             if (e.lit) { r.lit = true; r.s = "(-" + e.s + ")"; }
             return r;
@@ -744,8 +814,11 @@ struct Stage {
             std::string op = next().s;
             E e = unary();
             if (!e.lvalue || !e.t.num()) fail(ln, "'%s' needs a numeric l-value", op.c_str());
+            if (e.root) e.root->written = true;
             E r; r.t = e.t;
-            r.s = e.t.scalar() ? "(" + op + e.s + ")" : "(" + e.s + (op == "++" ? " += " : " -= ") + "1)";
+            r.s = e.t.scalar() ? "(" + op + e.s + ")"
+                : e.t.mat() ? "(" + e.s + " = " + (op == "++" ? "rs_madd(" : "rs_msub(") + e.s + ", 1.0f))"
+                            : "(" + e.s + (op == "++" ? " += " : " -= ") + "1)";
             return r;
         }
         return postfix(primary());
@@ -760,11 +833,12 @@ struct Stage {
                 if (idx.t != T_INT) fail(ln, "index must be an int, got %s", glsl_name(idx.t).c_str());
                 E r;
                 r.lvalue = e.lvalue;
+                r.root = e.root;
                 if (e.t.is_array()) {
                     r.t = e.t.elem();
-                    if (idx.cst && (idx.cv < 0 || idx.cv >= e.t.array)) fail(ln, "index %d out of range", (int)idx.cv);
-                    if (e.var && e.var->name == "gl_TexCoord") texcoord_mask |= idx.cst ? 1u << (int)idx.cv : 0xFFu;
-                    if (e.var && e.var->name == "gl_FragData") fragdata_max = std::max(fragdata_max, idx.cst ? (int)idx.cv + 1 : 8);
+                    if (idx.cst && (idx.cv < 0 || idx.cv >= e.t.array)) fail(ln, "index %d out of range", (int)ival(idx.cv));
+                    if (e.var && e.var->name == "gl_TexCoord") texcoord_mask |= idx.cst ? 1u << (int)ival(idx.cv) : 0xFFu;
+                    if (e.var && e.var->name == "gl_FragData") fragdata_max = std::max(fragdata_max, idx.cst ? (int)ival(idx.cv) + 1 : 8);
                     if (r.t.base == B_SAMPLER) r.smp = e.smp + "[" + idx.s + "]";
                 } else if (e.t.vec()) {
                     r.t = mk(e.t.base);
@@ -793,7 +867,7 @@ struct Stage {
                     for (auto &fd : e.t.st->fields)
                         if (fd.first == f.s) ft = &fd.second;
                     if (!ft) fail(ln, "%s has no field '%s'", e.t.st->name.c_str(), f.s.c_str());
-                    E r; r.t = *ft; r.lvalue = e.lvalue; r.s = e.s + ".v_" + f.s;
+                    E r; r.t = *ft; r.lvalue = e.lvalue; r.root = e.root; r.s = e.s + ".v_" + f.s;
                     e = r;
                     continue;
                 }
@@ -814,6 +888,7 @@ struct Stage {
                 E r;
                 r.t = mk(e.t.base, (int)sw.size());
                 r.lvalue = e.lvalue && !rep;
+                r.root = e.root;
                 r.s = e.t.scalar() ? msl_type(mk(e.t.base, 4)) + "(" + e.s + ")." + sw : e.s + "." + sw;
                 if (e.t.scalar() && sw.size() == 1) r.s = e.s;
                 e = r;
@@ -822,8 +897,16 @@ struct Stage {
             if (is("++") || is("--")) {
                 std::string op = next().s;
                 if (!e.lvalue || !e.t.num()) fail(ln, "'%s' needs a numeric l-value", op.c_str());
+                if (e.root) e.root->written = true;
                 E r; r.t = e.t;
-                r.s = e.t.scalar() ? "(" + e.s + op + ")" : (op == "++" ? "rs_postinc(" : "rs_postdec(") + e.s + ")";
+                if (e.t.scalar()) {
+                    r.s = "(" + e.s + op + ")";
+                } else {  // a statement expression: swizzles can't bind to a reference
+                    std::string t = "rs_o" + std::to_string(uniq++);
+                    std::string upd = e.t.mat() ? e.s + " = " + (op == "++" ? "rs_madd(" : "rs_msub(") + t + ", 1.0f)"
+                                                : e.s + " = " + t + (op == "++" ? " + 1" : " - 1");
+                    r.s = "({ " + msl_type(e.t) + " " + t + " = " + e.s + "; " + upd + "; " + t + "; })";
+                }
                 e = r;
                 continue;
             }
@@ -888,7 +971,7 @@ struct Stage {
         e.t = v->t;
         e.s = v->msl;
         e.lvalue = v->lvalue;
-        e.var = v.get();
+        e.var = e.root = v.get();
         if (v->t.base == B_SAMPLER) e.smp = "rs_s_" + v->mname;
         if (v->has_cv) { e.cst = true; e.cv = v->cv; }
         if (v->kind == V_UNIFORM && v->t.base == B_BOOL && !v->t.is_array())
@@ -910,6 +993,39 @@ struct Stage {
     }
 
     // --- constructors
+    // The components of `args` in order (a matrix argument column by column), cut into `groups`
+    // groups of `size` components of type `base` (vector constructor: 1 group; matrix: its columns).
+    // Components left over in the last argument are dropped, as GLSL does; an argument that isn't
+    // reached is an error.
+    std::vector<std::vector<std::string>> gather(const std::vector<E> &args, int groups, int size, Base base,
+                                                 const Type &t, int ln) {
+        std::vector<std::vector<std::string>> g(groups);
+        int gi = 0, gneed = size;
+        for (size_t i = 0; i < args.size(); i++) {
+            const E &a = args[i];
+            if (gi == groups) fail(ln, "too many arguments to %s", glsl_name(t).c_str());
+            if (a.t.base == B_STRUCT) fail(ln, "%s constructor from %s is not supported", glsl_name(t).c_str(), glsl_name(a.t).c_str());
+            int npieces = a.t.mat() ? a.t.cols : 1, pn = a.t.rows;
+            Base pb = a.t.mat() ? B_FLOAT : a.t.base;
+            for (int k = 0; k < npieces && gi < groups; k++) {
+                std::string ps = a.t.mat() ? a.s + "[" + std::to_string(k) + "]" : a.s;
+                for (int off = 0; off < pn && gi < groups;) {
+                    int take = std::min(pn - off, gneed);
+                    std::string x = off == 0 && take == pn ? ps : ps + "." + std::string("xyzw").substr(off, take);
+                    if (pb != base) {
+                        if (a.lit && base == B_FLOAT && pn == 1) x = fmt_num(a.cv, true);
+                        else x = msl_type(mk(base, take)) + "(" + x + ")";
+                    }
+                    g[gi].push_back(x);
+                    off += take;
+                    if ((gneed -= take) == 0) gi++, gneed = size;
+                }
+            }
+        }
+        if (gi < groups) fail(ln, "not enough arguments to %s", glsl_name(t).c_str());
+        return g;
+    }
+
     E construct(const Type &t, std::vector<E> &args, int ln) {
         E r;
         r.t = t;
@@ -934,7 +1050,7 @@ struct Stage {
             else r.s = msl_type(t) + "(" + s + ")";
             if (a.cst && a.t.scalar()) {
                 r.cst = true;
-                r.cv = t.base == B_INT ? (double)(long long)a.cv : t.base == B_BOOL ? (a.cv != 0) : a.cv;
+                r.cv = t.base == B_INT ? (double)ival(a.cv) : t.base == B_BOOL ? (a.cv != 0) : a.cv;
                 if (t.base == B_INT && a.lit) r.lit = true, r.s = fmt_num(r.cv, false);
             }
             return r;
@@ -948,27 +1064,8 @@ struct Stage {
                 r.s = tn + "(" + s + ")";
                 return r;
             }
-            int need = t.rows;
-            std::vector<std::string> parts;
-            for (size_t i = 0; i < args.size(); i++) {
-                const E &a = args[i];
-                if (need <= 0) fail(ln, "too many arguments to %s", glsl_name(t).c_str());
-                if (a.t.mat() || a.t.base == B_STRUCT) fail(ln, "%s constructor from %s is not supported", glsl_name(t).c_str(), glsl_name(a.t).c_str());
-                int n = a.t.rows;
-                std::string s = a.s;
-                if (n > need) {
-                    if (i + 1 != args.size()) fail(ln, "too many arguments to %s", glsl_name(t).c_str());
-                    s = (a.t.scalar() ? s : s + "." + std::string("xyzw").substr(0, need));
-                    n = need;
-                }
-                if (a.t.base != t.base) {
-                    if (a.lit && t.base == B_FLOAT && n == 1) s = fmt_num(a.cv, true);
-                    else s = msl_type(mk(t.base, n)) + "(" + s + ")";
-                }
-                parts.push_back(s);
-                need -= n;
-            }
-            if (need > 0) fail(ln, "not enough arguments to %s", glsl_name(t).c_str());
+            std::vector<std::vector<std::string>> g = gather(args, 1, t.rows, t.base, t, ln);
+            std::vector<std::string> &parts = g[0];
             r.s = tn + "(";
             for (size_t i = 0; i < parts.size(); i++) r.s += (i ? ", " : "") + parts[i];
             r.s += ")";
@@ -990,7 +1087,17 @@ struct Stage {
             if (!(a.t.vec() && a.t.rows == t.rows && a.t.base != B_BOOL)) cols_ok = false;
             if (!(a.t.scalar() && a.t.base != B_BOOL)) scal_ok = false;
         }
-        if (!cols_ok && !scal_ok) fail(ln, "this %s constructor form is not supported", glsl_name(t).c_str());
+        if (!cols_ok && !scal_ok) {  // components in column order, from any mix of scalars and vectors
+            std::vector<std::vector<std::string>> g = gather(args, t.cols, t.rows, B_FLOAT, t, ln);
+            r.s = tn + "(";
+            for (size_t c = 0; c < g.size(); c++) {
+                r.s += (c ? ", " : "") + msl_type(mk(B_FLOAT, t.rows)) + "(";
+                for (size_t i = 0; i < g[c].size(); i++) r.s += (i ? ", " : "") + g[c][i];
+                r.s += ")";
+            }
+            r.s += ")";
+            return r;
+        }
         r.s = tn + "(";
         for (size_t i = 0; i < args.size(); i++)
             r.s += (i ? ", " : "") + conv(args[i], with_base(args[i].t, B_FLOAT), ln);
@@ -1016,21 +1123,65 @@ struct Stage {
                 }
                 if (ok && cost < best_cost) { best = f.get(); best_cost = cost; }
             }
-            if (best) {
-                E r;
-                r.t = best->ret;
-                r.s = "v_" + name + "(";
-                for (size_t i = 0; i < args.size(); i++) {
-                    const Param &p = best->params[i];
-                    if (p.qual && !args[i].lvalue) fail(ln, "argument %zu of %s must be an l-value", i + 1, name.c_str());
-                    std::string s = p.t.base == B_SAMPLER ? args[i].s + ", " + args[i].smp : conv(args[i], p.t, ln);
-                    r.s += (i ? ", " : "") + s;
-                }
-                r.s += ")";
-                return r;
-            }
+            if (best) return user_call(*best, args, ln);
         }
         return builtin_call(name, args, ln);
+    }
+
+    // GLSL passes out / inout arguments by copy-in / copy-out; the MSL function takes references.
+    // A whole local variable or parameter binds directly (nothing else can reach it during the
+    // call) unless it is passed to two out / inout parameters; anything else (a swizzle or
+    // component, which can't bind to a reference, or a global the callee may also access) goes
+    // through a temporary in a statement expression, copied back left to right after the call.
+    // (The l-value of such an argument is evaluated twice, before and after the call.) Arrays from
+    // the uniform block (constant address space) are copied to a thread temporary for in
+    // parameters too.
+    E user_call(const Func &f, std::vector<E> &args, int ln) {
+        std::string pre, post, call = "v_" + f.name + "(";
+        for (size_t i = 0; i < args.size(); i++) {
+            const Param &p = f.params[i];
+            E &a = args[i];
+            std::string s;
+            if (p.t.base == B_SAMPLER) {
+                s = a.s + ", " + a.smp;
+            } else if (p.qual) {
+                if (!a.lvalue) fail(ln, "argument %zu of %s must be an l-value", i + 1, f.name.c_str());
+                if (a.root) a.root->written = true;
+                bool direct = a.var && (a.var->kind == V_LOCAL || a.var->kind == V_PARAM);
+                for (size_t j = 0; direct && j < args.size(); j++)
+                    if (j != i && f.params[j].qual && args[j].root == a.var) direct = false;
+                if (direct) {
+                    s = a.s;
+                } else {
+                    s = "rs_a" + std::to_string(uniq++);
+                    if (p.t.is_array()) {
+                        pre += msl_type(p.t.elem()) + " " + s + "[" + std::to_string(p.t.array) + "]; rs_acopy(" + s + ", " + a.s + "); ";
+                        post += "rs_acopy(" + a.s + ", " + s + "); ";
+                    } else {
+                        pre += msl_type(p.t) + " " + s + " = " + a.s + "; ";
+                        post += a.s + " = " + s + "; ";
+                    }
+                }
+            } else if (p.t.is_array() && a.root && a.root->kind == V_UNIFORM) {
+                s = "rs_a" + std::to_string(uniq++);
+                pre += msl_type(p.t.elem()) + " " + s + "[" + std::to_string(p.t.array) + "]; rs_acopy(" + s + ", " + a.s + "); ";
+            } else {
+                s = conv(a, p.t, ln);
+            }
+            call += (i ? ", " : "") + s;
+        }
+        call += ")";
+        E r;
+        r.t = f.ret;
+        if (pre.empty() && post.empty()) {
+            r.s = call;
+        } else if (f.ret == T_VOID) {
+            r.s = "({ " + pre + call + "; " + post + "})";
+        } else {
+            std::string t = "rs_r" + std::to_string(uniq++);
+            r.s = "({ " + pre + msl_type(f.ret) + " " + t + " = " + call + "; " + post + t + "; })";
+        }
+        return r;
     }
 
     static bool genf(const Type &t) { return t.num() && !t.mat(); }
@@ -1259,7 +1410,7 @@ struct Stage {
         if (is("struct")) fail(ln, "local struct declarations are not supported");
         Type base = parse_type();
         if (base.base == B_VOID || base.base == B_SAMPLER) fail(ln, "bad local variable type %s", glsl_name(base).c_str());
-        std::string out;
+        std::string out, ty = (is_const ? "const " : "") + msl_type(base);
         for (;;) {
             const Tok &id = next();
             if (id.k != K_IDENT) fail(ln, "expected a variable name");
@@ -1268,6 +1419,10 @@ struct Stage {
             auto v = std::make_shared<Var>();
             v->name = id.s;
             v->mname = "v_" + id.s;
+            // A name visible from an outer scope gets a fresh MSL name: in C++ the new variable is in
+            // scope in its own initialiser (`float x = x + 1.0;` would read itself), in GLSL it isn't.
+            for (auto &sc : scopes)
+                if (sc.count(id.s)) { v->mname = "rs_l" + std::to_string(uniq++) + "_" + id.s; break; }  // rs_: no GLSL name maps there
             v->msl = v->mname;
             v->t = t;
             v->kind = V_LOCAL;
@@ -1277,17 +1432,17 @@ struct Stage {
                 if (t.is_array()) fail(ln, "array initialisers are not supported");
                 E e = assign();
                 init = conv(e, t, ln);
-                if (is_const && e.cst && t.scalar()) { v->has_cv = true; v->cv = t.base == B_INT ? (double)(long long)e.cv : e.cv; }
+                if (is_const && e.cst && t.scalar()) { v->has_cv = true; v->cv = t.base == B_INT ? (double)ival(e.cv) : e.cv; }
             } else if (is_const) {
                 fail(ln, "const '%s' needs an initialiser", id.s.c_str());
             }
             declare(v, ln);  // after the initialiser: `float x = x;` reads the outer x, as in GLSL
-            std::string ty = (is_const ? "const " : "") + msl_type(t);
-            std::string dcl = ty + " " + v->mname + (t.is_array() ? "[" + std::to_string(t.array) + "]" : "");
-            out += (out.empty() ? ind(d) : ind(d)) + dcl + " = " + (init.empty() ? "{}" : init) + ";\n";
+            std::string dcl = v->mname + (t.is_array() ? "[" + std::to_string(t.array) + "]" : "") + " = " + (init.empty() ? "{}" : init);
+            // A for-init keeps its declarators in one declaration; elsewhere one per line.
+            if (in_for) out += (out.empty() ? ty + " " : ", ") + dcl;
+            else out += ind(d) + ty + " " + dcl + ";\n";
             if (accept(",")) continue;
-            if (!in_for) expect(";");
-            else expect(";");
+            expect(";");
             break;
         }
         return out;
@@ -1295,6 +1450,7 @@ struct Stage {
 
     std::string statement(int d) {
         int ln = line();
+        Nest nest(this, ln);
         if (accept("{")) {
             scopes.emplace_back();
             std::string s = ind(d) + "{\n";
@@ -1323,8 +1479,6 @@ struct Stage {
             if (accept(";")) init = "";
             else if (decl_start()) {
                 init = local_decl(0, true);
-                while (!init.empty() && (init.back() == '\n' || init.back() == ';')) init.pop_back();
-                if (init.find(";\n") != std::string::npos) fail(ln, "one declaration per for-init");
             } else {
                 init = expr().s;
                 expect(";");
@@ -1438,7 +1592,10 @@ struct Stage {
         }
         if (is("invariant") && peek(1).k == K_IDENT && (is(";", 2) || is(",", 2))) {
             // `invariant gl_Position;` — no-op here
-            while (!accept(";")) next();
+            while (!accept(";")) {
+                if (peek().k == K_END) fail(ln, "bad invariant declaration");
+                next();
+            }
             return;
         }
         VarKind kind = V_GLOBAL;
@@ -1492,7 +1649,7 @@ struct Stage {
             if (accept("=")) {
                 E e = assign();
                 if (kind != V_UNIFORM) init = conv(e, t, ln);  // uniform initialisers: ignored (GL default 0)
-                if (is_const && e.cst && t.scalar()) { v->has_cv = true; v->cv = t.base == B_INT ? (double)(long long)e.cv : e.cv; }
+                if (is_const && e.cst && t.scalar()) { v->has_cv = true; v->cv = t.base == B_INT ? (double)ival(e.cv) : e.cv; }
             } else if (is_const) {
                 fail(ln, "const '%s' needs an initialiser", id.s.c_str());
             }
@@ -1507,8 +1664,10 @@ struct Stage {
         }
     }
 
-    std::string param_text(const Param &p) {
-        std::string nm = "v_" + p.name;
+    // An `in` array parameter is a const reference; if the function writes it, the reference gets
+    // another name and the body starts with a copy (GLSL passes by value).
+    std::string param_text(const Param &p, const Var &v, std::string *prologue) {
+        std::string nm = v.mname;
         if (p.t.base == B_SAMPLER) {
             if (p.t.array) fail(0, "sampler array parameters are not supported");
             return msl_type(p.t) + " " + nm + ", sampler rs_s_" + nm;
@@ -1516,7 +1675,10 @@ struct Stage {
         std::string ty = msl_type(p.t);
         if (p.t.array) {
             std::string dim = "[" + std::to_string(p.t.array) + "]";
-            return p.qual ? "thread " + ty + " (&" + nm + ")" + dim : "const thread " + ty + " (&" + nm + ")" + dim;
+            if (p.qual) return "thread " + ty + " (&" + nm + ")" + dim;
+            if (!v.written) return "const thread " + ty + " (&" + nm + ")" + dim;
+            *prologue += ind(2) + ty + " " + nm + dim + "; rs_acopy(" + nm + ", rs_p_" + nm + ");\n";
+            return "const thread " + ty + " (&rs_p_" + nm + ")" + dim;
         }
         return p.qual ? "thread " + ty + " &" + nm : ty + " " + nm;
     }
@@ -1571,11 +1733,11 @@ struct Stage {
         existing->params = f->params;  // names from the definition
         cur_func = existing.get();
         scopes.emplace_back();
-        std::string sig = msl_type(ret) + " v_" + name + "(";
+        std::vector<VarP> pvars;
         for (size_t i = 0; i < f->params.size(); i++) {
             const Param &p = f->params[i];
-            sig += (i ? ", " : "") + param_text(p);
             auto v = std::make_shared<Var>();
+            pvars.push_back(v);
             v->name = p.name;
             v->mname = "v_" + p.name;
             v->msl = v->mname;
@@ -1584,14 +1746,21 @@ struct Stage {
             v->lvalue = p.t.base != B_SAMPLER;
             declare(v, ln);
         }
-        sig += ")";
         if (!is("{")) fail(ln, "expected a function body");
         std::string body = statement(1);
         scopes.pop_back();
         cur_func = nullptr;
+        std::string sig = msl_type(ret) + " v_" + name + "(", prologue;
+        for (size_t i = 0; i < f->params.size(); i++) sig += (i ? ", " : "") + param_text(f->params[i], *pvars[i], &prologue);
+        sig += ")";
+        if (!prologue.empty()) body.insert(body.find('\n') + 1, prologue);
         funcs_text += "    " + sig + "\n" + body;
     }
 };
+
+Nest::Nest(Stage *s, int ln) : d(&s->depth) {
+    if (++*d > kMaxNest) fail(ln, "nesting too deep");
+}
 
 // --- Link: interface, reflection, entry points ------------------------------------------------
 
@@ -1618,8 +1787,12 @@ const char *kPrelude =
     "template<typename T, typename U> inline T rs_mod(T x, U y) { return x - y * floor(x / y); }\n"
     "template<typename T> inline T rs_radians(T x) { return x * 0.0174532925199432958f; }\n"
     "template<typename T> inline T rs_degrees(T x) { return x * 57.295779513082321f; }\n"
-    "template<typename T> inline T rs_postinc(thread T &x) { T o = x; x += 1; return o; }\n"
-    "template<typename T> inline T rs_postdec(thread T &x) { T o = x; x -= 1; return o; }\n"
+    "template<typename D, typename S, size_t N> inline void rs_acopy(thread D (&d)[N], const thread S (&s)[N]) {\n"
+    "    for (size_t i = 0; i < N; i++) d[i] = s[i];\n"
+    "}\n"
+    "template<typename D, typename S, size_t N> inline void rs_acopy(thread D (&d)[N], const constant S (&s)[N]) {\n"
+    "    for (size_t i = 0; i < N; i++) d[i] = s[i];\n"
+    "}\n"
     "inline float rs_proj1(float2 c) { return c.x / c.y; }\n"
     "inline float rs_proj1(float4 c) { return c.x / c.w; }\n"
     "inline float2 rs_proj2(float3 c) { return c.xy / c.z; }\n"
@@ -1640,6 +1813,14 @@ const char *kPrelude =
     "    for (int i = 0; i < C; i++) a[i] *= b[i];\n"
     "    return a;\n"
     "}\n"
+    "// Component-wise matrix arithmetic (GLSL + - / with a scalar, / with a matrix).\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_madd(matrix<float, C, R> a, float s) { for (int i = 0; i < C; i++) a[i] += s; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_madd(float s, matrix<float, C, R> a) { for (int i = 0; i < C; i++) a[i] = s + a[i]; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_msub(matrix<float, C, R> a, float s) { for (int i = 0; i < C; i++) a[i] -= s; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_msub(float s, matrix<float, C, R> a) { for (int i = 0; i < C; i++) a[i] = s - a[i]; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_mdiv(matrix<float, C, R> a, float s) { for (int i = 0; i < C; i++) a[i] /= s; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_mdiv(float s, matrix<float, C, R> a) { for (int i = 0; i < C; i++) a[i] = s / a[i]; return a; }\n"
+    "template<int C, int R> inline matrix<float, C, R> rs_mdiv(matrix<float, C, R> a, matrix<float, C, R> b) { for (int i = 0; i < C; i++) a[i] /= b[i]; return a; }\n"
     "template<int C, int R> inline bool rs_meq(matrix<float, C, R> a, matrix<float, C, R> b) {\n"
     "    for (int i = 0; i < C; i++) if (any(a[i] != b[i])) return false;\n"
     "    return true;\n"
@@ -1758,9 +1939,11 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
             u.off[sb] = off;
             u.stride = sz;
             off += sz * (st.array ? st.array : 1);
+            if (off > kMaxBlock) fail(0, "%s uniforms take more than %d bytes", sb == RSMSL_STAGE_VS ? "vertex" : "fragment", kMaxBlock);
             ustruct[sb] += "    " + decl_member(st, g->mname) + ";  // offset " + std::to_string(u.off[sb]) + "\n";
         }
         L.size[sb] = (off + maxal - 1) / maxal * maxal;
+        if (L.size[sb] > kMaxBlock) fail(0, "%s uniforms take %d bytes (at most %d)", sb == RSMSL_STAGE_VS ? "vertex" : "fragment", L.size[sb], kMaxBlock);
     }
 
     // --- MSL
@@ -1831,7 +2014,7 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
         if (v.uses_texcoord) members += "    float4 rs_TexCoord[8] = {};\n";
         if (v.ff_fog) members += "    float rs_FogFragCoord = {};\n";
         members += v.members;
-        m += "\nstruct rs_vs_ctx {\n" + members + v.structs_text + v.funcs_text + "};\n";
+        m += "\nstruct rs_vs_ctx {\n" + v.structs_text + members + v.funcs_text + "};\n";
         // The body is a plain function so a probe entry (msl_verify) can call it too.
         std::vector<std::string> pdecl, pplain, pname;
         for (size_t a = 0, b; a < params.size(); a = b + 2) {
@@ -1918,7 +2101,11 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
         params.push_back("constant float &rs_alpha_ref [[buffer(1)]]");
         if (f.uses_fragcoord) { params.push_back("float4 rs_FragCoord [[position]]"); members += "    float4 rs_FragCoord;\n"; init.push_back("rs_FragCoord"); }
         if (f.uses_frontfacing) { params.push_back("bool rs_FrontFacing [[front_facing]]"); members += "    bool rs_FrontFacing;\n"; init.push_back("rs_FrontFacing"); }
-        if (f.uses_pointcoord) { params.push_back("float2 rs_PointCoord [[point_coord]]"); members += "    float2 rs_PointCoord;\n"; init.push_back("rs_PointCoord"); }
+        if (f.uses_pointcoord) {  // Metal's origin is the top of the target, i.e. GL's bottom (y flip): GL's upper left is 1 - y
+            params.push_back("float2 rs_point_coord [[point_coord]]");
+            members += "    float2 rs_PointCoord;\n";
+            init.push_back("float2(rs_point_coord.x, 1.0f - rs_point_coord.y)");
+        }
         std::string tp;
         tex_params(RSMSL_STAGE_FS, tp, init, members);
         members += "    float4 rs_FragColor = {};\n";
@@ -1931,7 +2118,7 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
             members += "};\n";
         }
         members += f.members;
-        m += "\nstruct rs_fs_ctx {\n" + members + f.structs_text + f.funcs_text + "};\n";
+        m += "\nstruct rs_fs_ctx {\n" + f.structs_text + members + f.funcs_text + "};\n";
         std::string ps;
         for (size_t i = 0; i < params.size(); i++) ps += (i ? ",\n        " : "\n        ") + params[i];
         ps += tp;
@@ -1967,7 +2154,7 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
 
 char *dupstr(const std::string &s) {
     char *p = (char *)malloc(s.size() + 1);
-    memcpy(p, s.c_str(), s.size() + 1);
+    if (p) memcpy(p, s.c_str(), s.size() + 1);
     return p;
 }
 
@@ -2032,6 +2219,9 @@ extern "C" rsmsl_program *rsmsl_translate_ex(const char *vs_glsl, const char *fs
         return p;
     } catch (const XErr &e) {
         if (error) *error = dupstr(stage_name + " shader: " + e.msg);
+        return nullptr;
+    } catch (const std::exception &e) {  // out of memory (or a translator bug): fail, don't abort the game
+        if (error) *error = dupstr(stage_name + " shader: internal error: " + e.what());
         return nullptr;
     }
 }

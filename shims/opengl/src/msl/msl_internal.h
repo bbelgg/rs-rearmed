@@ -9,7 +9,7 @@ extern "C" {
 
 // Bumped whenever the generated MSL or the reflection changes; a corpus written by another
 // version is ignored.
-#define RSMSL_VERSION 2
+#define RSMSL_VERSION 3
 
 // rsmsl_translate without the corpus lookup.
 rsmsl_program *rsmsl_translate_direct(const char *vs_glsl, const char *fs_glsl,

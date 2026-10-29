@@ -296,10 +296,8 @@ void rsmtl_glLinkProgram(GLuint program) {
         p->tex = NULL;
         p->vs_block = p->fs_block = NULL;
         p->n_uniforms = p->n_locations = p->n_tex = 0;
-        p->lib = nil;
+        p->entry = nil;
         p->vs = nil;
-        for (int i = 0; i < 9; i++)
-            p->fs[i] = nil;
         rsm_map_free(&p->pipelines);
         p->linked = false;
         p->attrib_mask = 0;
@@ -326,22 +324,17 @@ void rsmtl_glLinkProgram(GLuint program) {
             free(err);
             return;
         }
-        uint64_t key = rsmsl_key(vs.UTF8String, fs.UTF8String);
-        id<MTLLibrary> lib = ctx->libraries[@(key)];
-        if (!lib) {
-            NSError *e = nil;
-            MTLCompileOptions *o = [MTLCompileOptions new];
-            lib = [ctx->dev newLibraryWithSource:@(r->msl) options:o error:&e];
-            if (!lib) {
-                p->log = [NSString stringWithFormat:@"MSL compile failed: %@", e.localizedDescription];
-                rsm_log("%s\n--- MSL ---\n%s", p->log.UTF8String, r->msl);
-                rsmsl_free(r);
-                return;
-            }
-            ctx->libraries[@(key)] = lib;
+        // Libraries are shared by MSL (mtl_cache.m): programs with the same pair reuse it, and the
+        // disk cache may have built it already on its background queue.
+        RSMLibEntry *le = rsm_cache_library(ctx, r->msl, true);
+        if (!le->lib) {
+            p->log = [NSString stringWithFormat:@"MSL compile failed: %@", le->error];
+            rsm_log("%s\n--- MSL ---\n%s", p->log.UTF8String, r->msl);
+            rsmsl_free(r);
+            return;
         }
-        p->lib = lib;
-        p->vs = [lib newFunctionWithName:@"rs_vs"];
+        p->entry = le;
+        p->vs = le->vs;
         if (!p->vs) {
             p->log = @"MSL has no rs_vs";
             rsmsl_free(r);
@@ -391,20 +384,7 @@ void rsmtl_glLinkProgram(GLuint program) {
 
 id<MTLFunction> rsm_fragment_variant(RSMContext *ctx, RSMProgram *p, int alpha) {
     (void)ctx;
-    if (p->fs[alpha])
-        return p->fs[alpha];
-    MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
-    uint32_t v = (uint32_t)alpha;
-    [cv setConstantValue:&v type:MTLDataTypeUInt atIndex:0];
-    NSError *e = nil;
-    id<MTLFunction> f = [p->lib newFunctionWithName:@"rs_fs" constantValues:cv error:&e];
-    if (!f) {
-        f = [p->lib newFunctionWithName:@"rs_fs"];
-        if (!f)
-            rsm_log("fragment function: %s", e.localizedDescription.UTF8String);
-    }
-    p->fs[alpha] = f;
-    return f;
+    return rsm_cache_fragment(p->entry, alpha);
 }
 
 void rsmtl_glUseProgram(GLuint program) {

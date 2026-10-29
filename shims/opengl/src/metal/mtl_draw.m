@@ -43,10 +43,10 @@ static id<MTLTexture> rsm_dummy(RSMContext *ctx, bool cube) {
 }
 
 void rsm_draw_init(RSMContext *ctx) {
-    NSError *e = nil;
-    ctx->internal_lib = [ctx->dev newLibraryWithSource:kInternalMSL options:nil error:&e];
+    RSMLibEntry *le = rsm_cache_library(ctx, kInternalMSL.UTF8String, false);
+    ctx->internal_lib = le->lib;
     if (!ctx->internal_lib)
-        rsm_log("internal shaders: %s", e.localizedDescription.UTF8String);
+        rsm_log("internal shaders: %s", le->error.UTF8String);
     ctx->dummy_tex = rsm_dummy(ctx, false);
     ctx->dummy_cube = rsm_dummy(ctx, true);
     MTLSamplerDescriptor *sd = [MTLSamplerDescriptor new];
@@ -485,13 +485,10 @@ static uint8_t rsm_blend_op(GLenum e) {
     return MTLBlendOperationAdd;
 }
 
-static id<MTLRenderPipelineState> rsm_pipeline(RSMContext *ctx, RSMProgram *p, const rsm_pkey *k) {
-    id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, k);
-    if (ps)
-        return ps;
+MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunction> fs, const rsm_pkey *k) {
     MTLRenderPipelineDescriptor *d = [MTLRenderPipelineDescriptor new];
-    d.vertexFunction = p->vs;
-    d.fragmentFunction = rsm_fragment_variant(ctx, p, k->alpha_func);
+    d.vertexFunction = vs;
+    d.fragmentFunction = fs;
     MTLVertexDescriptor *vd = [MTLVertexDescriptor vertexDescriptor];
     for (int i = 0; i < RSM_MAX_ATTRIBS; i++) {
         if (!k->vl.fmt[i])
@@ -521,15 +518,17 @@ static id<MTLRenderPipelineState> rsm_pipeline(RSMContext *ctx, RSMProgram *p, c
     }
     d.depthAttachmentPixelFormat = k->depth_fmt;
     d.stencilAttachmentPixelFormat = k->stencil_fmt;
-    NSError *e = nil;
-    ps = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
-    if (!ps) {
-        static int told;
-        if (told++ < 16)
-            rsm_log("pipeline: %s", e.localizedDescription.UTF8String);
-        return nil;
-    }
-    rsm_map_put(&p->pipelines, k, ps);
+    return d;
+}
+
+// Per program first (no lock), then the shared cache (built once per MSL and key).
+static id<MTLRenderPipelineState> rsm_pipeline(RSMContext *ctx, RSMProgram *p, const rsm_pkey *k) {
+    id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, k);
+    if (ps)
+        return ps;
+    ps = rsm_cache_pipeline(ctx, p->entry, k);
+    if (ps)
+        rsm_map_put(&p->pipelines, k, ps);
     return ps;
 }
 

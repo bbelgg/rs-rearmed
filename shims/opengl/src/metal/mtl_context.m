@@ -390,8 +390,8 @@ static RSMContext *rsm_create(int w, int h, CAMetalLayer *layer) {
     rsm_map_init(&ctx->ds_states, sizeof(uint64_t));
     rsm_map_init(&ctx->samplers, sizeof(uint64_t));
     rsm_map_init(&ctx->clear_pipelines, sizeof(uint64_t));
-    ctx->libraries = [NSMutableDictionary new];
     rsm_init_state(ctx);
+    rsm_cache_context_created(ctx);
     rsm_draw_init(ctx);
     pthread_mutex_lock(&g_ctx_lock);
     for (int i = 0; i < 64; i++)
@@ -449,6 +449,7 @@ void rsmtl_gfx_destroy(rs_gfx_context *c) {
         free(ctx->spare);
         free(ctx->pool);
         ctx->prog = nil;
+        rsm_cache_context_destroyed(ctx);
         CFRelease(c);
     }
 }

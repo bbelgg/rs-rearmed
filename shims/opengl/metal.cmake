@@ -5,7 +5,8 @@ set(ogl_mtl_sources
   src/metal/mtl_objects.m
   src/metal/mtl_program.m
   src/metal/mtl_draw.m
-  src/metal/mtl_extras.m)
+  src/metal/mtl_extras.m
+  src/metal/mtl_cache.m)
 target_sources(opengl PRIVATE ${ogl_mtl_sources})
 set_source_files_properties(${ogl_mtl_sources} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
 target_link_libraries(opengl PRIVATE "-framework Metal" "-framework QuartzCore" "-framework Foundation")
@@ -27,6 +28,11 @@ target_include_directories(metal_core_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}"
 target_compile_options(metal_core_test PRIVATE -Wno-deprecated-declarations)
 target_link_libraries(metal_core_test PRIVATE opengl)
 
+add_executable(metal_cache_test test/metal_cache_test.c)
+target_include_directories(metal_cache_test PRIVATE src)
+target_compile_options(metal_cache_test PRIVATE -Wno-deprecated-declarations)
+target_link_libraries(metal_cache_test PRIVATE opengl)
+
 set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
   fbo render_to_texture depth_texture cube_map dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
@@ -37,6 +43,11 @@ if(TARGET rsmsl)
     add_test(NAME opengl.metal.${c} COMMAND metal_core_test --compare ${c})
     set_tests_properties(opengl.metal.${c} PROPERTIES ${ogl_pass})
   endforeach()
+  # Shader/pipeline disk cache: cold, warm, corrupt and stale runs in child processes sharing a
+  # cache directory under the build tree (never ~/Library).
+  add_test(NAME opengl.metal.cache
+    COMMAND metal_cache_test "${CMAKE_CURRENT_BINARY_DIR}/metal-cache-test")
+  set_tests_properties(opengl.metal.cache PROPERTIES ${ogl_pass} TIMEOUT 600)
   # All cases in one process on Metal, with error checking: every game import is called.
   add_test(NAME opengl.metal.coverage COMMAND metal_core_test --all)
   set_tests_properties(opengl.metal.coverage PROPERTIES

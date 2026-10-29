@@ -71,7 +71,7 @@ cc_obj() {  # src [extra flags]  -> work/o/<base>.o
 }
 
 objs=""
-for s in rsp_engine.c rsp_paths.c rsp_config.c rsp_logic.c; do objs="$objs $(cc_obj "$plat/src/$s")"; done
+for s in rsp_engine.c rsp_paths.c rsp_config.c rsp_logic.c rsp_overlay.c; do objs="$objs $(cc_obj "$plat/src/$s")"; done
 objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-declarations)"
 objs="$objs $(cc_obj "$here/seam_platform.c")"
 for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done

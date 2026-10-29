@@ -26,6 +26,16 @@ _glVertexPointer
 # Shell (rsp_shell.m): multithreaded GL engine switch
 _CGLEnable
 _CGLErrorString
+# Overlay (shims/platform/src/rsp_overlay.c): Apple's legacy-context VAOs
+_glBindVertexArrayAPPLE
+_glGenVertexArraysAPPLE
+# Overlay test (shims/platform/test/rsp_overlay_test.c)
+_CGLDestroyContext
+_CGLDestroyPixelFormat
+_glBindRenderbufferEXT
+_glFramebufferRenderbufferEXT
+_glGenRenderbuffersEXT
+_glRenderbufferStorageEXT
 # Cg tests (shims/cg/tests): offscreen CGL contexts, EXT FBOs, readback
 _CGLChoosePixelFormat
 _CGLCreateContext

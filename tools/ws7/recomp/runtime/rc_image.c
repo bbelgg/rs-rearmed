@@ -222,8 +222,12 @@ static void *handle_for(int64_t ord) {
   if (!dl_handle[ord - 1]) {
     const char *p = dylibs[ord - 1];
     void *h = 0;
+    // OpenGL goes to libRSOpenGL (shims/opengl) when the app links it: it wraps every GL/CGL
+    // function the game imports, picks the backend and re-exports the rest of the framework
+    if (!strcmp(p, "/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL"))
+      h = dlopen("@executable_path/libRSOpenGL.dylib", RTLD_LAZY | RTLD_NOLOAD);
     // only system libraries are opened; the game's own @executable_path shims are not
-    if (!strncmp(p, "/System/", 8) || !strncmp(p, "/usr/lib/", 9)) h = dlopen(p, RTLD_LAZY | RTLD_LOCAL);
+    if (!h && (!strncmp(p, "/System/", 8) || !strncmp(p, "/usr/lib/", 9))) h = dlopen(p, RTLD_LAZY | RTLD_LOCAL);
     dl_handle[ord - 1] = h ? h : RTLD_DEFAULT;
   }
   return dl_handle[ord - 1];

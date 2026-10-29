@@ -12,7 +12,8 @@
 #     credentials) is never copied;
 #   - the DLC the account owns (the ones Steam installed) and the free 248750 that custom songs
 #     carry count as owned; set RS_STEAM_DLC=all with launchctl setenv to own every AppID;
-#   - libnetguard refuses every non-local connection and logs to $HOME_DIR/logs/netguard.log.
+#   - libnetguard refuses every non-local connection and logs to $HOME_DIR/logs/netguard.log;
+#   - the renderer: $HOME_DIR/renderer (metal or opengl; see below).
 # The install's own files (and the Rosetta game) are not changed.
 set -u
 HOME_DIR=${RS_NATIVE_HOME:-"$HOME/Library/Application Support/RS Re-ARMed"}
@@ -86,6 +87,20 @@ done
 # Stored Ubisoft credentials never reach the game (the shim leaves them out too; this is a second guard).
 find "$HOME_DIR/steam" -name crd -type f -delete 2>/dev/null
 
+# Renderer (docs/BUILDING.md "Renderer"): $HOME_DIR/renderer says metal (the default) or opengl. The
+# game reads it itself (direct starts too) and falls back to OpenGL when Metal cannot start or ended
+# abnormally twice in a row, so for metal nothing is passed (an RS_GL_BACKEND=metal would force Metal
+# past that fallback). For opengl the launcher sets RS_GL_BACKEND=gl, which spares the game a
+# restart. An RS_GL_BACKEND in the launcher's own environment wins.
+renderer_env=()
+if [[ -n ${RS_GL_BACKEND:-} ]]; then
+    renderer_env=(--env RS_GL_BACKEND="$RS_GL_BACKEND")
+else
+    case $(tr -d '[:space:]' < "$HOME_DIR/renderer" 2>/dev/null | tr '[:upper:]' '[:lower:]') in
+        opengl|gl) renderer_env=(--env RS_GL_BACKEND=gl) ;;
+    esac
+fi
+
 [[ -f "$logs/last-run.log" ]] && mv -f "$logs/last-run.log" "$logs/previous-run.log"
 # Started through LaunchServices as an app of its own: exec'ing the game from this (LSUIElement)
 # launcher leaves it without a window when the launcher itself was opened from the Finder. The
@@ -94,4 +109,5 @@ exec /usr/bin/open -n -a "$stage/Rocksmith2014.app" \
     --env RS_STEAM_MODE=stub --env RS_STEAM_DATA_DIR="$HOME_DIR/steam" \
     --env RS_NETGUARD_LOG="$logs/netguard.log" \
     --env DYLD_INSERT_LIBRARIES="$HOME_DIR/libnetguard.dylib" \
+    --env RS_NATIVE_HOME="$HOME_DIR" ${renderer_env[@]+"${renderer_env[@]}"} \
     --stdout "$logs/last-run.log" --stderr "$logs/last-run.log"

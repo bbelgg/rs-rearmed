@@ -1,0 +1,66 @@
+# GL/CGL functions libRSOpenGL wraps besides the game's imports (game-gl-imports.txt):
+# what the Cg shim, the shell (shims/platform/src/rsp_shell.m), the overlay and the test
+# programs call (nm -u). Same format: one _name per line; '#' lines are comments.
+# Every gl*/CGL* name a client of libRSOpenGL calls must be listed (or be a game import):
+# one that isn't still links, through the re-exported system framework, and on
+# RS_GL_BACKEND=metal calls Apple's GL with no context (a crash). The check:
+#   nm -u <binary> | grep -E '^_(gl|CGL)[A-Z]'  against the generated gl_api.inc.
+# A name that is also a game import is ignored here. tools/gen-gl-api.py appends these to
+# the wrapper table after the game's imports; on RS_GL_BACKEND=metal each one, too, goes
+# to rsmtl_<name> (a weak "unimplemented" stub unless src/metal/ defines it).
+#
+# Cg shim (shims/cg/src): ARB programs, client arrays, context check
+_CGLGetCurrentContext
+_CGLGetShareGroup
+_glBindProgramARB
+_glClientActiveTexture
+_glColorPointer
+_glDeleteProgramsARB
+_glDisableClientState
+_glEnableClientState
+_glFogCoordPointer
+_glGenProgramsARB
+_glGetProgramivARB
+_glNormalPointer
+_glProgramLocalParameter4fvARB
+_glProgramLocalParameters4fvEXT
+_glProgramStringARB
+_glSecondaryColorPointer
+_glTexCoordPointer
+_glVertexPointer
+# Shell (rsp_shell.m): multithreaded GL engine switch
+_CGLEnable
+_CGLErrorString
+# Overlay (shims/platform/src/rsp_overlay.c): Apple's legacy-context VAOs
+_glBindVertexArrayAPPLE
+_glGenVertexArraysAPPLE
+# Overlay test (shims/platform/test/rsp_overlay_test.c)
+_CGLDestroyContext
+_CGLDestroyPixelFormat
+_glBindRenderbufferEXT
+_glFramebufferRenderbufferEXT
+_glGenRenderbuffersEXT
+_glRenderbufferStorageEXT
+# Cg tests (shims/cg/tests): offscreen CGL contexts, EXT FBOs, readback
+_CGLChoosePixelFormat
+_CGLCreateContext
+_CGLSetCurrentContext
+_glBindFramebufferEXT
+_glCheckFramebufferStatusEXT
+_glFramebufferTexture2DEXT
+_glGenFramebuffersEXT
+_glGetUniformfv
+_CGLDisable
+_glFinish
+_glFlush
+_glPointSize
+_glTexImage1D
+# Metal core tests (shims/opengl/test/metal_core_test.c; also glFinish, glFlush above)
+_glCompressedTexSubImage2D
+_glDeleteVertexArraysAPPLE
+_glStencilMaskSeparate
+_glIsEnabled
+_glIsVertexArray
+_glUniform3f
+_glUniform4f
+_glReadBuffer

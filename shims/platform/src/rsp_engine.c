@@ -1,7 +1,9 @@
 // The C layer between the ObjC shell and the engine (originally a C++ file
 // next to main, 0x100179dc0-0x10017a3b0), the input queue that lived on
 // MainService_MacOS, and the stub engine. See rsp_platform.h.
+#include <math.h>
 #include "rsp_platform.h"
+#include "rsp_renderer.h"
 
 #include <pthread.h>
 #include <stdarg.h>
@@ -242,8 +244,15 @@ int rsp_focused(void) { return g_focused; }
 // ---------------------------------------------------------------------------
 // Display mode (GRDisplaySettings through the hooks)
 
+static double g_render_scale = 1.0;
+void rsp_set_render_scale(double s) { g_render_scale = s > 0 ? s : 1.0; }
+double rsp_render_scale(void) { return g_render_scale; }
+static int to_engine(int v) { return (int)lround(v * g_render_scale); }
+static int from_engine(int v) { return (int)lround(v / g_render_scale); }
+int rsp_mouse_engine_coord(double v) { return rsp_mouse_coord(v * g_render_scale); }
+
 void rsp_set_display_mode(int fs, int w, int h) {  // 0x10017a1f0
-  if (H->set_resolution) H->set_resolution(H->ctx, w, h);
+  if (H->set_resolution) H->set_resolution(H->ctx, to_engine(w), to_engine(h));
   if (H->set_fullscreen) H->set_fullscreen(H->ctx, fs & 0xff);
 }
 int rsp_is_fullscreen(void) {  // 0x10017a210
@@ -255,12 +264,12 @@ int rsp_no_vsync(void) {  // 0x10017a220
 int rsp_screen_width(void) {  // 0x10017a310
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return w;
+  return from_engine(w);
 }
 int rsp_screen_height(void) {  // 0x10017a330
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return h;
+  return from_engine(h);
 }
 
 // ---------------------------------------------------------------------------
@@ -269,10 +278,14 @@ int rsp_screen_height(void) {  // 0x10017a330
 static void default_exit(int status) { _exit(status); }
 static void (*g_exit)(int) = default_exit;
 void rsp_set_exit(void (*fn)(int)) { g_exit = fn ? fn : default_exit; }
-void rsp_exit(int status) { g_exit(status); }
+// Both are clean ends of a session: a Metal session's crash marker goes (rsp_renderer.h).
+void rsp_exit(int status) {
+  rsp_metal_session_end();
+  g_exit(status);
+}
 
 void rsp_request_quit(void) {  // 0x10017a350
-  if (!H->request_quit || !H->request_quit(H->ctx)) g_exit(0);
+  if (!H->request_quit || !H->request_quit(H->ctx)) rsp_exit(0);
 }
 
 static int g_booted;  // the original guards on the Lua state (0x1018e7478)
@@ -295,7 +308,11 @@ int rsp_game_bootstrap(const rsp_boot *boot) {  // 0x100179dc0
   if (H->set_fullscreen) H->set_fullscreen(H->ctx, (int)cfg->fullscreen);
   if (H->set_resolution) H->set_resolution(H->ctx, (int)cfg->screen_width, (int)cfg->screen_height);
   if (H->set_visual_quality) H->set_visual_quality(H->ctx, (int)cfg->visual_quality);
-  unsigned w = (unsigned)rsp_screen_width(), h = (unsigned)rsp_screen_height();
+  // The config and the floor are in engine pixels, as in the original (not rsp_screen_width/height,
+  // which are window points when a render scale is set).
+  int ew = 0, eh = 0;
+  if (H->get_resolution) H->get_resolution(H->ctx, &ew, &eh);
+  unsigned w = (unsigned)ew, h = (unsigned)eh;
   if (w < 800 || h <= 599)
     if (H->set_resolution) H->set_resolution(H->ctx, 1280, 720);
   // 5. The engine: VFS, MainService_MacOS, Init(1, {"Rocksmith.app"}).

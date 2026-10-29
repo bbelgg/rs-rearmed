@@ -11,7 +11,11 @@ Download `RS.Re-ARMed.Installer.app.zip` from the
 the source of its own release, checks prerequisites, builds everything and installs it the same way as
 `tools/play-native/install.sh` (see [Install](#6-install) below): the launcher
 `~/Applications/RS Re-ARMed.app`, which you start the game with, and the game build with your saves in
-`~/Library/Application Support/RS Re-ARMed/`. When it's done it says so and offers to start the game. A
+`~/Library/Application Support/RS Re-ARMed/`. **Renderer** chooses how the game draws: **Metal
+(recommended)** or **OpenGL** (see [Renderer](#renderer)); the installer remembers the choice. With
+Metal its last step, **Preparing shaders**, compiles the game's Metal shaders once (see
+[Install](#6-install)): a few minutes on a first install, seconds after an update; with OpenGL there is
+no such step. When it's done it says so and offers to start the game. A
 progress bar and live log keep you informed; if anything fails it shows the error. The log of every run is
 kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 
@@ -120,8 +124,15 @@ tools/ws7/recomp/app/build-m4.sh build/m4
 ```
 
 This builds the native override libraries, recompiles the game image to C, compiles it (the slowest
-part) and links `build/m4/app/Rocksmith2014.app`. At the end it starts the new app once with
-`--init-only` as a check and prints `app: <path>`.
+part), makes the Metal renderer's shader corpus and links `build/m4/app/Rocksmith2014.app`. At the end
+it starts the new app once with `--init-only` as a check and prints `app: <path>`.
+
+The shader corpus (`tools/metal/make-corpus.sh`, under a minute) is the Metal translation of every
+shader the game can compile, made from the game files alone: the Scaleform UI shaders from the game
+image, the Cg programs from your `static.psarc` (through `build/shims/cg/cg_corpus_load` and
+`build/shims/opengl/msl_verify` from step 4). It goes to `<output>/shaders` (derived from the game: keep
+it on your Mac) and into the app as `Contents/Resources/rsmsl-corpus.bin`. If it can't be made the build
+goes on without it (Metal then translates each shader when the game first uses it).
 
 The argument is the output directory. Without it, the output goes to `$RS_BUILD_DIR/m4`.
 
@@ -142,6 +153,9 @@ Environment variables the build reads:
 | `RC_PGO` | none | `gen`: an instrumented build that records a profile; `use:FILE.profdata`: optimise with it |
 | `RC_PGO_DIR` | `<output>/pgo` | where an instrumented game writes its profiles |
 | `RC_JOBS` | all cores | parallel compile jobs |
+| `RS_SHADER_CORPUS` | on | `0`: no shader corpus |
+| `RS_MSL_CORPUS_FILE` | none | bundle this `rsmsl-corpus.bin` instead of making one |
+| `RS_MSL_VERIFY` | off | `1`: also check every corpus program against OpenGL (a few minutes; for translator work) |
 | `RC_RELAXED` | on | `0`: fence every memory access of the audio kernels listed in `tools/ws7/recomp/xlat/relaxed.py` too, for tracking down a suspected memory-ordering problem |
 
 #### Optimised builds (optional)
@@ -190,8 +204,61 @@ launcher `~/Applications/RS Re-ARMed.app`. Quit the game first. Start **RS Re-AR
 mirrors your game folder next to it; opening `Rocksmith2014.app` directly doesn't work. With `RS_GAME_DIR`
 set, `install.sh` remembers that game folder for the launcher.
 
+Last, `install.sh` prepares the shaders of the Metal renderer (`tools/play-native/warm-shaders.sh`): it
+runs the installed game once with `--warm-shaders`, which opens no window and starts nothing of the
+game, and compiles the shader corpus and the shaders of earlier runs into the caches the game reads,
+showing `Preparing shaders… N of M`. That takes a few minutes the first time (about 4.5 minutes for
+3880 shaders on an M2); on later installs it compiles only what changed, usually in a second or so. Without it the first start with Metal does the same behind a black window with
+the same message (and with a fast-load `cache.psarc` it would otherwise hang on the loading screen).
+Metal keeps compiled shaders per app and per install location, so only the installed game itself can do
+this, and moving the install means preparing again. `RS_WARM_SHADERS=0` skips the step; run
+`tools/play-native/warm-shaders.sh` later to do it then.
+
+`RS_RENDERER=metal` or `RS_RENDERER=opengl` chooses the [renderer](#renderer) (`RS_RENDERER=opengl
+tools/play-native/install.sh`); without it `install.sh` keeps the one the install has, else Metal. The
+shader step runs only for Metal: OpenGL needs no shaders prepared, and an OpenGL install that later
+switches to Metal prepares them on its first Metal start (or run `tools/play-native/warm-shaders.sh`
+after switching).
+
 To update later, pull, repeat steps 4 and 5, and run `install.sh` again. Your saves are kept.
 `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.
+
+### Renderer
+
+The game draws with **Metal** by default: RS Re-ARMed's own GL-on-Metal layer (`libRSOpenGL`), which
+renders the same frames as Apple's OpenGL with a little less CPU per frame, and keeps up with displays
+faster than 60 Hz. **OpenGL** (Apple's OpenGL, as the original Mac game)
+stays available. The choice is the file `renderer` in `~/Library/Application Support/RS Re-ARMed/`,
+holding `metal` or `opengl`; `install.sh` and the installer write it. To switch without reinstalling,
+quit the game and write the other one:
+
+```bash
+echo opengl > ~/Library/Application\ Support/RS\ Re-ARMed/renderer   # or: echo metal > ...
+```
+
+The next start uses it. For a single start, `RS_GL_BACKEND=gl` or `RS_GL_BACKEND=metal` in the
+environment wins over the file (from a terminal: `launchctl setenv RS_GL_BACKEND gl`, start the
+launcher, `launchctl unsetenv RS_GL_BACKEND`). The log (`logs/last-run.log` in the same folder) says
+which one ran and why: `[rsp] renderer: metal (default)`.
+
+**Fallback to OpenGL.** The game falls back by itself, so a Metal problem never leaves you without a
+game:
+
+- When Metal cannot start (no Metal device, or the Metal layer cannot be created) the game starts again
+  with OpenGL right away (`[rsp] no usable Metal device; starting with OpenGL`). This changes nothing
+  for later starts.
+- When the last two starts with Metal both ended abnormally (a crash, or the game had to be
+  force-quit; a normal quit, also with Cmd+Q or by closing the window, resets the count), the
+  next start uses OpenGL and writes `opengl` into `renderer`, so later starts keep using OpenGL. The log
+  says `[rsp] Metal ended abnormally twice in a row; starting with OpenGL`, a notification tells you,
+  and `renderer-fallback.txt` in the same folder says what happened. To try Metal again (after an update,
+  say), write `metal` into `renderer` again; reinstalling with Metal does the same. An explicit
+  `RS_GL_BACKEND=metal` always uses Metal.
+
+The game applies the file and the fallback itself (the launcher only hands `opengl` on as
+`RS_GL_BACKEND=gl`, which spares the game a restart), so they hold however it is started; a build run
+from outside an install keeps both in `~/Library/Caches/rs-rearmed/` (or in `$RS_NATIVE_HOME`). `Rocksmith2014.app/Contents/MacOS/Rocksmith2014 --renderer-check` prints the
+renderer a start would use now, without starting the game.
 
 ### 7. Troubleshooting
 
@@ -207,6 +274,9 @@ To update later, pull, repeat steps 4 and 5, and run `install.sh` again. Your sa
 | `build libnetguard first (tools/ws8/netguard/build.sh)` | Run the last command of step 4. |
 | `no native build at ...` or `... is not arm64` | Run step 5, or pass `install.sh` the path of the app it printed. |
 | `quit Rocksmith 2014 first` | Quit the game, then run `install.sh` again. |
+| `shader corpus: not made ...` (step 5) | Check that step 4 built `build/shims/opengl/msl_verify` and `build/shims/cg/cg_corpus_load`, and that `RC_IMAGE` and `RS_GAME_DIR` are right; details in `<output>/shaders.log`. The app works without it. |
+| `warm-shaders: failed ...` or `timed out` | Not fatal: the game prepares its shaders on its first start with Metal instead. Run `tools/play-native/warm-shaders.sh` to try again. |
+| The game now starts with OpenGL, `renderer-fallback.txt` in `~/Library/Application Support/RS Re-ARMed/` | Metal ended abnormally twice in a row (see [Renderer](#renderer)). `echo metal > ~/Library/Application\ Support/RS\ Re-ARMed/renderer` tries Metal again; if it keeps crashing, open an issue with `logs/last-run.log` and `logs/previous-run.log`. |
 | Launcher: "The native build is not installed" | Run step 6. |
 | Launcher: "libnetguard.dylib is missing" | Run the last command of step 4, then step 6. The game never starts without the network guard. |
 | Launcher: "Rocksmith 2014 is not installed at ..." | Install the game through Steam, or tell the launcher where it is: `launchctl setenv RS_GAME_DIR "/path/to/Rocksmith2014"`. |

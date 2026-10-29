@@ -1024,7 +1024,7 @@ static void trace_open(unsigned long frame);
 static void tr_atexit(void) {
     if (tr_fp) { fprintf(tr_fp, "# EXIT (trace cut short)\n"); fflush(tr_fp); }
 }
-void rs_tr_init(void *const *real, const char *const *names) {
+void rs_tr_init(void *const *real, const char *const *names, int sys_gl) {
     rs_r = real;
     rs_nm = names;
     tr_dir = getenv("RS_GL_TRACE_DIR");
@@ -1039,7 +1039,9 @@ void rs_tr_init(void *const *real, const char *const *names) {
         else snprintf(tr_keypath, sizeof tr_keypath, "%s/go", tr_dir);
     } else tr_key = NULL;
     if (tr_start < 0 && !tr_key) tr_start = 0;
-    void *sys = dlopen("/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL", RTLD_NOW | RTLD_LOCAL);
+    // Extra read-backs straight from the system framework, which is only the
+    // backend on GL: on Metal it has no context and is not called.
+    void *sys = sys_gl ? dlopen("/System/Library/Frameworks/OpenGL.framework/Versions/A/OpenGL", RTLD_NOW | RTLD_LOCAL) : NULL;
     *(void **)&r_GetBufferSubData = sys ? dlsym(sys, "glGetBufferSubData") : NULL;
     *(void **)&r_IsEnabled = sys ? dlsym(sys, "glIsEnabled") : NULL;
     *(void **)&r_GetLocalParam = sys ? dlsym(sys, "glGetProgramLocalParameterfvARB") : NULL;

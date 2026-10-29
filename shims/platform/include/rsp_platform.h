@@ -124,6 +124,14 @@ int rsp_is_fullscreen(void);                       // 0x10017a210
 int rsp_no_vsync(void);                            // 0x10017a220
 int rsp_screen_width(void);                        // 0x10017a310
 int rsp_screen_height(void);                       // 0x10017a330
+// Engine pixels per window point (not in the original): 1, or the backing scale with Metal and
+// RS_METAL_RETINA=1. The shell works in points; rsp_set_display_mode, rsp_screen_width/height and
+// mouse positions convert at the engine boundary, so the engine renders at the drawable's size.
+void rsp_set_render_scale(double s);
+double rsp_render_scale(void);
+// A mouse coordinate in window points -> the engine's pixels: rsp_mouse_coord(v * render scale).
+// Origin bottom left at any scale (the engine's frame is the view scaled).
+int rsp_mouse_engine_coord(double v);
 void rsp_request_quit(void);                       // 0x10017a350 / 0x10017a380
 void rsp_set_exit(void (*fn)(int status));         // _Exit by default
 void rsp_exit(int status);                         // the shell's _Exit(0)s go here
@@ -253,6 +261,14 @@ int rsp_timer_fullscreen_refit(double screen_w, double screen_h, double win_w, d
 int rsp_timer_window_adopt(double content_w, double content_h, int engine_w, int engine_h);
 // 4. Swap interval: returns the new numSwapBuffers, or -1 if unchanged.
 int rsp_timer_swap(int no_vsync, int num_swap_buffers);
+
+// ---------------------------------------------------------------------------
+// The overlay API for mods (shims/include/rs_overlay.h, rsp_overlay.c; not in the original).
+// drawView runs the registered callbacks after the game's frame, before flushBuffer, with the GL context
+// current; width and height are the framebuffer's size in pixels.
+int rsp_overlay_active(void);  // a callback is registered
+void rsp_overlay_run(int width, int height);
+void rsp_overlay_set_target(unsigned fb);  // GL framebuffer to draw to; 0 (the window's) unless a test sets it
 
 #ifdef __cplusplus
 }

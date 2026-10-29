@@ -2,6 +2,7 @@
 // MessageBox, the nib's object graph and main(). Each method behaves like the
 // game's method at the address in its comment (unslid, decrypted binary). MRC.
 #import "rsp_shell.h"
+#import "rsp_present.h"
 
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
@@ -13,6 +14,27 @@
 
 NSOpenGLContext *rsp_g_gl_context;
 MainController *rsp_g_main_controller;
+
+// Metal presentation (not in the original; rsp_present.h): set when libRSOpenGL's backend is Metal
+// (the default; RS_GL_BACKEND=gl or main()'s fallback chooses GL), NULL on GL. One view per process, like the original. Where a method has a
+// GL and a Metal branch, the GL one is the original's code.
+static rsp_mtl *rsp_g_mtl;
+
+// Set (not in the original) before the engine shuts down on the frame thread, so the main thread's
+// customEventTimer: (and rsp_renderScaleChanged) stop calling into it meanwhile.
+static atomic_int rsp_quitting;
+
+// Safe load (not in the original; rsp_present.h): on Metal with a modded cache.psarc, awakeFromNib
+// runs its second half (from rsp_game_bootstrap on) only after rs_gfx_prepare, which compiles the
+// shaders known from earlier runs. Before the bootstrap the game has started nothing (no engine,
+// no loading threads, no display link), so its loading never shares the CPU with those compiles.
+// The wait runs on a background thread while the main thread's run loop goes on (the window is
+// shown, black, with a progress line after half a second, and handles events); set while it lasts.
+// The first start with a modded cache.psarc also compiles the whole shader corpus (83 s
+// cold on an M2), hence the limit; at the limit the game starts anyway and compiles the rest while
+// it loads (rs_gfx_prepare skips the corpus libraries not started yet).
+static atomic_int rsp_boot_deferred;
+enum { RSP_SAFE_LOAD_MAX_SECONDS = 600 };
 
 // ===========================================================================
 @implementation AppDelegate
@@ -53,7 +75,9 @@ MainController *rsp_g_main_controller;
 // libRSOpenGL/libglspy loaded, drawView reports when it got the CGL lock and when
 // rsp_game_frame returned, as a 'G' event in that library's frame-time log
 // (shims/opengl/src/nsgl_hook.m). Otherwise one load
-// and branch per frame.
+// and branch per frame. On Metal there is no flushBuffer for that library to swizzle (and so it
+// never times drawView / getFrameForTime: either): the shell reports 'F' (rs_gfx_present), 'D'
+// (drawView) and 'V' (getFrameForTime:) itself, with the same meaning.
 typedef void (*rsp_ft_mark_t)(int kind, uint64_t t0, uint64_t t1, uint64_t x, unsigned flags);
 static rsp_ft_mark_t rsp_ft_mark_fn(void) {
   static rsp_ft_mark_t fn;
@@ -187,6 +211,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 
 // Display-link thread, once per refresh.
 - (CVReturn)getFrameForTime:(const CVTimeStamp *)outputTime {  // 0x100184260
+  uint64_t v0 = rsp_g_mtl && rsp_ft_mark_fn() ? mach_absolute_time() : 0;
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   if (cursorInWindow) {
     double now = CFAbsoluteTimeGetCurrent();
@@ -199,12 +224,17 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   }
   [self drawView];
   [pool release];
+  if (v0) rsp_ft_mark_fn()('V', v0, mach_absolute_time(), outputTime ? outputTime->hostTime : 0, 0);
   return kCVReturnSuccess;
 }
 
 - (void)setupDisplayLink {  // 0x100184350
   CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
   CVDisplayLinkSetOutputCallback(displayLink, rsp_display_link_cb, self);
+  if (rsp_g_mtl) {  // the window's display (the main display until the view is in a window)
+    CVDisplayLinkSetCurrentCGDisplay(displayLink, rsp_mtl_display(self));
+    return;
+  }
   CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(
       displayLink, (CGLContextObj)[[self openGLContext] CGLContextObj],
       (CGLPixelFormatObj)[[self pixelFormat] CGLPixelFormatObj]);
@@ -218,6 +248,10 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   lastInputTime = [controller renderTime];  // controller is nil here: 0.0
   self = [super initWithFrame:frame];
   if (!self) return nil;
+  if (rsp_mtl_selected()) {
+    [self rsp_initMetal];
+    return self;
+  }
   // Accelerated NoRecovery DoubleBuffer ColorSize 24 DepthSize 16 StencilSize 8,
   // no NSOpenGLPFAOpenGLProfile: a legacy (2.1) context.
   NSOpenGLPixelFormatAttribute attrs[] = {NSOpenGLPFAAccelerated,
@@ -230,6 +264,9 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
                                           NSOpenGLPFAStencilSize,
                                           8,
                                           0};
+  // Not in the original: the app is high-resolution capable (Info.plist, for Metal's opt-in
+  // RS_METAL_RETINA); GL keeps a point-sized surface, which the engine's resolution matches.
+  [self setWantsBestResolutionOpenGLSurface:NO];
   pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
   if (!pixelFormat) NSLog(@"No OpenGL pixel format");
   openGLContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:share];
@@ -267,6 +304,87 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   return self;
 }
 
+// The rest of initWithFrame:shareContext: on Metal: the same steps, with a CAMetalLayer and an rs_gfx
+// context in place of the pixel format and the NSOpenGLContext.
+- (void)rsp_initMetal {
+  GLint swap = rsp_fps() ? 0 : 1;
+  rsp_g_mtl = rsp_mtl_attach(self, swap);
+  rsp_mtl_make_current(rsp_g_mtl);
+  if (getenv("RS_GL_MTENGINE")) NSLog(@"RS_GL_MTENGINE: OpenGL only, ignored on Metal");
+  [self setupDisplayLink];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(reshape)
+                                               name:NSViewFrameDidChangeNotification
+                                             object:self];
+  trackingArea = [[NSTrackingArea alloc]
+      initWithRect:[self frame]
+           options:NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved | NSTrackingActiveInActiveApp
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:trackingArea];
+  sleepDisableSuccess = IOPMAssertionCreateWithName(
+      kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn,
+      CFSTR("Rocksmith 2014 is preventing your Mac from sleeping."), &sleepAssertionID);
+  // The game's g_glContext (0x1018e7488) is read once, by GRGLRenderer::Initialize, which copies it
+  // to a renderer global (0x101920b48) that nothing reads; the game's own CGL calls are all in the
+  // shell. So on Metal the game gets nil, and rsp_g_gl_context is nil. Code that needs a
+  // CGLContextObj (CGLLockContext etc.) gets libRSOpenGL's token from CGLGetCurrentContext() or
+  // rsp_mtl_cgl().
+  rsp_g_gl_context = nil;
+  const rsp_engine_hooks *h = rsp_hooks();
+  if (h->gl_context) h->gl_context(h->ctx, NULL);
+  [[self window] setAspectRatio:NSMakeSize(16.0, 9.0)];
+}
+
+// Not in the original: on Metal, follow the window's display and backing scale.
+- (void)viewDidMoveToWindow {
+  [super viewDidMoveToWindow];
+  if (!rsp_g_mtl) return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidChangeScreenNotification object:nil];
+  if ([self window])
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(rsp_screenChanged:)
+                                                 name:NSWindowDidChangeScreenNotification
+                                               object:[self window]];
+  [self rsp_screenChanged:nil];
+}
+- (void)rsp_screenChanged:(NSNotification *)n {
+  if (displayLink) CVDisplayLinkSetCurrentCGDisplay(displayLink, rsp_mtl_display(self));
+  rsp_mtl_view_resized(rsp_g_mtl, self);
+  [self rsp_renderScaleChanged];
+}
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  if (rsp_g_mtl) {
+    rsp_mtl_view_resized(rsp_g_mtl, self);
+    [self rsp_renderScaleChanged];
+  }
+}
+// RS_METAL_RETINA=1: the engine renders at the drawable's pixel size. A new backing scale (the
+// window moved to another screen) re-sends the current resolution, converted (rsp_set_display_mode).
+- (void)rsp_renderScaleChanged {
+  double s = rsp_mtl_scale(rsp_g_mtl);
+  if (s == rsp_render_scale() || atomic_load(&rsp_quitting)) return;
+  // A mode change already waiting for the frame thread (goFullScreen / goWindow / an adopted window
+  // size, all in points) is converted at the new scale when it is applied: keep it. The engine's
+  // current resolution would be the stale one (the screen change comes with a new window size).
+  BOOL pending = controller && controller->CurrentSetting_NeedsUpdate;
+  int w = rsp_screen_width(), h = rsp_screen_height();  // points, at the old scale
+  rsp_set_render_scale(s);
+  if (pending) {
+    w = controller->CurrentSetting_Width;
+    h = controller->CurrentSetting_Height;
+  }
+  fprintf(stderr, "[rsp] render scale %.1f: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
+          (int)lround(h * s), w, h);
+  if (controller && !pending && w > 0 && h > 0) {
+    controller->CurrentSetting_Width = w;
+    controller->CurrentSetting_Height = h;
+    controller->CurrentSetting_FullScreen = rsp_is_fullscreen();
+    controller->CurrentSetting_NeedsUpdate = YES;  // applied by updateScreenSize on the frame thread
+  }
+}
+
 - (id)initWithFrame:(NSRect)frame {  // 0x100184700
   return [self initWithFrame:frame shareContext:nil];
 }
@@ -277,6 +395,20 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)reshape {  // 0x1001847c0
+  if (rsp_g_mtl) {
+    rsp_mtl_lock(rsp_g_mtl);
+    rsp_mtl_view_resized(rsp_g_mtl, self);
+    [self removeTrackingArea:trackingArea];
+    [trackingArea release];
+    trackingArea = [[NSTrackingArea alloc]
+        initWithRect:[self frame]
+             options:NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved | NSTrackingActiveInActiveApp
+               owner:self
+            userInfo:nil];
+    [self addTrackingArea:trackingArea];
+    rsp_mtl_unlock(rsp_g_mtl);
+    return;
+  }
   CGLContextObj cgl = (CGLContextObj)[[self openGLContext] CGLContextObj];
   CGLLockContext(cgl);
   [[self openGLContext] update];
@@ -292,10 +424,15 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)drawRect:(NSRect)r {  // 0x1001848f0
+  if (atomic_load(&rsp_boot_deferred)) return;  // not in the original: no engine yet (safe load)
   if (!CVDisplayLinkIsRunning(displayLink)) [self drawView];
 }
 
 - (void)drawView {  // 0x100184930
+  if (rsp_g_mtl) {
+    [self rsp_drawViewMetal];
+    return;
+  }
   CGLContextObj cgl = (CGLContextObj)[[self openGLContext] CGLContextObj];
   CGLLockContext(cgl);
   uint64_t ft0 = rsp_ft_mark_fn() ? mach_absolute_time() : 0;
@@ -305,9 +442,41 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [controller updateScreenSize];
   done = (BOOL)rsp_game_frame();
   if (ft0) rsp_ft_mark_fn()('G', ft0, mach_absolute_time(), 0, 0);
+  // Not in the original: the mods' overlays (rs_overlay.h), on the frame about to be shown.
+  if (!done && rsp_overlay_active()) {
+    // the GL surface is point-sized unless the view asks for the best resolution
+    NSSize px = [self wantsBestResolutionOpenGLSurface] ? [self convertRectToBacking:[self bounds]].size
+                                                        : [self bounds].size;
+    rsp_overlay_run((int)px.width, (int)px.height);
+  }
   [[self openGLContext] flushBuffer];
   CGLUnlockContext((CGLContextObj)[[self openGLContext] CGLContextObj]);
   if (done) [self dealloc];  // the original's exit path (ends in _Exit(0))
+}
+
+// drawView on Metal: the same frame, through rs_gfx.
+- (void)rsp_drawViewMetal {
+  rsp_mtl *m = rsp_g_mtl;
+  uint64_t d0 = rsp_ft_mark_fn() ? mach_absolute_time() : 0;
+  rsp_mtl_lock(m);
+  uint64_t ft0 = d0 ? mach_absolute_time() : 0;
+  rsp_mtl_make_current(m);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+  [controller updateScreenSize];
+  done = (BOOL)rsp_game_frame();
+  if (ft0) rsp_ft_mark_fn()('G', ft0, mach_absolute_time(), 0, 0);
+  if (!done && rsp_overlay_active()) {
+    int w, h;
+    rsp_mtl_size(m, &w, &h);  // the drawable: points, or pixels with RS_METAL_RETINA=1
+    rsp_overlay_run(w, h);
+  }
+  uint64_t f0 = d0 ? mach_absolute_time() : 0;
+  rsp_mtl_present(m);
+  if (f0) rsp_ft_mark_fn()('F', f0, mach_absolute_time(), 0, 0);
+  rsp_mtl_unlock(m);
+  if (d0) rsp_ft_mark_fn()('D', d0, mach_absolute_time(), 0, 0);
+  if (done) [self dealloc];
 }
 
 - (BOOL)acceptsFirstResponder {  // 0x100184a30
@@ -439,6 +608,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [[NSNotificationCenter defaultCenter] removeObserver:self
                                                   name:NSViewGlobalFrameDidChangeNotification
                                                 object:self];
+  if (rsp_g_mtl) [[NSNotificationCenter defaultCenter] removeObserver:self];
   rsp_exit(0);  // _Exit(0): the process ends here, [super dealloc] never runs
 }
 #pragma clang diagnostic pop
@@ -497,6 +667,25 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   rsp_g_main_controller = self;
   NSString *appDir = [[[NSBundle mainBundle] bundlePath] stringByDeletingLastPathComponent];
   NSString *cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+  if (rsp_g_mtl && rsp_mtl_safe_load([appDir UTF8String])) {
+    // Not in the original: the rest of this method after rs_gfx_prepare (see rsp_boot_deferred).
+    atomic_store(&rsp_boot_deferred, 1);
+    rsp_mtl_hold_black(rsp_g_mtl);
+    // The block retains self, appDir and cwd. A progress line shows after half a second.
+    rsp_mtl_prepare_async(rsp_g_mtl, RSP_SAFE_LOAD_MAX_SECONDS, 0.5, ^(int rc) {
+      (void)rc;
+      atomic_store(&rsp_boot_deferred, 0);
+      [self rsp_bootAppDir:appDir cwd:cwd];
+      // The app became active while the engine did not exist yet: tell the booted engine.
+      if (rsp_focused()) rsp_set_focus(1);
+    });
+    return;
+  }
+  [self rsp_bootAppDir:appDir cwd:cwd];
+}
+
+// The second half of awakeFromNib (0x100185760), from the bootstrap on.
+- (void)rsp_bootAppDir:(NSString *)appDir cwd:(NSString *)cwd {
   rsp_boot boot = {[appDir UTF8String], [cwd UTF8String], 0, NULL};
   rsp_game_bootstrap(&boot);
   [openGLView setMainController:self];
@@ -515,9 +704,6 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [[NSRunLoop currentRunLoop] addTimer:renderTimer forMode:NSDefaultRunLoopMode];
 }
 
-// Set (not in the original) before the engine shuts down on the frame thread, so the main thread's
-// customEventTimer: stops calling into it meanwhile.
-static atomic_int rsp_quitting;
 
 - (void)dealloc {  // 0x100185950
   atomic_store(&rsp_quitting, 1);
@@ -561,7 +747,8 @@ static atomic_int rsp_quitting;
 
 - (void)mouseMoved:(NSEvent *)e {  // 0x100185b40
   NSPoint p = [openGLView convertPoint:[e locationInWindow] fromView:nil];
-  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_coord(p.x), rsp_mouse_coord(p.y));
+  // points -> engine pixels (not in the original: the render scale is 1 unless RS_METAL_RETINA=1)
+  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_engine_coord(p.x), rsp_mouse_engine_coord(p.y));
 }
 
 - (void)customEventTimer:(NSTimer *)t {  // 0x100185bd0
@@ -580,6 +767,11 @@ static atomic_int rsp_quitting;
     // 3. windowed: a resized window becomes the engine resolution
     NSRect fr = w ? [w frame] : NSZeroRect;
     NSRect c = w ? [w contentRectForFrameRect:fr] : NSZeroRect;
+    // Not in the original: whole points. The app is high-resolution capable, so on a 2x screen a
+    // window can be resized to half points (1279.5), which no int engine size equals: without this
+    // the window would be re-adopted, and the engine resolution re-set, every 0.1 s. (int) below
+    // truncated anyway; at scale 1 sizes are whole and this changes nothing.
+    c.size = NSMakeSize(floor(c.size.width), floor(c.size.height));
     if (rsp_timer_window_adopt(c.size.width, c.size.height, rsp_screen_width(), rsp_screen_height())) {
       [w setContentView:openGLView];
       [w setContentSize:c.size];
@@ -598,7 +790,8 @@ static atomic_int rsp_quitting;
   if (ns >= 0) {
     numSwapBuffers = ns;
     GLint v = numSwapBuffers;
-    [[openGLView openGLContext] setValues:&v forParameter:NSOpenGLCPSwapInterval];
+    if (rsp_g_mtl) rsp_mtl_set_swap_interval(rsp_g_mtl, v);
+    else [[openGLView openGLContext] setValues:&v forParameter:NSOpenGLCPSwapInterval];
   }
 }
 

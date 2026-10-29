@@ -9,9 +9,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
+#include <mach-o/dyld.h>
+#include <signal.h>
+
 #include "rsp_platform.h"
+#include "rsp_renderer.h"
 
 static int g_pass, g_fail;
 #define CHECK(c, ...)                         \
@@ -309,6 +314,63 @@ static void write_ini(const char *text) {
   fclose(f);
 }
 
+// The engine works in pixels, the shell in window points; rsp_set_render_scale converts at the boundary.
+static void test_render_scale(void) {
+  rsp_stub_state *s = rsp_stub();
+  CHECK(rsp_render_scale() == 1.0, "scale 1 by default");
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 1280 && s->height == 720 && rsp_screen_width() == 1280 && rsp_screen_height() == 720,
+        "scale 1: identity");
+  CHECK(rsp_mouse_engine_coord(639.5) == rsp_mouse_coord(639.5) && rsp_mouse_engine_coord(-0.51) == -1,
+        "scale 1: mouse as the original");
+  rsp_set_render_scale(2.0);
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 2560 && s->height == 1440, "scale 2: engine %dx%d", s->width, s->height);
+  CHECK(rsp_screen_width() == 1280 && rsp_screen_height() == 720, "scale 2: points %dx%d", rsp_screen_width(),
+        rsp_screen_height());
+  rsp_set_display_mode(1, 1279, 719);  // odd point sizes stay exact
+  CHECK(s->width == 2558 && s->height == 1438 && rsp_screen_width() == 1279 && rsp_screen_height() == 719,
+        "scale 2: odd sizes %dx%d", s->width, s->height);
+  s->width = 2561;  // an engine size no point size maps to: nearest point
+  CHECK(rsp_screen_width() == 1281, "scale 2: odd engine width -> %d", rsp_screen_width());
+  // Mouse: view points (origin bottom left) -> engine pixels (origin bottom left, frame 2x the view):
+  // the view's corners map to the engine frame's corners, half points to whole pixels.
+  struct { double v; int want; } mc[] = {{0, 0}, {0.25, 1}, {0.5, 1}, {0.75, 2}, {639.5, 1279},
+                                         {1279.75, 2560}, {720, 1440}, {-0.5, -1}};
+  for (size_t i = 0; i < sizeof mc / sizeof *mc; i++)
+    CHECK(rsp_mouse_engine_coord(mc[i].v) == mc[i].want, "scale 2: mouse %g -> %d (want %d)", mc[i].v,
+          rsp_mouse_engine_coord(mc[i].v), mc[i].want);
+  rsp_set_render_scale(0);
+  CHECK(rsp_render_scale() == 1.0, "scale 0 -> 1");
+  rsp_set_render_scale(-2);
+  CHECK(rsp_render_scale() == 1.0, "negative scale -> 1");
+  rsp_set_render_scale(NAN);
+  CHECK(rsp_render_scale() == 1.0, "NaN scale -> 1");
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 1280 && rsp_screen_width() == 1280, "back to scale 1");
+}
+
+// Bootstrap at render scale 2 (in a child: the bootstrap runs once per process): Rocksmith.ini and the
+// 800x600 floor are engine pixels, so 1024x600 is kept, not forced to 1280x720 as half of it would be.
+static void test_boot_scaled(void) {
+  pid_t pid = fork();
+  if (pid == 0) {
+    rsp_stub_state *s = rsp_stub();
+    write_ini("[Renderer.MacOS]\nScreenWidth=1024\nScreenHeight=600\nFullscreen=0\nVisualQuality=2\n");
+    rsp_boot b = {g_tmpdir, "/", 0, NULL};
+    *rsp_config_global() = (rsp_config){0};
+    rsp_config_defaults(rsp_config_global());
+    rsp_set_render_scale(2.0);
+    int ok = rsp_game_bootstrap(&b) == 0 && s->width == 1024 && s->height == 600;
+    if (!ok) printf("FAIL: scaled bootstrap: engine %dx%d\n", s->width, s->height);
+    fflush(stdout);
+    _exit(ok ? 0 : 1);
+  }
+  int st = 0;
+  CHECK(pid > 0 && waitpid(pid, &st, 0) == pid && WIFEXITED(st) && WEXITSTATUS(st) == 0,
+        "bootstrap at scale 2 keeps the config's engine resolution (status %d)", st);
+}
+
 static void test_boot(void) {
   rsp_stub_state *s = rsp_stub();
   write_ini("[Renderer.MacOS]\nScreenWidth=640\nScreenHeight=480\nFullscreen=0\nVisualQuality=2\n");
@@ -400,7 +462,241 @@ static void test_logic(void) {
   CHECK(rsp_timer_swap(7, 1) == 0, "no_vsync is a bool");
 }
 
-int main(void) {
+// --- renderer choice and the Metal crash fallback (rsp_renderer.h) -----------------------------
+static rsp_renderer_out decide(const char *env, const char *setting, int abnormal, int metal_ok, int loaded) {
+  rsp_renderer_in in = {env, setting, abnormal, metal_ok, loaded};
+  return rsp_renderer_decide(&in);
+}
+#define DECIDES(o, be, why, re) ((o).backend == (be) && (o).reason == (why) && (o).reexec == (re))
+
+static void test_renderer_decide(void) {
+  enum { G = RSP_GFX_GL, M = RSP_GFX_METAL, N = RSP_GFX_NONE };
+  CHECK(rsp_renderer_parse("metal") == M && rsp_renderer_parse(" Metal\n") == M, "parse metal");
+  CHECK(rsp_renderer_parse("gl") == G && rsp_renderer_parse("opengl\r\n") == G && rsp_renderer_parse("OpenGL") == G,
+        "parse gl");
+  CHECK(rsp_renderer_parse(NULL) == N && rsp_renderer_parse("") == N && rsp_renderer_parse("vulkan") == N &&
+            rsp_renderer_parse("metal x") == N && rsp_renderer_parse("metalx") == N,
+        "parse other");
+  rsp_renderer_out o;
+  // Nothing set: Metal, which libRSOpenGL loaded with by default.
+  o = decide(NULL, NULL, 0, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_DEFAULT, 0), "default metal (%d %d %d)", o.backend, o.reason, o.reexec);
+  o = decide("", "", 1, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_DEFAULT, 0), "empty env + empty setting + one crash: metal");
+  o = decide("vulkan", "garbage", 0, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_DEFAULT, 0), "unknown values: default");
+  // The setting.
+  o = decide(NULL, "opengl\n", 0, 1, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_SETTING, 1), "setting opengl: restart with gl");
+  o = decide(NULL, "metal", 0, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_SETTING, 0), "setting metal");
+  // The environment wins, and needs no restart (libRSOpenGL read the same variable).
+  o = decide("gl", "metal", 0, 1, G);
+  CHECK(DECIDES(o, G, RSP_RENDERER_ENV, 0), "env gl over setting metal");
+  o = decide("metal", "opengl", 0, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_ENV, 0), "env metal over setting opengl");
+  o = decide("metal", NULL, 7, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_ENV, 0), "env metal forces Metal over the crash count");
+  o = decide("opengl", NULL, 0, 1, G);
+  CHECK(DECIDES(o, G, RSP_RENDERER_ENV, 0), "env opengl");
+  // Crashes: two abnormal endings in a row.
+  o = decide(NULL, NULL, 1, 1, M);
+  CHECK(DECIDES(o, M, RSP_RENDERER_DEFAULT, 0), "one abnormal ending: still metal");
+  o = decide(NULL, NULL, 2, 1, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_CRASHES, 1), "two: opengl, restart");
+  o = decide(NULL, "metal", 3, 1, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_CRASHES, 1), "setting metal does not force over crashes");
+  o = decide(NULL, "opengl", 5, 1, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_SETTING, 1), "setting opengl: the count does not matter");
+  // No Metal.
+  o = decide(NULL, NULL, 0, 0, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_NO_METAL, 1), "no Metal: opengl, restart");
+  o = decide("metal", NULL, 0, 0, M);
+  CHECK(DECIDES(o, G, RSP_RENDERER_NO_METAL, 1), "env metal without Metal: opengl anyway");
+  o = decide("gl", NULL, 0, 0, G);
+  CHECK(DECIDES(o, G, RSP_RENDERER_ENV, 0), "gl without Metal");
+  // No restart loop: when RS_GL_BACKEND already says it, a restart changes nothing.
+  o = decide("gl", NULL, 0, 1, M);
+  CHECK(o.backend == G && !o.reexec, "env gl but metal loaded: no restart");
+  // No libRSOpenGL: nothing to choose.
+  o = decide("metal", "metal", 0, 1, N);
+  CHECK(DECIDES(o, G, RSP_RENDERER_NO_RSGL, 0), "no libRSOpenGL");
+  CHECK(!strcmp(rsp_renderer_name(M), "metal") && !strcmp(rsp_renderer_name(G), "opengl"), "names");
+}
+
+static int read_file(const char *path, char *buf, size_t n) {
+  FILE *f = fopen(path, "r");
+  if (!f) return 0;
+  size_t k = fread(buf, 1, n - 1, f);
+  buf[k] = 0;
+  fclose(f);
+  return 1;
+}
+
+static void test_renderer_files(void) {
+  char home[600], p[700], b[256];
+  snprintf(home, sizeof home, "%s/rhome-files", g_tmpdir);
+  mkdir(home, 0755);
+  CHECK(!rsp_renderer_read_setting(home, b, sizeof b), "no setting file");
+  CHECK(rsp_renderer_write_setting(home, RSP_GFX_GL) == 0 && rsp_renderer_read_setting(home, b, sizeof b) &&
+            !strcmp(b, "opengl"),
+        "setting written: %s", b);
+  CHECK(rsp_renderer_write_setting(home, RSP_GFX_METAL) == 0 && rsp_renderer_read_setting(home, b, sizeof b) &&
+            !strcmp(b, "metal"),
+        "setting rewritten: %s", b);
+  // Marker: a session that ends cleanly leaves none, one that does not counts.
+  CHECK(rsp_metal_abnormal_count(home) == 0, "no marker: 0");
+  CHECK(rsp_metal_session_begin(home, 0) == 0, "begin");
+  snprintf(p, sizeof p, "%s/metal-session", home);
+  CHECK(access(p, F_OK) == 0, "marker written");
+  CHECK(rsp_metal_abnormal_count(home) == 1, "marker of a running session: it counts as one if found later");
+  rsp_metal_session_end();
+  CHECK(access(p, F_OK) != 0 && rsp_metal_abnormal_count(home) == 0, "clean end removes it");
+  rsp_metal_session_end();  // twice: nothing
+  CHECK(rsp_metal_session_begin(home, 1) == 0 && rsp_metal_abnormal_count(home) == 2, "N = 1: two in a row");
+  rsp_metal_session_forget(home);
+  CHECK(rsp_metal_abnormal_count(home) == 0, "forget");
+  rsp_metal_session_end();
+  // A marker a clean exit of another process removed is not removed twice (no error either).
+  FILE *f = fopen(p, "w");
+  fputs("garbage\n", f);
+  fclose(f);
+  CHECK(rsp_metal_abnormal_count(home) == 1, "unreadable count: one");
+  unlink(p);
+  // rsp_exit is a clean end.
+  rsp_metal_session_begin(home, 0);
+  rsp_set_exit(NULL);
+  pid_t pid = fork();
+  if (pid == 0) rsp_exit(0);
+  int st = 0;
+  waitpid(pid, &st, 0);
+  CHECK(WIFEXITED(st) && access(p, F_OK) != 0, "rsp_exit removes the marker");
+  rsp_metal_session_end();
+
+  // <home>: RS_NATIVE_HOME, the install layout, else the caches folder.
+  char got[700], app[700];
+  setenv("RS_NATIVE_HOME", home, 1);
+  CHECK(rsp_renderer_home(got, sizeof got, "/x/game/R.app") && !strcmp(got, home), "RS_NATIVE_HOME");
+  unsetenv("RS_NATIVE_HOME");
+  snprintf(app, sizeof app, "%s/game/Rocksmith2014.app", home);
+  snprintf(p, sizeof p, "%s/game", home);
+  mkdir(p, 0755);
+  CHECK(rsp_renderer_home(got, sizeof got, app) && strstr(got, "/Library/Caches/rs-rearmed"),
+        "game/ without game-dir: not an install (%s)", got);
+  snprintf(p, sizeof p, "%s/game-dir", home);
+  fclose(fopen(p, "w"));
+  CHECK(rsp_renderer_home(got, sizeof got, app) && !strcmp(got, home), "install layout: %s", got);
+  snprintf(app, sizeof app, "%s/game/Rocksmith2014.app/", home);
+  CHECK(rsp_renderer_home(got, sizeof got, app) && !strcmp(got, home), "trailing slash: %s", got);
+  CHECK(rsp_renderer_home(got, sizeof got, "/x/R.app") && strstr(got, "/Library/Caches/rs-rearmed"), "elsewhere");
+  (void)read_file;
+}
+
+// The startup in a child process (this executable with --renderer-child): restarts, the crash
+// fallback across sessions, clean and abnormal ends.
+static char g_self[1024];
+static int g_child_gen;
+
+static int child_metal_ok(void) {
+  const char *e = getenv("RSP_TEST_NO_METAL");
+  return !(e && *e == '1');
+}
+
+// argv: self --renderer-child <how>; how = check | clean | exit | crash (SIGKILL) | term
+static int renderer_child(int argc, char **argv) {
+  const char *g = getenv("RSP_TEST_GEN");
+  g_child_gen = (g ? atoi(g) : 0) + 1;
+  char gs[16];
+  snprintf(gs, sizeof gs, "%d", g_child_gen);
+  setenv("RSP_TEST_GEN", gs, 1);
+  // What libRSOpenGL would have loaded with.
+  int loaded = rsp_renderer_parse(getenv("RS_GL_BACKEND")) == RSP_GFX_GL ? RSP_GFX_GL : RSP_GFX_METAL;
+  const char *how = argc > 2 ? argv[2] : "check";
+  int session = strcmp(how, "check") != 0;
+  rsp_renderer_out o = rsp_renderer_startup(argv, NULL, loaded, child_metal_ok, session ? RSP_RENDERER_SESSION : 0);
+  printf("gen %d backend %s reason %d\n", g_child_gen, rsp_renderer_name(o.backend), o.reason);
+  fflush(stdout);
+  if (!strcmp(how, "clean")) rsp_exit(0);
+  if (!strcmp(how, "exit")) exit(0);
+  if (!strcmp(how, "crash")) raise(SIGKILL);  // as a force quit (an abort would leave a crash report)
+  if (!strcmp(how, "term")) raise(SIGTERM);
+  return 0;
+}
+
+// Runs the child with `env` (prefix for env(1)); its output into out.
+static int run_child(const char *home, const char *env, const char *how, char *out, size_t n) {
+  char cmd[3000];
+  snprintf(cmd, sizeof cmd,
+           "exec env -u RS_GL_BACKEND -u RSP_TEST_GEN -u RSP_TEST_NO_METAL RS_RENDERER_NOTIFY=0 RS_NATIVE_HOME='%s' %s "
+           "'%s' --renderer-child %s 2>/dev/null",
+           home, env, g_self, how);
+  FILE *p = popen(cmd, "r");
+  if (!p) return -1;
+  size_t k = fread(out, 1, n - 1, p);
+  out[k] = 0;
+  return pclose(p);
+}
+
+static void test_renderer_startup(void) {
+  char home[600], p[700], out[512], b[2048];
+  snprintf(home, sizeof home, "%s/rhome-startup", g_tmpdir);
+  mkdir(home, 0755);
+  snprintf(p, sizeof p, "%s/metal-session", home);
+  char fb[700], set[700];
+  snprintf(fb, sizeof fb, "%s/renderer-fallback.txt", home);
+  snprintf(set, sizeof set, "%s/renderer", home);
+
+  run_child(home, "", "check", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") != NULL, "default: metal, no restart: %s", out);
+  run_child(home, "RSP_TEST_NO_METAL=1", "check", out, sizeof out);
+  CHECK(strstr(out, "gen 2 backend opengl") != NULL, "no Metal: restarted once with gl: %s", out);
+  run_child(home, "RS_GL_BACKEND=gl", "check", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend opengl") != NULL, "env gl: %s", out);
+
+  // A clean Metal session leaves no marker; exit() and SIGTERM are clean too.
+  run_child(home, "", "clean", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") && access(p, F_OK) != 0, "clean: no marker (%s)", out);
+  run_child(home, "", "exit", out, sizeof out);
+  CHECK(access(p, F_OK) != 0, "exit(): no marker");
+  run_child(home, "", "term", out, sizeof out);
+  CHECK(access(p, F_OK) != 0, "SIGTERM: no marker");
+  // --renderer-check style starts (no session) write none.
+  run_child(home, "", "check", out, sizeof out);
+  CHECK(access(p, F_OK) != 0, "no session: no marker");
+
+  // Crash, clean, crash: the clean exit resets the count; still Metal.
+  run_child(home, "", "crash", out, sizeof out);
+  CHECK(read_file(p, b, sizeof b) && atoi(b) == 0, "first crash: marker 0 (%s)", b);
+  run_child(home, "", "clean", out, sizeof out);
+  CHECK(strstr(out, "backend metal") && access(p, F_OK) != 0, "one abnormal: metal, clean end resets");
+  run_child(home, "", "crash", out, sizeof out);
+  run_child(home, "", "crash", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") && read_file(p, b, sizeof b) && atoi(b) == 1,
+        "second crash in a row: marker 1 (%s / %s)", out, b);
+  // An explicit RS_GL_BACKEND=metal: Metal anyway (and it counts on).
+  run_child(home, "RS_GL_BACKEND=metal", "crash", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") && read_file(p, b, sizeof b) && atoi(b) == 2, "forced: %s / %s", out, b);
+  // The next start: OpenGL, restarted, the setting switched, a note, the count reset.
+  CHECK(access(fb, F_OK) != 0, "no note yet");
+  run_child(home, "", "clean", out, sizeof out);
+  CHECK(strstr(out, "gen 2 backend opengl") != NULL, "after two abnormal endings: opengl (%s)", out);
+  CHECK(read_file(set, b, sizeof b) && !strcmp(b, "opengl\n"), "setting -> opengl (%s)", b);
+  CHECK(access(p, F_OK) != 0, "marker gone");
+  CHECK(read_file(fb, b, sizeof b) && strstr(b, "echo metal >"), "note written");
+  // From now on OpenGL by the setting (a GL session writes no marker), until it says metal again.
+  run_child(home, "", "crash", out, sizeof out);
+  CHECK(strstr(out, "gen 2 backend opengl") && access(p, F_OK) != 0, "setting opengl: %s", out);
+  FILE *f = fopen(set, "w");
+  fputs("metal\n", f);
+  fclose(f);
+  run_child(home, "", "clean", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") != NULL, "setting metal again: metal (%s)", out);
+}
+
+int main(int argc, char **argv) {
+  if (argc > 1 && !strcmp(argv[1], "--renderer-child")) return renderer_child(argc, argv);
+  uint32_t sn = sizeof g_self;
+  if (_NSGetExecutablePath(g_self, &sn) != 0) return 2;
   setenv("RSP_LOG", "0", 0);
   snprintf(g_tmpdir, sizeof g_tmpdir, "%s/rsp_core_test.XXXXXX", getenv("TMPDIR") ? getenv("TMPDIR") : "/tmp");
   for (char *p = g_tmpdir; (p = strstr(p, "//"));) memmove(p, p + 1, strlen(p));
@@ -412,7 +708,12 @@ int main(void) {
   test_config();
   test_input();
   test_logic();
+  test_render_scale();
+  test_boot_scaled();
   test_boot();
+  test_renderer_decide();
+  test_renderer_files();
+  test_renderer_startup();
   printf("rsp_core_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)
          "arm64",

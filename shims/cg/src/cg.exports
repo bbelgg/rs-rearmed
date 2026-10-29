@@ -33,3 +33,4 @@ _cgGetLastListing
 _cgGetParameterResource
 _cgGLDisableProfile
 _cgGLUnbindProgram
+_rs_cg_gl_stats

@@ -1,24 +1,29 @@
 # Cg.framework replacement: the Cg runtime API on Apple's OpenGL (ARB programs
-# run as is or translated to GLSL).
+# run as is or translated to GLSL). GL comes from libRSOpenGL (shims/opengl,
+# @executable_path/libRSOpenGL.dylib), so the shim's calls take the game's path
+# through the wrappers and the selected backend; it re-exports OpenGL.framework.
 rs_add_shim(cg
   INSTALL_NAME @executable_path/../Frameworks/Cg.framework/Cg
   SOURCES src/cg_shim.cpp src/arb_parse.cpp src/arb_glsl.cpp
-  LINK "-framework OpenGL")
+  LINK opengl)
 # Export only the Cg API; the translator stays internal.
 set_target_properties(cg PROPERTIES CXX_VISIBILITY_PRESET hidden)
 target_link_options(cg PRIVATE "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/cg.exports")
 set_property(TARGET cg APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/src/cg.exports")
 # Test programs live in build/shims/cg/ and load the shim by its real install
-# name, @executable_path/../Frameworks/Cg.framework/Cg, like the game does.
+# name, @executable_path/../Frameworks/Cg.framework/Cg, like the game does, and
+# libRSOpenGL as @executable_path/libRSOpenGL.dylib (a symlink next to them, as
+# Contents/MacOS/libRSOpenGL.dylib in the app).
 set(cg_fw "${CMAKE_CURRENT_BINARY_DIR}/../Frameworks/Cg.framework")
 add_custom_command(TARGET cg POST_BUILD
   COMMAND ${CMAKE_COMMAND} -E make_directory "${cg_fw}"
   COMMAND ${CMAKE_COMMAND} -E create_symlink "$<TARGET_FILE:cg>" "${cg_fw}/Cg"
+  COMMAND ${CMAKE_COMMAND} -E create_symlink "$<TARGET_FILE:opengl>" "${CMAKE_CURRENT_BINARY_DIR}/libRSOpenGL.dylib"
   VERBATIM)
 
 foreach(t render_test param_dump corpus_load diff_render)
   add_executable(cg_${t} tests/${t}.c)
-  target_link_libraries(cg_${t} PRIVATE cg "-framework OpenGL")
+  target_link_libraries(cg_${t} PRIVATE cg opengl)
   target_compile_options(cg_${t} PRIVATE -Wno-deprecated-declarations)
 endforeach()
 

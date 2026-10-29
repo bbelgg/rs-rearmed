@@ -25,6 +25,7 @@
 #define RSP_PRESENT_H
 
 #include <CoreGraphics/CoreGraphics.h>
+#include <stdio.h>
 
 #ifdef __OBJC__
 @class NSView;
@@ -106,6 +107,23 @@ void *rsp_mtl_status_layer(rsp_mtl *m);
 // queue. While it runs longer than show_after seconds the progress line is shown (updated 4 times
 // a second); it is removed before `then` runs.
 void rsp_mtl_prepare_async(rsp_mtl *m, double max_seconds, double show_after, void (^then)(int rc));
+
+// Warm-only mode (not in the original): the shader warm-up of safe load with no window and no game,
+// for the installer (the app's --warm-shaders, tools/play-native/warm-shaders.sh). Metal's own shader
+// cache belongs to the app (bundle identifier and bundle path), so the warm-up must run in the
+// installed game executable for the game's later compiles to hit it. Needs the Metal backend
+// (RS_GL_BACKEND=metal). An offscreen context opens the disk cache and starts warming its manifest;
+// rs_gfx_prepare(max_seconds) compiles that and, by its corpus rule (a small manifest or no
+// corpus-warmed record; RS_METAL_CORPUS_WARM overrides), every library of the bundled corpus.
+// Writes to `out` "progress F Preparing shaders… N of M" lines (F = N/M, never decreasing) at most
+// every `interval` seconds while the counts change, one with F = 1 when it ends (also on a
+// timeout), then a
+// "warm-shaders: ..." summary. Returns an exit status: 0 ready (also: nothing to compile), 1 timed out
+// (the rest compiles in the game), 2 no Metal context (no libRSOpenGL, or not the Metal backend).
+int rsp_mtl_warm_only(double max_seconds, double interval, FILE *out);
+// The progress line's fraction and label as rsp_mtl_warm_only prints them: "progress F LABEL" with
+// F = max(prev, done/total) (1 when total is 0); returns F.
+double rsp_mtl_warm_line(char *buf, size_t n, int done, int total, double prev);
 
 #ifdef __cplusplus
 }

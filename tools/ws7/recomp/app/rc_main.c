@@ -7,6 +7,11 @@
 // Flags (anywhere before the game's own args):
 //   --init-only   load + initializers, print counts and timing, exit 0
 //   --bind-only   load only (prints the bind statistics), exit 0
+//   --warm-shaders  compile the Metal shaders (manifest + bundled corpus) into this app's caches and
+//                 exit, before anything of the game is loaded: no window, no engine (the installer's
+//                 warm-up, tools/play-native/warm-shaders.sh; rsp_mtl_warm_only). Runs with the
+//                 Metal backend whatever RS_GL_BACKEND says (re-executes itself with it set);
+//                 RS_METAL_WARM_MAX_SECONDS limits it (default 3600). Exit 0 ready, 1 timed out, 2 no Metal.
 // Environment:
 //   RS_RC_IMAGE        the plain x86_64 image (default <bundle>/Contents/Resources/Rocksmith2014.x86_64)
 //   RS_RC_SHIMS        extra dylibs to dlopen RTLD_GLOBAL before the image binds (colon list)
@@ -37,6 +42,7 @@
 #include "seam.h"
 
 int rsp_shell_main(int argc, const char **argv);  // shims/platform/src/rsp_shell.m
+int rsp_mtl_warm_only(double max_seconds, double interval, FILE *out);  // rsp_present_metal.m
 
 static double now_s(void) {
   struct timeval tv;
@@ -204,12 +210,35 @@ static int fix_objc(void) {
   return patched;
 }
 
+// --warm-shaders. libRSOpenGL reads RS_GL_BACKEND once when it loads (before main), so without
+// "metal" the process starts again with it: the same executable path, so the same app for Metal's
+// shader cache.
+static int warm_shaders(char **argv) {
+  const char *b = getenv("RS_GL_BACKEND");
+  if (!b || strcmp(b, "metal")) {
+    char exe[4096];
+    uint32_t n = sizeof exe;
+    if (_NSGetExecutablePath(exe, &n) == 0) {
+      setenv("RS_GL_BACKEND", "metal", 1);
+      execv(exe, argv);
+    }
+    fprintf(stderr, "[rc] --warm-shaders: cannot restart with RS_GL_BACKEND=metal\n");
+    return 2;
+  }
+  const char *e = getenv("RS_METAL_WARM_MAX_SECONDS");
+  double max_s = e && *e ? atof(e) : 3600;
+  setvbuf(stdout, NULL, _IOLBF, 0);
+  return rsp_mtl_warm_only(max_s > 0 ? max_s : 3600, 0.5, stdout);
+}
+
 // ---------------------------------------------------------------------------
 
 int main(int argc, char **argv, char **envp, char **apple) {
   int init_only = 0, bind_only = 0;
   static char *gargv[64];
   int gargc = 0;
+  for (int i = 1; i < argc; i++)
+    if (!strcmp(argv[i], "--warm-shaders")) return warm_shaders(argv);
   for (int i = 0; i < argc && gargc < 63; i++) {
     if (i > 0 && !strcmp(argv[i], "--init-only")) init_only = 1;
     else if (i > 0 && !strcmp(argv[i], "--bind-only")) bind_only = 1;

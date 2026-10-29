@@ -129,6 +129,19 @@ if(TARGET opengl)
   set_tests_properties(platform.present.metal PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
 endif()
+# The app's warm-only mode (--warm-shaders, rsp_mtl_warm_only) on a test corpus written with the
+# translator (rsmsl): child processes, no window.
+if(TARGET opengl AND TARGET rsmsl)
+  add_executable(rsp_warm_test test/rsp_warm_test.m src/rsp_present_metal.m)
+  target_link_libraries(rsp_warm_test PRIVATE opengl rsmsl "-framework Foundation" "-framework AppKit"
+    "-framework Metal" "-framework QuartzCore")
+  target_compile_options(rsp_warm_test PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
+  set_target_properties(rsp_warm_test PROPERTIES OSX_ARCHITECTURES arm64 LINKER_LANGUAGE CXX)
+  add_test(NAME platform.warm.metal COMMAND arch -arm64 ${rsp_dyld} $<TARGET_FILE:rsp_warm_test>
+    "${CMAKE_CURRENT_BINARY_DIR}/warm-test")
+  set_tests_properties(platform.warm.metal PROPERTIES
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" TIMEOUT 300)
+endif()
 if(EXISTS "${RS_GAME_PLAIN}")
   add_test(NAME platform.difftest.x86_64 COMMAND $<TARGET_FILE:rsp_platform_difftest> "${RS_GAME_PLAIN}")
   set_tests_properties(platform.difftest.x86_64 PROPERTIES

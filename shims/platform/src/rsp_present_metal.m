@@ -11,6 +11,7 @@
 #include <CommonCrypto/CommonDigest.h>
 
 #include <dlfcn.h>
+#include <mach/mach_time.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -32,6 +33,8 @@ static struct {
   void *(*cgl)(rs_gfx_context *);
   int (*prepare)(rs_gfx_context *, double);  // optional: older libRSOpenGL builds lack it
   int (*prepare_progress)(rs_gfx_context *, int *, int *);  // optional too
+  rs_gfx_context *(*create_offscreen)(int, int);  // warm-only mode
+  void (*destroy)(rs_gfx_context *);
 } gfx;
 static int gfx_ok;
 
@@ -50,6 +53,8 @@ static void gfx_load(void) {
   gfx_ok = ok;
   *(void **)&gfx.prepare = dlsym(RTLD_DEFAULT, "rs_gfx_prepare");
   *(void **)&gfx.prepare_progress = dlsym(RTLD_DEFAULT, "rs_gfx_prepare_progress");
+  *(void **)&gfx.create_offscreen = dlsym(RTLD_DEFAULT, "rs_gfx_create_offscreen");
+  *(void **)&gfx.destroy = dlsym(RTLD_DEFAULT, "rs_gfx_destroy");
 }
 
 struct rsp_mtl {
@@ -359,4 +364,87 @@ void rsp_mtl_prepare_async(rsp_mtl *m, double max_seconds, double show_after, vo
       then(rc);
     });
   });
+}
+
+// --- Warm-only mode ----------------------------------------------------------------------------
+
+static double warm_now(void) {
+  static mach_timebase_info_data_t tb;
+  if (!tb.denom) mach_timebase_info(&tb);
+  return (double)mach_absolute_time() * tb.numer / tb.denom / 1e9;
+}
+
+double rsp_mtl_warm_line(char *buf, size_t n, int done, int total, double prev) {
+  double f = total > 0 ? (double)(done < total ? done : total) / total : 1.0;
+  if (f < prev) f = prev;
+  if (total > 0)
+    snprintf(buf, n, "progress %.3f Preparing shaders… %d of %d", f, done < total ? done : total, total);
+  else
+    snprintf(buf, n, "progress %.3f Preparing shaders… nothing to compile", f);
+  return f;
+}
+
+typedef struct {
+  rs_gfx_context *ctx;
+  double max_seconds;
+  atomic_int done, rc;
+} warm_job;
+
+static void *warm_thread(void *arg) {
+  warm_job *j = arg;
+  atomic_store(&j->rc, gfx.prepare(j->ctx, j->max_seconds));
+  atomic_store(&j->done, 1);
+  return NULL;
+}
+
+int rsp_mtl_warm_only(double max_seconds, double interval, FILE *out) {
+  if (!rsp_mtl_selected() || !gfx.create_offscreen || !gfx.prepare || !gfx.prepare_progress) {
+    fprintf(stderr, "[rsp] warm-shaders: no Metal backend (libRSOpenGL with RS_GL_BACKEND=metal is needed)\n");
+    return 2;
+  }
+  double t0 = warm_now();
+  rs_gfx_context *ctx = gfx.create_offscreen(16, 16);
+  if (!ctx) {
+    fprintf(stderr, "[rsp] warm-shaders: no Metal context (no Metal device?)\n");
+    return 2;
+  }
+  warm_job j = {ctx, max_seconds, 0, 0};
+  pthread_t th;
+  if (pthread_create(&th, NULL, warm_thread, &j)) {
+    gfx.destroy(ctx);
+    return 2;
+  }
+  char line[160];
+  double f = 0, last_print = -1;
+  int last_done = -1, last_total = -1, done = 0, total = 0;
+  useconds_t poll = interval > 0 && interval < 0.1 ? (useconds_t)(interval * 1e6) : 100 * 1000;
+  while (!atomic_load(&j.done)) {
+    usleep(poll);
+    if (gfx.prepare_progress(ctx, &done, &total) != 1) continue;  // not started yet, or just finished
+    double t = warm_now();
+    if ((done == last_done && total == last_total) || (last_print >= 0 && t - last_print < interval)) continue;
+    f = rsp_mtl_warm_line(line, sizeof line, done, total, f);
+    fprintf(out, "%s\n", line);
+    fflush(out);
+    last_done = done;
+    last_total = total;
+    last_print = t;
+  }
+  pthread_join(th, NULL);
+  int rc = atomic_load(&j.rc);
+  gfx.prepare_progress(ctx, &done, &total);
+  // The step is over either way: F = 1 (on a timeout with the counts reached).
+  rsp_mtl_warm_line(line, sizeof line, rc == 0 ? total : done, total, 1.0);
+  fprintf(out, "%s\n", line);
+  gfx.destroy(ctx);  // the last context: the disk cache is written out
+  double dt = warm_now() - t0;
+  if (rc == 0)
+    fprintf(out, "warm-shaders: %d shader libraries ready in %.1f s\n", total, dt);
+  else if (rc == 1)
+    fprintf(out, "warm-shaders: timed out after %.0f s with %d of %d libraries; the game compiles the rest\n",
+            dt, done, total);
+  else
+    fprintf(out, "warm-shaders: rs_gfx_prepare failed (%d)\n", rc);
+  fflush(out);
+  return rc == 0 ? 0 : rc == 1 ? 1 : 2;
 }

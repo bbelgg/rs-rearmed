@@ -861,6 +861,134 @@ static void case_render_to_texture(void) {
     glok("render to texture");
 }
 
+
+// Depth texture in an FBO (a shadow map): render depth, then sample it. (A colour
+// attachment too: GL 2.1 without glDrawBuffer(GL_NONE) needs one.)
+static void case_depth_texture(void) {
+    GLuint dt;
+    glGenTextures(1, &dt);
+    glBindTexture(GL_TEXTURE_2D, dt);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, 32, 32, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_INT, NULL);
+    GLuint fbo;
+    glGenFramebuffers(1, &fbo);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, dt, 0);
+    GLuint ct = texture_rgba(32, 32, NULL, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, ct, 0);
+    check(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "depth texture FBO complete");
+    glViewport(0, 0, 32, 32);
+    glClearDepth(1.0);
+    glClear(GL_DEPTH_BUFFER_BIT);
+    glEnable(GL_DEPTH_TEST);
+    glDepthFunc(GL_ALWAYS);
+    GLuint p = program(kVSz, kFScolor, "pos", NULL);
+    uniform4(p, "color", 1, 1, 1, 1);
+    float v[12] = {-1, -1, 0, 0, -1, 0, -1, 1, 0, 0, 1, 0};  // left half at z 0 -> depth 0.5
+    glGenBuffers(1, &g_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, g_vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof v, v, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glDisable(GL_DEPTH_TEST);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, W, H);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint pt = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(pt, "tex"), 0);
+    glBindTexture(GL_TEXTURE_2D, dt);
+    draw_tex_rect(0, 0, 64, 64);
+    snap();
+    check(near(px(8, 32)[0], 128, 1), "sampled depth 0.5 in red (%d)", px(8, 32)[0]);
+    check(near(px(56, 32)[0], 255, 1), "cleared depth 1.0 (%d)", px(56, 32)[0]);
+    float d[2] = {0};
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glReadPixels(4, 4, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, d);
+    glReadPixels(28, 4, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, d + 1);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    check(fabsf(d[0] - 0.5f) < 0.001f && d[1] == 1.0f, "glReadPixels depth (%f, %f)", d[0], d[1]);
+    // Green/blue of a sampled depth texture differ between implementations (depth texture mode).
+    for (int i = 0; i < W * H; i++)
+        g_px[i * 4 + 1] = g_px[i * 4 + 2] = 0;
+    g_dump_len = 0;
+    dump(g_px, sizeof g_px);
+    glDeleteFramebuffers(1, &fbo);
+    glok("depth texture");
+}
+
+
+// Cube map: one colour per face, looked up along each axis.
+static void case_cube_map(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    static const char vs[] =
+        "#version 120\n"
+        "attribute vec2 pos;\n"
+        "attribute vec3 dir;\n"
+        "varying vec3 v_dir;\n"
+        "void main() { v_dir = dir; gl_Position = vec4(pos, 0.0, 1.0); }\n";
+    static const char fs[] =
+        "#version 120\n"
+        "uniform samplerCube cube;\n"
+        "varying vec3 v_dir;\n"
+        "void main() { gl_FragColor = textureCube(cube, v_dir); }\n";
+    GLuint p = program(vs, fs, "pos", "dir", NULL);
+    glUniform1i(glGetUniformLocation(p, "cube"), 1);
+    GLuint t;
+    glGenTextures(1, &t);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_CUBE_MAP, t);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    static const unsigned char faces[6][4] = {{255, 0, 0, 255}, {0, 255, 0, 255}, {0, 0, 255, 255},
+                                              {255, 255, 0, 255}, {0, 255, 255, 255}, {255, 0, 255, 255}};
+    for (int f = 0; f < 6; f++) {
+        unsigned char img[4 * 4 * 4];
+        for (int i = 0; i < 16; i++)
+            memcpy(img + i * 4, faces[f], 4);
+        img[0] = 255;  // one corner texel differs: orientation
+        img[1] = img[2] = 255;
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + (GLenum)f, 0, GL_RGBA, 4, 4, 0, GL_RGBA, GL_UNSIGNED_BYTE, img);
+    }
+    glActiveTexture(GL_TEXTURE0);
+    static const float dirs[6][3] = {{1, 0.1f, 0.2f}, {-1, 0.1f, 0.2f}, {0.1f, 1, 0.2f},
+                                     {0.1f, -1, 0.2f}, {0.1f, 0.2f, 1}, {0.1f, 0.2f, -1}};
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    for (int f = 0; f < 6; f++) {
+        float pos[8], dir[12];
+        rect(pos, f * 10, 0, f * 10 + 10, 10);
+        for (int k = 0; k < 4; k++)
+            memcpy(dir + k * 3, dirs[f], sizeof dirs[f]);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, pos);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, dir);
+        glEnableVertexAttribArray(0);
+        glEnableVertexAttribArray(1);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+    // Corner directions: which texel of +Z is the "first" one.
+    static const float corners[4][3] = {{-0.9f, -0.9f, 1}, {0.9f, -0.9f, 1}, {-0.9f, 0.9f, 1}, {0.9f, 0.9f, 1}};
+    for (int c = 0; c < 4; c++) {
+        float pos[8], dir[12];
+        rect(pos, c * 10, 20, c * 10 + 10, 30);
+        for (int k = 0; k < 4; k++)
+            memcpy(dir + k * 3, corners[c], sizeof corners[c]);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, pos);
+        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, dir);
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    }
+    snap();
+    for (int f = 0; f < 6; f++)
+        check_px(f * 10 + 5, 5, faces[f][0], faces[f][1], faces[f][2], 255, "cube face");
+    int whites = 0;
+    for (int c = 0; c < 4; c++)
+        whites += px(c * 10 + 5, 25)[0] == 255 && px(c * 10 + 5, 25)[1] == 255 && px(c * 10 + 5, 25)[2] == 255;
+    check(whites == 1, "one corner of +Z is the first texel (%d)", whites);
+    glok("cube map");
+}
+
 // DXT blocks: colour endpoints and indices chosen to decode exactly.
 static void case_dxt(void) {
     glClearColor(0, 0, 0, 1);
@@ -1564,6 +1692,8 @@ static const test_case kCases[] = {
     {"viewport", case_viewport, 2},
     {"fbo", case_fbo, 0},
     {"render_to_texture", case_render_to_texture, 0},
+    {"depth_texture", case_depth_texture, 1},
+    {"cube_map", case_cube_map, 0},
     {"dxt", case_dxt, 1},
     {"bgra", case_bgra, 0},
     {"luminance", case_luminance, 0},

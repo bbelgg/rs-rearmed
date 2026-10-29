@@ -28,7 +28,7 @@ target_link_libraries(metal_core_test PRIVATE opengl)
 
 set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
-  fbo render_to_texture dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
+  fbo render_to_texture depth_texture cube_map dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
   map_buffer readback_orientation tex_subimage unpack_alignment uniforms queries errors api)
 # Programs need the translator (msl.cmake's rsmsl).
 if(TARGET rsmsl)

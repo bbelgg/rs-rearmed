@@ -11,7 +11,7 @@ them only together with every user.
                                    |                                    rs_gfx_* API   rs_overlay_* (executable)
                             libRSOpenGL.dylib  ── rsgl.c wrappers: rs_impl_<name> per entry point
                               /                         \
-             RS_GL_BACKEND=gl (default)          RS_GL_BACKEND=metal
+             RS_GL_BACKEND=gl                    RS_GL_BACKEND=metal (default)
              system OpenGL.framework             src/metal/: rsmtl_<name> implementations
                                                  src/msl/:   GLSL 1.20 -> MSL (offline corpus + runtime fallback)
 ```
@@ -21,11 +21,54 @@ them only together with every user.
   (`extra-gl-imports.txt`). Everything goes through `rs_impl_<name>`. With `RS_GL_BACKEND=metal`
   `rs_impl_<name> = rsmtl_<name>`. The generator emits a weak `rsmtl_<name>` for every entry point that
   logs `unimplemented <name>` once and returns 0; a strong definition in `src/metal/` replaces it. The
-  backend is chosen once, at load, and `rs_gfx_backend()` reports it.
+  backend is chosen once, at load, and `rs_gfx_backend()` reports it: Metal unless `RS_GL_BACKEND` is
+  `gl` (or `opengl`). The spy (`libglspy`) always wraps the system framework.
 - The Cg shim links `libRSOpenGL` instead of `OpenGL.framework`, so its calls take the same path. On Metal
-  the Cg shim always uses its `glsl` backend: ARB programs never reach the Metal core.
+  (asked from `rs_gfx_backend()`, not from the environment) the Cg shim always uses its `glsl` backend:
+  ARB programs never reach the Metal core.
 - `CGL*` (game imports `CGLLockContext`/`CGLUnlockContext`) and `NSOpenGLContext` are only used on GL. On
   Metal the shell uses `rs_gfx_*` and `CGLLockContext` takes the context's mutex.
+
+## Defaults and fallback (`shims/platform/include/rsp_renderer.h`)
+
+Metal is the default; OpenGL stays a choice and the fallback. Since `libRSOpenGL` fixes its backend when
+it loads (before `main`), the app's `main()` decides first thing, before the image, the shims, the
+engine or a window (`rsp_renderer_startup`, `rsp_renderer_decide`: pure, unit-tested in
+`platform.core`), and when the decision differs from what `libRSOpenGL` loaded with it `execv`s its own
+executable with the same arguments and `RS_GL_BACKEND` set (same path: the same app for Metal's shader
+cache; no `NSApplication` yet, so LaunchServices sees nothing). Inputs, strongest first:
+
+1. `RS_GL_BACKEND=gl|metal`: always wins; `metal` also over the crash count.
+2. Metal cannot start: no `MTLCreateSystemDefaultDevice()`, or a `libRSOpenGL` without the `rs_gfx`
+   presentation (`rsp_mtl_usable`; `RS_RENDERER_TEST_NO_METAL=1` simulates it) -> OpenGL, this start only.
+3. Crash count: the last two Metal sessions ended without a clean exit -> OpenGL; the setting becomes
+   `opengl` (so the next starts need no count), the marker goes, `renderer-fallback.txt` explains it and
+   an `osascript` notification says so (fire and forget, never blocks the game; `RS_RENDERER_NOTIFY=0`
+   turns it off). Writing `metal` into the setting tries Metal again with a fresh count; `install.sh`
+   also resets the count (a new build).
+4. `<home>/renderer`: `metal` or `opengl` (`install.sh`'s `RS_RENDERER`, the installer's Renderer
+   popup). The launcher passes `opengl` on as `RS_GL_BACKEND=gl` (no restart) and `metal` not at all (so
+   the crash fallback still applies), plus `RS_NATIVE_HOME`.
+5. Default: Metal.
+
+`<home>`: `RS_NATIVE_HOME`, else the install when the app is `<home>/game/<app>` and `<home>/game-dir`
+exists, else `~/Library/Caches/rs-rearmed` (builds run from elsewhere). **Session marker**: a Metal game
+start (not `--warm-shaders`, `--init-only`, `--bind-only`, `--renderer-check`) writes
+`<home>/metal-session` holding N, the abnormal endings in a row before it; clean exits remove it:
+`rsp_exit` (the shell's quit path, `-[OpenGLView dealloc]` after `MainController`'s shutdown, ending in
+`_Exit(0)`), `rsp_request_quit` without an engine, `exit()` (atexit) and SIGTERM/SIGINT/SIGHUP (a polite
+stop is not Metal's fault; only installed when nobody else handles them). A marker found at start means
+that session crashed, hung and was force-quit, or was killed: count N + 1. Force quit counts as
+abnormal (unavoidable), hence the threshold of 2. A GL session neither writes nor clears it.
+
+Late failure: `rs_gfx_create_layer` failing in `rsp_mtl_attach` (window already up) also restarts with
+OpenGL (`rsp_renderer_restart_gl`: not counted as a crash); only if that exec fails does the shell abort
+with a message. The re-exec'd process logs the original reason
+(`[rsp] renderer: opengl (Metal cannot start here; restarted with RS_GL_BACKEND set)`).
+`--renderer-check` prints the decision and exits (a pending crash fallback is applied as by a start).
+
+Tests: GL-only tests set `RS_GL_BACKEND=gl` (the Cg directory adds it to every test not named
+`*.metal`; `platform.overlay.<arch>`, `opengl.shim.window.*`), tests of both backends set it either way.
 
 ## Context and presentation API (`shims/opengl/src/rs_gfx.h`)
 

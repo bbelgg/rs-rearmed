@@ -20,6 +20,10 @@ let oldBuildFolderName = "RS Re-ARMed Build"  // 1.0.0-1.0.2; a saved path endin
 let defaultBuildBase = NSHomeDirectory() + "/Library/Caches/" + buildFolderName
 let buildBaseDefaultsKey = "BuildFolder"
 let launcherApp = NSHomeDirectory() + "/Applications/RS Re-ARMed.app"  // made by tools/play-native/install.sh
+let nativeHome = NSHomeDirectory() + "/Library/Application Support/RS Re-ARMed"  // install.sh's folder
+// The renderer (install.sh's RS_RENDERER, written to <nativeHome>/renderer): "metal" or "opengl".
+let rendererDefaultsKey = "Renderer"
+let rendererChoices: [(title: String, value: String)] = [("Metal (recommended)", "metal"), ("OpenGL", "opengl")]
 let logsDir = NSHomeDirectory() + "/Library/Logs/RS Re-ARMed Installer"  // kept when build files are deleted
 
 // MARK: - Progress lines
@@ -126,6 +130,7 @@ final class BuildRunner {
     var buildBase = defaultBuildBase  // standalone only: holds the source, its build/ and the logs
     var embeddedInRepo = false
     var cleanupAfterInstall = false
+    var renderer = "metal"  // rendererChoices' value
     var logFileURL: URL?
 
     private var logFileHandle: FileHandle?
@@ -267,8 +272,12 @@ final class BuildRunner {
             ("Building shims",                Steps.buildShims),
             ("Building the app",              Steps.buildApp),
             ("Packaging",                     Steps.packageApp),
-            ("Preparing shaders",             Steps.prepareShaders),
         ]
+        // The Metal shaders only for Metal: an OpenGL install needs none (a later switch to Metal
+        // prepares them on its first start).
+        if renderer == "metal" {
+            steps.append(("Preparing shaders", Steps.prepareShaders))
+        }
         if !embeddedInRepo && cleanupAfterInstall {
             steps.append(("Cleaning up", Steps.cleanup))
         }
@@ -553,7 +562,7 @@ enum Steps {
         // ~/Applications/RS Re-ARMed.app is the launcher.
         // The shader warm-up is a step of its own (prepareShaders).
         try await r.shell("tools/play-native/install.sh \"\(builtApp)\"",
-                          env: ["RS_GAME_DIR": r.gameDir, "RS_WARM_SHADERS": "0"])
+                          env: ["RS_GAME_DIR": r.gameDir, "RS_WARM_SHADERS": "0", "RS_RENDERER": r.renderer])
         guard FileManager.default.fileExists(atPath: launcherApp + "/Contents/MacOS/launch") else {
             throw InstallerError.fileNotFound(launcherApp)
         }
@@ -561,6 +570,8 @@ enum Steps {
         r.appendLog("\n══════════════════════════════════════════")
         r.appendLog("Installed: \(launcherApp)")
         r.appendLog("Game and saves: ~/Library/Application Support/RS Re-ARMed/")
+        r.appendLog("Renderer: \(r.renderer == "metal" ? "Metal" : "OpenGL") (the file \"renderer\" there; "
+            + "write metal or opengl into it to switch)")
         r.appendLog("To uninstall, delete both.")
         r.appendLog("══════════════════════════════════════════")
     }
@@ -638,11 +649,12 @@ class InstallerWindow: NSWindow {
     let showLogButton = NSButton(title: "Show Log File", target: nil, action: nil)
     let playButton = NSButton(title: "Start RS Re-ARMed", target: nil, action: nil)
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
+    let rendererPopup = NSPopUpButton(frame: .zero, pullsDown: false)
 
     init() {
         repoDetected = detectRepoRoot()
 
-        let rect = NSRect(x: 0, y: 0, width: 720, height: 560)
+        let rect = NSRect(x: 0, y: 0, width: 720, height: 590)
         super.init(contentRect: rect, styleMask: [.titled, .closable, .miniaturizable, .resizable],
                    backing: .buffered, defer: false)
         self.title = "RS Re-ARMed Installer v\(rsVersion)"
@@ -732,6 +744,29 @@ class InstallerWindow: NSWindow {
             content.addSubview(buildDirField)
             content.addSubview(buildBrowseButton)
         }
+
+        // Renderer: remembered like the build folder; else what the current install uses; else Metal.
+        let rendererLabel = NSTextField(labelWithString: "Renderer:")
+        rendererLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        rendererLabel.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(rendererLabel)
+
+        rendererPopup.addItems(withTitles: rendererChoices.map { $0.title })
+        let installed = (try? String(contentsOfFile: nativeHome + "/renderer", encoding: .utf8))?
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        let saved = UserDefaults.standard.string(forKey: rendererDefaultsKey) ?? (installed == "gl" ? "opengl" : installed)
+        rendererPopup.selectItem(at: rendererChoices.firstIndex(where: { $0.value == saved }) ?? 0)
+        rendererPopup.font = .systemFont(ofSize: 12)
+        rendererPopup.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(rendererPopup)
+
+        let rendererHint = NSTextField(labelWithString: "Change it later without reinstalling: the file \"renderer\" in ~/Library/Application Support/RS Re-ARMed")
+        rendererHint.font = .systemFont(ofSize: 11)
+        rendererHint.textColor = .secondaryLabelColor
+        rendererHint.lineBreakMode = .byTruncatingTail
+        rendererHint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        rendererHint.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(rendererHint)
 
         // Source info
         let sourceLabel = NSTextField(labelWithString: "Source:")
@@ -860,7 +895,17 @@ class InstallerWindow: NSWindow {
             browseButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             browseButton.widthAnchor.constraint(equalToConstant: 90),
 
-            sourceLabel.topAnchor.constraint(equalTo: sourceTopAnchor, constant: 12),
+            rendererLabel.centerYAnchor.constraint(equalTo: rendererPopup.centerYAnchor),
+            rendererLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+
+            rendererPopup.topAnchor.constraint(equalTo: sourceTopAnchor, constant: 12),
+            rendererPopup.leadingAnchor.constraint(equalTo: rendererLabel.trailingAnchor, constant: 8),
+
+            rendererHint.centerYAnchor.constraint(equalTo: rendererPopup.centerYAnchor),
+            rendererHint.leadingAnchor.constraint(equalTo: rendererPopup.trailingAnchor, constant: 10),
+            rendererHint.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -20),
+
+            sourceLabel.topAnchor.constraint(equalTo: rendererPopup.bottomAnchor, constant: 12),
             sourceLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
 
             sourceField.topAnchor.constraint(equalTo: sourceLabel.bottomAnchor, constant: 2),
@@ -928,6 +973,7 @@ class InstallerWindow: NSWindow {
         buildBrowseButton.isEnabled = !runner.isRunning
         buildDirField.isEditable = !runner.isRunning
         cleanupCheck.isEnabled = !runner.isRunning
+        rendererPopup.isEnabled = !runner.isRunning
         showLogButton.isHidden = runner.logFileURL == nil
 
         let logText = runner.log
@@ -1003,6 +1049,8 @@ class InstallerWindow: NSWindow {
             return
         }
         runner.cleanupAfterInstall = cleanupCheck.state == .on
+        runner.renderer = rendererChoices[max(0, rendererPopup.indexOfSelectedItem)].value
+        UserDefaults.standard.set(runner.renderer, forKey: rendererDefaultsKey)
         Task { @MainActor in
             await runner.run()
             updateUI()
@@ -1022,7 +1070,7 @@ class InstallerWindow: NSWindow {
 
                     The game build and your saves are in ~/Library/Application Support/RS Re-ARMed/. \
                     To uninstall, delete both.
-                    \(runner.shadersReady ? "" : """
+                    \(runner.renderer != "metal" || runner.shadersReady ? "" : """
 
                     The game's Metal shaders are not prepared yet: its first start with Metal shows \
                     "Preparing shaders" for a few minutes.

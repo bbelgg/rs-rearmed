@@ -47,3 +47,8 @@ _glGenFramebuffersEXT
 _glGetUniformfv
 _glPointSize
 _glTexImage1D
+# Metal core tests (shims/opengl/test/metal_core_test.c)
+_glIsEnabled
+_glIsVertexArray
+_glUniform3f
+_glUniform4f

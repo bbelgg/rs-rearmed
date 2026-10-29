@@ -1,1 +1,39 @@
 # Metal core (src/metal/, docs/METAL-DESIGN.md): sources added to the opengl target and its tests.
+set(ogl_mtl_sources
+  src/metal/mtl_context.m
+  src/metal/mtl_state.m
+  src/metal/mtl_objects.m
+  src/metal/mtl_program.m
+  src/metal/mtl_draw.m
+  src/metal/mtl_extras.m)
+target_sources(opengl PRIVATE ${ogl_mtl_sources})
+set_source_files_properties(${ogl_mtl_sources} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
+target_link_libraries(opengl PRIVATE "-framework Metal" "-framework QuartzCore" "-framework Foundation")
+if(TARGET rsmsl)
+  target_link_libraries(opengl PRIVATE rsmsl)
+else()
+  # No translator in this build: resolve it at run time (a test program may provide one).
+  target_link_options(opengl PRIVATE "LINKER:-U,_rsmsl_translate" "LINKER:-U,_rsmsl_free" "LINKER:-U,_rsmsl_key")
+  set_property(SOURCE src/metal/mtl_program.m APPEND PROPERTY COMPILE_DEFINITIONS RSM_MSL_DYNAMIC)
+endif()
+
+# --- Tests ------------------------------------------------------------------------------
+# metal_core_test runs one GL call sequence through an rs_gfx offscreen context;
+# --compare runs it on both backends (child processes) and compares the pixels.
+add_executable(metal_core_test test/metal_core_test.c)
+add_dependencies(metal_core_test opengl_api)
+target_include_directories(metal_core_test PRIVATE "${CMAKE_CURRENT_BINARY_DIR}" src)
+target_compile_options(metal_core_test PRIVATE -Wno-deprecated-declarations)
+target_link_libraries(metal_core_test PRIVATE opengl)
+
+set(ogl_metal_cases
+  clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
+  fbo render_to_texture dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
+  map_buffer readback_orientation tex_subimage unpack_alignment uniforms queries errors)
+# Programs need the translator (msl.cmake's rsmsl).
+if(TARGET rsmsl)
+  foreach(c ${ogl_metal_cases})
+    add_test(NAME opengl.metal.${c} COMMAND metal_core_test --compare ${c})
+    set_tests_properties(opengl.metal.${c} PROPERTIES ${ogl_pass})
+  endforeach()
+endif()

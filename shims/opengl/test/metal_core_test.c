@@ -28,6 +28,7 @@
 
 #define GL_VERTEX_ARRAY_BINDING 0x85B5
 #define GL_MAX_VERTEX_UNIFORM_VECTORS 0x8DFB
+#define GL_PROGRAM_BINARY_RETRIEVABLE_HINT 0x8257
 
 extern char **environ;
 
@@ -1457,6 +1458,92 @@ static void case_errors(void) {
           "error model");
 }
 
+
+// The imports no other case calls (program binaries, info logs, CGL, ...).
+static void case_api(void) {
+    rs_gfx_context *ctx = rs_gfx_current();
+    check(CGLLockContext(rs_gfx_cgl(ctx)) == kCGLNoError, "CGLLockContext");
+    check(CGLUnlockContext(rs_gfx_cgl(ctx)) == kCGLNoError, "CGLUnlockContext");
+    GLuint p = glCreateProgram();
+    GLuint vs = shader(GL_VERTEX_SHADER, kVS), fs = shader(GL_FRAGMENT_SHADER, kFScolor);
+    glAttachShader(p, vs);
+    glAttachShader(p, fs);
+    glBindAttribLocation(p, 0, "pos");
+    glBindFragDataLocation(p, 0, "gl_FragColor_unused");
+    glGetError();
+    glProgramParameteri(p, GL_PROGRAM_BINARY_RETRIEVABLE_HINT, GL_TRUE);
+    glGetError();  // Apple's legacy context: may be an error
+    glLinkProgram(p);
+    char log[256];
+    GLsizei n = -1;
+    glGetShaderInfoLog(vs, sizeof log, &n, log);
+    check(n >= 0, "glGetShaderInfoLog");
+    glGetProgramInfoLog(p, sizeof log, &n, log);
+    check(n >= 0, "glGetProgramInfoLog");
+    // Program binaries: no formats, so a reload fails cleanly.
+    static char bin[4096];
+    GLsizei got = 0;
+    GLenum fmt = 0;
+    glGetProgramBinary(p, sizeof bin, &got, &fmt, bin);
+    glGetError();
+    GLuint p2 = glCreateProgram();
+    glProgramBinary(p2, fmt, bin, got);
+    glGetError();
+    GLint ok2 = 1;
+    glGetProgramiv(p2, GL_LINK_STATUS, &ok2);
+    check(!ok2, "glProgramBinary without formats leaves the program unlinked");
+    glDeleteProgram(p2);
+    glDeleteProgram(p);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    // Texture parameter / string queries.
+    GLuint t = texture_rgba(1, 1, (const unsigned char[]){1, 2, 3, 4}, GL_LINEAR);
+    GLint mf = 0;
+    glGetTexParameteriv(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, &mf);
+    check(mf == GL_LINEAR, "glGetTexParameteriv");
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, (GLfloat)GL_NEAREST);
+    glDeleteTextures(1, &t);
+    const GLubyte *e0 = glGetStringi(GL_EXTENSIONS, 0);
+    glGetError();  // GL 3 only on Apple's legacy context
+    (void)e0;
+    GLint rb = 0;
+    glGenRenderbuffers(1, (GLuint *)&rb);
+    glBindRenderbuffer(GL_RENDERBUFFER, (GLuint)rb);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_RGBA8, 4, 4);
+    GLint w = 0;
+    glGetRenderbufferParameteriv(GL_RENDERBUFFER, GL_RENDERBUFFER_WIDTH, &w);
+    check(w == 4 && glIsRenderbuffer((GLuint)rb), "renderbuffer");
+    glDeleteRenderbuffers(1, (GLuint *)&rb);
+    GLuint fb;
+    glGenFramebuffers(1, &fb);
+    glBindFramebuffer(GL_FRAMEBUFFER, fb);
+    check(glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE, "empty FBO incomplete");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fb);
+    GLuint vao;
+    glGenVertexArrays(1, &vao);
+    glGetError();
+    glBindVertexArray(0);
+    glGetError();
+    glDeleteVertexArrays(1, &vao);
+    glGetError();
+    glUniform2f(-1, 0, 0);
+    glUniform1iv(-1, 0, NULL);
+    glUniform2fv(-1, 0, NULL);
+    glUniform1f(-1, 0);
+    glUniform3fv(-1, 0, NULL);
+    glUniform4fv(-1, 0, NULL);
+    glGetError();
+    glStencilFunc(GL_ALWAYS, 0, 0xFF);
+    glDrawArraysInstancedARB(GL_TRIANGLES, 0, 0, 1);
+    glDrawElementsInstanced(GL_TRIANGLES, 0, GL_UNSIGNED_SHORT, NULL, 1);
+    glDrawElementsInstancedARB(GL_TRIANGLES, 0, GL_UNSIGNED_SHORT, NULL, 1);
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    snap();
+    glok("api");
+}
+
 typedef struct {
     const char *name;
     void (*fn)(void);
@@ -1491,6 +1578,7 @@ static const test_case kCases[] = {
     {"uniforms", case_uniforms, 1},
     {"queries", case_queries, 0},
     {"errors", case_errors, 0},
+    {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };
 
@@ -1668,7 +1756,37 @@ static int bench(int frames, int draws, int subdata) {
     return 0;
 }
 
+
+// Every case in one process on the current backend, then the API coverage:
+// all of the game's imports must have been called.
+static int run_all(void) {
+    for (int i = 0; i < N_CASES; i++) {
+        g_dump_len = 0;
+        g_vbo = 0;
+        run_case(&kCases[i], NULL);
+    }
+    struct rs_gl_stat st[512];
+    int n = rs_gl_stats(NULL), used = 0, game = 0;
+    if (n > 512)
+        n = 512;
+    rs_gl_stats(st);
+    // The game's imports come first in the table (game-gl-imports.txt).
+    for (int i = 0; i < n && i < RS_GL_GAME_COUNT; i++) {
+        game++;
+        if (st[i].calls)
+            used++;
+        else
+            printf("UNCALLED %s\n", st[i].name);
+    }
+    printf("COVERAGE %d/%d game GL imports called\n", used, game);
+    check(used == game, "every game import was called");
+    printf("all on %s: %d passed, %d failed\n", g_backend, passed, failed);
+    return failed != 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 2 && !strcmp(argv[1], "--all"))
+        return run_all();
     if (argc >= 2 && !strcmp(argv[1], "--bench"))
         return bench(argc > 2 ? atoi(argv[2]) : 200, argc > 3 ? atoi(argv[3]) : 500, argc > 4 ? atoi(argv[4]) : 1);
     if (argc >= 2 && !strcmp(argv[1], "--list")) {

@@ -29,11 +29,16 @@ target_link_libraries(metal_core_test PRIVATE opengl)
 set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
   fbo render_to_texture dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
-  map_buffer readback_orientation tex_subimage unpack_alignment uniforms queries errors)
+  map_buffer readback_orientation tex_subimage unpack_alignment uniforms queries errors api)
 # Programs need the translator (msl.cmake's rsmsl).
 if(TARGET rsmsl)
   foreach(c ${ogl_metal_cases})
     add_test(NAME opengl.metal.${c} COMMAND metal_core_test --compare ${c})
     set_tests_properties(opengl.metal.${c} PROPERTIES ${ogl_pass})
   endforeach()
+  # All cases in one process on Metal, with error checking: every game import is called.
+  add_test(NAME opengl.metal.coverage COMMAND metal_core_test --all)
+  set_tests_properties(opengl.metal.coverage PROPERTIES
+    ENVIRONMENT "RS_GL_BACKEND=metal;RS_GL_CHECK=1"
+    PASS_REGULAR_EXPRESSION "COVERAGE 107/107.*all on metal: [0-9]+ passed, 0 failed")
 endif()

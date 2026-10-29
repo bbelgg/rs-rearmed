@@ -11,9 +11,13 @@
 //                       and re-exports the rest of the system framework.
 //                       Backends (RS_GL_BACKEND, read once at load):
 //                         gl     the system framework (Apple's Metal-backed GL),
-//                                through dlsym; the default
+//                                through dlsym ("opengl" is accepted too)
 //                         metal  rsmtl_<name> (src/metal/; a weak generated stub
-//                                reports "unimplemented <name>" and returns 0)
+//                                reports "unimplemented <name>" and returns 0);
+//                                the default (unset, empty or unknown). The app's
+//                                main() may start again with RS_GL_BACKEND=gl
+//                                (no Metal device, Metal crash fallback:
+//                                shims/platform/include/rsp_renderer.h)
 //                       The spy wraps only the game's imports and always uses
 //                       the system framework.
 //
@@ -38,7 +42,8 @@
 //   RS_GL_TRACE_DIR=<dir>     per-frame call trace (gltrace.c; RS_GL_TRACE_START / _KEY / _FRAMES)
 //   RS_GL_FRAMETIMES=<file>   timestamp every present, drawView and display-link callback
 //                             (nsgl_hook.m). No call tracing
-//   RS_GL_BACKEND=gl|metal    the shim's backend (default gl); rs_gfx_backend() reports it
+//   RS_GL_BACKEND=gl|metal    the shim's backend (default metal; the spy: always gl);
+//                             rs_gfx_backend() reports it
 #include "gl_api.h"
 #include "gltrace.h"
 #include "rs_gfx.h"
@@ -658,16 +663,21 @@ static void *rs_report_thread(void *arg) {
 // --- Backend --------------------------------------------------------------------
 static _Atomic int rs_backend = -1;
 
-// RS_GL_BACKEND, parsed once (also when asked before the constructor ran).
+// RS_GL_BACKEND, parsed once (also when asked before the constructor ran). libRSOpenGL: Metal
+// unless it says gl (or opengl); the spy wraps the system framework only.
 static rs_gfx_backend_t rs_backend_get(void) {
     int b = rs_backend;
     if (b < 0) {
-        const char *e = getenv("RS_GL_BACKEND");
+#ifdef RS_GL_SPY
         b = RS_GFX_GL;
-        if (e && !strcmp(e, "metal"))
-            b = RS_GFX_METAL;
-        else if (e && *e && strcmp(e, "gl"))
-            fprintf(stderr, "[rs-gl] unknown RS_GL_BACKEND=%s, using gl\n", e);
+#else
+        const char *e = getenv("RS_GL_BACKEND");
+        b = RS_GFX_METAL;
+        if (e && (!strcmp(e, "gl") || !strcmp(e, "opengl")))
+            b = RS_GFX_GL;
+        else if (e && *e && strcmp(e, "metal"))
+            fprintf(stderr, "[rs-gl] unknown RS_GL_BACKEND=%s, using metal\n", e);
+#endif
         rs_backend = b;
     }
     return (rs_gfx_backend_t)b;

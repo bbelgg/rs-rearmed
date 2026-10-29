@@ -606,9 +606,10 @@ static void bench(Gpu *g, int frames, int mt) {
 
 int main(int argc, char **argv) {
     const char *b = getenv("RS_CG_BACKEND");
-    const char *gb = getenv("RS_GL_BACKEND");
-    g_glsl = (b && !strcmp(b, "glsl")) || (gb && !strcmp(gb, "metal"));
-    int metal = gb && !strcmp(gb, "metal");
+    // libRSOpenGL's backend (Metal unless RS_GL_BACKEND=gl), as the shim sees it.
+    int (*be)(void) = (int (*)(void))dlsym(RTLD_DEFAULT, "rs_gfx_backend");
+    int metal = be && be() == 1;
+    g_glsl = (b && !strcmp(b, "glsl")) || metal;
     Gpu a = {0}, shared = {0}, alone = {0};
     if (!make_gpu(&a, NULL, NULL)) {
         printf("no GL context\n");

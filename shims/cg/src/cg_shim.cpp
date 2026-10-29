@@ -13,8 +13,8 @@
 //                   libRSOpenGL, which translates its GLSL to MSL.
 //
 // Environment:
-//   RS_CG_BACKEND=arb|glsl      backend (default arb; always glsl when
-//                               RS_GL_BACKEND=metal, which has no ARB programs)
+//   RS_CG_BACKEND=arb|glsl      backend (default arb; always glsl when libRSOpenGL
+//                               runs on Metal, its default, which has no ARB programs)
 //   RS_CG_GLSL_DIALECT=120|100es
 //   RS_CG_GLSL_EAGER=1          glsl: link a pair at bind time, not at first use
 //   RS_CG_PAIR_CACHE=<file>|0   glsl: pairs linked in earlier runs, linked again as
@@ -89,9 +89,16 @@ struct Config {
     Config() {
         const char *b = getenv("RS_CG_BACKEND");
         if (b && !strcmp(b, "glsl")) glsl = true;
-        // libRSOpenGL's Metal core implements no ARB programs.
-        const char *gl = getenv("RS_GL_BACKEND");
-        if (gl && !strcmp(gl, "metal")) glsl = true;
+        // libRSOpenGL's Metal core implements no ARB programs. Its backend (Metal unless
+        // RS_GL_BACKEND=gl) is asked from libRSOpenGL itself; without it (the system framework)
+        // only an explicit RS_GL_BACKEND=metal counts.
+        typedef int (*BackendFn)(void);
+        if (BackendFn be = (BackendFn)dlsym(RTLD_DEFAULT, "rs_gfx_backend")) {
+            if (be() == 1) glsl = true;
+        } else {
+            const char *gl = getenv("RS_GL_BACKEND");
+            if (gl && !strcmp(gl, "metal")) glsl = true;
+        }
         if (const char *d = getenv("RS_CG_GLSL_DIALECT")) dialect = d;
         glsl_eager = env_on("RS_CG_GLSL_EAGER");
         log = env_on("RS_CG_LOG");

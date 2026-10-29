@@ -262,8 +262,7 @@ static void test_safe_load(void) {
 
 int main(void) {
   @autoreleasepool {
-    const char *b = getenv("RS_GL_BACKEND");
-    if (b && !strcmp(b, "metal")) test_metal();
+    if (rsp_mtl_loaded_backend() == 1) test_metal();  // libRSOpenGL's backend: RS_GL_BACKEND, default metal
     else test_gl();
     test_safe_load();
   }

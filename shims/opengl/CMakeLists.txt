@@ -4,8 +4,8 @@
 #   libRSOpenGL.dylib  OpenGL.framework replacement: wrappers for the game's 107
 #                      imports and the extra functions the Cg shim, the shell and
 #                      the tests call (extra-gl-imports.txt), forwarding to the
-#                      backend (RS_GL_BACKEND=gl: the system framework, the
-#                      default; metal: rsmtl_<name>, docs/METAL-DESIGN.md), plus
+#                      backend (RS_GL_BACKEND=gl: the system framework;
+#                      metal, the default: rsmtl_<name>, docs/METAL-DESIGN.md), plus
 #                      re-export of the rest of the framework and rs_gfx.h.
 #                      The app, the shell and Cg link it (@executable_path).
 #   libglspy.dylib     the game-import wrappers as a DYLD_INSERT_LIBRARIES
@@ -101,9 +101,9 @@ foreach(arch arm64 x86_64)
     COMMAND arch -${arch} "$<TARGET_FILE:gl_native_test_shim>" --window)
   set_tests_properties(opengl.system.core.${arch} opengl.system.legacy.${arch}
     PROPERTIES ${ogl_pass})
-  # With error checking on, through the shim, all 107 imports must be called.
+  # With error checking on, through the shim (on GL: an NSOpenGLContext), all 107 imports must be called.
   set_tests_properties(opengl.shim.window.${arch} PROPERTIES
-    ENVIRONMENT "RS_GL_CHECK=1"
+    ENVIRONMENT "RS_GL_BACKEND=gl;RS_GL_CHECK=1"
     PASS_REGULAR_EXPRESSION "COVERAGE 107/107.*[0-9]+ passed, 0 failed"
     RUN_SERIAL TRUE)
 

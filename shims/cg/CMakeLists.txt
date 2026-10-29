@@ -93,6 +93,14 @@ if(TARGET rsmsl)
   set_tests_properties(cg.render.metal cg.stress.metal PROPERTIES ENVIRONMENT "RS_GL_BACKEND=metal")
 endif()
 
+# libRSOpenGL's default backend is Metal: every other test here runs on GL, as it was written for.
+get_property(cg_tests DIRECTORY PROPERTY TESTS)
+foreach(t IN LISTS cg_tests)
+  if(NOT t MATCHES "\\.metal$")
+    set_property(TEST ${t} APPEND PROPERTY ENVIRONMENT "RS_GL_BACKEND=gl")
+  endif()
+endforeach()
+
 # x86_64 tool that records NVIDIA's runtime's answers for the corpus
 # (tools/make_reference.sh); links the Cg.framework from the game install.
 set(cg_orig "${RS_GAME_APP}/Contents/Frameworks/Cg.framework/Cg")

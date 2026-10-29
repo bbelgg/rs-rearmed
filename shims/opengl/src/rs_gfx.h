@@ -10,7 +10,7 @@ extern "C" {
 
 typedef enum { RS_GFX_GL = 0, RS_GFX_METAL = 1 } rs_gfx_backend_t;
 
-// RS_GL_BACKEND=gl|metal, read once when libRSOpenGL loads (default gl).
+// RS_GL_BACKEND=gl|metal, read once when libRSOpenGL loads (default metal).
 rs_gfx_backend_t rs_gfx_backend(void);
 
 typedef struct rs_gfx_context rs_gfx_context;

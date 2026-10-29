@@ -22,6 +22,83 @@ let buildBaseDefaultsKey = "BuildFolder"
 let launcherApp = NSHomeDirectory() + "/Applications/RS Re-ARMed.app"  // made by tools/play-native/install.sh
 let logsDir = NSHomeDirectory() + "/Library/Logs/RS Re-ARMed Installer"  // kept when build files are deleted
 
+// MARK: - Progress lines
+
+// "progress F LABEL" lines on a command's stdout (build-m4.sh, warm-shaders.sh): F is the fraction
+// of the current step. Parsed apart from the UI, so `--parse-progress FILE` can check it.
+struct ProgressLine {
+    let fraction: Double
+    let label: String
+
+    static func parse(_ line: Substring) -> ProgressLine? {
+        let parts = line.split(separator: " ", maxSplits: 2)
+        guard parts.count == 3, parts[0] == "progress", let f = Double(parts[1]) else { return nil }
+        return ProgressLine(fraction: min(max(f, 0), 1), label: String(parts[2]))
+    }
+
+    // The log line: "→ Linking the app…", "→ Preparing shaders… 120 of 3880".
+    var logText: String { label.contains(where: { $0.isNumber }) ? "→ \(label)" : "→ \(label)…" }
+
+    // What the step label shows: the label without the step's own title ("Preparing shaders… 120
+    // of 3880" in the step "Preparing shaders" -> "120 of 3880").
+    func detail(inStep title: String) -> String {
+        let prefix = title + "… "
+        return label.hasPrefix(prefix) ? String(label.dropFirst(prefix.count)) : label
+    }
+}
+
+// Which progress lines go to the log: a new label, and for a counting label ("… 120 of 3880") also
+// every further tenth of the step, rather than every count.
+struct ProgressLog {
+    private var lastKey = ""
+    private var lastTenth = -1
+
+    mutating func shouldLog(_ p: ProgressLine) -> Bool {
+        let key = String(p.label.filter { !$0.isNumber })
+        let tenth = Int(p.fraction * 10)
+        if key != lastKey {
+            lastKey = key
+            lastTenth = tenth
+            return true
+        }
+        if key != p.label && tenth > lastTenth {
+            lastTenth = tenth
+            return true
+        }
+        return false
+    }
+
+    mutating func reset() { self = ProgressLog() }
+}
+
+// `RS Re-ARMed Installer --parse-progress FILE [STEP]`: feeds FILE (a command's captured output) through
+// the parsing above and prints what the step label and the log would show; exit 1 if the fractions go
+// backwards or do not end at 1. A check of the step's parsing without the UI, e.g. on the output of
+// tools/play-native/warm-shaders.sh.
+func parseProgressFile(_ path: String, step: String) -> Int32 {
+    guard let text = try? String(contentsOfFile: path, encoding: .utf8) else {
+        print("parse-progress: cannot read \(path)")
+        return 2
+    }
+    var log = ProgressLog()
+    var last = -1.0, lines = 0, logged = 0, backwards = 0, detail = ""
+    for line in text.split(separator: "\n") {
+        guard let p = ProgressLine.parse(line) else { continue }
+        lines += 1
+        if p.fraction < last { backwards += 1 }
+        last = p.fraction
+        detail = p.detail(inStep: step)
+        if log.shouldLog(p) {
+            logged += 1
+            print("log: \(p.logText)")
+        }
+    }
+    print("parse-progress: \(lines) progress lines, \(logged) logged, last \(last), last label shown: \(detail)")
+    let ok = lines > 0 && backwards == 0 && last == 1.0
+    print(ok ? "parse-progress: ok" : "parse-progress: FAILED (\(backwards) steps backwards, last fraction \(last))")
+    return ok ? 0 : 1
+}
+
 // MARK: - Build runner
 
 @MainActor
@@ -35,6 +112,9 @@ final class BuildRunner {
     var stepFraction: Double = 0
     var stepDetail = ""
     var stepStart = Date()
+    var progressLog = ProgressLog()
+    // The shader warm-up step compiled everything (the first Metal start is quick then).
+    var shadersReady = false
     var isRunning = false
     var isFinished = false
     var failure: Error?
@@ -58,19 +138,17 @@ final class BuildRunner {
         }
     }
 
-    // A command's output: "progress F LABEL" lines move the bar within the step (only a new LABEL
-    // goes to the log), the rest is logged as is.
+    // A command's output: "progress F LABEL" lines move the bar within the step and set the step
+    // label (ProgressLog picks the ones that go to the log), the rest is logged as is.
     func appendOutput(_ text: String) {
         var rest: [Substring] = []
         for line in text.split(separator: "\n", omittingEmptySubsequences: false) {
-            let parts = line.split(separator: " ", maxSplits: 2)
-            if parts.count == 3, parts[0] == "progress", let f = Double(parts[1]) {
-                stepFraction = min(max(f, 0), 1)
+            if let p = ProgressLine.parse(line) {
+                stepFraction = p.fraction
                 progress = (Double(currentStep - 1) + stepFraction) / Double(max(totalSteps, 1))
-                let label = String(parts[2])
-                if label != stepDetail {
-                    stepDetail = label
-                    rest.append(Substring("→ \(label)…"))
+                stepDetail = p.detail(inStep: stepTitle)
+                if progressLog.shouldLog(p) {
+                    rest.append(Substring(p.logText))
                 }
             } else {
                 rest.append(line)
@@ -189,6 +267,7 @@ final class BuildRunner {
             ("Building shims",                Steps.buildShims),
             ("Building the app",              Steps.buildApp),
             ("Packaging",                     Steps.packageApp),
+            ("Preparing shaders",             Steps.prepareShaders),
         ]
         if !embeddedInRepo && cleanupAfterInstall {
             steps.append(("Cleaning up", Steps.cleanup))
@@ -203,6 +282,7 @@ final class BuildRunner {
                 stepTitle = title
                 stepFraction = 0
                 stepDetail = ""
+                progressLog.reset()
                 stepStart = Date()
                 progress = Double(i) / Double(steps.count)
                 appendLog("\n══════════════════════════════════════════")
@@ -471,7 +551,9 @@ enum Steps {
         // The same install as a manual build: the game goes into ~/Library/Application Support/RS Re-ARMed/game
         // (the launcher mirrors the game folder there, since the game finds its files next to its .app) and
         // ~/Applications/RS Re-ARMed.app is the launcher.
-        try await r.shell("tools/play-native/install.sh \"\(builtApp)\"", env: ["RS_GAME_DIR": r.gameDir])
+        // The shader warm-up is a step of its own (prepareShaders).
+        try await r.shell("tools/play-native/install.sh \"\(builtApp)\"",
+                          env: ["RS_GAME_DIR": r.gameDir, "RS_WARM_SHADERS": "0"])
         guard FileManager.default.fileExists(atPath: launcherApp + "/Contents/MacOS/launch") else {
             throw InstallerError.fileNotFound(launcherApp)
         }
@@ -481,6 +563,17 @@ enum Steps {
         r.appendLog("Game and saves: ~/Library/Application Support/RS Re-ARMed/")
         r.appendLog("To uninstall, delete both.")
         r.appendLog("══════════════════════════════════════════")
+    }
+
+    // The installed game compiles its Metal shaders once (warm-shaders.sh runs its executable with
+    // --warm-shaders: no window), so its first start with Metal does not have to; "progress" lines
+    // with "Preparing shaders… N of M" move the bar. Never fails the install: without it the game
+    // prepares them on its first Metal start.
+    static func prepareShaders(_ r: BuildRunner) async throws {
+        r.appendLog("Compiling the game's Metal shaders, so its first start with Metal is quick. "
+            + "The first time this takes a few minutes; after an update usually seconds.")
+        let out = try await r.shell("tools/play-native/warm-shaders.sh")
+        r.shadersReady = out.contains("shader libraries ready")
     }
 
     static func cleanup(_ r: BuildRunner) async throws {
@@ -929,6 +1022,11 @@ class InstallerWindow: NSWindow {
 
                     The game build and your saves are in ~/Library/Application Support/RS Re-ARMed/. \
                     To uninstall, delete both.
+                    \(runner.shadersReady ? "" : """
+
+                    The game's Metal shaders are not prepared yet: its first start with Metal shows \
+                    "Preparing shaders" for a few minutes.
+                    """)
 
                     The installer log is in \(logPath).
                     """,
@@ -1047,6 +1145,11 @@ func makeMainMenu() -> NSMenu {
     main.addItem(windowItem)
 
     return main
+}
+
+if let i = CommandLine.arguments.firstIndex(of: "--parse-progress"), i + 1 < CommandLine.arguments.count {
+    let a = CommandLine.arguments
+    exit(parseProgressFile(a[i + 1], step: i + 2 < a.count ? a[i + 2] : "Preparing shaders"))
 }
 
 let delegate = AppDelegate()

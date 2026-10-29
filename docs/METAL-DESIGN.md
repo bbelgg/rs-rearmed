@@ -92,6 +92,27 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   corpus warm off / forces it. Then the pool is throttled for the rest of the run: at most 2 jobs at
   once (`RS_MTL_COMPILE_THREADS` when set), all at utility QoS, so libraries the manifest did not know
   cannot starve the loading threads; a draw that needs one still waits for it or compiles it itself.
+  **Install-time warm-up** (`--warm-shaders`, `rsp_mtl_warm_only` in `rsp_present_metal.m`,
+  `tools/play-native/warm-shaders.sh`, run by `install.sh` and the installer's "Preparing shaders"
+  step): the installed app's own executable, before it loads anything of the game (no image, no
+  window, no NSApplication, so no Dock icon), re-executes itself with `RS_GL_BACKEND=metal` if needed,
+  makes an offscreen context (which opens the disk cache and starts the manifest's warming) and runs
+  `rs_gfx_prepare` with the same corpus rule, printing `progress F Preparing shaders… N of M` (F never
+  decreasing, 1 at the end, also on a timeout; `RS_METAL_WARM_MAX_SECONDS`, default 3600); exit 0
+  ready, 1 timed out, 2 no Metal. The game's later safe load then finds the `corpus-warmed` record and
+  system-cache hits, and without safe load the game's own compiles are hits. It has to be the
+  installed app, run at its resolved path: Metal's system shader cache
+  (`$(getconf DARWIN_USER_CACHE_DIR)<bundle id>/com.apple.metal/`; a process without a bundle uses
+  `…/com.apple.metal/` itself) is keyed by the bundle identifier and, as measured on macOS 26, the
+  length of the bundle's path (a copy of the app at a path of another length misses, one of the same
+  length with other names hits; a path through a symlink counts with its own length; argv[0] does not
+  matter). LaunchServices starts the app by its resolved path, and a launch through `open -n -a` hit
+  every library of a warm-up done by exec'ing the executable directly (500 of 500 in 10 ms, 31 s cold;
+  a copy at another path length: 84 of 500 in 5 s). So a separate tool cannot do it, the warm-up
+  stays valid across reinstalls to the same place, and moving the install warms again (by the
+  manifest; the corpus too while the manifest is small). Our own disk cache is per user, not per app
+  (`~/Library/Caches/rs-rearmed/metal`), the same for both. Cost on this M2, cold: 3880 libraries in
+  270 s (8 threads, nothing else running); again: 0.2 s.
   Pipelines are built on the drawing thread (warming: on the pool), archive adds on one serial utility
   queue. With the original `cache.psarc` nothing of this applies. GL: `rs_gfx_prepare` is a no-op.
   Uniforms live in CPU shadow blocks per stage, uploaded per draw with `setVertexBytes`/`setFragmentBytes`
@@ -119,8 +140,23 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
 ## Shader translation (`shims/opengl/src/msl/`, `tools/metal/`)
 
 `rsmsl_translate` (see `msl_xlat.h`) first looks in the offline corpus (MSL generated at build time from
-every shader seen in the game; keyed by a hash of both sources), then translates at run time and logs it
-(`RS_MSL_LOG`). Binding conventions: vertex attributes `[[attribute(i)]]` from `[[stage_in]]`; vertex
+every shader the game can compile; keyed by a hash of both sources), then translates at run time and logs it
+(`RS_MSL_LOG`).
+
+The corpus of a user's build is made from the game files alone (`tools/metal/make-corpus.sh`, run by
+`build-m4.sh`, a few seconds): Scaleform's GL HAL keeps the full source of each shader in the image,
+one set per GLSL version; `extract_scaleform.py` takes the `#version 120` set (66 vertex, 147 fragment
+shaders) and sizes the batch uniform arrays (`vfuniforms`, `vfmuniforms`) for 12 batches instead of the
+strings' 24, as the HAL does at run time with the GL limits both backends report. The result is byte
+for byte the 213 shaders `RS_GL_DUMP_SHADERS` dumped in menu and song runs. The Cg side comes from
+`static.psarc` (`shims/cg/tools/extract_corpus.py`, then `cg_corpus_load --dump-glsl`). Pairing
+(`pair_shaders.py`) and translation (`build-msl-corpus.sh --translate-only`, i.e. `msl_verify
+--translate-only`: no MSL compile, no GL) give 6250 programs, 4081 entries, 3880 distinct MSL texts:
+the same entries as the corpus built from game-run dumps and checked against GL (only the "verified"
+flag differs; `RS_MSL_VERIFY=1` runs that check too, about 5 minutes). Not covered: a shader the game
+would build at run time from other sources (none seen in game runs), and a game version whose image
+does not hold the expected set (`extract_scaleform.py` then fails and the build goes on without a
+corpus). Binding conventions: vertex attributes `[[attribute(i)]]` from `[[stage_in]]`; vertex
 buffers at buffer index 14 + attribute index (14..29: one buffer per enabled attribute, Metal stops at 30); uniforms at buffer 0 in
 each stage; fragment alpha-test reference at buffer 1; textures and samplers at the sampler's texture unit.
 

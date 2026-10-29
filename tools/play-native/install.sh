@@ -7,6 +7,8 @@
 #       libnetguard.dylib,
 #       steam/ (the shim's offline cloud, made on first launch), logs/
 #   ~/Applications/RS Re-ARMed.app               the launcher (tools/play-native/launch.sh)
+# Then it compiles the game's Metal shaders (tools/play-native/warm-shaders.sh: a few minutes the
+# first time; RS_WARM_SHADERS=0 skips it).
 # Re-run it after a new build to update the game. Saves in steam/ are kept. Never touches the
 # install or the real Steam folder. RS_NATIVE_HOME / RS_NATIVE_LAUNCHER override the two paths.
 set -euo pipefail
@@ -70,3 +72,6 @@ lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchSe
 touch "$launcher" "$home/game/Rocksmith2014.app"
 echo "installed: $home/game/Rocksmith2014.app"
 echo "launcher:  $launcher"
+# Compile the Metal shaders now rather than on the first Metal start (tools/play-native/warm-shaders.sh;
+# RS_WARM_SHADERS=0 skips it, a second or so when everything is compiled already).
+"$here/warm-shaders.sh" "$home/game/Rocksmith2014.app"

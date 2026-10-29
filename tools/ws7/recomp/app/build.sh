@@ -126,7 +126,7 @@ codesign --force -s - "$app/Contents/MacOS/libsteam_api.dylib" "$app/Contents/Ma
 # writes new ones (next to the executable and _CodeSignature), so they go again after it: the bundle
 # still verifies where it is, but a copy of it would not.
 find "$app" -name '._*' -delete
-codesign --force -s - "$exe" 2>/dev/null
+codesign --force -s - "$exe"  # its errors stay visible: under set -e a failure ends the build here
 find "$app" -name '._*' -delete
 echo "built $app"
 lipo -archs "$exe"

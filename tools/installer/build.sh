@@ -56,6 +56,6 @@ EOF
 # and _CodeSignature), so they go again after it: the bundle still verifies where it is, but a copy
 # of it would not.
 find "$out" -name '._*' -delete
-codesign --force -s - "$out" 2>/dev/null || true
+codesign --force -s - "$out" || true  # the executable is already signed by the linker
 find "$out" -name '._*' -delete
 echo "built: $out"

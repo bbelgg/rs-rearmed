@@ -6,7 +6,8 @@
 # arm64 slices of the shims/game libraries the adapters call (OUTDIR/lib/librs_*.a), and OUTDIR/overrides.skip
 # (gen_image.py --skip). The generated adapters are in gen/ and are checked in.
 #
-# Modules (default set): lua png jpeg zlib efd efd_qi crypto online dsp. Optional: efd_ds (DataStream: malloc
+# Modules (default set): lua png jpeg zlib efd efd_qi crypto online dsp. Also audio (latency, see src/audio.h),
+# which build-m4.sh links; it is not in liboverrides.a or overrides.skip. Optional: efd_ds (DataStream: malloc
 # vs the efd allocator), not in liboverrides.a and not in overrides.skip.
 # A link also needs: -lz, -lc++ (online), and CoreFoundation-free libc only; no network library.
 set -eu
@@ -61,6 +62,7 @@ build_module efd_ds "$SH" "$here/gen/efd_ds.c"
 build_module crypto "$SH" "$here/gen/crypto.c" "$here/src/crypto_glue.c"
 build_module online "$SH" "$here/gen/online.c" "$here/src/online_glue.c"
 build_module dsp "" "$here/src/dsp_glue.c"
+build_module audio "" "$here/src/audio_out.c" "$here/src/audio_in.c" "$here/src/audio_devs.c"
 
 # one library with the default set
 rm -f "$out/lib/liboverrides.a"

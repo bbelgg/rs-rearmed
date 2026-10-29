@@ -1,0 +1,4 @@
+# Skip list of override module `audio` (gen_image.py --skip): native replacements that lower guitar-to-sound
+# latency (src/audio.h, src/audio_out.c, src/audio_in.c).
+100b049b0  # ak_lengine_thread   Wwise LEngine thread entry: real-time policy, output device's audio workgroup
+10133b310  # input_queue_read    SoundInput queue reader: drops stale slots (RS_AUDIO_INPUT_TRIM)

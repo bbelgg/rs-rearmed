@@ -25,6 +25,10 @@ How it runs, every launch:
   is not planned (do it by hand, with a backup, only if you go back to playing under Rosetta).
 - If a boot sticks on the white loading screen (with a fast-load `cache.psarc` mod, now and then when the
   Mac is busy), quit and start again.
+- **Your audio settings.** The `Rocksmith.ini` copy is made from the install's on every launch, but
+  `[Audio] LatencyBuffer` (the audio engine setting in the game's Audio settings, which the game saves
+  to the copy) is kept; `RS_LATENCY_BUFFER=N` (1-16, `launchctl setenv`) overrides it. See the latency
+  FAQ in the main README.
 - **Your mods and assets.** The install's `cache.psarc` (e.g. a fast-load mod: title in ~11 s) and the
   RS Re-ARMed title logo (`static.psarc.rearmed`, `tools/loadscreen`; `RS_REARMED=0` for the
   original) are used; the real Real Tone cable as usual.

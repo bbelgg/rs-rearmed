@@ -1,5 +1,6 @@
 // Metal presentation for the shell (docs/METAL-PLAN.md step 6), rsp_present_metal.m. Not in the
-// original. With libRSOpenGL loaded and RS_GL_BACKEND=metal (rs_gfx_backend() == RS_GFX_METAL),
+// original. With libRSOpenGL loaded with its Metal backend (rs_gfx_backend() == RS_GFX_METAL: the
+// default, or RS_GL_BACKEND=metal; main() chooses, rsp_renderer.h),
 // OpenGLView draws into a CAMetalLayer through an rs_gfx layer context instead of an NSOpenGLContext;
 // otherwise nothing here is used and the GL path is the original's.
 //
@@ -47,9 +48,15 @@ int rsp_mtl_selected(void);
 // framebufferOnly, drawable w x h, sync per swap_interval). NULL if rs_gfx_create_layer fails.
 rsp_mtl *rsp_mtl_create(void *layer, int w, int h, int swap_interval);
 // The view becomes layer-hosting with a new CAMetalLayer, sized from the view (see above).
-// Main thread. Aborts with a message when the Metal core cannot make the context: no silent
-// fallback to GL, which would hide a broken backend.
+// Main thread. When the Metal core cannot make the context the process starts again with OpenGL
+// (rsp_renderer_restart_gl, logged); if even that fails, it aborts with a message.
 rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval);
+
+// For main()'s renderer choice (rsp_renderer.h), before anything else: the backend libRSOpenGL
+// loaded with (RSP_GFX_NONE: no libRSOpenGL), and whether Metal can start (libRSOpenGL's Metal
+// presentation and a Metal device; RS_RENDERER_TEST_NO_METAL=1 says no, for tests).
+int rsp_mtl_loaded_backend(void);
+int rsp_mtl_usable(void);
 
 void rsp_mtl_make_current(rsp_mtl *m);
 void rsp_mtl_lock(rsp_mtl *m);

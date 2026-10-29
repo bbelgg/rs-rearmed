@@ -12,6 +12,13 @@
 //                 warm-up, tools/play-native/warm-shaders.sh; rsp_mtl_warm_only). Runs with the
 //                 Metal backend whatever RS_GL_BACKEND says (re-executes itself with it set);
 //                 RS_METAL_WARM_MAX_SECONDS limits it (default 3600). Exit 0 ready, 1 timed out, 2 no Metal.
+//   --renderer-check  print the renderer a game start would use now ("renderer: metal (default)")
+//                 and exit 0, without a window or the game. Decides as a start does (rsp_renderer.h),
+//                 restart and crash fallback included (that one switches the setting to opengl),
+//                 but starts no Metal session (no crash marker).
+// Renderer: before anything else main() decides Metal or OpenGL (rsp_renderer_startup: RS_GL_BACKEND,
+// no Metal device, the Metal crash count, <home>/renderer, default Metal) and, when libRSOpenGL
+// loaded with the other backend, executes itself again with RS_GL_BACKEND set.
 // Environment:
 //   RS_RC_IMAGE        the plain x86_64 image (default <bundle>/Contents/Resources/Rocksmith2014.x86_64)
 //   RS_RC_SHIMS        extra dylibs to dlopen RTLD_GLOBAL before the image binds (colon list)
@@ -39,10 +46,13 @@
 
 #include "rc_rt.h"
 #include "rsp_platform.h"
+#include "rsp_renderer.h"
 #include "seam.h"
 
 int rsp_shell_main(int argc, const char **argv);  // shims/platform/src/rsp_shell.m
 int rsp_mtl_warm_only(double max_seconds, double interval, FILE *out);  // rsp_present_metal.m
+int rsp_mtl_loaded_backend(void);                                         // rsp_present_metal.m
+int rsp_mtl_usable(void);                                                 // rsp_present_metal.m
 
 static double now_s(void) {
   struct timeval tv;
@@ -210,12 +220,11 @@ static int fix_objc(void) {
   return patched;
 }
 
-// --warm-shaders. libRSOpenGL reads RS_GL_BACKEND once when it loads (before main), so without
-// "metal" the process starts again with it: the same executable path, so the same app for Metal's
-// shader cache.
+// --warm-shaders. libRSOpenGL reads RS_GL_BACKEND once when it loads (before main), so when it
+// loaded with OpenGL the process starts again with "metal": the same executable path, so the same
+// app for Metal's shader cache.
 static int warm_shaders(char **argv) {
-  const char *b = getenv("RS_GL_BACKEND");
-  if (!b || strcmp(b, "metal")) {
+  if (rsp_mtl_loaded_backend() != RSP_GFX_METAL && rsp_renderer_parse(getenv("RS_GL_BACKEND")) != RSP_GFX_METAL) {
     char exe[4096];
     uint32_t n = sizeof exe;
     if (_NSGetExecutablePath(exe, &n) == 0) {
@@ -231,20 +240,37 @@ static int warm_shaders(char **argv) {
   return rsp_mtl_warm_only(max_s > 0 ? max_s : 3600, 0.5, stdout);
 }
 
+// --renderer-check
+static int renderer_check(char **argv) {
+  char b[1024];
+  int have = bundle_path(b, sizeof b);
+  rsp_renderer_out o = rsp_renderer_startup(argv, have ? b : NULL, rsp_mtl_loaded_backend(), rsp_mtl_usable, 0);
+  printf("renderer: %s (%s)\n", rsp_renderer_name(o.backend), rsp_renderer_reason_text(o.reason));
+  return 0;
+}
+
 // ---------------------------------------------------------------------------
 
 int main(int argc, char **argv, char **envp, char **apple) {
   int init_only = 0, bind_only = 0;
   static char *gargv[64];
   int gargc = 0;
-  for (int i = 1; i < argc; i++)
+  for (int i = 1; i < argc; i++) {
     if (!strcmp(argv[i], "--warm-shaders")) return warm_shaders(argv);
+    if (!strcmp(argv[i], "--renderer-check")) return renderer_check(argv);
+  }
   for (int i = 0; i < argc && gargc < 63; i++) {
     if (i > 0 && !strcmp(argv[i], "--init-only")) init_only = 1;
     else if (i > 0 && !strcmp(argv[i], "--bind-only")) bind_only = 1;
     else gargv[gargc++] = argv[i];
   }
   gargv[gargc] = 0;
+  // 0. the renderer, before anything heavy: may start this process again with RS_GL_BACKEND set.
+  if (!init_only && !bind_only) {
+    char b[1024];
+    int have = bundle_path(b, sizeof b);
+    rsp_renderer_startup(argv, have ? b : NULL, rsp_mtl_loaded_backend(), rsp_mtl_usable, RSP_RENDERER_SESSION);
+  }
   install_crash_handler();
   if (init_only || bind_only) setenv("RC_LOG_UNRESOLVED", "1", 0);
   setenv("RS_STEAM_MODE", "stub", 0);  // offline: the game must never call home

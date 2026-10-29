@@ -3,6 +3,7 @@
 // MainService_MacOS, and the stub engine. See rsp_platform.h.
 #include <math.h>
 #include "rsp_platform.h"
+#include "rsp_renderer.h"
 
 #include <pthread.h>
 #include <stdarg.h>
@@ -277,10 +278,14 @@ int rsp_screen_height(void) {  // 0x10017a330
 static void default_exit(int status) { _exit(status); }
 static void (*g_exit)(int) = default_exit;
 void rsp_set_exit(void (*fn)(int)) { g_exit = fn ? fn : default_exit; }
-void rsp_exit(int status) { g_exit(status); }
+// Both are clean ends of a session: a Metal session's crash marker goes (rsp_renderer.h).
+void rsp_exit(int status) {
+  rsp_metal_session_end();
+  g_exit(status);
+}
 
 void rsp_request_quit(void) {  // 0x10017a350
-  if (!H->request_quit || !H->request_quit(H->ctx)) g_exit(0);
+  if (!H->request_quit || !H->request_quit(H->ctx)) rsp_exit(0);
 }
 
 static int g_booted;  // the original guards on the Lua state (0x1018e7478)

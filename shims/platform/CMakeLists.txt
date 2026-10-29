@@ -17,7 +17,8 @@ set(RS_GAME_PLAIN "${rsp_repo}/analysis/cg/Rocksmith2014_x64_plain"
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -O2)
 
 # Portable C: engine boundary, input queue, paths, Rocksmith.ini, helpers.
-add_library(rsp_core STATIC src/rsp_engine.c src/rsp_paths.c src/rsp_config.c src/rsp_logic.c)
+add_library(rsp_core STATIC src/rsp_engine.c src/rsp_paths.c src/rsp_config.c src/rsp_logic.c
+  src/rsp_renderer.c)
 target_include_directories(rsp_core PUBLIC include)
 set_target_properties(rsp_core PROPERTIES OSX_ARCHITECTURES "${rsp_archs}")
 
@@ -96,7 +97,8 @@ if(TARGET opengl)
   set(rsp_dyld -e "DYLD_LIBRARY_PATH=$<TARGET_FILE_DIR:opengl>")
 endif()
 foreach(arch IN LISTS rsp_gl_archs)
-  add_test(NAME platform.overlay.${arch} COMMAND arch -${arch} ${rsp_dyld} $<TARGET_FILE:rsp_overlay_test>)
+  add_test(NAME platform.overlay.${arch} COMMAND arch -${arch} ${rsp_dyld} -e RS_GL_BACKEND=gl
+    $<TARGET_FILE:rsp_overlay_test>)
   set_tests_properties(platform.overlay.${arch} PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
 endforeach()
@@ -114,7 +116,7 @@ endif()
 # libRSOpenGL; the Metal variant needs the Metal core (metal.cmake) in it.
 if(TARGET opengl)
   add_executable(rsp_present_test test/rsp_present_test.m src/rsp_present_metal.m)
-  target_link_libraries(rsp_present_test PRIVATE opengl "-framework Foundation" "-framework AppKit"
+  target_link_libraries(rsp_present_test PRIVATE opengl rsp_core "-framework Foundation" "-framework AppKit"
     "-framework Metal" "-framework QuartzCore")
   target_compile_options(rsp_present_test PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
   set_target_properties(rsp_present_test PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
@@ -133,7 +135,7 @@ endif()
 # translator (rsmsl): child processes, no window.
 if(TARGET opengl AND TARGET rsmsl)
   add_executable(rsp_warm_test test/rsp_warm_test.m src/rsp_present_metal.m)
-  target_link_libraries(rsp_warm_test PRIVATE opengl rsmsl "-framework Foundation" "-framework AppKit"
+  target_link_libraries(rsp_warm_test PRIVATE opengl rsmsl rsp_core "-framework Foundation" "-framework AppKit"
     "-framework Metal" "-framework QuartzCore")
   target_compile_options(rsp_warm_test PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
   set_target_properties(rsp_warm_test PROPERTIES OSX_ARCHITECTURES arm64 LINKER_LANGUAGE CXX)

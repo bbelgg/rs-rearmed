@@ -4,6 +4,7 @@
 // links and runs against the system OpenGL.framework when it is built without libRSOpenGL (then
 // the backend is always GL).
 #import "rsp_present.h"
+#include "rsp_renderer.h"
 
 #import <AppKit/AppKit.h>
 #import <Metal/Metal.h>
@@ -78,6 +79,24 @@ int rsp_mtl_selected(void) {
     if (v) fprintf(stderr, "[rsp] presenting with Metal (CAMetalLayer)\n");
   }
   return v;
+}
+
+int rsp_mtl_loaded_backend(void) {
+  int (*b)(void);
+  *(void **)&b = dlsym(RTLD_DEFAULT, "rs_gfx_backend");
+  return b ? b() : RSP_GFX_NONE;
+}
+
+int rsp_mtl_usable(void) {
+  static pthread_once_t once = PTHREAD_ONCE_INIT;
+  pthread_once(&once, gfx_load);
+  const char *t = getenv("RS_RENDERER_TEST_NO_METAL");  // tests: as if there were no Metal device
+  if (t && *t == '1') return 0;
+  if (!gfx_ok) return 0;
+  id<MTLDevice> d = MTLCreateSystemDefaultDevice();  // +1
+  if (!d) return 0;
+  [d release];
+  return 1;
 }
 
 int rsp_mtl_retina(void) {
@@ -156,11 +175,13 @@ rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
   [view setWantsLayer:YES];
   rsp_mtl *m = rsp_mtl_create(layer, w, h, swap_interval);
   if (!m) {
-    fprintf(stderr,
-            "[rsp] RS_GL_BACKEND=metal: rs_gfx_create_layer failed (the Metal core in libRSOpenGL has "
-            "no layer context, or no Metal device). Not falling back to OpenGL; unset RS_GL_BACKEND "
-            "to use it.\n");
-    NSLog(@"RS_GL_BACKEND=metal: no Metal layer context; aborting");
+    // Too late to switch backends in this process (libRSOpenGL chose at load): start again with
+    // OpenGL (rsp_renderer.h; the window goes, the new process makes its own).
+    fprintf(stderr, "[rsp] Metal: rs_gfx_create_layer failed (no layer context, or no Metal device)\n");
+    rsp_renderer_restart_gl("Metal could not create its layer context");
+    fprintf(stderr, "[rsp] Metal: cannot start again with OpenGL; start with RS_GL_BACKEND=gl or write "
+                    "opengl into the renderer file of the RS Re-ARMed folder\n");
+    NSLog(@"Metal: no layer context and no restart with OpenGL; aborting");
     abort();
   }
   fprintf(stderr, "[rsp] Metal drawable %dx%d (%s), %d drawables, display sync %s\n", w, h,

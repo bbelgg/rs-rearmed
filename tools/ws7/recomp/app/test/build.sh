@@ -9,6 +9,6 @@ out=$1
 mkdir -p "$out"
 clang -arch arm64 -O1 -g -Wall -Wno-unused-parameter -I"$rt" -I"$plat/include" -I"$here/.." \
   "$here/seam_test.c" "$here/../seam_platform.c" "$plat/src/rsp_engine.c" "$plat/src/rsp_paths.c" \
-  "$plat/src/rsp_config.c" "$plat/src/rsp_logic.c" "$rt/rc_native.c" "$rt/rc_native_arm64.S" \
+  "$plat/src/rsp_config.c" "$plat/src/rsp_logic.c" "$plat/src/rsp_renderer.c" "$rt/rc_native.c" "$rt/rc_native_arm64.S" \
   -o "$out/seam_test"
 RSP_LOG=0 "$out/seam_test"

@@ -16,7 +16,7 @@ NSOpenGLContext *rsp_g_gl_context;
 MainController *rsp_g_main_controller;
 
 // Metal presentation (not in the original; rsp_present.h): set when libRSOpenGL's backend is Metal
-// (RS_GL_BACKEND=metal), NULL on GL. One view per process, like the original. Where a method has a
+// (the default; RS_GL_BACKEND=gl or main()'s fallback chooses GL), NULL on GL. One view per process, like the original. Where a method has a
 // GL and a Metal branch, the GL one is the original's code.
 static rsp_mtl *rsp_g_mtl;
 

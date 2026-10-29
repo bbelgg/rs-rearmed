@@ -393,7 +393,10 @@ void rsmtl_glPixelStorei(GLenum pname, GLint param) {
     case GL_PACK_SKIP_PIXELS: p = &ctx->pack_skip_pixels; break;
     case GL_UNPACK_SWAP_BYTES: case GL_UNPACK_LSB_FIRST: case GL_PACK_SWAP_BYTES:
     case GL_PACK_LSB_FIRST: case GL_UNPACK_IMAGE_HEIGHT: case GL_UNPACK_SKIP_IMAGES:
-    case GL_PACK_IMAGE_HEIGHT: case GL_PACK_SKIP_IMAGES: case GL_UNPACK_CLIENT_STORAGE_APPLE:
+    case GL_PACK_IMAGE_HEIGHT: case GL_PACK_SKIP_IMAGES:
+        return;
+    case GL_UNPACK_CLIENT_STORAGE_APPLE:  // uploads are copied anyway
+        ctx->unpack_client_storage = param != 0;
         return;
     default:
         rsm_error(ctx, GL_INVALID_ENUM);
@@ -487,6 +490,9 @@ static bool rsm_query(RSMContext *ctx, GLenum pname, rsm_q *q) {
     case GL_IMPLEMENTATION_COLOR_READ_TYPE: qi(q, 1, GL_UNSIGNED_INT_8_8_8_8_REV); break;
     // Bindings.
     case GL_ARRAY_BUFFER_BINDING: qi(q, 1, (int)ctx->array_buffer); break;
+    case GL_PIXEL_PACK_BUFFER_BINDING: qi(q, 1, (int)ctx->pixel_pack_buffer); break;
+    case GL_PIXEL_UNPACK_BUFFER_BINDING: qi(q, 1, (int)ctx->pixel_unpack_buffer); break;
+    case GL_UNPACK_CLIENT_STORAGE_APPLE: q->n = 1; q->kind = Q_BOOL; q->v[0] = ctx->unpack_client_storage; break;
     case GL_ELEMENT_ARRAY_BUFFER_BINDING: qi(q, 1, (int)ctx->vao->element_buffer); break;
     case GL_VERTEX_ARRAY_BINDING: qi(q, 1, (int)ctx->vao_name); break;
     case GL_TEXTURE_BINDING_2D: qi(q, 1, (int)ctx->tex2d[ctx->active_unit]); break;

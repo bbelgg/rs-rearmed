@@ -304,7 +304,8 @@ typedef struct {
     GLuint vao_name;
 
     // Bindings.
-    GLuint array_buffer;
+    GLuint array_buffer, pixel_pack_buffer, pixel_unpack_buffer;
+    GLint unpack_client_storage;
     GLuint draw_fb, read_fb, renderbuffer;
     GLuint tex2d[RSM_MAX_UNITS], texcube[RSM_MAX_UNITS];
     int active_unit, client_unit;
@@ -400,6 +401,9 @@ void rsm_retire_buffer(RSMContext *ctx, id<MTLBuffer> b, uint64_t serial);
 
 // Objects (mtl_objects.m).
 RSMBuffer *rsm_buffer(RSMContext *ctx, GLuint name);
+// Client pointer of pixel data: an offset into the bound pixel pack/unpack buffer, if any.
+const void *rsm_unpack_ptr(RSMContext *ctx, const void *p);
+void *rsm_pack_ptr(RSMContext *ctx, void *p);
 RSMTexture *rsm_texture(RSMContext *ctx, GLuint name);
 RSMRenderbuffer *rsm_renderbuffer(RSMContext *ctx, GLuint name);
 void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t);  // build t->sampler

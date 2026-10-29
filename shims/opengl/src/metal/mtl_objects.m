@@ -16,6 +16,28 @@ RSMBuffer *rsm_buffer(RSMContext *ctx, GLuint name) {
     return b;
 }
 
+const void *rsm_unpack_ptr(RSMContext *ctx, const void *p) {
+    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_unpack_buffer);
+    return b && b->mtl ? (const uint8_t *)b->mtl.contents + (size_t)p : p;
+}
+
+void *rsm_pack_ptr(RSMContext *ctx, void *p) {
+    RSMBuffer *b = rsm_get(&ctx->buffers, ctx->pixel_pack_buffer);
+    if (!b || !b->mtl)
+        return p;
+    // The GPU may still read the buffer: it gets new storage first.
+    if (rsm_in_flight(ctx, b->last_use)) {
+        id<MTLBuffer> nb = rsm_new_buffer(ctx, b->mtl.length);
+        memcpy(nb.contents, b->mtl.contents, b->size);
+        rsm_retire_buffer(ctx, b->mtl, b->last_use);
+        b->mtl = nb;
+        b->last_use = 0;
+    }
+    if (ctx->buf_opts & MTLResourceStorageModeManaged)
+        [b->mtl didModifyRange:NSMakeRange(0, b->size)];
+    return (uint8_t *)b->mtl.contents + (size_t)p;
+}
+
 void rsmtl_glGenBuffers(GLsizei n, GLuint *buffers) {
     RSM_CTX()
     if (n < 0) {
@@ -36,6 +58,10 @@ void rsmtl_glDeleteBuffers(GLsizei n, const GLuint *buffers) {
             continue;
         if (ctx->array_buffer == b)
             ctx->array_buffer = 0;
+        if (ctx->pixel_pack_buffer == b)
+            ctx->pixel_pack_buffer = 0;
+        if (ctx->pixel_unpack_buffer == b)
+            ctx->pixel_unpack_buffer = 0;
         if (ctx->vao->element_buffer == b)
             ctx->vao->element_buffer = 0;
         for (int a = 0; a < RSM_MAX_ATTRIBS; a++)
@@ -56,6 +82,8 @@ static GLuint *rsm_buffer_binding(RSMContext *ctx, GLenum target) {
     switch (target) {
     case GL_ARRAY_BUFFER: return &ctx->array_buffer;
     case GL_ELEMENT_ARRAY_BUFFER: return &ctx->vao->element_buffer;
+    case GL_PIXEL_PACK_BUFFER: return &ctx->pixel_pack_buffer;
+    case GL_PIXEL_UNPACK_BUFFER: return &ctx->pixel_unpack_buffer;
     }
     rsm_error(ctx, GL_INVALID_ENUM);
     return NULL;
@@ -1377,6 +1405,7 @@ void rsmtl_glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsize
     if (!width || !height)
         return;
     @autoreleasepool {
+        pixels = rsm_unpack_ptr(ctx, pixels);
         if (!rsm_tex_define(ctx, t, level, (GLenum)internalformat, &f, width, height) || !pixels || f.stencil)
             return;
         size_t pitch;
@@ -1422,6 +1451,7 @@ void rsmtl_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
         rsm_error(ctx, GL_INVALID_OPERATION);
         return;
     }
+    pixels = rsm_unpack_ptr(ctx, pixels);
     if (!pixels || !width || !height)
         return;
     @autoreleasepool {
@@ -1460,6 +1490,7 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
         return;
     }
     @autoreleasepool {
+        data = rsm_unpack_ptr(ctx, data);
         if (!rsm_tex_define(ctx, t, level, internalformat, &f, width, height) || !data)
             return;
         rsm_tex_write(ctx, t, level, face, 0, 0, width, height, data, pitch);
@@ -1484,7 +1515,7 @@ void rsmtl_glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, 
         return;
     }
     @autoreleasepool {
-        rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, data, pitch);
+        rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, rsm_unpack_ptr(ctx, data), pitch);
     }
 }
 
@@ -1600,6 +1631,7 @@ void rsmtl_glGetTexImage(GLenum target, GLint level, GLenum format, GLenum type,
         return;
     }
     int lw = t->w >> level ? t->w >> level : 1, lh = t->h >> level ? t->h >> level : 1;
+    pixels = rsm_pack_ptr(ctx, pixels);
     @autoreleasepool {
         size_t bpp;
         MTLBlitOption opt = t->fmt == MTLPixelFormatDepth32Float_Stencil8
@@ -2014,6 +2046,7 @@ void rsmtl_glReadPixels(GLint x, GLint y, GLsizei width, GLsizei height, GLenum 
     int tw = (int)tex.width >> level, th = (int)tex.height >> level;
     int x0 = x < 0 ? 0 : x, y0 = y < 0 ? 0 : y;
     int x1 = x + width > tw ? tw : x + width, y1 = y + height > th ? th : y + height;
+    pixels = rsm_pack_ptr(ctx, pixels);
     if (x1 <= x0 || y1 <= y0 || !pixels)
         return;
     @autoreleasepool {

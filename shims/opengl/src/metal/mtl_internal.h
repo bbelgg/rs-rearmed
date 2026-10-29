@@ -64,7 +64,7 @@
 enum {
     RSM_MAX_ATTRIBS = 16,
     RSM_MAX_UNITS = 16,       // GL_MAX_TEXTURE_IMAGE_UNITS (Apple: 16)
-    RSM_VB_BASE = 16,         // vertex buffer index of attribute 0 (msl_xlat.h)
+    RSM_VB_BASE = 14,         // vertex buffer index of attribute 0: 14..29 (0 uniforms, 1 alpha ref, 30 probe)
     RSM_FRAMES_IN_FLIGHT = 2,
 };
 

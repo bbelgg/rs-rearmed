@@ -822,7 +822,8 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             p->vs_dirty = p->fs_dirty = false;
             ctx->cur_prog_uid = p->uid;
         }
-        if ((ctx->dirty & RSM_DIRTY_ALPHA_REF) && k.alpha_func != 8) {
+        // rs_fs always declares buffer(1), alpha test or not: always bound.
+        if (ctx->dirty & RSM_DIRTY_ALPHA_REF) {
             float ref = ctx->alpha_ref;
             [e setFragmentBytes:&ref length:sizeof ref atIndex:1];
             ctx->dirty &= ~(unsigned)RSM_DIRTY_ALPHA_REF;

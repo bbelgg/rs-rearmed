@@ -1483,6 +1483,50 @@ static void case_uniforms(void) {
     glok("uniforms");
 }
 
+// glBindAttribLocation after link: no effect until the next link, which uses it (attribute 15:
+// the highest vertex buffer index).
+static void case_rebind_attrib(void) {
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint p = program(kVScol, kFSvcol, "pos", "col", NULL);  // col at 1
+    float v[8];
+    rect(v, 0, 0, W, H);
+    static const unsigned char red[16] = {255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255};
+    static const unsigned char green[16] = {0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255, 0, 255};
+    GLuint b[3];
+    glGenBuffers(3, b);
+    glBindBuffer(GL_ARRAY_BUFFER, b[0]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof v, v, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, b[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof red, red, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, b[2]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof green, green, GL_STATIC_DRAW);
+    glVertexAttribPointer(15, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(15);
+    glViewport(0, 0, W / 2, H);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);  // left half: col from 1 (red)
+    glBindAttribLocation(p, 15, "col");
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);  // not linked yet: still red
+    glLinkProgram(p);
+    GLint ok = 0;
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    check(ok, "relink");
+    glUseProgram(p);
+    glViewport(W / 2, 0, W / 2, H);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);  // right half: col from 15, the last one (green)
+    glDisableVertexAttribArray(1);
+    glDisableVertexAttribArray(15);
+    glViewport(0, 0, W, H);
+    snap();
+    check_px(W / 4, H / 2, 255, 0, 0, 255, "binding before the relink");
+    check_px(3 * W / 4, H / 2, 0, 255, 0, 255, "binding after the relink");
+    glok("rebind_attrib");
+}
+
 static void case_queries(void) {
     // State round trips; the values go into the dump and must match GL.
     glBlendFuncSeparate(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA, GL_ONE, GL_ZERO);
@@ -1706,6 +1750,7 @@ static const test_case kCases[] = {
     {"tex_subimage", case_tex_subimage, 0},
     {"unpack_alignment", case_unpack_alignment, 0},
     {"uniforms", case_uniforms, 1},
+    {"rebind_attrib", case_rebind_attrib, 0},
     {"queries", case_queries, 0},
     {"errors", case_errors, 0},
     {"api", case_api, 0},

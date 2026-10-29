@@ -55,7 +55,7 @@
 #include <unistd.h>
 
 enum {
-    RSM_CACHE_VERSION = 1,       // bump when the manifest or rsm_pkey meaning changes
+    RSM_CACHE_VERSION = 2,       // bump when the manifest or rsm_pkey meaning changes
     RSM_SERIALIZE_EVERY = 32,    // new pipelines between archive writes
     RSM_SERIALIZE_DELAY_MS = 3000,
     RSM_WARM_QUEUES = 2,
@@ -625,10 +625,20 @@ static void rsm_publish(RSMShaderCache *c, int *state) {
 
 static RSMShaderCache *rsm_cache_for(id<MTLDevice> dev);
 
+// No fast math: with it 44 of 372 Cg programs differ from GL.
+static MTLCompileOptions *rsm_compile_options(void) {
+    MTLCompileOptions *o = [MTLCompileOptions new];
+    if (@available(macOS 15.0, *))
+        o.mathMode = MTLMathModeSafe;
+    else
+        o.fastMathEnabled = NO;
+    return o;
+}
+
 static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
     uint64_t t0 = rsm_now_ns();
     NSError *err = nil;
-    e->lib = [c->dev newLibraryWithSource:e->msl options:[MTLCompileOptions new] error:&err];
+    e->lib = [c->dev newLibraryWithSource:e->msl options:rsm_compile_options() error:&err];
     if (e->lib) {
         e->vs = [e->lib newFunctionWithName:@"rs_vs"];
     } else {

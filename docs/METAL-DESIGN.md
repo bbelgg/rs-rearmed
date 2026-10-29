@@ -78,7 +78,7 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
 `rsmsl_translate` (see `msl_xlat.h`) first looks in the offline corpus (MSL generated at build time from
 every shader seen in the game; keyed by a hash of both sources), then translates at run time and logs it
 (`RS_MSL_LOG`). Binding conventions: vertex attributes `[[attribute(i)]]` from `[[stage_in]]`; vertex
-buffers at buffer index 16 + attribute index (one buffer per enabled attribute); uniforms at buffer 0 in
+buffers at buffer index 14 + attribute index (14..29: one buffer per enabled attribute, Metal stops at 30); uniforms at buffer 0 in
 each stage; fragment alpha-test reference at buffer 1; textures and samplers at the sampler's texture unit.
 
 ## Overlay API (`shims/include/rs_overlay.h`)

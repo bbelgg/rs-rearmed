@@ -16,6 +16,10 @@
 #       SHIM_OPENGL    libRSOpenGL.dylib (shims/opengl; default build/shims/opengl/libRSOpenGL.dylib):
 #                      the app links it instead of OpenGL.framework (it re-exports the framework) and
 #                      bundles it as Contents/MacOS/libRSOpenGL.dylib
+#       RS_MSL_CORPUS_FILE  the Metal backend's offline shader corpus (rsmsl-corpus.bin, tools/metal/
+#                      build-msl-corpus.sh; default build/metal/msl-corpus/ or build/shims/opengl/msl-corpus/
+#                      if one exists): bundled as Contents/Resources/rsmsl-corpus.bin, where libRSOpenGL
+#                      looks; optional (without it shaders are translated at run time)
 #       RC_UNIT_TEST=1 also build and run test/seam_test (no game needed)
 #       RC_LTO, RC_LTO_JOBS, RC_LTO_CACHE (default OUTDIR/lto-cache), RC_PGO, RC_PGO_DIR (default
 #                      OUTDIR/pgo): see tools/ws7/recomp/build/optflags.sh (libgame_rc.a must be built with the same)
@@ -125,6 +129,18 @@ printf 'APPL????' > "$app/Contents/PkgInfo"
 [ -n "$shim_bink" ] && cp "$shim_bink" "$app/Contents/MacOS/libBink2Macx64.dylib" || echo "warning: no arm64 libBink2Macx64.dylib" >&2
 [ -n "$shim_cg" ] && cp "$shim_cg" "$app/Contents/Frameworks/Cg.framework/Cg" || echo "warning: no arm64 Cg" >&2
 cp "$shim_opengl" "$app/Contents/MacOS/libRSOpenGL.dylib"
+# the shader corpus is data: Contents/Resources (a non-code file in Contents/MacOS breaks the bundle's
+# signature seal); libRSOpenGL finds it there as ../Resources/rsmsl-corpus.bin
+rm -f "$app/Contents/MacOS/rsmsl-corpus.bin" "$app/Contents/Resources/rsmsl-corpus.bin"
+if [ -n "${RS_MSL_CORPUS_FILE:-}" ]; then
+  [ -f "$RS_MSL_CORPUS_FILE" ] || { echo "RS_MSL_CORPUS_FILE: no such file: $RS_MSL_CORPUS_FILE" >&2; exit 1; }
+  corpus=$RS_MSL_CORPUS_FILE
+else
+  corpus=$(for f in "$root/build/metal/msl-corpus/rsmsl-corpus.bin" "$root/build/shims/opengl/msl-corpus/rsmsl-corpus.bin"; do
+    [ -f "$f" ] && { echo "$f"; break; }; done || true)
+fi
+if [ -n "$corpus" ]; then cp "$corpus" "$app/Contents/Resources/rsmsl-corpus.bin"
+else echo "note: no rsmsl-corpus.bin (Metal translates shaders at run time); set RS_MSL_CORPUS_FILE" >&2; fi
 shims="$app/Contents/MacOS/libsteam_api.dylib $app/Contents/MacOS/libBink2Macx64.dylib $app/Contents/MacOS/libRSOpenGL.dylib $app/Contents/Frameworks/Cg.framework/Cg"
 # lipo -thin when a fat shim was found, so every bundled Mach-O is arm64
 for f in $shims; do

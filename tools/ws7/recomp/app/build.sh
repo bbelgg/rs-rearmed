@@ -135,9 +135,11 @@ rm -f "$app/Contents/MacOS/rsmsl-corpus.bin" "$app/Contents/Resources/rsmsl-corp
 if [ -n "${RS_MSL_CORPUS_FILE:-}" ]; then
   [ -f "$RS_MSL_CORPUS_FILE" ] || { echo "RS_MSL_CORPUS_FILE: no such file: $RS_MSL_CORPUS_FILE" >&2; exit 1; }
   corpus=$RS_MSL_CORPUS_FILE
-else
+elif [ "${RS_SHADER_CORPUS:-1}" != 0 ]; then
   corpus=$(for f in "$root/build/metal/msl-corpus/rsmsl-corpus.bin" "$root/build/shims/opengl/msl-corpus/rsmsl-corpus.bin"; do
     [ -f "$f" ] && { echo "$f"; break; }; done || true)
+else
+  corpus=
 fi
 if [ -n "$corpus" ]; then cp "$corpus" "$app/Contents/Resources/rsmsl-corpus.bin"
 else echo "note: no rsmsl-corpus.bin (Metal translates shaders at run time); set RS_MSL_CORPUS_FILE" >&2; fi

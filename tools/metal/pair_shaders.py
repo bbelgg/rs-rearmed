@@ -53,7 +53,7 @@ def main():
                                 (a.cg, '.vert', '.frag', ','.join('rs_attr%d=%d' % (i, i) for i in range(16)))):
         if not d or not os.path.isdir(d):
             continue
-        names = sorted(os.listdir(d))
+        names = sorted(n for n in os.listdir(d) if not n.startswith('.'))  # no ._ AppleDouble files (exFAT)
         v = [os.path.join(d, n) for n in names if n.endswith(vsuf)]
         f = [os.path.join(d, n) for n in names if n.endswith(fsuf)]
         p, unpaired = pairs(v, f, bind)

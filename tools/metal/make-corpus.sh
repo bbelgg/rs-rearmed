@@ -54,7 +54,7 @@ rm -rf "$out/cg/static"  # the extracted static.psarc entries, only needed for t
 progress 0.20 "Translating the shaders"
 xonly=--translate-only
 [ "${RS_MSL_VERIFY:-0}" = 1 ] && xonly=
-rm -f "$out/msl.rc"
+rm -f "$out/msl.rc" "$out/msl/rsmsl-corpus.bin"  # a failed run must not leave the last corpus to bundle
 # The checker's own progress lines, mapped onto 0.20..0.99 as they come; everything to the log.
 { sh "$here/build-msl-corpus.sh" --verify "$verify" --out "$out/msl" --scaleform "$out/scaleform" \
     --cg "$out/cg-glsl" $xonly --progress 2>&1; echo $? > "$out/msl.rc"; } |

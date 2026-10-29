@@ -2045,15 +2045,21 @@ static void case_pbo_bounds(void) {
     glBindTexture(GL_TEXTURE_2D, t);
     glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
     GLenum e0 = glGetError();
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
-    GLenum e1 = glGetError();
-    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 16, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
-    GLenum e2 = glGetError();
-    glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
-    glReadPixels(0, 0, 32, 32, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
-    GLenum e3 = glGetError();
-    glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    // Transfers past the end of the buffer: Metal only. Apple's GL does not always reject them; it then
+    // runs them on a worker thread, which reads or writes out of range (seen: a crash in libGLImage's
+    // storeVecColor under glReadPixels).
+    int metal = !strcmp(g_backend, "metal");
+    if (metal) {
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 32, 32, 0, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
+        check(glGetError() != 0, "texture image past the end of the unpack buffer fails");
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 16, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
+        check(glGetError() != 0, "sub-image past the end of the unpack buffer fails");
+        glBindBuffer(GL_PIXEL_UNPACK_BUFFER, 0);
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, pbo);
+        glReadPixels(0, 0, 32, 32, GL_RGBA, GL_UNSIGNED_BYTE, (void *)0);
+        check(glGetError() != 0, "glReadPixels past the end of the pack buffer fails");
+        glBindBuffer(GL_PIXEL_PACK_BUFFER, 0);
+    }
     // Within range: fine.
     glBindBuffer(GL_PIXEL_UNPACK_BUFFER, pbo);
     glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 16, 15, GL_RGBA, GL_UNSIGNED_BYTE, (void *)64);
@@ -2074,12 +2080,12 @@ static void case_pbo_bounds(void) {
     GLenum e8 = glGetError();
     // A negative level: Apple's GL reports an error only some of the time (seen 7 of 20 runs
     // without), so it is checked on Metal only and left out of the compared dump.
-    if (!strcmp(g_backend, "metal"))
+    if (metal)
         check(e7 != 0, "compressed sub-image at a negative level fails");
-    int r[] = {e0 == 0, e1 != 0, e2 != 0, e3 != 0, e4 == 0, e5 == 0, e6 != 0, e8 == 0};
+    int r[] = {e0 == 0, e4 == 0, e5 == 0, e6 != 0, e8 == 0};
     for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
         dump_int(r[i]);
-    printf("INFO errors 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", e0, e1, e2, e3, e4, e5, e6, e7, e8);
+    printf("INFO errors 0x%x 0x%x 0x%x 0x%x 0x%x 0x%x\n", e0, e4, e5, e6, e7, e8);
     int ok = 1;
     for (unsigned i = 0; i < sizeof r / sizeof r[0]; i++)
         ok &= r[i];

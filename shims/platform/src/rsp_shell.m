@@ -20,6 +20,10 @@ MainController *rsp_g_main_controller;
 // GL and a Metal branch, the GL one is the original's code.
 static rsp_mtl *rsp_g_mtl;
 
+// Set (not in the original) before the engine shuts down on the frame thread, so the main thread's
+// customEventTimer: (and rsp_renderScaleChanged) stop calling into it meanwhile.
+static atomic_int rsp_quitting;
+
 // ===========================================================================
 @implementation AppDelegate
 @synthesize window;
@@ -348,12 +352,20 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 // window moved to another screen) re-sends the current resolution, converted (rsp_set_display_mode).
 - (void)rsp_renderScaleChanged {
   double s = rsp_mtl_scale(rsp_g_mtl);
-  if (s == rsp_render_scale()) return;
+  if (s == rsp_render_scale() || atomic_load(&rsp_quitting)) return;
+  // A mode change already waiting for the frame thread (goFullScreen / goWindow / an adopted window
+  // size, all in points) is converted at the new scale when it is applied: keep it. The engine's
+  // current resolution would be the stale one (the screen change comes with a new window size).
+  BOOL pending = controller && controller->CurrentSetting_NeedsUpdate;
   int w = rsp_screen_width(), h = rsp_screen_height();  // points, at the old scale
   rsp_set_render_scale(s);
+  if (pending) {
+    w = controller->CurrentSetting_Width;
+    h = controller->CurrentSetting_Height;
+  }
   fprintf(stderr, "[rsp] render scale %.1f: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
           (int)lround(h * s), w, h);
-  if (controller && w > 0 && h > 0) {
+  if (controller && !pending && w > 0 && h > 0) {
     controller->CurrentSetting_Width = w;
     controller->CurrentSetting_Height = h;
     controller->CurrentSetting_FullScreen = rsp_is_fullscreen();
@@ -660,9 +672,6 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [[NSRunLoop currentRunLoop] addTimer:renderTimer forMode:NSDefaultRunLoopMode];
 }
 
-// Set (not in the original) before the engine shuts down on the frame thread, so the main thread's
-// customEventTimer: stops calling into it meanwhile.
-static atomic_int rsp_quitting;
 
 - (void)dealloc {  // 0x100185950
   atomic_store(&rsp_quitting, 1);
@@ -706,8 +715,8 @@ static atomic_int rsp_quitting;
 
 - (void)mouseMoved:(NSEvent *)e {  // 0x100185b40
   NSPoint p = [openGLView convertPoint:[e locationInWindow] fromView:nil];
-  double s = rsp_render_scale();  // engine pixels per point (not in the original; 1 by default)
-  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_coord(p.x * s), rsp_mouse_coord(p.y * s));
+  // points -> engine pixels (not in the original: the render scale is 1 unless RS_METAL_RETINA=1)
+  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_engine_coord(p.x), rsp_mouse_engine_coord(p.y));
 }
 
 - (void)customEventTimer:(NSTimer *)t {  // 0x100185bd0
@@ -726,6 +735,11 @@ static atomic_int rsp_quitting;
     // 3. windowed: a resized window becomes the engine resolution
     NSRect fr = w ? [w frame] : NSZeroRect;
     NSRect c = w ? [w contentRectForFrameRect:fr] : NSZeroRect;
+    // Not in the original: whole points. The app is high-resolution capable, so on a 2x screen a
+    // window can be resized to half points (1279.5), which no int engine size equals: without this
+    // the window would be re-adopted, and the engine resolution re-set, every 0.1 s. (int) below
+    // truncated anyway; at scale 1 sizes are whole and this changes nothing.
+    c.size = NSMakeSize(floor(c.size.width), floor(c.size.height));
     if (rsp_timer_window_adopt(c.size.width, c.size.height, rsp_screen_width(), rsp_screen_height())) {
       [w setContentView:openGLView];
       [w setContentSize:c.size];

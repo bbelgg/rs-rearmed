@@ -129,6 +129,9 @@ int rsp_screen_height(void);                       // 0x10017a330
 // mouse positions convert at the engine boundary, so the engine renders at the drawable's size.
 void rsp_set_render_scale(double s);
 double rsp_render_scale(void);
+// A mouse coordinate in window points -> the engine's pixels: rsp_mouse_coord(v * render scale).
+// Origin bottom left at any scale (the engine's frame is the view scaled).
+int rsp_mouse_engine_coord(double v);
 void rsp_request_quit(void);                       // 0x10017a350 / 0x10017a380
 void rsp_set_exit(void (*fn)(int status));         // _Exit by default
 void rsp_exit(int status);                         // the shell's _Exit(0)s go here

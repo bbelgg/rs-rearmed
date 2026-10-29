@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "rsp_platform.h"
@@ -309,6 +310,63 @@ static void write_ini(const char *text) {
   fclose(f);
 }
 
+// The engine works in pixels, the shell in window points; rsp_set_render_scale converts at the boundary.
+static void test_render_scale(void) {
+  rsp_stub_state *s = rsp_stub();
+  CHECK(rsp_render_scale() == 1.0, "scale 1 by default");
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 1280 && s->height == 720 && rsp_screen_width() == 1280 && rsp_screen_height() == 720,
+        "scale 1: identity");
+  CHECK(rsp_mouse_engine_coord(639.5) == rsp_mouse_coord(639.5) && rsp_mouse_engine_coord(-0.51) == -1,
+        "scale 1: mouse as the original");
+  rsp_set_render_scale(2.0);
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 2560 && s->height == 1440, "scale 2: engine %dx%d", s->width, s->height);
+  CHECK(rsp_screen_width() == 1280 && rsp_screen_height() == 720, "scale 2: points %dx%d", rsp_screen_width(),
+        rsp_screen_height());
+  rsp_set_display_mode(1, 1279, 719);  // odd point sizes stay exact
+  CHECK(s->width == 2558 && s->height == 1438 && rsp_screen_width() == 1279 && rsp_screen_height() == 719,
+        "scale 2: odd sizes %dx%d", s->width, s->height);
+  s->width = 2561;  // an engine size no point size maps to: nearest point
+  CHECK(rsp_screen_width() == 1281, "scale 2: odd engine width -> %d", rsp_screen_width());
+  // Mouse: view points (origin bottom left) -> engine pixels (origin bottom left, frame 2x the view):
+  // the view's corners map to the engine frame's corners, half points to whole pixels.
+  struct { double v; int want; } mc[] = {{0, 0}, {0.25, 1}, {0.5, 1}, {0.75, 2}, {639.5, 1279},
+                                         {1279.75, 2560}, {720, 1440}, {-0.5, -1}};
+  for (size_t i = 0; i < sizeof mc / sizeof *mc; i++)
+    CHECK(rsp_mouse_engine_coord(mc[i].v) == mc[i].want, "scale 2: mouse %g -> %d (want %d)", mc[i].v,
+          rsp_mouse_engine_coord(mc[i].v), mc[i].want);
+  rsp_set_render_scale(0);
+  CHECK(rsp_render_scale() == 1.0, "scale 0 -> 1");
+  rsp_set_render_scale(-2);
+  CHECK(rsp_render_scale() == 1.0, "negative scale -> 1");
+  rsp_set_render_scale(NAN);
+  CHECK(rsp_render_scale() == 1.0, "NaN scale -> 1");
+  rsp_set_display_mode(0, 1280, 720);
+  CHECK(s->width == 1280 && rsp_screen_width() == 1280, "back to scale 1");
+}
+
+// Bootstrap at render scale 2 (in a child: the bootstrap runs once per process): Rocksmith.ini and the
+// 800x600 floor are engine pixels, so 1024x600 is kept, not forced to 1280x720 as half of it would be.
+static void test_boot_scaled(void) {
+  pid_t pid = fork();
+  if (pid == 0) {
+    rsp_stub_state *s = rsp_stub();
+    write_ini("[Renderer.MacOS]\nScreenWidth=1024\nScreenHeight=600\nFullscreen=0\nVisualQuality=2\n");
+    rsp_boot b = {g_tmpdir, "/", 0, NULL};
+    *rsp_config_global() = (rsp_config){0};
+    rsp_config_defaults(rsp_config_global());
+    rsp_set_render_scale(2.0);
+    int ok = rsp_game_bootstrap(&b) == 0 && s->width == 1024 && s->height == 600;
+    if (!ok) printf("FAIL: scaled bootstrap: engine %dx%d\n", s->width, s->height);
+    fflush(stdout);
+    _exit(ok ? 0 : 1);
+  }
+  int st = 0;
+  CHECK(pid > 0 && waitpid(pid, &st, 0) == pid && WIFEXITED(st) && WEXITSTATUS(st) == 0,
+        "bootstrap at scale 2 keeps the config's engine resolution (status %d)", st);
+}
+
 static void test_boot(void) {
   rsp_stub_state *s = rsp_stub();
   write_ini("[Renderer.MacOS]\nScreenWidth=640\nScreenHeight=480\nFullscreen=0\nVisualQuality=2\n");
@@ -412,6 +470,8 @@ int main(void) {
   test_config();
   test_input();
   test_logic();
+  test_render_scale();
+  test_boot_scaled();
   test_boot();
   printf("rsp_core_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)

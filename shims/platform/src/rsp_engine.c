@@ -248,6 +248,7 @@ void rsp_set_render_scale(double s) { g_render_scale = s > 0 ? s : 1.0; }
 double rsp_render_scale(void) { return g_render_scale; }
 static int to_engine(int v) { return (int)lround(v * g_render_scale); }
 static int from_engine(int v) { return (int)lround(v / g_render_scale); }
+int rsp_mouse_engine_coord(double v) { return rsp_mouse_coord(v * g_render_scale); }
 
 void rsp_set_display_mode(int fs, int w, int h) {  // 0x10017a1f0
   if (H->set_resolution) H->set_resolution(H->ctx, to_engine(w), to_engine(h));
@@ -302,7 +303,11 @@ int rsp_game_bootstrap(const rsp_boot *boot) {  // 0x100179dc0
   if (H->set_fullscreen) H->set_fullscreen(H->ctx, (int)cfg->fullscreen);
   if (H->set_resolution) H->set_resolution(H->ctx, (int)cfg->screen_width, (int)cfg->screen_height);
   if (H->set_visual_quality) H->set_visual_quality(H->ctx, (int)cfg->visual_quality);
-  unsigned w = (unsigned)rsp_screen_width(), h = (unsigned)rsp_screen_height();
+  // The config and the floor are in engine pixels, as in the original (not rsp_screen_width/height,
+  // which are window points when a render scale is set).
+  int ew = 0, eh = 0;
+  if (H->get_resolution) H->get_resolution(H->ctx, &ew, &eh);
+  unsigned w = (unsigned)ew, h = (unsigned)eh;
   if (w < 800 || h <= 599)
     if (H->set_resolution) H->set_resolution(H->ctx, 1280, 720);
   // 5. The engine: VFS, MainService_MacOS, Init(1, {"Rocksmith.app"}).

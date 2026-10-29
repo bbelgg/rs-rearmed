@@ -9,7 +9,8 @@
 // returns; the first pipeline needed for that library waits for it, or compiles it on the calling
 // thread if no worker has started it yet. Warming (below) uses the same pool at a lower priority.
 // rs_gfx_prepare (the shell's safe load, before the game starts loading) waits for warming on the
-// whole pool and then throttles the pool for the rest of the run ("Safe load" below).
+// whole pool and then throttles the pool for the rest of the run ("Safe load" below); on a first
+// run it also compiles the offline shader corpus's libraries ("Corpus warm" below).
 //
 // On disk (one directory per cache format, core conventions, OS build and GPU; not per build of
 // libRSOpenGL: rebuilding the app keeps the cache, and libraries are keyed by their MSL text):
@@ -28,6 +29,8 @@
 //                  vertex/fragment functions), so warming is what hides the MSL front-end compile;
 //                  the system's Metal cache makes repeated compiles of the same source cheap too,
 //                  but may be evicted.
+//   corpus-warmed  the identity of the last shader corpus compiled completely by a safe load's
+//                  corpus warm here (see "Corpus warm").
 //
 // Archive access: adds and serialisation run on one serial queue (concurrent add + serialise
 // crashes in Metal); lookups from pipeline creation run on any thread (concurrent with both, as
@@ -58,8 +61,11 @@
 //   RS_MTL_SALT_COMPILE=<text>  diagnostics only: the same, but only in the source handed to the
 //                             compiler (cache keys and the manifest keep the plain MSL), so a run
 //                             can meet a known manifest with a cold system Metal cache
+//   RS_METAL_CORPUS_WARM=0|1  safe load's corpus warm: never / always (default: by the rule in
+//                             "Corpus warm")
 //   RS_MTL_TEST_FAIL=<text>   tests only: MSL containing <text> gets an #error (compile failure path)
 //   RS_METAL_CACHE_KEEP_RUNS=<n>  tests only: RSM_KEEP_RUNS
+//   RS_METAL_CORPUS_MIN_MANIFEST=<n>  tests only: RSM_CORPUS_MIN_MANIFEST
 #include "mtl_internal.h"
 
 #include <dirent.h>
@@ -85,6 +91,10 @@ enum {
     RSM_SERIALIZE_EVERY = 32,    // new pipelines between archive writes
     RSM_SERIALIZE_DELAY_MS = 3000,
     RSM_MAX_THREADS = 8,
+    RSM_MAX_BOOST_THREADS = 16,  // the pool while rs_gfx_prepare waits (nothing else runs then)
+    // Safe load: the corpus is warmed when the manifest lists fewer libraries than this (a run
+    // that reaches the game's menus links about 90) or no complete corpus warm is recorded.
+    RSM_CORPUS_MIN_MANIFEST = 32,
     RSM_MAX_ARCHIVE_FILES = 8,
     RSM_MAX_LIBS = 8192,
     RSM_MAX_PIPES = 65536,
@@ -124,6 +134,8 @@ static struct {
     // since the throttle started (rs_gfx_prepare); time spent in rs_gfx_prepare.
     int pool_peak, pool_qos;
     _Atomic uint64_t prepare_ns;
+    _Atomic int corpus_warmed, corpus_failed;  // corpus warm: libraries compiled, failed
+    _Atomic uint64_t corpus_ns;
     bool verbose;  // RS_METAL_CACHE_STATS=2: every hit and miss
 } st;
 
@@ -180,9 +192,14 @@ static uint64_t rsm_now_ns(void) {
 
     // Warming.
     dispatch_group_t warm;
-    int warm_total;                // libraries queued for warming
+    _Atomic int warm_total;        // libraries queued for warming
     _Atomic int warm_done;
     _Atomic bool closing;
+
+    // Safe load (rs_gfx_prepare): the corpus warm and the progress rs_gfx_prepare_progress reports.
+    dispatch_group_t corpus;
+    _Atomic int corpus_total, corpus_done;
+    _Atomic bool preparing;
 }
 @end
 @implementation RSMShaderCache
@@ -241,7 +258,8 @@ static void rsm_remove_cache_dir(NSString *path) {
         return;
     struct dirent *de;
     while ((de = readdir(d))) {
-        if (!strncmp(de->d_name, "manifest.bin", 12) || !strncmp(de->d_name, "archive-", 8))
+        if (!strncmp(de->d_name, "manifest.bin", 12) || !strncmp(de->d_name, "archive-", 8) ||
+            !strcmp(de->d_name, "corpus-warmed"))
             unlink([path stringByAppendingPathComponent:@(de->d_name)].fileSystemRepresentation);
     }
     closedir(d);
@@ -785,11 +803,8 @@ static void rsm_dump_msl(RSMLibEntry *e) {
     }
 }
 
-// render: compiled for the game (on its thread or by the pool for a link); else warming.
-static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
-    rsm_dump_msl(e);
-    uint64_t t0 = rsm_now_ns();
-    NSError *err = nil;
+// RS_MTL_SALT_COMPILE's line (nil when unset).
+static NSString *rsm_compile_salt(void) {
     static NSString *csalt;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
@@ -797,8 +812,21 @@ static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
         if (s && *s && !strpbrk(s, "\r\n"))
             csalt = [NSString stringWithFormat:@"\n// salt %s\n", s];
     });
-    NSString *src = csalt ? [e->msl stringByAppendingString:csalt] : e->msl;
-    id<MTLLibrary> lib = [c->dev newLibraryWithSource:src options:rsm_compile_options() error:&err];
+    return csalt;
+}
+
+static id<MTLLibrary> rsm_compile(RSMShaderCache *c, NSString *msl, NSError **err) {
+    NSString *csalt = rsm_compile_salt();
+    NSString *src = csalt ? [msl stringByAppendingString:csalt] : msl;
+    return [c->dev newLibraryWithSource:src options:rsm_compile_options() error:err];
+}
+
+// render: compiled for the game (on its thread or by the pool for a link); else warming.
+static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
+    rsm_dump_msl(e);
+    uint64_t t0 = rsm_now_ns();
+    NSError *err = nil;
+    id<MTLLibrary> lib = rsm_compile(c, e->msl, &err);
     if (lib) {
         e->vs = [lib newFunctionWithName:@"rs_vs"];
     } else {
@@ -874,13 +902,15 @@ static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntr
 // then prebuilds that library's pipelines from the manifest. Workers run link jobs at
 // user-initiated QoS and warming at utility (the compile itself runs in Metal's compiler
 // service, which inherits the requester's QoS). After rs_gfx_prepare at most g_pool_limit jobs
-// run at once, all at utility ("Safe load" below).
+// run at once, all at utility ("Safe load" below). Corpus jobs (also in the warming FIFO) compile
+// an MSL text that has no entry and drop the library ("Corpus warm" below).
 @interface RSMJob : NSObject {
 @public
     RSMShaderCache *c;
     RSMLibEntry *e;
     NSArray<NSData *> *keys;  // warming: pipelines to prebuild
-    bool warm;
+    bool warm;                // manifest or corpus warming (the second FIFO)
+    NSString *corpus_msl;     // a corpus job: compile this, keep nothing
 }
 @end
 @implementation RSMJob
@@ -924,10 +954,42 @@ static int rsm_pool_max(void) {
     return n;
 }
 
+// A corpus job: only the system's Metal cache keeps the result, so the game's own compile of
+// this MSL later is a cache hit (well under a millisecond) instead of 0.1-0.5 s of CPU. Keeping
+// the libraries instead would hold some 60 KB each, for thousands the game mostly never links.
+static void rsm_run_corpus_job(RSMJob *j) {
+    RSMShaderCache *c = j->c;
+    uint64_t t0 = rsm_now_ns();
+    @autoreleasepool {
+        NSError *err = nil;
+        id<MTLLibrary> lib = rsm_compile(c, j->corpus_msl, &err);
+        if (!lib)
+            st.corpus_failed++;
+        lib = nil;
+    }
+    st.corpus_ns += rsm_now_ns() - t0;
+    st.corpus_warmed++;
+}
+
+static void rsm_job_done(RSMJob *j) {
+    if (j->corpus_msl) {
+        j->c->corpus_done++;
+        dispatch_group_leave(j->c->corpus);
+    } else if (j->warm) {
+        j->c->warm_done++;
+        dispatch_group_leave(j->c->warm);
+    }
+}
+
 static void rsm_run_job(RSMJob *j) {
     RSMShaderCache *c = j->c;
     RSMLibEntry *e = j->e;
-    if (!(j->warm && c->closing)) {
+    if (j->corpus_msl) {
+        if (!c->closing) {
+            pthread_set_qos_class_self_np(g_warm_boost && !g_throttled ? QOS_CLASS_USER_INITIATED : QOS_CLASS_UTILITY, 0);
+            rsm_run_corpus_job(j);
+        }
+    } else if (!(j->warm && c->closing)) {
         // Read without the lock: a job that starts as the mode changes runs at either QoS.
         bool throttled = __atomic_load_n(&g_throttled, __ATOMIC_RELAXED);
         qos_class_t q = throttled || (j->warm && !g_warm_boost) ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED;
@@ -956,10 +1018,7 @@ static void rsm_run_job(RSMJob *j) {
             rsm_pipeline_for(c, e, kd.bytes, false);
         }
     }
-    if (j->warm) {
-        c->warm_done++;
-        dispatch_group_leave(c->warm);
-    }
+    rsm_job_done(j);
 }
 
 static void *rsm_worker(void *arg) {
@@ -992,9 +1051,17 @@ static void *rsm_worker(void *arg) {
     return NULL;
 }
 
+// While rs_gfx_prepare waits the game has not started: the pool may use every CPU (unless
+// RS_MTL_COMPILE_THREADS is set).
+static int rsm_pool_boost_max(void) {
+    int cpus = 0;
+    size_t len = sizeof cpus;
+    if (sysctlbyname("hw.activecpu", &cpus, &len, NULL, 0))
+        cpus = 4;
+    return cpus < 2 ? 2 : cpus > RSM_MAX_BOOST_THREADS ? RSM_MAX_BOOST_THREADS : cpus;
+}
+
 static void rsm_pool_push(NSArray<RSMJob *> *jobs, bool warm) {
-    if (!jobs.count)
-        return;
     pthread_mutex_lock(&g_pool_m);
     if (!g_jobs[0]) {
         g_jobs[0] = [NSMutableArray new];
@@ -1003,6 +1070,8 @@ static void rsm_pool_push(NSArray<RSMJob *> *jobs, bool warm) {
     [g_jobs[warm] addObjectsFromArray:jobs];
     int want = (int)(g_jobs[0].count + g_jobs[1].count);
     int max = rsm_pool_max() ?: (g_jobs[1].count ? 2 : 0);  // 0: warming still runs in the background
+    if (g_warm_boost && !g_throttled && !rsm_pool_explicit())
+        max = rsm_pool_boost_max();
     if (g_throttled && max > g_pool_limit)
         max = g_pool_limit;
     while (g_pool_idle < want && g_pool_threads < max) {
@@ -1029,10 +1098,22 @@ static void rsm_pool_drain(void) {
     [g_jobs[0] removeAllObjects];
     [g_jobs[1] removeAllObjects];
     pthread_mutex_unlock(&g_pool_m);
-    for (RSMJob *j in warm) {
-        j->c->warm_done++;
-        dispatch_group_leave(j->c->warm);
-    }
+    for (RSMJob *j in warm)
+        rsm_job_done(j);
+}
+
+// rs_gfx_prepare timed out: the corpus jobs not started yet are dropped (speculative; the game's
+// own links still compile what it needs). Returns how many.
+static int rsm_pool_drop_corpus(RSMShaderCache *c) {
+    pthread_mutex_lock(&g_pool_m);
+    NSMutableArray<RSMJob *> *drop = [NSMutableArray new], *keep = [NSMutableArray new];
+    for (RSMJob *j in g_jobs[1])
+        [(j->corpus_msl && j->c == c ? drop : keep) addObject:j];
+    [g_jobs[1] setArray:keep];
+    pthread_mutex_unlock(&g_pool_m);
+    for (RSMJob *j in drop)
+        dispatch_group_leave(c->corpus);
+    return (int)drop.count;
 }
 
 // The throttled pool's size: RS_MTL_COMPILE_THREADS when set (at least 1), else 2.
@@ -1283,15 +1364,154 @@ static const char *rsm_qos_name(int q) {
     }
 }
 
+// --- Corpus warm ---------------------------------------------------------------------------
+// The manifest only knows what earlier runs linked: on the very first run (or after an OS update,
+// a new GPU or translator: a new cache directory or new MSL) it is empty and every library the
+// game needs would compile, cold, while it loads. So rs_gfx_prepare also compiles the MSL of
+// every program in the offline shader corpus (rsmsl_corpus_*; distinct texts only, minus the
+// manifest's) on the whole pool, before the game starts. The libraries are not kept (see
+// rsm_run_corpus_job): the system's Metal cache makes the game's own compiles of them cheap. Done
+// when the manifest lists fewer than RSM_CORPUS_MIN_MANIFEST libraries, or when the cache
+// directory has no record (corpus-warmed) that this corpus was compiled completely here before;
+// the record names the corpus's MSL set (and RS_MTL_SALT_COMPILE), so a new corpus or translator
+// warms again. A corpus warm cut short by the timeout leaves no record: the next start goes on
+// where the system's cache stopped. Pipelines are not warmed from the corpus: they need draw
+// state the corpus does not have (the manifest has it), and cost far less than the libraries.
+#ifdef RSM_MSL_DYNAMIC
+extern int rsmsl_corpus_count(void) __attribute__((weak_import));
+extern char *rsmsl_corpus_msl(int) __attribute__((weak_import));
+#endif
+
+static NSString *rsm_corpus_record_path(RSMShaderCache *c) {
+    return [c->dir stringByAppendingPathComponent:@"corpus-warmed"];
+}
+
+static uint64_t rsm_corpus_record(RSMShaderCache *c) {
+    char buf[64] = "";
+    FILE *f = fopen(rsm_corpus_record_path(c).fileSystemRepresentation, "r");
+    if (!f)
+        return 0;
+    if (!fgets(buf, sizeof buf, f))
+        buf[0] = 0;
+    fclose(f);
+    return strtoull(buf, NULL, 16);
+}
+
+static void rsm_corpus_record_write(RSMShaderCache *c, uint64_t id) {
+    NSString *path = rsm_corpus_record_path(c);
+    NSString *tmp = [path stringByAppendingFormat:@".tmp.%d", (int)getpid()];
+    FILE *f = fopen(tmp.fileSystemRepresentation, "w");
+    if (!f)
+        return;
+    bool ok = fprintf(f, "%016llx\n", (unsigned long long)id) > 0;
+    ok = fclose(f) == 0 && ok;
+    if (!ok || rename(tmp.fileSystemRepresentation, path.fileSystemRepresentation))
+        unlink(tmp.fileSystemRepresentation);
+}
+
+// The corpus's distinct MSL texts (as the game would compile them: rsm_msl_string), without the
+// ones already known (the manifest's, being warmed), and the identity of the whole set.
+static NSArray<NSString *> *rsm_corpus_list(RSMShaderCache *c, uint64_t *id) {
+    *id = 0;
+#ifdef RSM_MSL_DYNAMIC
+    if (!rsmsl_corpus_count || !rsmsl_corpus_msl)
+        return @[];
+#endif
+    int n = rsmsl_corpus_count();
+    if (n <= 0)
+        return @[];
+    NSMutableArray<NSString *> *out = [NSMutableArray new];
+    NSMutableSet<NSString *> *seen = [NSMutableSet new];
+    uint64_t h = 0xcbf29ce484222325ull;
+    for (int i = 0; i < n; i++) {
+        @autoreleasepool {
+            char *m = rsmsl_corpus_msl(i);
+            if (!m)
+                continue;
+            NSString *s = rsm_msl_string(m);
+            uint64_t mh = rsm_hash(m, strlen(m));
+            free(m);
+            if (!s || [seen containsObject:s])
+                continue;
+            [seen addObject:s];
+            h = (h ^ mh) * 0x100000001b3ull;
+            pthread_mutex_lock(&c->m);
+            bool known = c->libs[s] != nil;
+            pthread_mutex_unlock(&c->m);
+            if (!known)
+                [out addObject:s];
+        }
+    }
+    NSString *csalt = rsm_compile_salt();
+    if (csalt) {
+        const char *u = csalt.UTF8String;
+        h = (h ^ rsm_hash(u, strlen(u))) * 0x100000001b3ull;
+    }
+    *id = h ? h : 1;
+    return out;
+}
+
+// Whether this safe load warms the corpus; if so, the jobs are queued (c->corpus) and *id is the
+// record to write once they are all done.
+static bool rsm_corpus_start(RSMShaderCache *c, uint64_t *id) {
+    *id = 0;
+    const char *e = getenv("RS_METAL_CORPUS_WARM");
+    bool force = e && *e && atoi(e) != 0;
+    if ((e && *e && !force) || !c->persist || c->corpus)
+        return false;
+    uint64_t t0 = rsm_now_ns();
+    uint64_t cid;
+    NSArray<NSString *> *list = rsm_corpus_list(c, &cid);
+    if (!cid)
+        return false;  // no corpus
+    const char *me = getenv("RS_METAL_CORPUS_MIN_MANIFEST");
+    int min_manifest = me && *me ? atoi(me) : RSM_CORPUS_MIN_MANIFEST;
+    uint64_t rec = rsm_corpus_record(c);
+    bool small = c->warm_total < min_manifest;
+    if (!force && !small && rec == cid) {
+        rsm_log("safe load: shader corpus compiled here before, the manifest's %d libraries are enough",
+                c->warm_total);
+        return false;
+    }
+    rsm_log("safe load: compiling the shader corpus too (%lu distinct libraries not in the manifest; %s; "
+            "listed in %.0f ms)",
+            (unsigned long)list.count,
+            force ? "RS_METAL_CORPUS_WARM=1"
+            : rec != cid ? (rec ? "another corpus than last time" : "first time with this corpus here")
+                         : "the manifest is small",
+            (rsm_now_ns() - t0) / 1e6);
+    *id = cid;
+    if (!list.count)
+        return true;
+    c->corpus = dispatch_group_create();
+    NSMutableArray<RSMJob *> *jobs = [NSMutableArray new];
+    for (NSString *msl in list) {
+        RSMJob *j = [RSMJob new];
+        j->c = c;
+        j->warm = true;
+        j->corpus_msl = msl;
+        dispatch_group_enter(c->corpus);
+        [jobs addObject:j];
+    }
+    c->corpus_total = (int)jobs.count;
+    rsm_pool_push(jobs, true);
+    return true;
+}
+
 int rsm_cache_prepare(RSMContext *ctx, double max_s) {
     RSMShaderCache *c = rsm_cache_for(ctx->dev);
     uint64_t t0 = rsm_now_ns();
     int rc = 0;
-    if (c->warm) {
-        g_warm_boost = true;
-        int total = c->warm_total;
-        rsm_log("safe load: compiling the %d libraries of the cache manifest before the game loads "
-                "(%d threads, at most %g s)", total, g_pool_threads, max_s);
+    c->preparing = true;
+    g_warm_boost = true;
+    rsm_pool_push(@[], true);  // the whole machine for what warming has queued
+    uint64_t corpus_id = 0;
+    bool corpus = rsm_corpus_start(c, &corpus_id);
+    int total = c->warm_total + c->corpus_total;
+    if (total) {
+        rsm_log("safe load: compiling %d libraries (cache manifest %d, shader corpus %d) before the game loads "
+                "(%d threads, at most %g s)",
+                total, c->warm_total, (int)c->corpus_total, g_pool_threads, max_s);
         double next_log = 2.0;
         for (;;) {
             double el = (rsm_now_ns() - t0) / 1e9, left = max_s - el;
@@ -1300,24 +1520,48 @@ int rsm_cache_prepare(RSMContext *ctx, double max_s) {
                 break;
             }
             double step = left < 0.25 ? left : 0.25;
-            if (!dispatch_group_wait(c->warm, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(step * 1e9))))
+            dispatch_time_t until = dispatch_time(DISPATCH_TIME_NOW, (int64_t)(step * 1e9));
+            bool done = (!c->warm || !dispatch_group_wait(c->warm, until)) &&
+                        (!c->corpus || !dispatch_group_wait(c->corpus, until));
+            if (done)
                 break;
             if (el >= next_log) {
-                rsm_log("safe load: %d of %d libraries (%.0f s)", (int)c->warm_done, total, el);
-                next_log += 2.0;
+                rsm_log("safe load: %d of %d libraries (%.0f s)", (int)(c->warm_done + c->corpus_done), total, el);
+                next_log += el < 30 ? 2.0 : 10.0;
             }
         }
-        g_warm_boost = false;
-        if (rc)
-            rsm_log("safe load: timed out after %g s with %d of %d libraries; the rest compiles while "
-                    "the game loads", max_s, (int)c->warm_done, total);
+        if (rc) {
+            int dropped = c->corpus ? rsm_pool_drop_corpus(c) : 0;
+            rsm_log("safe load: timed out after %g s with %d of %d libraries; the manifest's rest compiles while "
+                    "the game loads, %d corpus libraries are skipped",
+                    max_s, (int)(c->warm_done + c->corpus_done), total, dropped);
+        }
+    }
+    g_warm_boost = false;
+    if (corpus && !rc && !c->closing) {
+        rsm_corpus_record_write(c, corpus_id);
+        if (st.corpus_failed)
+            rsm_log("safe load: %d corpus libraries failed to compile", (int)st.corpus_failed);
     }
     rsm_pool_throttle();
     uint64_t dt = rsm_now_ns() - t0;
     st.prepare_ns += dt;
     rsm_log("safe load: %d libraries ready in %.1f ms; compile pool now %d at a time, utility QoS",
-            c->warm ? (int)c->warm_done : 0, dt / 1e6, g_pool_limit);
+            (int)(c->warm_done + c->corpus_done), dt / 1e6, g_pool_limit);
+    c->preparing = false;
     return rc;
+}
+
+int rsm_cache_progress(RSMContext *ctx, int *done, int *total) {
+    RSMShaderCache *c = rsm_cache_for(ctx->dev);
+    // done first: a reader never sees done > total (both only grow).
+    int d = c->warm_done + c->corpus_done;
+    int t = c->warm_total + c->corpus_total;
+    if (done)
+        *done = d < t ? d : t;
+    if (total)
+        *total = t;
+    return c->preparing ? 1 : 0;
 }
 
 // --- Setup ---------------------------------------------------------------------------------
@@ -1328,12 +1572,14 @@ static void rsm_print_stats(const char *when) {
             "[rs-mtl] cache stats (%s): lib_compiled=%d lib_ms=%.1f lib_async=%d lib_stolen=%d lib_reused=%d "
             "lib_waited=%d lib_warmed=%d lib_failed=%d pipe_built=%d pipe_ms=%.1f pipe_reused=%d pipe_waited=%d pipe_warmed=%d "
             "archive_hits=%d archive_misses=%d wait_ms=%.1f warm_ms=%.1f archive_writes=%d write_ms=%.1f "
-            "discarded=%d compacted=%d pool_threads=%d pool_limit=%d pool_peak=%d pool_qos=%s prepare_ms=%.1f\n",
+            "discarded=%d compacted=%d pool_threads=%d pool_limit=%d pool_peak=%d pool_qos=%s prepare_ms=%.1f "
+            "corpus_warmed=%d corpus_failed=%d corpus_ms=%.1f\n",
             when, st.lib_compiled, st.lib_ns / 1e6, st.lib_async, st.lib_stolen, st.lib_reused, st.lib_waited, st.lib_warmed, st.lib_failed,
             st.pipe_built, st.pipe_ns / 1e6, st.pipe_reused, st.pipe_waited, st.pipe_warmed, st.pipe_hits,
             st.pipe_misses, st.wait_ns / 1e6, st.warm_ns / 1e6, st.serialized, st.serialize_ns / 1e6, st.discarded,
             st.compacted, g_pool_threads, g_throttled ? g_pool_limit : rsm_pool_max(), st.pool_peak,
-            rsm_qos_name(st.pool_qos), st.prepare_ns / 1e6);
+            rsm_qos_name(st.pool_qos), st.prepare_ns / 1e6, (int)st.corpus_warmed, (int)st.corpus_failed,
+            st.corpus_ns / 1e6);
 }
 
 static void rsm_flush(RSMShaderCache *c) {

@@ -14,8 +14,9 @@ if(TARGET rsmsl)
   target_link_libraries(opengl PRIVATE rsmsl)
 else()
   # No translator in this build: resolve it at run time (a test program may provide one).
-  target_link_options(opengl PRIVATE "LINKER:-U,_rsmsl_translate" "LINKER:-U,_rsmsl_free" "LINKER:-U,_rsmsl_key")
-  set_property(SOURCE src/metal/mtl_program.m APPEND PROPERTY COMPILE_DEFINITIONS RSM_MSL_DYNAMIC)
+  target_link_options(opengl PRIVATE "LINKER:-U,_rsmsl_translate" "LINKER:-U,_rsmsl_free" "LINKER:-U,_rsmsl_key"
+    "LINKER:-U,_rsmsl_corpus_count" "LINKER:-U,_rsmsl_corpus_msl")
+  set_property(SOURCE src/metal/mtl_program.m src/metal/mtl_cache.m APPEND PROPERTY COMPILE_DEFINITIONS RSM_MSL_DYNAMIC)
   set_tests_properties(opengl.gfx.offscreen.metal PROPERTIES DISABLED TRUE)
 endif()
 
@@ -32,6 +33,11 @@ add_executable(metal_cache_test test/metal_cache_test.c)
 target_include_directories(metal_cache_test PRIVATE src)
 target_compile_options(metal_cache_test PRIVATE -Wno-deprecated-declarations)
 target_link_libraries(metal_cache_test PRIVATE opengl)
+if(TARGET rsmsl)
+  # Writes the test's shader corpus (rsmsl_corpus_*: also in libRSOpenGL, hidden there).
+  target_link_libraries(metal_cache_test PRIVATE rsmsl)
+  set_target_properties(metal_cache_test PROPERTIES LINKER_LANGUAGE CXX)
+endif()
 
 set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport

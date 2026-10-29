@@ -476,6 +476,17 @@ int rsmtl_gfx_prepare(rs_gfx_context *c, double max_seconds) {
     }
 }
 
+int rsmtl_gfx_prepare_progress(rs_gfx_context *c, int *done, int *total) {
+    if (!c) {
+        if (done)
+            *done = 0;
+        if (total)
+            *total = 0;
+        return -1;
+    }
+    return rsm_cache_progress((__bridge RSMContext *)c, done, total);
+}
+
 void rsmtl_gfx_make_current(rs_gfx_context *c) { rsm_tls = (__bridge RSMContext *)c; }
 
 rs_gfx_context *rsmtl_gfx_current(void) { return (__bridge rs_gfx_context *)rsm_tls; }

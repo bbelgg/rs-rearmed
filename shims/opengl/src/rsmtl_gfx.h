@@ -20,6 +20,7 @@ void rsmtl_gfx_lock(rs_gfx_context *ctx);
 void rsmtl_gfx_unlock(rs_gfx_context *ctx);
 CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx);
 int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
+int rsmtl_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total);
 
 // rsgl.c: the generated weak rsmtl_<name> stubs report through this.
 void rsmtl_unimplemented(int idx, const char *name);

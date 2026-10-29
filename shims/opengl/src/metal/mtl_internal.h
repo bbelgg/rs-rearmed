@@ -480,9 +480,11 @@ bool rsm_cache_library_wait(RSMContext *ctx, RSMLibEntry *e);  // compiled (buil
 id<MTLRenderPipelineState> rsm_cache_pipeline(RSMContext *ctx, RSMLibEntry *e, const rsm_pkey *k);
 void rsm_cache_context_created(RSMContext *ctx);    // first one: open the disk cache, start warming
 void rsm_cache_context_destroyed(RSMContext *ctx);  // last one: write the archive
-// rs_gfx_prepare: wait for warming on the whole pool (at most max_s), then throttle the pool.
-// 0 everything warmed (or nothing to warm), 1 timed out.
+// rs_gfx_prepare: wait for warming (and the corpus warm, mtl_cache.m) on the whole pool (at most
+// max_s), then throttle the pool. 0 everything warmed (or nothing to warm), 1 timed out.
 int rsm_cache_prepare(RSMContext *ctx, double max_s);
+// rs_gfx_prepare_progress: libraries compiled / to compile so far; 1 while rs_gfx_prepare runs.
+int rsm_cache_progress(RSMContext *ctx, int *done, int *total);
 // The descriptor for a program pipeline (mtl_draw.m).
 MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunction> fs, const rsm_pkey *k);
 

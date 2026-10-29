@@ -24,15 +24,23 @@
 //   stale       directories of other formats/OS/GPUs are removed, foreign files left alone
 //   async       --async children with the compile pool and with RS_MTL_COMPILE_THREADS=0
 //   prune       the game links other MSL for a few runs: the old libraries leave the manifest
+//   corpus      safe load with an offline shader corpus (a small one written here): the first run
+//               compiles its distinct libraries before the game (progress monotonic, reaching the
+//               total), the game's own compiles of them are then system-cache hits; a recorded
+//               complete warm and a big enough manifest skip it; a new corpus, the override and the
+//               timeout; nothing without prepare
 // Output ends with "N passed, M failed".
 #define GL_SILENCE_DEPRECATION
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
 
 #include "rs_gfx.h"
+#include "msl_internal.h"  // the corpus writer (rsmsl, linked into this test too)
 
 #include <fcntl.h>
 #include <mach/mach_time.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <spawn.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -79,13 +87,50 @@ static rs_gfx_context *create_ctx(void) {
     g_created_ms = now_ms();
     return rs_gfx_create_offscreen(W, H);
 }
+// RSM_TEST_PROGRESS=1: another thread polls rs_gfx_prepare_progress while prepare runs.
+static rs_gfx_context *g_pctx;
+static atomic_int g_pstop;
+static int g_psamples, g_prunning, g_pbad, g_plast_done, g_plast_total;
+static void *progress_poller(void *arg) {
+    (void)arg;
+    int ld = 0, lt = 0;
+    while (!atomic_load(&g_pstop)) {
+        int d = -1, t = -1;
+        int r = rs_gfx_prepare_progress(g_pctx, &d, &t);
+        g_psamples++;
+        g_prunning += r == 1;
+        if (d < ld || t < lt || d > t || d < 0 || (r != 0 && r != 1))
+            g_pbad++;
+        ld = d, lt = t;
+        usleep(500);
+    }
+    g_plast_done = ld, g_plast_total = lt;
+    return NULL;
+}
+
 static void maybe_prepare(rs_gfx_context *c) {
     const char *e = getenv("RSM_TEST_PREPARE");
     if (!e || !*e)
         return;
+    const char *pe = getenv("RSM_TEST_PROGRESS");
+    pthread_t t;
+    int poll = pe && *pe == '1';
+    if (poll) {
+        g_pctx = c;
+        pthread_create(&t, NULL, progress_poller, NULL);
+    }
     double t0 = now_ms();
     int rc = rs_gfx_prepare(c, atof(e));
     printf("PREPARE rc=%d ms=%.1f total_ms=%.1f\n", rc, now_ms() - t0, now_ms() - g_created_ms);
+    if (poll) {
+        atomic_store(&g_pstop, 1);
+        pthread_join(t, NULL);
+        int d = -1, tt = -1;
+        int r = rs_gfx_prepare_progress(c, &d, &tt);
+        printf("PROGRESS samples=%d running=%d bad=%d last_done=%d last_total=%d after_rc=%d after_done=%d "
+               "after_total=%d\n",
+               g_psamples, g_prunning, g_pbad, g_plast_done, g_plast_total, r, d, tt);
+    }
 }
 
 static GLuint shader(GLenum type, const char *src) {
@@ -93,6 +138,26 @@ static GLuint shader(GLenum type, const char *src) {
     glShaderSource(s, 1, &src, NULL);
     glCompileShader(s);
     return s;
+}
+
+static const char *kChildVS =
+    "attribute vec2 pos;\n"
+    "attribute vec4 col;\n"
+    "varying vec4 v_col;\n"
+    "void main() { v_col = col; gl_Position = vec4(pos, 0.0, 1.0); }\n";
+
+// The child's fragment shader i (the corpus scenario writes the same ones into its corpus).
+static void child_fs(char *fs, size_t n, int i, int nonce) {
+    snprintf(fs, n,
+             "varying vec4 v_col;\n"
+             "uniform vec4 tint;\n"
+             "void main() {\n"
+             "    vec4 c = v_col * tint;\n"
+             "    c.r = %d.0 / 255.0;\n"
+             "    c.b = float(%d) * 1.0e-12;\n"  // per-run code: the system's Metal cache starts cold
+             "    gl_FragColor = c;\n"
+             "}\n",
+             i * 8, nonce);
 }
 
 static int child(int nonce) {
@@ -103,25 +168,12 @@ static int child(int nonce) {
     }
     maybe_prepare(c);
     rs_gfx_make_current(c);
-    static const char *vs =
-        "attribute vec2 pos;\n"
-        "attribute vec4 col;\n"
-        "varying vec4 v_col;\n"
-        "void main() { v_col = col; gl_Position = vec4(pos, 0.0, 1.0); }\n";
+    const char *vs = kChildVS;
     GLuint prog[NPROG];
     double t0 = now_ms();
     for (int i = 0; i < NPROG; i++) {
         char fs[512];
-        snprintf(fs, sizeof fs,
-                 "varying vec4 v_col;\n"
-                 "uniform vec4 tint;\n"
-                 "void main() {\n"
-                 "    vec4 c = v_col * tint;\n"
-                 "    c.r = %d.0 / 255.0;\n"
-                 "    c.b = float(%d) * 1.0e-12;\n"  // per-run code: the system's Metal cache starts cold
-                 "    gl_FragColor = c;\n"
-                 "}\n",
-                 i * 8, nonce);
+        child_fs(fs, sizeof fs, i, nonce);
         GLuint p = glCreateProgram();
         glAttachShader(p, shader(GL_VERTEX_SHADER, vs));
         glAttachShader(p, shader(GL_FRAGMENT_SHADER, fs));
@@ -477,7 +529,7 @@ static const char *g_mode = "--child", *g_arg2;  // child mode, extra child argu
 static run_result run(const char *name, const char *extra_env[]) {
     run_result r;
     memset(&r, 0, sizeof r);
-    char logpath[1200];
+    char logpath[1300];
     snprintf(logpath, sizeof logpath, "%s.%s.log", g_dir, name);
     char nonce[32];
     snprintf(nonce, sizeof nonce, "%d", g_nonce);
@@ -486,8 +538,15 @@ static run_result run(const char *name, const char *extra_env[]) {
     char *env[512];
     int n = 0;
     for (char **e = environ; *e && n < 480; e++)
-        if (strncmp(*e, "RS_METAL_CACHE", 14) && strncmp(*e, "RS_GL_BACKEND=", 14) && strncmp(*e, "RS_MTL_", 7))
+        if (strncmp(*e, "RS_METAL_", 9) && strncmp(*e, "RS_GL_BACKEND=", 14) && strncmp(*e, "RS_MTL_", 7) &&
+            strncmp(*e, "RS_MSL_CORPUS=", 14))
             env[n++] = *e;
+    // No shader corpus unless the run names one.
+    int has_corpus = 0;
+    for (int i = 0; extra_env && extra_env[i]; i++)
+        has_corpus |= !strncmp(extra_env[i], "RS_MSL_CORPUS=", 14);
+    if (!has_corpus)
+        env[n++] = "RS_MSL_CORPUS=";
     static char dirvar[1100];
     snprintf(dirvar, sizeof dirvar, "RS_METAL_CACHE_DIR=%s", g_dir);
     env[n++] = dirvar;
@@ -640,6 +699,136 @@ static int bench(const char *self, const char *dir, int n) {
     bench_one("warm safe, +disk", n, s3, (const char *[]){"RSM_TEST_PREPARE=120", NULL});
     bench_one("cold-sys safe, +disk", n, s3, (const char *[]){"RSM_TEST_PREPARE=120", s4, NULL});
     return 0;
+}
+
+// --- Corpus warm ---------------------------------------------------------------------------
+enum { NEXTRA = 6, NCORPUS = NPROG + NEXTRA };  // distinct MSL in the test corpus
+
+// The child's NPROG programs, NEXTRA more it never links, and one more pair with program 0's MSL
+// (a duplicate text: compiled once).
+static int write_corpus(const char *path, int nonce) {
+    rsmsl_attrib bound[] = {{"pos", 0, 0}, {"col", 1, 0}};
+    rsmsl_corpus_writer *w = rsmsl_corpus_begin();
+    rsmsl_program *p0 = NULL;
+    for (int i = 0; i < NCORPUS; i++) {
+        char fs[512];
+        child_fs(fs, sizeof fs, i, nonce);
+        char *err = NULL;
+        rsmsl_program *p = rsmsl_translate_direct(kChildVS, fs, bound, 2, &err);
+        if (!p) {
+            printf("corpus: translation %d failed: %s\n", i, err ? err : "?");
+            return -1;
+        }
+        rsmsl_corpus_add(w, kChildVS, fs, p, RSMSL_CORPUS_VERIFIED);
+        if (i)
+            rsmsl_free(p);
+        else
+            p0 = p;
+    }
+    char fs[512];
+    child_fs(fs, sizeof fs, 0, nonce);
+    char vs2[512];
+    snprintf(vs2, sizeof vs2, "%s// another pair, the same MSL\n", kChildVS);
+    rsmsl_corpus_add(w, vs2, fs, p0, 0);
+    rsmsl_free(p0);
+    return rsmsl_corpus_finish(w, path);
+}
+
+static int progress_ok(const char *log, int total) {
+    const char *p = strstr(log, "PROGRESS ");
+    return p && num(p, "samples=") > 0 && num(p, "bad=") == 0 && num(p, "after_rc=") == 0 &&
+           num(p, "after_done=") == total && num(p, "after_total=") == total;
+}
+
+static void test_corpus(void) {
+    char saved[1024], corpus[1100], corpus_var[1200], rec[1700];
+    snprintf(saved, sizeof saved, "%s", g_dir);
+    snprintf(corpus, sizeof corpus, "%s-corpus.bin", saved);
+    snprintf(corpus_var, sizeof corpus_var, "RS_MSL_CORPUS=%s", corpus);
+    check(write_corpus(corpus, g_nonce) == 0, "test corpus written");
+    snprintf(g_dir, sizeof g_dir, "%s-corpus", saved);
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+    char salt[96], salt2[96], salt3[96], salt4[96];
+    snprintf(salt, sizeof salt, "RS_MTL_SALT_COMPILE=cw%d-%d", g_nonce, (int)getpid());
+    snprintf(salt2, sizeof salt2, "RS_MTL_SALT_COMPILE=cx%d-%d", g_nonce, (int)getpid());
+    snprintf(salt3, sizeof salt3, "RS_MTL_SALT_COMPILE=cy%d-%d", g_nonce, (int)getpid());
+    snprintf(salt4, sizeof salt4, "RS_MTL_SALT_COMPILE=cz%d-%d", g_nonce, (int)getpid());
+    const char *minm = "RS_METAL_CORPUS_MIN_MANIFEST=8";
+
+    // Control: the same first run without the corpus warm (cold compiles while "loading").
+    const char *ctl_env[] = {"RSM_TEST_PREPARE=60", corpus_var, minm, "RS_METAL_CORPUS_WARM=0", salt4, NULL};
+    run_result ctl = run("corpus-off", ctl_env);
+    check(ctl.rc == 0 && ctl.bad == 0 && num(ctl.log, "corpus_warmed=") == 0,
+          "RS_METAL_CORPUS_WARM=0: no corpus warm (rc %d, %d)", ctl.rc, (int)num(ctl.log, "corpus_warmed="));
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+
+    // First run: empty manifest -> every distinct corpus library before the game links anything.
+    const char *first_env[] = {"RSM_TEST_PREPARE=60", "RSM_TEST_PROGRESS=1", corpus_var, minm, salt, NULL};
+    run_result first = run("corpus-first", first_env);
+    const char *pl = strstr(first.log, "PREPARE ");
+    check(first.rc == 0 && first.bad == 0 && pl && num(pl, "rc=") == 0, "corpus-first: draws, prepare rc %d",
+          (int)num(pl, "rc="));
+    check(num(first.log, "corpus_warmed=") == NCORPUS && num(first.log, "corpus_failed=") == 0,
+          "corpus-first: %d corpus libraries compiled (want %d distinct of %d entries)",
+          (int)num(first.log, "corpus_warmed="), NCORPUS, NCORPUS + 1);
+    check(progress_ok(first.log, NCORPUS), "corpus-first: progress monotonic, ends at %d of %d: %.200s", NCORPUS,
+          NCORPUS, strstr(first.log, "PROGRESS ") ? strstr(first.log, "PROGRESS ") : "(none)");
+    // The game's own compiles of those libraries are system-cache hits now.
+    printf("corpus: game's library compiles after the corpus warm %.1f ms (%d), without it %.1f ms (%d); "
+           "corpus warm %.1f ms in prepare\n",
+           first.lib_ms, first.lib_compiled, ctl.lib_ms, ctl.lib_compiled, num(pl, "ms="));
+    check(first.lib_compiled >= NPROG && first.lib_ms < ctl.lib_ms * 0.5,
+          "corpus-first: the game's compiles are cheap (%.1f ms vs %.1f ms cold)", first.lib_ms, ctl.lib_ms);
+    char sub[1500];
+    check(cache_subdir(sub, sizeof sub), "corpus cache directory");
+    snprintf(rec, sizeof rec, "%s/corpus-warmed", sub);
+    check(file_size(rec) == 17, "corpus-first: complete warm recorded (%lld bytes)", (long long)file_size(rec));
+    check(!strstr(first.log, "keeping"), "corpus libraries the game did not link are not in the manifest");
+
+    // Second start: recorded and the manifest is big enough -> the manifest only.
+    const char *again_env[] = {"RSM_TEST_PREPARE=60", "RSM_TEST_PROGRESS=1", corpus_var, minm, salt, NULL};
+    run_result again = run("corpus-again", again_env);
+    check(again.rc == 0 && again.bad == 0 && num(again.log, "corpus_warmed=") == 0 && again.lib_warmed == NPROG &&
+              strstr(again.log, "compiled here before"),
+          "corpus-again: no corpus warm, the manifest's %d libraries warmed", again.lib_warmed);
+    check(progress_ok(again.log, NPROG), "corpus-again: progress ends at %d: %.200s", NPROG,
+          strstr(again.log, "PROGRESS ") ? strstr(again.log, "PROGRESS ") : "(none)");
+    // Without the test's lower limit the 16-library manifest counts as small: warmed again, minus
+    // what the manifest has (and cheap now).
+    const char *small_env[] = {"RSM_TEST_PREPARE=60", corpus_var, salt, NULL};
+    run_result small = run("corpus-small", small_env);
+    check(small.rc == 0 && num(small.log, "corpus_warmed=") == NCORPUS - NPROG && strstr(small.log, "manifest is small"),
+          "corpus-small: %d corpus libraries (want %d: the manifest's are skipped)",
+          (int)num(small.log, "corpus_warmed="), NCORPUS - NPROG);
+    // Forced, and another corpus identity (the compiled source changes: as with a new translator).
+    const char *force_env[] = {"RSM_TEST_PREPARE=60", corpus_var, minm, salt, "RS_METAL_CORPUS_WARM=1", NULL};
+    run_result forced = run("corpus-forced", force_env);
+    check(forced.rc == 0 && num(forced.log, "corpus_warmed=") == NCORPUS - NPROG,
+          "RS_METAL_CORPUS_WARM=1: warmed (%d)", (int)num(forced.log, "corpus_warmed="));
+    const char *new_env[] = {"RSM_TEST_PREPARE=60", corpus_var, minm, salt2, NULL};
+    run_result renewed = run("corpus-new", new_env);
+    check(renewed.rc == 0 && renewed.bad == 0 && num(renewed.log, "corpus_warmed=") == NCORPUS - NPROG &&
+              strstr(renewed.log, "another corpus"),
+          "another corpus: warmed again (%d)", (int)num(renewed.log, "corpus_warmed="));
+    // No prepare (the original cache.psarc): nothing of this.
+    const char *noprep_env[] = {corpus_var, minm, salt3, NULL};
+    run_result noprep = run("corpus-noprep", noprep_env);
+    check(noprep.rc == 0 && noprep.bad == 0 && num(noprep.log, "corpus_warmed=") == 0,
+          "no prepare: no corpus warm (%d)", (int)num(noprep.log, "corpus_warmed="));
+    // Timeout: what was not started is skipped, no record, the game still draws.
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+    const char *to_env[] = {"RSM_TEST_PREPARE=0.001", "RSM_TEST_PROGRESS=1", "RS_MTL_COMPILE_THREADS=1", corpus_var,
+                            minm, salt3, NULL};
+    run_result to = run("corpus-timeout", to_env);
+    pl = strstr(to.log, "PREPARE ");
+    check(to.rc == 0 && to.bad == 0 && pl && num(pl, "rc=") == 1 && num(to.log, "corpus_warmed=") < NCORPUS,
+          "corpus-timeout: rc %d, %d corpus libraries, draws", (int)num(pl, "rc="), (int)num(to.log, "corpus_warmed="));
+    check(strstr(to.log, "corpus libraries are skipped") != NULL, "corpus-timeout: the rest skipped");
+    check(cache_subdir(sub, sizeof sub), "corpus cache directory (timeout)");
+    snprintf(rec, sizeof rec, "%s/corpus-warmed", sub);
+    check(file_size(rec) < 0, "corpus-timeout: no record");
+    snprintf(g_dir, sizeof g_dir, "%s", saved);
+    unlink(corpus);
 }
 
 int main(int argc, char **argv) {
@@ -863,6 +1052,8 @@ int main(int argc, char **argv) {
     g_nonce = nonce1;
     run_result back = run("old-msl", sync_env);
     check(back.rc == 0 && back.bad == 0, "the pruned MSL still works (compiled again, rc %d)", back.rc);
+
+    test_corpus();
 
     printf("%d passed, %d failed\n", passed, failed);
     return failed ? 1 : 0;

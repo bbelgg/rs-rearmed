@@ -105,3 +105,7 @@ if(EXISTS "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014")
     COMMAND sh -c "xcrun dyld_info -arch x86_64 -imports \"$0\" | awk '/from OpenGL\\)/ {print $1}' | sort -u | diff - \"$1\""
             "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014" "${ogl_imports}")
 endif()
+
+# Metal backend (docs/METAL-DESIGN.md): the shader translator, then the Metal core.
+include(msl.cmake)
+include(metal.cmake)

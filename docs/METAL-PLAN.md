@@ -51,6 +51,9 @@ the game uses, so a Metal backend is not about speed:
 
 ## Steps
 
+Interfaces and the Metal core's object model: [METAL-DESIGN.md](METAL-DESIGN.md).
+
+
 Each step is useful on its own and lands with tests. GL stays the default throughout.
 
 1. **Route GL through `libRSOpenGL`.** Link the game (and the shell) against the shim instead of the system

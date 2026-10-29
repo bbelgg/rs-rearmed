@@ -8,8 +8,12 @@
 #import <AppKit/AppKit.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/QuartzCore.h>
+#include <CommonCrypto/CommonDigest.h>
 
 #include <dlfcn.h>
+#include <fcntl.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -26,6 +30,7 @@ static struct {
   void (*lock)(rs_gfx_context *);
   void (*unlock)(rs_gfx_context *);
   void *(*cgl)(rs_gfx_context *);
+  int (*prepare)(rs_gfx_context *, double);  // optional: older libRSOpenGL builds lack it
 } gfx;
 static int gfx_ok;
 
@@ -42,6 +47,7 @@ static void gfx_load(void) {
   S(cgl, "rs_gfx_cgl");
 #undef S
   gfx_ok = ok;
+  *(void **)&gfx.prepare = dlsym(RTLD_DEFAULT, "rs_gfx_prepare");
 }
 
 struct rsp_mtl {
@@ -206,4 +212,64 @@ CGDirectDisplayID rsp_mtl_display(NSView *view) {
   NSScreen *s = [[view window] screen];
   NSNumber *n = s ? [[s deviceDescription] objectForKey:@"NSScreenNumber"] : nil;
   return n ? (CGDirectDisplayID)[n unsignedIntValue] : CGMainDisplayID();
+}
+
+// --- Safe load ---------------------------------------------------------------------------------
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdeprecated-declarations"  // CC_MD5: a file check, not security
+int rsp_psarc_check(const char *path, long long size, const char *md5_hex) {
+  struct stat sb;
+  if (stat(path, &sb) || !S_ISREG(sb.st_mode)) return -1;  // stat follows a symlink
+  if ((long long)sb.st_size != size) return 1;
+  int fd = open(path, O_RDONLY);
+  if (fd < 0) return -1;
+  CC_MD5_CTX md;
+  CC_MD5_Init(&md);
+  static unsigned char buf[1 << 20];
+  ssize_t n;
+  while ((n = read(fd, buf, sizeof buf)) > 0) CC_MD5_Update(&md, buf, (CC_LONG)n);
+  close(fd);
+  if (n < 0) return -1;
+  unsigned char d[CC_MD5_DIGEST_LENGTH];
+  CC_MD5_Final(d, &md);
+  char hex[2 * CC_MD5_DIGEST_LENGTH + 1];
+  for (int i = 0; i < CC_MD5_DIGEST_LENGTH; i++) snprintf(hex + 2 * i, 3, "%02x", d[i]);
+  return strcasecmp(hex, md5_hex) != 0;
+}
+#pragma clang diagnostic pop
+
+int rsp_mtl_safe_load(const char *root) {
+  const char *e = getenv("RS_METAL_SAFE_LOAD");
+  if (e && *e) {
+    int on = atoi(e) != 0;
+    fprintf(stderr, "[rsp] RS_METAL_SAFE_LOAD=%s: safe load %s\n", e, on ? "on" : "off");
+    return on;
+  }
+  char path[2048];
+  size_t n = strlen(root);
+  snprintf(path, sizeof path, "%s%scache.psarc", root, n && root[n - 1] == '/' ? "" : "/");
+  int r = rsp_psarc_check(path, RSP_CACHE_PSARC_SIZE, RSP_CACHE_PSARC_MD5);
+  if (r < 0)
+    fprintf(stderr, "[rsp] cache.psarc not found or unreadable: safe load off\n");
+  else
+    fprintf(stderr, "[rsp] cache.psarc is %s: safe load %s\n", r ? "modded" : "the original",
+            r ? "on (shaders compiled before loading, compile pool throttled while loading)" : "off");
+  return r > 0;
+}
+
+int rsp_mtl_prepare(rsp_mtl *m, double max_seconds) {
+  if (!gfx.prepare) {
+    fprintf(stderr, "[rsp] safe load: this libRSOpenGL has no rs_gfx_prepare\n");
+    return -2;
+  }
+  return gfx.prepare(m->ctx, max_seconds);
+}
+
+void rsp_mtl_hold_black(rsp_mtl *m) {
+  [CATransaction begin];
+  [CATransaction setDisableActions:YES];
+  CGColorRef black = CGColorCreateGenericRGB(0, 0, 0, 1);
+  m->layer.backgroundColor = black;
+  CGColorRelease(black);
+  [CATransaction commit];
 }

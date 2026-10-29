@@ -74,6 +74,24 @@ int rsp_mtl_retina(void);
 // Drawable count for a swap interval (RS_METAL_DRAWABLES, else 3 with sync, 2 without).
 int rsp_mtl_drawables(int swap_interval);
 
+// Safe load (not in the original). With a modded cache.psarc (a community "fast-load" cache) the
+// game's loading can stall for good on its loading screen when the CPU is busy, and a cold Metal
+// start (shader compiles on every core) makes it busy. So, with one, the shell has libRSOpenGL
+// compile the shaders it knows from earlier runs before the game starts loading and keep the
+// compile pool small afterwards (rs_gfx_prepare). With the original cache.psarc nothing changes.
+#define RSP_CACHE_PSARC_SIZE 15614243LL
+#define RSP_CACHE_PSARC_MD5 "ef4682b1ce7c9009e1a32b7720137da7"
+// 0: the file at `path` (symlinks followed) is `size` bytes with that MD5; 1: other content;
+// -1: missing or unreadable. The hash is only computed when the size matches.
+int rsp_psarc_check(const char *path, long long size, const char *md5_hex);
+// Whether to use safe load for the game in `root` (the folder holding the .app): RS_METAL_SAFE_LOAD=1
+// or 0 decides; else on when <root>/cache.psarc is not the original. Logs which case applied.
+int rsp_mtl_safe_load(const char *root);
+// rs_gfx_prepare(context, max_seconds): blocks; any thread. -2 when libRSOpenGL lacks it.
+int rsp_mtl_prepare(rsp_mtl *m, double max_seconds);
+// Black behind the drawable until the first frame is presented (main thread).
+void rsp_mtl_hold_black(rsp_mtl *m);
+
 #ifdef __cplusplus
 }
 #endif

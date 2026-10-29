@@ -14,6 +14,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include "../src/rsp_present.h"
@@ -154,7 +155,68 @@ static int test_metal(void) {
   rsp_mtl_unlock(g_m);
   CHECK(px[0] == 255 && px[1] == 255 && px[2] == 255, "clear after resize %d %d %d", px[0], px[1], px[2]);
   CHECK(glGetError() == GL_NO_ERROR, "no GL errors after resize");
+
+  // Safe load's warm-up: no disk cache outside an app bundle, so nothing to wait for.
+  double p0 = now_s();
+  CHECK(rsp_mtl_prepare(g_m, 5.0) == 0, "rs_gfx_prepare with nothing to warm");
+  CHECK(now_s() - p0 < 1.0, "prepare with nothing to warm took %.3f s", now_s() - p0);
+  rsp_mtl_hold_black(g_m);
+  CHECK(layer.backgroundColor != NULL, "black behind the drawable");
   return 0;
+}
+
+// The cache.psarc check (rsp_psarc_check / rsp_mtl_safe_load) on files made here.
+static void test_safe_load(void) {
+  char dir[] = "/tmp/rsp-present-test.XXXXXX";
+  if (!mkdtemp(dir)) {
+    CHECK(0, "mkdtemp");
+    return;
+  }
+  char path[256], link[256], other[256], root[256], cmd[1024];
+  snprintf(path, sizeof path, "%s/data.bin", dir);
+  snprintf(other, sizeof other, "%s/other.bin", dir);
+  snprintf(root, sizeof root, "%s/game", dir);
+  snprintf(link, sizeof link, "%s/cache.psarc", root);
+  FILE *f = fopen(path, "w");
+  for (int i = 0; i < 300000; i++) fputc((i * 7) & 0xff, f);
+  fclose(f);
+  // The same size, one byte different.
+  snprintf(cmd, sizeof cmd, "cp '%s' '%s' && printf Z | dd of='%s' bs=1 seek=1000 conv=notrunc 2>/dev/null",
+           path, other, other);
+  CHECK(system(cmd) == 0, "copy");
+  char md5[64] = "";
+  snprintf(cmd, sizeof cmd, "md5 -q '%s'", path);
+  FILE *p = popen(cmd, "r");
+  if (p) {
+    if (fgets(md5, sizeof md5, p)) md5[strcspn(md5, "\n")] = 0;
+    pclose(p);
+  }
+  CHECK(strlen(md5) == 32, "md5 of the test file: %s", md5);
+  CHECK(rsp_psarc_check(path, 300000, md5) == 0, "matching size and MD5: original");
+  CHECK(rsp_psarc_check(path, 300001, md5) == 1, "another size: modded");
+  CHECK(rsp_psarc_check(other, 300000, md5) == 1, "same size, other content: modded");
+  CHECK(rsp_psarc_check(link, 300000, md5) == -1, "missing file");
+  mkdir(root, 0755);
+  CHECK(symlink(path, link) == 0, "symlink");
+  CHECK(rsp_psarc_check(link, 300000, md5) == 0, "a symlink is followed");
+  // The game's check: the test file is not the original cache.psarc; the override wins.
+  unsetenv("RS_METAL_SAFE_LOAD");
+  CHECK(rsp_mtl_safe_load(root) == 1, "modded cache.psarc: safe load on");
+  snprintf(cmd, sizeof cmd, "%s/", root);
+  CHECK(rsp_mtl_safe_load(cmd) == 1, "root with a trailing slash");
+  setenv("RS_METAL_SAFE_LOAD", "0", 1);
+  CHECK(rsp_mtl_safe_load(root) == 0, "RS_METAL_SAFE_LOAD=0 forces it off");
+  setenv("RS_METAL_SAFE_LOAD", "1", 1);
+  CHECK(rsp_mtl_safe_load(dir) == 1, "RS_METAL_SAFE_LOAD=1 forces it on (no cache.psarc)");
+  unsetenv("RS_METAL_SAFE_LOAD");
+  CHECK(rsp_mtl_safe_load(dir) == 0, "no cache.psarc: off");
+  // A file of the original's size that is not the original: hashed, modded.
+  CHECK(truncate(other, RSP_CACHE_PSARC_SIZE) == 0, "truncate");
+  unlink(link);
+  CHECK(symlink(other, link) == 0, "symlink 2");
+  CHECK(rsp_mtl_safe_load(root) == 1, "original size, other content: on");
+  snprintf(cmd, sizeof cmd, "rm -rf '%s'", dir);
+  system(cmd);
 }
 
 int main(void) {
@@ -162,6 +224,7 @@ int main(void) {
     const char *b = getenv("RS_GL_BACKEND");
     if (b && !strcmp(b, "metal")) test_metal();
     else test_gl();
+    test_safe_load();
   }
   printf("%d passed, %d failed\n", g_pass, g_fail);
   return g_fail != 0;

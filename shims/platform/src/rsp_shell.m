@@ -24,6 +24,15 @@ static rsp_mtl *rsp_g_mtl;
 // customEventTimer: (and rsp_renderScaleChanged) stop calling into it meanwhile.
 static atomic_int rsp_quitting;
 
+// Safe load (not in the original; rsp_present.h): on Metal with a modded cache.psarc, awakeFromNib
+// runs its second half (from rsp_game_bootstrap on) only after rs_gfx_prepare, which compiles the
+// shaders known from earlier runs. Before the bootstrap the game has started nothing (no engine,
+// no loading threads, no display link), so its loading never shares the CPU with those compiles.
+// The wait runs on a background thread while the main thread's run loop goes on (the window is
+// shown, black, and handles events); set while it lasts.
+static atomic_int rsp_boot_deferred;
+enum { RSP_SAFE_LOAD_MAX_SECONDS = 120 };
+
 // ===========================================================================
 @implementation AppDelegate
 @synthesize window;
@@ -412,6 +421,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)drawRect:(NSRect)r {  // 0x1001848f0
+  if (atomic_load(&rsp_boot_deferred)) return;  // not in the original: no engine yet (safe load)
   if (!CVDisplayLinkIsRunning(displayLink)) [self drawView];
 }
 
@@ -654,6 +664,27 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   rsp_g_main_controller = self;
   NSString *appDir = [[[NSBundle mainBundle] bundlePath] stringByDeletingLastPathComponent];
   NSString *cwd = [[NSFileManager defaultManager] currentDirectoryPath];
+  if (rsp_g_mtl && rsp_mtl_safe_load([appDir UTF8String])) {
+    // Not in the original: the rest of this method after rs_gfx_prepare (see rsp_boot_deferred).
+    atomic_store(&rsp_boot_deferred, 1);
+    rsp_mtl_hold_black(rsp_g_mtl);
+    rsp_mtl *m = rsp_g_mtl;  // the blocks retain self, appDir and cwd
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+      rsp_mtl_prepare(m, RSP_SAFE_LOAD_MAX_SECONDS);
+      dispatch_async(dispatch_get_main_queue(), ^{
+        atomic_store(&rsp_boot_deferred, 0);
+        [self rsp_bootAppDir:appDir cwd:cwd];
+        // The app became active while the engine did not exist yet: tell the booted engine.
+        if (rsp_focused()) rsp_set_focus(1);
+      });
+    });
+    return;
+  }
+  [self rsp_bootAppDir:appDir cwd:cwd];
+}
+
+// The second half of awakeFromNib (0x100185760), from the bootstrap on.
+- (void)rsp_bootAppDir:(NSString *)appDir cwd:(NSString *)cwd {
   rsp_boot boot = {[appDir UTF8String], [cwd UTF8String], 0, NULL};
   rsp_game_bootstrap(&boot);
   [openGLView setMainController:self];

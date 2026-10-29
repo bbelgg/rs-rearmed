@@ -2,6 +2,7 @@
 // MessageBox, the nib's object graph and main(). Each method behaves like the
 // game's method at the address in its comment (unslid, decrypted binary). MRC.
 #import "rsp_shell.h"
+#import "rsp_present.h"
 
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
@@ -13,6 +14,11 @@
 
 NSOpenGLContext *rsp_g_gl_context;
 MainController *rsp_g_main_controller;
+
+// Metal presentation (not in the original; rsp_present.h): set when libRSOpenGL's backend is Metal
+// (RS_GL_BACKEND=metal), NULL on GL. One view per process, like the original. Where a method has a
+// GL and a Metal branch, the GL one is the original's code.
+static rsp_mtl *rsp_g_mtl;
 
 // ===========================================================================
 @implementation AppDelegate
@@ -53,7 +59,9 @@ MainController *rsp_g_main_controller;
 // libRSOpenGL/libglspy loaded, drawView reports when it got the CGL lock and when
 // rsp_game_frame returned, as a 'G' event in that library's frame-time log
 // (shims/opengl/src/nsgl_hook.m). Otherwise one load
-// and branch per frame.
+// and branch per frame. On Metal there is no flushBuffer for that library to swizzle (and so it
+// never times drawView / getFrameForTime: either): the shell reports 'F' (rs_gfx_present), 'D'
+// (drawView) and 'V' (getFrameForTime:) itself, with the same meaning.
 typedef void (*rsp_ft_mark_t)(int kind, uint64_t t0, uint64_t t1, uint64_t x, unsigned flags);
 static rsp_ft_mark_t rsp_ft_mark_fn(void) {
   static rsp_ft_mark_t fn;
@@ -187,6 +195,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 
 // Display-link thread, once per refresh.
 - (CVReturn)getFrameForTime:(const CVTimeStamp *)outputTime {  // 0x100184260
+  uint64_t v0 = rsp_g_mtl && rsp_ft_mark_fn() ? mach_absolute_time() : 0;
   NSAutoreleasePool *pool = [[NSAutoreleasePool alloc] init];
   if (cursorInWindow) {
     double now = CFAbsoluteTimeGetCurrent();
@@ -199,12 +208,17 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   }
   [self drawView];
   [pool release];
+  if (v0) rsp_ft_mark_fn()('V', v0, mach_absolute_time(), outputTime ? outputTime->hostTime : 0, 0);
   return kCVReturnSuccess;
 }
 
 - (void)setupDisplayLink {  // 0x100184350
   CVDisplayLinkCreateWithActiveCGDisplays(&displayLink);
   CVDisplayLinkSetOutputCallback(displayLink, rsp_display_link_cb, self);
+  if (rsp_g_mtl) {  // the window's display (the main display until the view is in a window)
+    CVDisplayLinkSetCurrentCGDisplay(displayLink, rsp_mtl_display(self));
+    return;
+  }
   CVDisplayLinkSetCurrentCGDisplayFromOpenGLContext(
       displayLink, (CGLContextObj)[[self openGLContext] CGLContextObj],
       (CGLPixelFormatObj)[[self pixelFormat] CGLPixelFormatObj]);
@@ -218,6 +232,10 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   lastInputTime = [controller renderTime];  // controller is nil here: 0.0
   self = [super initWithFrame:frame];
   if (!self) return nil;
+  if (rsp_mtl_selected()) {
+    [self rsp_initMetal];
+    return self;
+  }
   // Accelerated NoRecovery DoubleBuffer ColorSize 24 DepthSize 16 StencilSize 8,
   // no NSOpenGLPFAOpenGLProfile: a legacy (2.1) context.
   NSOpenGLPixelFormatAttribute attrs[] = {NSOpenGLPFAAccelerated,
@@ -267,6 +285,59 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   return self;
 }
 
+// The rest of initWithFrame:shareContext: on Metal: the same steps, with a CAMetalLayer and an rs_gfx
+// context in place of the pixel format and the NSOpenGLContext.
+- (void)rsp_initMetal {
+  GLint swap = rsp_fps() ? 0 : 1;
+  rsp_g_mtl = rsp_mtl_attach(self, swap);
+  rsp_mtl_make_current(rsp_g_mtl);
+  if (getenv("RS_GL_MTENGINE")) NSLog(@"RS_GL_MTENGINE: OpenGL only, ignored on Metal");
+  [self setupDisplayLink];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(reshape)
+                                               name:NSViewFrameDidChangeNotification
+                                             object:self];
+  trackingArea = [[NSTrackingArea alloc]
+      initWithRect:[self frame]
+           options:NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved | NSTrackingActiveInActiveApp
+             owner:self
+          userInfo:nil];
+  [self addTrackingArea:trackingArea];
+  sleepDisableSuccess = IOPMAssertionCreateWithName(
+      kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn,
+      CFSTR("Rocksmith 2014 is preventing your Mac from sleeping."), &sleepAssertionID);
+  // The game's g_glContext (0x1018e7488) is read once, by GRGLRenderer::Initialize, which copies it
+  // to a renderer global (0x101920b48) that nothing reads; the game's own CGL calls are all in the
+  // shell. So on Metal the game gets nil, and rsp_g_gl_context is nil. Code that needs a
+  // CGLContextObj (CGLLockContext etc.) gets libRSOpenGL's token from CGLGetCurrentContext() or
+  // rsp_mtl_cgl().
+  rsp_g_gl_context = nil;
+  const rsp_engine_hooks *h = rsp_hooks();
+  if (h->gl_context) h->gl_context(h->ctx, NULL);
+  [[self window] setAspectRatio:NSMakeSize(16.0, 9.0)];
+}
+
+// Not in the original: on Metal, follow the window's display and backing scale.
+- (void)viewDidMoveToWindow {
+  [super viewDidMoveToWindow];
+  if (!rsp_g_mtl) return;
+  [[NSNotificationCenter defaultCenter] removeObserver:self name:NSWindowDidChangeScreenNotification object:nil];
+  if ([self window])
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(rsp_screenChanged:)
+                                                 name:NSWindowDidChangeScreenNotification
+                                               object:[self window]];
+  [self rsp_screenChanged:nil];
+}
+- (void)rsp_screenChanged:(NSNotification *)n {
+  if (displayLink) CVDisplayLinkSetCurrentCGDisplay(displayLink, rsp_mtl_display(self));
+  rsp_mtl_view_resized(rsp_g_mtl, self);
+}
+- (void)viewDidChangeBackingProperties {
+  [super viewDidChangeBackingProperties];
+  if (rsp_g_mtl) rsp_mtl_view_resized(rsp_g_mtl, self);
+}
+
 - (id)initWithFrame:(NSRect)frame {  // 0x100184700
   return [self initWithFrame:frame shareContext:nil];
 }
@@ -277,6 +348,20 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)reshape {  // 0x1001847c0
+  if (rsp_g_mtl) {
+    rsp_mtl_lock(rsp_g_mtl);
+    rsp_mtl_view_resized(rsp_g_mtl, self);
+    [self removeTrackingArea:trackingArea];
+    [trackingArea release];
+    trackingArea = [[NSTrackingArea alloc]
+        initWithRect:[self frame]
+             options:NSTrackingMouseEnteredAndExited | NSTrackingMouseMoved | NSTrackingActiveInActiveApp
+               owner:self
+            userInfo:nil];
+    [self addTrackingArea:trackingArea];
+    rsp_mtl_unlock(rsp_g_mtl);
+    return;
+  }
   CGLContextObj cgl = (CGLContextObj)[[self openGLContext] CGLContextObj];
   CGLLockContext(cgl);
   [[self openGLContext] update];
@@ -296,6 +381,10 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)drawView {  // 0x100184930
+  if (rsp_g_mtl) {
+    [self rsp_drawViewMetal];
+    return;
+  }
   CGLContextObj cgl = (CGLContextObj)[[self openGLContext] CGLContextObj];
   CGLLockContext(cgl);
   uint64_t ft0 = rsp_ft_mark_fn() ? mach_absolute_time() : 0;
@@ -313,6 +402,31 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [[self openGLContext] flushBuffer];
   CGLUnlockContext((CGLContextObj)[[self openGLContext] CGLContextObj]);
   if (done) [self dealloc];  // the original's exit path (ends in _Exit(0))
+}
+
+// drawView on Metal: the same frame, through rs_gfx.
+- (void)rsp_drawViewMetal {
+  rsp_mtl *m = rsp_g_mtl;
+  uint64_t d0 = rsp_ft_mark_fn() ? mach_absolute_time() : 0;
+  rsp_mtl_lock(m);
+  uint64_t ft0 = d0 ? mach_absolute_time() : 0;
+  rsp_mtl_make_current(m);
+  glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+  glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+  [controller updateScreenSize];
+  done = (BOOL)rsp_game_frame();
+  if (ft0) rsp_ft_mark_fn()('G', ft0, mach_absolute_time(), 0, 0);
+  if (!done && rsp_overlay_active()) {
+    int w, h;
+    rsp_mtl_size(m, &w, &h);  // the drawable: points, or pixels with RS_METAL_RETINA=1
+    rsp_overlay_run(w, h);
+  }
+  uint64_t f0 = d0 ? mach_absolute_time() : 0;
+  rsp_mtl_present(m);
+  if (f0) rsp_ft_mark_fn()('F', f0, mach_absolute_time(), 0, 0);
+  rsp_mtl_unlock(m);
+  if (d0) rsp_ft_mark_fn()('D', d0, mach_absolute_time(), 0, 0);
+  if (done) [self dealloc];
 }
 
 - (BOOL)acceptsFirstResponder {  // 0x100184a30
@@ -444,6 +558,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [[NSNotificationCenter defaultCenter] removeObserver:self
                                                   name:NSViewGlobalFrameDidChangeNotification
                                                 object:self];
+  if (rsp_g_mtl) [[NSNotificationCenter defaultCenter] removeObserver:self];
   rsp_exit(0);  // _Exit(0): the process ends here, [super dealloc] never runs
 }
 #pragma clang diagnostic pop
@@ -603,7 +718,8 @@ static atomic_int rsp_quitting;
   if (ns >= 0) {
     numSwapBuffers = ns;
     GLint v = numSwapBuffers;
-    [[openGLView openGLContext] setValues:&v forParameter:NSOpenGLCPSwapInterval];
+    if (rsp_g_mtl) rsp_mtl_set_swap_interval(rsp_g_mtl, v);
+    else [[openGLView openGLContext] setValues:&v forParameter:NSOpenGLCPSwapInterval];
   }
 }
 

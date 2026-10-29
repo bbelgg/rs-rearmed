@@ -34,9 +34,10 @@ endif()
 
 # ObjC: AppDelegate, OpenGLView, MainController, MessageBox, the nib, main().
 # Manual retain/release like the original.
-add_library(rsp_shell STATIC src/rsp_shell.m src/rsp_overlay.c)
+# rsp_present_metal.m: the CAMetalLayer path, used when libRSOpenGL's backend is Metal (rsp_present.h).
+add_library(rsp_shell STATIC src/rsp_shell.m src/rsp_overlay.c src/rsp_present_metal.m)
 target_link_libraries(rsp_shell PUBLIC rsp_core "-framework AppKit" ${rsp_gl}
-  "-framework CoreVideo" "-framework IOKit")
+  "-framework CoreVideo" "-framework IOKit" "-framework Metal" "-framework QuartzCore")
 target_compile_options(rsp_shell PRIVATE $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc> -Wno-deprecated-declarations)
 set_target_properties(rsp_shell PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
 
@@ -103,6 +104,25 @@ if(TARGET opengl)
   add_test(NAME platform.overlay.metal COMMAND arch -arm64 ${rsp_dyld} -e RS_GL_BACKEND=metal
     $<TARGET_FILE:rsp_overlay_test>)
   set_tests_properties(platform.overlay.metal PROPERTIES
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" DISABLED TRUE)
+endif()
+# The Metal presentation path on a CAMetalLayer in no window (rsp_present_metal.m). Needs
+# libRSOpenGL; the Metal variant waits for the Metal core's rs_gfx_create_layer (step 5).
+if(TARGET opengl)
+  add_executable(rsp_present_test test/rsp_present_test.m src/rsp_present_metal.m)
+  target_link_libraries(rsp_present_test PRIVATE opengl "-framework Foundation" "-framework AppKit"
+    "-framework Metal" "-framework QuartzCore")
+  target_compile_options(rsp_present_test PRIVATE -fno-objc-arc -Wno-deprecated-declarations)
+  set_target_properties(rsp_present_test PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
+  foreach(arch IN LISTS rsp_gl_archs)
+    add_test(NAME platform.present.gl.${arch} COMMAND arch -${arch} ${rsp_dyld} -e RS_GL_BACKEND=gl
+      $<TARGET_FILE:rsp_present_test>)
+    set_tests_properties(platform.present.gl.${arch} PROPERTIES
+      PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
+  endforeach()
+  add_test(NAME platform.present.metal COMMAND arch -arm64 ${rsp_dyld} -e RS_GL_BACKEND=metal
+    $<TARGET_FILE:rsp_present_test>)
+  set_tests_properties(platform.present.metal PROPERTIES
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" DISABLED TRUE)
 endif()
 if(EXISTS "${RS_GAME_PLAIN}")

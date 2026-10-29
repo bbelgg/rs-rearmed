@@ -3,6 +3,13 @@
 //   stress_test                     replay test (RS_CG_BACKEND selects the backend)
 //   stress_test <program files...>  + corpus churn: random pairs of the game's programs
 //   stress_test --bench [frames]    GL calls and time per replayed frame
+//   stress_test --pairs <pass>      pair cache (RS_CG_PAIR_CACHE): pass 1 records the
+//                                   pairs of a replay; later passes must link them all
+//                                   while the programs load and none while drawing
+//
+// RS_CG_TEST_TRACKED=gl makes this program's rs_gl_current_program (which the
+// shim looks up in place of libRSOpenGL's) answer from GL, =unknown answer -1;
+// unset, libRSOpenGL's is used when it has one.
 //
 // What the game does (from its renderer, see shims/cg/README.md):
 // - It binds a Cg program only when it differs from the one it bound last for
@@ -17,8 +24,10 @@
 // Each frame draws a grid of cells, each with a known expected colour, and
 // checks every cell and glGetError. Then the same frames run on a second
 // context in the same share group and (glsl only: ARB program objects aren't
-// shared) on one in a share group of its own.
+// shared) on one in a share group of its own (not on libRSOpenGL's Metal
+// backend, which has no shared contexts yet).
 #define GL_SILENCE_DEPRECATION
+#include <dlfcn.h>
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
@@ -62,6 +71,35 @@ static float frand(float lo, float hi) { return lo + (hi - lo) * (rnd() / 167772
 
 static int g_glsl;
 static CGcontext g_ctx;
+
+// See the top. Exported from the executable, so the shim's dlsym finds it first.
+__attribute__((visibility("default"))) int rs_gl_current_program(void) {
+    static int mode = -1;
+    static int (*next)(void);
+    if (mode < 0) {
+        const char *e = getenv("RS_CG_TEST_TRACKED");
+        mode = !e ? 0 : !strcmp(e, "gl") ? 1 : 2;
+        if (!mode) next = (int (*)(void))dlsym(RTLD_NEXT, "rs_gl_current_program");
+    }
+    if (mode == 1) {
+        GLint cur = 0;
+        glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
+        return cur;
+    }
+    return mode == 0 && next ? next() : -1;
+}
+
+// Whether the shim gets the current program without asking GL.
+static int tracked(void) {
+    const char *e = getenv("RS_CG_TEST_TRACKED");
+    return (e && !strcmp(e, "gl")) || (!e && dlsym(RTLD_NEXT, "rs_gl_current_program"));
+}
+
+static void print_times(const char *what, const unsigned long long *a, const unsigned long long *b) {
+    printf("  %s: %llu links (%.1f ms, longest %.2f ms), %llu shader compiles (%.1f ms), %llu warmed\n", what,
+           b[ST_Links] - a[ST_Links], (b[ST_LinkUs] - a[ST_LinkUs]) / 1000.0, b[ST_LinkMaxUs] / 1000.0,
+           b[ST_Compile] - a[ST_Compile], (b[ST_CompileUs] - a[ST_CompileUs]) / 1000.0, b[ST_Warmed] - a[ST_Warmed]);
+}
 
 // --- programs ------------------------------------------------------------------
 
@@ -219,6 +257,8 @@ typedef struct {
     float scale;          // M = scale * identity (same coverage)
     int own;              // drawn by "Scaleform" instead
     float own_u[4];
+    int keep_streams;     // no cgGLDisableClientState after the draw
+    int minimal;          // a repeat of the last game draw: no binds or parameters, only streams (and textures)
 } Draw;
 
 static float g_expect[GRID * GRID][4];
@@ -290,22 +330,26 @@ static void game_draw(const Gpu *g, const Draw *d, int cell) {
     }
     float col[4][4];
     for (int v = 0; v < 4; v++) memcpy(col[v], d->col, sizeof col[v]);
-    if (g_geometry_first) streams(d, col);
-    game_bind(g_vp[d->vp], 0);
-    game_bind(g_fp[d->fp], 1);
-    float M[16] = {0};
-    for (int i = 0; i < 4; i++) M[5 * i] = d->scale;
-    cgGLSetMatrixParameterfr(g_vp_M[d->vp], M);
-    cgGLSetParameter4fv(g_vp_k[d->vp], d->k);
-    cgGLSetParameter4fv(g_fp_tint[d->fp], d->tint);
+    if (g_geometry_first || d->minimal) streams(d, col);
+    if (!d->minimal) {
+        game_bind(g_vp[d->vp], 0);
+        game_bind(g_fp[d->fp], 1);
+        float M[16] = {0};
+        for (int i = 0; i < 4; i++) M[5 * i] = d->scale;
+        cgGLSetMatrixParameterfr(g_vp_M[d->vp], M);
+        cgGLSetParameter4fv(g_vp_k[d->vp], d->k);
+        cgGLSetParameter4fv(g_fp_tint[d->fp], d->tint);
+    }
     if (d->fp & 1) {
         cgGLSetTextureParameter(g_fp_img[d->fp], g->tex[d->tex]);
         cgGLEnableTextureParameter(g_fp_img[d->fp]);
     }
-    if (!g_geometry_first) streams(d, col);
+    if (!g_geometry_first && !d->minimal) streams(d, col);
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    cgGLDisableClientState(g_vp_pos[d->vp]);
-    cgGLDisableClientState(g_vp_col[d->vp]);
+    if (!d->keep_streams) {
+        cgGLDisableClientState(g_vp_pos[d->vp]);
+        cgGLDisableClientState(g_vp_col[d->vp]);
+    }
     if (d->fp & 1) cgGLDisableTextureParameter(g_fp_img[d->fp]);
 }
 
@@ -319,6 +363,19 @@ static void switch_to(const Gpu *g) {
 static void run_frame(const Gpu *g, int frame, const char *what) {
     Draw draws[GRID * GRID];
     plan_frame(draws, GRID * GRID, 0);
+    // A draw that leaves its streams enabled, Scaleform, and the same draw again
+    // with nothing but its streams: only the stream calls can give GL back to the
+    // pair, which takes the tracked current program (without it the shim checks
+    // once per run of stream enables and relies on the disables in between).
+    if (g_glsl && tracked())
+        for (int i = 3; i + 2 < GRID * GRID; i += 11) {
+            draws[i].own = 0;
+            draws[i].keep_streams = 1;
+            draws[i + 1].own = 1;
+            draws[i + 2] = draws[i];
+            draws[i + 2].keep_streams = 0;
+            draws[i + 2].minimal = 1;
+        }
     g_geometry_first = frame % 2;
     glClearColor(-1, -1, -1, -1);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -421,6 +478,8 @@ static void disable_streams(CGprogram p) {
 static void corpus_churn(const Gpu *g, int argc, char **argv) {
     CorpusProg *vps = calloc(argc, sizeof *vps), *fps = calloc(argc, sizeof *fps);
     int nv = 0, nf = 0;
+    unsigned long long st_load[RS_CG_STAT_COUNT];
+    rs_cg_gl_stats(st_load);
     for (int i = 0; i < argc; i++) {
         char *src = slurp(argv[i]);
         if (!src || strncmp(src, "!!ARB", 5)) { free(src); continue; }
@@ -454,6 +513,7 @@ static void corpus_churn(const Gpu *g, int argc, char **argv) {
     data[0][3] = data[1][3] = data[2][3] = 1;
     unsigned long long st0[RS_CG_STAT_COUNT], st1[RS_CG_STAT_COUNT];
     rs_cg_gl_stats(st0);
+    print_times("corpus load", st_load, st0);
     int draws = nv && nf ? 6000 : 0, gl_errors = 0, cg_errors = 0;
     clock_t t0 = clock();
     int vi = 0, fi = 0;
@@ -483,6 +543,7 @@ static void corpus_churn(const Gpu *g, int argc, char **argv) {
     printf("corpus churn: %d vertex x %d fragment programs, %d draws in %.0f ms CPU, %llu links, "
            "%d GL errors, %d Cg errors\n",
            nv, nf, draws, ms, st1[ST_Links] - st0[ST_Links], gl_errors, cg_errors);
+    print_times("corpus draws", st0, st1);
     g_failures += gl_errors + cg_errors;
     glUseProgram(0);
     for (int i = 0; i < nv; i++) cgDestroyProgram(vps[i].p);
@@ -534,6 +595,8 @@ static void bench(Gpu *g, int frames, int mt) {
     unsigned long long total = 0;
     for (int s = 0; s < RS_CG_STAT_COUNT; s++) {
         double per = (double)(b[s] - a[s]) / frames;
+        if (s == ST_CurProgram && per > 0) printf("  %-16s %8.1f per frame (no GL call)\n", rs_cg_stat_names[s], per);
+        if (!RS_CG_STAT_IS_CALL(s)) continue;
         total += b[s] - a[s];
         if (per > 0) printf("  %-16s %8.1f per frame\n", rs_cg_stat_names[s], per);
     }
@@ -545,13 +608,35 @@ int main(int argc, char **argv) {
     const char *b = getenv("RS_CG_BACKEND");
     const char *gb = getenv("RS_GL_BACKEND");
     g_glsl = (b && !strcmp(b, "glsl")) || (gb && !strcmp(gb, "metal"));
+    int metal = gb && !strcmp(gb, "metal");
     Gpu a = {0}, shared = {0}, alone = {0};
     if (!make_gpu(&a, NULL, NULL)) {
         printf("no GL context\n");
         return 1;
     }
     g_ctx = cgCreateContext();
+    unsigned long long st0[RS_CG_STAT_COUNT], st1[RS_CG_STAT_COUNT], st2[RS_CG_STAT_COUNT];
+    rs_cg_gl_stats(st0);
     make_programs();
+    rs_cg_gl_stats(st1);
+
+    if (argc >= 3 && !strcmp(argv[1], "--pairs")) {
+        int pass = atoi(argv[2]);
+        for (int f = 0; f < 20; f++) run_frame(&a, f, "context A");
+        rs_cg_gl_stats(st2);
+        print_times("load", st0, st1);
+        print_times("frames", st1, st2);
+        unsigned long long warmed = st1[ST_Warmed] - st0[ST_Warmed], drawn = st2[ST_Links] - st1[ST_Links];
+        if (pass == 1) {
+            CHECK(warmed == 0 && drawn > 0, "pass 1: %llu warmed, %llu linked while drawing", warmed, drawn);
+        } else {
+            CHECK(warmed > 0 && drawn == 0, "pass %d: %llu warmed, %llu linked while drawing", pass, warmed, drawn);
+            CHECK(st1[ST_Links] - st0[ST_Links] == warmed, "pass %d: links at load besides the warmed ones", pass);
+        }
+        cgDestroyContext(g_ctx);
+        printf("pairs pass %d %s (%d failures)\n", pass, g_failures ? "FAILED" : "ok", g_failures);
+        return g_failures ? 1 : 0;
+    }
 
     if (argc >= 2 && !strcmp(argv[1], "--bench")) {
         int frames = argc >= 3 ? atoi(argv[2]) : 300;
@@ -561,6 +646,16 @@ int main(int argc, char **argv) {
     }
 
     for (int f = 0; f < 40; f++) run_frame(&a, f, "context A");
+    if (metal) {
+        // No shared contexts on the Metal backend yet: context A only.
+        if (argc > 1) corpus_churn(&a, argc - 1, argv + 1);
+        for (int i = 0; i < NVP; i++) cgDestroyProgram(g_vp[i]);
+        for (int j = 0; j < NFP; j++) cgDestroyProgram(g_fp[j]);
+        CHECK(glGetError() == GL_NO_ERROR, "GL error after destroying the programs");
+        cgDestroyContext(g_ctx);
+        printf("glsl on metal %s (%d failures)\n", g_failures ? "FAILED" : "ok", g_failures);
+        return g_failures ? 1 : 0;
+    }
 
     // A second context sharing A's objects, and back.
     if (!make_gpu(&shared, a.cgl, &a)) { printf("no shared GL context\n"); return 1; }

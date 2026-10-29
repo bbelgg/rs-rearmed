@@ -17,7 +17,12 @@
 //                               RS_GL_BACKEND=metal, which has no ARB programs)
 //   RS_CG_GLSL_DIALECT=120|100es
 //   RS_CG_GLSL_EAGER=1          glsl: link a pair at bind time, not at first use
-//   RS_CG_LOG=1                 log errors and program creation to stderr
+//   RS_CG_PAIR_CACHE=<file>|0   glsl: pairs linked in earlier runs, linked again as
+//                               soon as both programs are loaded (see "Pair cache";
+//                               default ~/Library/Caches/rs-rearmed/cg-pairs.txt when
+//                               running from an .app bundle, off otherwise)
+//   RS_CG_LOG=1                 log errors, program creation, compiles and links
+//                               (with their times) to stderr
 //   RS_CG_DUMP_GLSL=<dir>       write every generated GLSL shader there
 //                               (RS_CG_DUMP_DIR is the old name)
 #define GL_SILENCE_DEPRECATION
@@ -25,7 +30,13 @@
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
 
+#include <dlfcn.h>
+#include <mach-o/dyld.h>
+#include <mach/mach_time.h>
+#include <sys/stat.h>
+
 #include <algorithm>
+#include <cerrno>
 #include <cstdarg>
 #include <cstdio>
 #include <cstdlib>
@@ -36,6 +47,7 @@
 #include <pthread.h>
 #include <set>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "arb_program.h"
@@ -73,6 +85,7 @@ struct Config {
     std::string dialect = "120";
     bool log = false;
     std::string dump_dir;
+    std::string pair_cache;   // empty: off
     Config() {
         const char *b = getenv("RS_CG_BACKEND");
         if (b && !strcmp(b, "glsl")) glsl = true;
@@ -84,6 +97,18 @@ struct Config {
         log = env_on("RS_CG_LOG");
         if (const char *d = getenv("RS_CG_DUMP_DIR")) dump_dir = d;
         if (const char *d = getenv("RS_CG_DUMP_GLSL")) dump_dir = d;
+        const char *pc = getenv("RS_CG_PAIR_CACHE");
+        if (pc && *pc) {
+            if (strcmp(pc, "0")) pair_cache = pc;
+        } else {
+            // Like libRSOpenGL's Metal cache: only the app writes there by
+            // default, never tools and tests.
+            char exe[4096];
+            uint32_t n = sizeof exe;
+            const char *home = getenv("HOME");
+            if (home && *home && !_NSGetExecutablePath(exe, &n) && strstr(exe, ".app/Contents/MacOS/"))
+                pair_cache = std::string(home) + "/Library/Caches/rs-rearmed/cg-pairs.txt";
+        }
     }
 };
 
@@ -100,6 +125,12 @@ void logf(const char *fmt, ...) {
     vfprintf(stderr, fmt, ap);
     fputc('\n', stderr);
     va_end(ap);
+}
+
+double now_us() {
+    static mach_timebase_info_data_t tb;
+    if (!tb.denom) mach_timebase_info(&tb);
+    return (double)mach_absolute_time() * tb.numer / tb.denom / 1000.0;
 }
 
 // GL calls the shim makes, by kind (rs_cg_gl_stats, cg_stats.h). Every GL call
@@ -139,6 +170,48 @@ RS_GL_COUNTED(glDisableVertexAttribArray, ST_Attrib)
 #define glEnableVertexAttribArray glEnableVertexAttribArray_c
 #define glDisableVertexAttribArray glDisableVertexAttribArray_c
 
+// GL_CURRENT_PROGRAM. libRSOpenGL tracks it in its glUseProgram wrapper and
+// answers without a GL call (rs_gl_current_program, -1 when it doesn't know);
+// looked up at run time, so the shim runs on a libRSOpenGL without it too.
+// RS_CG_TRACKED_PROGRAM=0 always asks GL (for comparisons).
+typedef int (*CurrentProgramFn)(void);
+CurrentProgramFn g_current_program_fn;
+bool g_current_program_init;
+
+bool tracked_program_available() {
+    if (!g_current_program_init) {
+        g_current_program_init = true;
+        const char *e = getenv("RS_CG_TRACKED_PROGRAM");
+        if (!(e && !strcmp(e, "0")))
+            g_current_program_fn = (CurrentProgramFn)dlsym(RTLD_DEFAULT, "rs_gl_current_program");
+    }
+    return g_current_program_fn != nullptr;
+}
+
+// The tracked current program, -1 when there is none (no GL call either way).
+int tracked_program() {
+    if (!tracked_program_available()) return -1;
+    int p = g_current_program_fn();
+    if (p >= 0) g_stats[ST_CurProgram]++;
+    return p;
+}
+
+GLint current_program() {
+    int p = tracked_program();
+    if (p >= 0) return p;
+    GLint cur = 0;
+    glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
+    return cur;
+}
+
+// Share group of `c`. libRSOpenGL's Metal contexts aren't CGL contexts and
+// CGLGetShareGroup answers NULL for them: each such context is its own group.
+CGLShareGroupObj group_of(CGLContextObj c) {
+    if (!c) return nullptr;
+    CGLShareGroupObj g = CGLGetShareGroup(c);
+    return g ? g : (CGLShareGroupObj)c;
+}
+
 // The shim keeps no locks: the game makes every Cg call on its render thread.
 // Log (once) if that ever stops being true.
 void check_thread(const char *fn) {
@@ -172,6 +245,7 @@ struct Program {
     CGprofile profile;
     Stage stage;
     std::string source, entry;
+    uint64_t key = 0;                // cg_program_key: names the program in logs and the pair cache
     ArbProgram arb;
     bool parsed = false;
     std::string parse_error;
@@ -236,9 +310,11 @@ uint64_t g_clock = 1;   // monotonically increasing stamp for slot writes
 // and makes the pair's program current again unless a program of the game's own
 // is current (that one wins, as it does over ARB programs).
 //
-// The check is one glGetIntegerv: per changed parameter (its upload needs our
-// program current) and once per run of cgGLEnableClientState calls (the game's
-// stream setup loop issues nothing else in between).
+// The check reads GL_CURRENT_PROGRAM per changed parameter (its upload needs
+// our program current) and once per run of cgGLEnableClientState calls (the
+// game's stream setup loop issues nothing else in between). libRSOpenGL tracks
+// the current program (rs_gl_current_program), so that is no GL call when it
+// knows; then every cgGLEnableClientState checks.
 //
 // Pairs are linked lazily: binding a vertex program whose new pair has no GL
 // program yet only marks it pending, and the next Cg call (the fragment bind, a
@@ -280,7 +356,7 @@ Gpu *g_gpu = nullptr;
 Gpu &gpu() {
     CGLContextObj c = CGLGetCurrentContext();
     if (g_gpu && c == g_gpu_ctx) return *g_gpu;
-    CGLShareGroupObj sg = c ? CGLGetShareGroup(c) : nullptr;
+    CGLShareGroupObj sg = group_of(c);
     g_gpu_ctx = c;
     for (auto &g : g_gpus)
         if (g->group == sg) return *(g_gpu = g.get());
@@ -303,19 +379,23 @@ void dump(const std::string &name, const std::string &text) {
 }
 
 std::string program_tag(const Program *p) {
+    if (!p) return "passthrough";
     char b[32];
-    snprintf(b, sizeof b, "%016llx",
-             (unsigned long long)cg_program_key(p->source.c_str(), p->profile, p->entry.c_str()));
+    snprintf(b, sizeof b, "%016llx", (unsigned long long)p->key);
     return b;
 }
 
-GLuint compile(GLenum kind, const std::string &src, const std::string &tag) {
+// `t0`: when the work for this shader started (translation included).
+GLuint compile(GLenum kind, const std::string &src, const std::string &tag, double t0) {
     GLuint s = glCreateShader(kind);
     const char *t = src.c_str();
     glShaderSource(s, 1, &t, nullptr);
     glCompileShader(s);
     GLint ok = 0;
     glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+    double us = now_us() - t0;
+    g_stats[ST_CompileUs] += (unsigned long long)us;
+    logf("compiled %s in %.2f ms", tag.c_str(), us / 1000);
     dump(tag, src);
     if (!ok) {
         char log[4096] = {0};
@@ -356,10 +436,11 @@ GLuint vertex_shader(Gpu &g, Program *vp, unsigned fs_inputs) {
     Shaders &sh = g.shaders[vp];
     auto it = sh.vs.find(key);
     if (it != sh.vs.end()) return it->second;
+    double t0 = now_us();
     const ArbProgram &a = vp ? vp->arb : passthrough(Stage::Vertex);
     char tag[64];
-    snprintf(tag, sizeof tag, "%s.%03x.vert", vp ? program_tag(vp).c_str() : "passthrough", key);
-    GLuint s = compile(GL_VERTEX_SHADER, emit_glsl(a, cfg().dialect, key), tag);
+    snprintf(tag, sizeof tag, "%s.%03x.vert", program_tag(vp).c_str(), key);
+    GLuint s = compile(GL_VERTEX_SHADER, emit_glsl(a, cfg().dialect, key), tag, t0);
     sh.vs[key] = s;
     return s;
 }
@@ -367,9 +448,10 @@ GLuint vertex_shader(Gpu &g, Program *vp, unsigned fs_inputs) {
 GLuint fragment_shader(Gpu &g, Program *fp) {
     Shaders &sh = g.shaders[fp];
     if (sh.fs_done) return sh.fs;
+    double t0 = now_us();
     const ArbProgram &a = fp ? fp->arb : passthrough(Stage::Fragment);
-    std::string tag = (fp ? program_tag(fp) : std::string("passthrough")) + ".frag";
-    sh.fs = compile(GL_FRAGMENT_SHADER, emit_glsl(a, cfg().dialect, 0), tag);
+    std::string tag = program_tag(fp) + ".frag";
+    sh.fs = compile(GL_FRAGMENT_SHADER, emit_glsl(a, cfg().dialect, 0), tag, t0);
     sh.fs_done = true;
     return sh.fs;
 }
@@ -384,12 +466,113 @@ std::vector<GLint> slot_locations(GLuint prog, const char *array, int n) {
     return loc;
 }
 
+// --- pair cache ---------------------------------------------------------------
+//
+// A pair's first link is a GLSL compile in the driver (on the Metal backend also
+// an MSL translation and a Metal compile), and linked lazily it happens at the
+// pair's first draw, in the middle of a song. Every pair linked is recorded in a
+// file by program keys; in later runs a program's load links the recorded pairs
+// whose other program is loaded already, so those links happen while the game
+// loads. File: a header line, then "<vertex key> <fragment key>\n" in hex per
+// pair (0: no program for that stage). Bad lines are skipped, a file with another
+// header starts over, at most kMaxPairs are kept.
+
+struct PairCache {
+    bool opened = false;
+    FILE *out = nullptr;
+    std::set<std::pair<uint64_t, uint64_t>> known;
+    std::unordered_map<uint64_t, std::vector<uint64_t>> partners;   // key -> keys paired with it
+};
+PairCache g_pairs;
+std::unordered_map<uint64_t, std::vector<Program *>> g_loaded;   // glsl: loaded programs by key
+const char kPairHeader[] = "rs-cg-pairs 1\n";
+enum { kMaxPairs = 65536 };
+
+bool pair_add(uint64_t v, uint64_t f) {
+    if (g_pairs.known.size() >= kMaxPairs || !g_pairs.known.insert({v, f}).second) return false;
+    g_pairs.partners[v].push_back(f);
+    g_pairs.partners[f].push_back(v);
+    return true;
+}
+
+void pair_cache_open() {
+    if (g_pairs.opened) return;
+    g_pairs.opened = true;
+    const std::string &path = cfg().pair_cache;
+    if (path.empty()) return;
+    for (size_t i = 1; i < path.size(); i++)   // parent directories
+        if (path[i] == '/') mkdir(path.substr(0, i).c_str(), 0755);
+    bool keep = false, newline = true;
+    if (FILE *in = fopen(path.c_str(), "r")) {
+        char line[128];
+        if (fgets(line, sizeof line, in) && !strcmp(line, kPairHeader)) {
+            keep = true;
+            while (fgets(line, sizeof line, in)) {
+                size_t n = strlen(line);
+                newline = n && line[n - 1] == '\n';
+                unsigned long long v, f;
+                char end = 0;
+                if (sscanf(line, "%16llx %16llx%c", &v, &f, &end) == 3 && end == '\n') pair_add(v, f);
+            }
+        }
+        fclose(in);
+    }
+    g_pairs.out = fopen(path.c_str(), keep ? "a" : "w");
+    if (!g_pairs.out) {
+        logf("pair cache %s: can't write (%s)", path.c_str(), strerror(errno));
+        return;
+    }
+    if (!keep) fputs(kPairHeader, g_pairs.out);
+    else if (!newline) fputc('\n', g_pairs.out);   // a cut last line stays on its own
+    fflush(g_pairs.out);
+    logf("pair cache %s: %zu pairs", path.c_str(), g_pairs.known.size());
+}
+
+void pair_record(const Program *vp, const Program *fp) {
+    pair_cache_open();
+    uint64_t v = vp ? vp->key : 0, f = fp ? fp->key : 0;
+    if (!g_pairs.out || !pair_add(v, f)) return;
+    fprintf(g_pairs.out, "%016llx %016llx\n", (unsigned long long)v, (unsigned long long)f);
+    fflush(g_pairs.out);
+}
+
+Link *get_link(Gpu &g, Program *vp, Program *fp);
+
+// Link the recorded pairs of `p` (just loaded) whose other program is loaded.
+void pair_warm(Program *p) {
+    pair_cache_open();
+    auto it = g_pairs.partners.find(p->key);
+    if (it == g_pairs.partners.end()) return;
+    std::vector<uint64_t> keys = it->second;
+    Gpu &g = gpu();
+    double t0 = now_us();
+    int n = 0;
+    for (uint64_t k : keys) {
+        std::vector<Program *> others{nullptr};   // key 0: the passthrough shader
+        if (k) {
+            auto l = g_loaded.find(k);
+            others = l != g_loaded.end() ? l->second : std::vector<Program *>();
+        }
+        for (Program *q : others) {
+            if (q && q->stage == p->stage) continue;
+            Program *vp = p->stage == Stage::Vertex ? p : q, *fp = p->stage == Stage::Vertex ? q : p;
+            if (g.links.count({vp, fp})) continue;
+            get_link(g, vp, fp);
+            n++;
+        }
+    }
+    g_stats[ST_Warmed] += n;
+    if (n) logf("warmed %d pairs of %s in %.1f ms", n, program_tag(p).c_str(), (now_us() - t0) / 1000);
+}
+
 // Link the pair (cached, failures included). Leaves GL's current program as it
 // found it.
 Link *get_link(Gpu &g, Program *vp, Program *fp) {
     auto key = std::make_pair(vp, fp);
     auto it = g.links.find(key);
     if (it != g.links.end()) return it->second.get();
+    double t0 = now_us();
+    unsigned long long compile_us = g_stats[ST_CompileUs];
     auto l = std::make_unique<Link>();
     l->vp = vp;
     l->fp = fp;
@@ -413,12 +596,10 @@ Link *get_link(Gpu &g, Program *vp, Program *fp) {
             char log[4096] = {0};
             glGetProgramInfoLog(l->program, sizeof log, nullptr, log);
             g_listing = log;
-            logf("GLSL link failed (%s + %s):\n%s", vp ? program_tag(vp).c_str() : "-",
-                 fp ? program_tag(fp).c_str() : "-", log);
+            logf("GLSL link failed (%s + %s):\n%s", program_tag(vp).c_str(), program_tag(fp).c_str(), log);
         } else {
             l->ok = true;
-            GLint prev = 0;
-            glGetIntegerv(GL_CURRENT_PROGRAM, &prev);
+            GLint prev = current_program();
             glUseProgram(l->program);
             for (unsigned unit = 0; unit < 16; unit++)
                 for (const char *t : {"1D", "2D", "3D", "CUBE", "RECT"}) {
@@ -432,6 +613,14 @@ Link *get_link(Gpu &g, Program *vp, Program *fp) {
             if ((GLuint)prev != l->program) glUseProgram(prev);
         }
     }
+    double us = now_us() - t0;
+    g_stats[ST_LinkUs] += (unsigned long long)us;
+    if (us > g_stats[ST_LinkMaxUs]) g_stats[ST_LinkMaxUs] = (unsigned long long)us;
+    if (cfg().log)
+        logf("linked %s + %s in %.2f ms (%.2f ms compiling), link %llu", program_tag(vp).c_str(),
+             program_tag(fp).c_str(), us / 1000, (g_stats[ST_CompileUs] - compile_us) / 1000.0,
+             g_stats[ST_Links]);
+    if (l->ok) pair_record(vp, fp);
     Link *raw = l.get();
     g.links[key] = std::move(l);
     return raw;
@@ -479,17 +668,15 @@ Link *glsl_sync(bool defer = false) {
     Gpu &g = gpu();
     Link *l = bound_link(g, defer);
     if (g.pending) return nullptr;
-    GLint cur = 0;
-    glGetIntegerv(GL_CURRENT_PROGRAM, &cur);
-    bool cur_ours = cur && g.ours.count((GLuint)cur);
+    GLint cur = current_program();
     if (!l) {
         // No pair: fixed function, unless the game has a program of its own
         // current. A pair that failed to link leaves GL as it is.
-        if (!active_vp() && !active_fp() && cur_ours) glUseProgram(0);
+        if (!active_vp() && !active_fp() && cur && g.ours.count((GLuint)cur)) glUseProgram(0);
         return nullptr;
     }
     if ((GLuint)cur != l->program) {
-        if (cur && !cur_ours) return nullptr;   // the game's own program wins
+        if (cur && !g.ours.count((GLuint)cur)) return nullptr;   // the game's own program wins
         glUseProgram(l->program);
     }
     upload_slots(l->vp, l->vp_loc, &l->vp_seen);
@@ -514,10 +701,10 @@ void glsl_resolve_pending() {
 // Drop everything built from `p`. GL objects of other share groups can't be
 // deleted from here (their context isn't current); they are only forgotten.
 void glsl_forget_program(Program *p) {
+    if (g_gpus.empty()) return;
     CGLContextObj c = CGLGetCurrentContext();
-    CGLShareGroupObj cur = c ? CGLGetShareGroup(c) : nullptr;
-    GLint cur_prog = 0;
-    if (c) glGetIntegerv(GL_CURRENT_PROGRAM, &cur_prog);
+    CGLShareGroupObj cur = group_of(c);
+    GLint cur_prog = c ? current_program() : 0;
     for (auto &gp : g_gpus) {
         Gpu &g = *gp;
         bool live = g.group == cur;
@@ -677,6 +864,10 @@ bool load_program(Program *p) {
             set_error(CG_PROGRAM_LOAD_ERROR, "GLSL compilation failed");
             return false;
         }
+        p->loaded = true;
+        g_loaded[p->key].push_back(p);
+        pair_warm(p);
+        return true;
     } else {
         static bool ext_checked = false;
         if (!ext_checked) {
@@ -769,6 +960,7 @@ CG_EXPORT CGprogram cgCreateProgram(CGcontext handle, CGenum type, const char *t
     p->stage = is_vertex_profile(profile) ? Stage::Vertex : Stage::Fragment;
     p->source = object;
     p->entry = entry ? entry : "main";
+    p->key = cg_program_key(p->source.c_str(), p->profile, p->entry.c_str());
     p->arb.stage = p->stage;
     p->parsed = parse_arb_program(object, &p->arb, &p->parse_error);
     if (p->parsed && p->arb.stage != p->stage) {
@@ -806,6 +998,12 @@ CG_EXPORT void cgDestroyProgram(CGprogram handle) {
     if (g_bound_vp == p) g_bound_vp = nullptr;
     if (g_bound_fp == p) g_bound_fp = nullptr;
     glsl_forget_program(p);
+    auto lk = g_loaded.find(p->key);
+    if (lk != g_loaded.end()) {
+        auto &v = lk->second;
+        v.erase(std::remove(v.begin(), v.end(), p), v.end());
+        if (v.empty()) g_loaded.erase(lk);
+    }
     if (p->arb_id) {
         glDeleteProgramsARB(1, &p->arb_id);   // unbinds it if bound; the name may come back
         for (GLuint &b : g_arb.bound)
@@ -1027,10 +1225,18 @@ CG_EXPORT void cgGLEnableClientState(CGparameter handle) {
     Param *q = check<Param>(handle, CG_INVALID_PARAM_HANDLE_ERROR);
     if (!q) return;
     // The game enables every vertex stream before each draw: the point where the
-    // bound pair has to be current (see the GLSL backend section).
-    if (cfg().glsl && !g_streams_synced) {
-        glsl_sync();
-        g_streams_synced = true;
+    // bound pair has to be current (see the GLSL backend section). Asking GL
+    // once per run of these calls is enough when the game disables its streams
+    // after each draw; the tracked current program is cheap enough to check on
+    // every one, which also covers a draw that leaves them enabled.
+    if (cfg().glsl) {
+        if (!g_streams_synced) {
+            glsl_sync();
+            g_streams_synced = true;
+        } else if (int t = tracked_program(); t >= 0) {
+            Gpu &g = gpu();
+            if (g.active && (GLuint)t != g.active->program) glsl_sync();
+        }
     }
     client_state(q, true);
 }

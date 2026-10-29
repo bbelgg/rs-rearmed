@@ -73,6 +73,25 @@ foreach(backend glsl arb)
   add_test(NAME cg.stress.${backend} COMMAND cg_stress_test ${cg_stress_args})
   set_tests_properties(cg.stress.${backend} PROPERTIES ENVIRONMENT "RS_CG_BACKEND=${backend}")
 endforeach()
+# The shim's checks of the current program through libRSOpenGL's tracking
+# (rs_gl_current_program, here answered by the test), and without it.
+add_test(NAME cg.stress.glsl.tracked COMMAND cg_stress_test)
+set_tests_properties(cg.stress.glsl.tracked PROPERTIES ENVIRONMENT "RS_CG_BACKEND=glsl;RS_CG_TEST_TRACKED=gl")
+add_test(NAME cg.stress.glsl.untracked COMMAND cg_stress_test)
+set_tests_properties(cg.stress.glsl.untracked PROPERTIES ENVIRONMENT "RS_CG_BACKEND=glsl;RS_CG_TEST_TRACKED=unknown")
+# Pair cache: a run records its pairs, the next ones link them while loading
+# (also after a bad line and a cut last line were added to the file).
+add_test(NAME cg.stress.pairs
+  COMMAND sh -c "set -e; f=\"$2/cg-pairs.txt\"; rm -f \"$f\"; export RS_CG_BACKEND=glsl RS_CG_PAIR_CACHE=\"$f\"
+                 \"$1\" --pairs 1; \"$1\" --pairs 2; printf 'not a pair\\n0123' >> \"$f\"; \"$1\" --pairs 3
+                 grep -qx '0123' \"$f\" && \"$1\" --pairs 4"
+          sh $<TARGET_FILE:cg_stress_test> ${CMAKE_CURRENT_BINARY_DIR})
+# libRSOpenGL's Metal backend (glsl only), without its shared contexts.
+if(TARGET rsmsl)
+  add_test(NAME cg.render.metal COMMAND cg_render_test)
+  add_test(NAME cg.stress.metal COMMAND cg_stress_test)
+  set_tests_properties(cg.render.metal cg.stress.metal PROPERTIES ENVIRONMENT "RS_GL_BACKEND=metal")
+endif()
 
 # x86_64 tool that records NVIDIA's runtime's answers for the corpus
 # (tools/make_reference.sh); links the Cg.framework from the game install.

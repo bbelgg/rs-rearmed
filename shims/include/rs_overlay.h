@@ -47,9 +47,12 @@ int rs_overlay_api_version(void);
 // (16 entries) is full or fn is NULL. The same (fn, user) pair registered twice runs twice.
 int rs_overlay_register(rs_overlay_fn fn, void *user);
 // Removes the first registration of (fn, user) (any thread, also from inside a callback). 0, or -1.
+// When it returns, that callback is not running and does not run again, so user may be freed (called
+// from another thread it waits for a running call to return: do not hold a lock the callback takes;
+// called from inside the callback itself, that call finishes normally).
 int rs_overlay_unregister(rs_overlay_fn fn, void *user);
 
-// --- inside a callback only (they return NULL / -1 or do nothing elsewhere) ---
+// --- inside a callback only, on the thread that runs it (they return NULL / -1 or do nothing elsewhere) ---
 
 // A w x h image, initially transparent. It lives until rs_overlay_image_destroy, across frames.
 rs_overlay_image *rs_overlay_image_create(rs_overlay_frame *frame, int w, int h);

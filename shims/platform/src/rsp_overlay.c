@@ -41,11 +41,19 @@ extern void glBindFramebuffer(GLenum target, GLuint fb);
 typedef struct {
   rs_overlay_fn fn;
   void *user;
+  uint64_t id;  // unique per registration
 } cb_t;
 static pthread_mutex_t g_mu = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_cv = PTHREAD_COND_INITIALIZER;  // signalled when g_running changes
 static cb_t g_cb[MAX_CB];
 static int g_ncb;
+static uint64_t g_next_id = 1;
+static uint64_t g_running;   // id of the callback running now (0: none); under g_mu
+static pthread_t g_run_thread;  // the thread inside rsp_overlay_run; valid while g_in_run
+static volatile int g_in_run;
 static volatile int g_any;  // g_ncb != 0, read without the lock once per frame
+
+static int on_run_thread(void) { return g_in_run && pthread_equal(pthread_self(), g_run_thread); }
 
 RSO_EXPORT int rs_overlay_api_version(void) { return RS_OVERLAY_API_VERSION; }
 
@@ -56,6 +64,7 @@ RSO_EXPORT int rs_overlay_register(rs_overlay_fn fn, void *user) {
   if (ok) {
     g_cb[g_ncb].fn = fn;
     g_cb[g_ncb].user = user;
+    g_cb[g_ncb].id = g_next_id++;
     g_ncb++;
     g_any = 1;
   }
@@ -63,14 +72,19 @@ RSO_EXPORT int rs_overlay_register(rs_overlay_fn fn, void *user) {
   return ok ? 0 : -1;
 }
 
+// Once this returns, the registration's callback is not running and will not run again (unless
+// called from inside that very callback, which then finishes normally), so the mod may free `user`.
 RSO_EXPORT int rs_overlay_unregister(rs_overlay_fn fn, void *user) {
   int r = -1;
+  int self = on_run_thread();  // from a callback: never wait for ourselves
   pthread_mutex_lock(&g_mu);
   for (int i = 0; i < g_ncb; i++)
     if (g_cb[i].fn == fn && g_cb[i].user == user) {
+      uint64_t id = g_cb[i].id;
       memmove(&g_cb[i], &g_cb[i + 1], (size_t)(g_ncb - i - 1) * sizeof g_cb[0]);
       g_ncb--;
       r = 0;
+      while (!self && g_running == id) pthread_cond_wait(&g_cv, &g_mu);
       break;
     }
   g_any = g_ncb != 0;
@@ -303,8 +317,11 @@ static int init_gl(void) {
 }
 
 // Saves the game's state and sets ours, once per frame. 0 if the API cannot be used now.
+// Inside a callback: the frame being drawn, on the thread drawing it.
+static int in_callback(const rs_overlay_frame *f) { return f && g_in_frame && f == g_frame && on_run_thread(); }
+
 static int begin(rs_overlay_frame *f) {
-  if (!g_in_frame || f != g_frame || g_gl_failed) return 0;
+  if (!in_callback(f) || g_gl_failed) return 0;
   if (g_touched) return 1;
   pick_vao();
   save_state(&g_saved);
@@ -342,6 +359,23 @@ static int begin(rs_overlay_frame *f) {
   return 1;
 }
 
+// Still registered (it may have been unregistered by an earlier callback of this frame, or by another
+// thread); if so it is marked running, so that rs_overlay_unregister waits for it.
+static int claim(uint64_t id) {
+  pthread_mutex_lock(&g_mu);
+  int found = 0;
+  for (int i = 0; i < g_ncb && !found; i++) found = g_cb[i].id == id;
+  g_running = found ? id : 0;
+  pthread_mutex_unlock(&g_mu);
+  return found;
+}
+static void unclaim(void) {
+  pthread_mutex_lock(&g_mu);
+  g_running = 0;
+  pthread_cond_broadcast(&g_cv);
+  pthread_mutex_unlock(&g_mu);
+}
+
 void rsp_overlay_run(int width, int height) {
   if (!g_any || width <= 0 || height <= 0) return;
   cb_t cb[MAX_CB];
@@ -351,13 +385,20 @@ void rsp_overlay_run(int width, int height) {
   pthread_mutex_unlock(&g_mu);
   static uint32_t index;
   rs_overlay_frame f = {width, height, index++};
+  g_run_thread = pthread_self();
+  g_in_run = 1;
   g_frame = &f;
   g_in_frame = 1;
   g_touched = 0;
-  for (int i = 0; i < n; i++) cb[i].fn(&f, cb[i].user);
+  for (int i = 0; i < n; i++) {
+    if (!claim(cb[i].id)) continue;
+    cb[i].fn(&f, cb[i].user);
+    unclaim();
+  }
   if (g_touched) restore_state(&g_saved);
   g_in_frame = 0;
   g_frame = NULL;
+  g_in_run = 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +485,9 @@ RSO_EXPORT int rs_overlay_fill_rect(rs_overlay_frame *f, float x, float y, float
 }
 
 RSO_EXPORT int rs_overlay_read_pixels(rs_overlay_frame *f, int x, int y, int w, int h, void *out) {
-  if (!out || w <= 0 || h <= 0 || x < 0 || y < 0 || x + w > (f ? f->width : 0) || y + h > (f ? f->height : 0) ||
+  // f is only dereferenced once it is known to be the live frame; the bounds are checked without
+  // overflowing (x + w can exceed INT_MAX)
+  if (!out || !in_callback(f) || w <= 0 || h <= 0 || x < 0 || y < 0 || x > f->width - w || y > f->height - h ||
       !begin(f))
     return -1;
   size_t row = (size_t)w * 4;

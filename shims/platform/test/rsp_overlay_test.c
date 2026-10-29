@@ -5,9 +5,12 @@
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
+#include <limits.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #include "../../include/rs_overlay.h"
 #include "rsp_platform.h"
@@ -152,6 +155,12 @@ static rs_overlay_image *g_img;
 
 static uint8_t img_px(int x, int y, int c) { return c == 0 ? (uint8_t)(x * 30 + 10) : c == 1 ? (uint8_t)(y * 40 + 5) : c == 2 ? 77 : 255; }
 
+static int g_other_thread_r;
+static void *other_thread_draw(void *f) {
+  g_other_thread_r = rs_overlay_fill_rect(f, 0, 0, 1, 1, 0xffffffffu);
+  return NULL;
+}
+
 static void draw_cb(rs_overlay_frame *f, void *user) {
   g_calls++;
   CHECK(user == (void *)&g_calls, "user pointer");
@@ -184,6 +193,15 @@ static void draw_cb(rs_overlay_frame *f, void *user) {
       if (!near(p, img_px(x, y, 0), img_px(x, y, 1), img_px(x, y, 2)) || p[3] != 255) g_read_pixels_ok = 0;
     }
   CHECK(rs_overlay_read_pixels(f, W - 2, 0, 4, 1, rd) == -1, "read_pixels outside the frame");
+  // x + w and y + h past INT_MAX must not wrap into a "valid" rect
+  CHECK(rs_overlay_read_pixels(f, 1, 0, INT_MAX, 1, rd) == -1, "read_pixels x + w overflow");
+  CHECK(rs_overlay_read_pixels(f, 0, 1, 1, INT_MAX, rd) == -1, "read_pixels y + h overflow");
+  CHECK(rs_overlay_read_pixels(f, INT_MAX, 0, 1, 1, rd) == -1, "read_pixels x past the frame");
+  // another thread holding the frame pointer gets nothing (its GL calls would race the render thread)
+  pthread_t t;
+  pthread_create(&t, NULL, other_thread_draw, f);
+  pthread_join(t, NULL);
+  CHECK(g_other_thread_r == -1, "fill_rect from another thread during a callback: %d", g_other_thread_r);
 }
 
 // Does nothing, except destroying the image on its second call.
@@ -192,6 +210,45 @@ static void empty_cb(rs_overlay_frame *f, void *user) {
     rs_overlay_image_destroy(f, g_img);
     g_img = NULL;
   }
+}
+
+// --- unregister vs a running callback -------------------------------------------
+static volatile int g_slow_in, g_slow_done, g_done_at_unregister = -1, g_victim_calls, g_order_calls;
+static void slow_cb(rs_overlay_frame *f, void *user) {
+  g_slow_in = 1;
+  usleep(200 * 1000);
+  g_slow_done = 1;
+}
+static void *unregister_slow(void *arg) {
+  while (!g_slow_in) usleep(1000);
+  int r = rs_overlay_unregister(slow_cb, arg);
+  g_done_at_unregister = r == 0 ? g_slow_done : -2;
+  return NULL;
+}
+static void victim_cb(rs_overlay_frame *f, void *user) { g_victim_calls++; }
+// Unregisters victim_cb, which comes after it in this frame, and itself.
+static void killer_cb(rs_overlay_frame *f, void *user) {
+  g_order_calls++;
+  CHECK(rs_overlay_unregister(victim_cb, NULL) == 0, "unregister another callback from a callback");
+  CHECK(rs_overlay_unregister(killer_cb, NULL) == 0, "unregister itself from its callback");
+}
+
+static void test_unregister_races(void) {
+  // From another thread while the callback runs: returns only after it has returned, so the mod can
+  // free what `user` points to.
+  CHECK(rs_overlay_register(slow_cb, (void *)&g_slow_in) == 0, "register slow");
+  pthread_t t;
+  pthread_create(&t, NULL, unregister_slow, (void *)&g_slow_in);
+  rsp_overlay_run(W, H);
+  pthread_join(t, NULL);
+  CHECK(g_done_at_unregister == 1, "unregister from another thread waited for the running callback (%d)",
+        g_done_at_unregister);
+  // From a callback: a later callback of the same frame no longer runs.
+  CHECK(rs_overlay_register(killer_cb, NULL) == 0 && rs_overlay_register(victim_cb, NULL) == 0, "register 2");
+  rsp_overlay_run(W, H);
+  CHECK(g_order_calls == 1 && g_victim_calls == 0, "unregistered in this frame: %d %d", g_order_calls,
+        g_victim_calls);
+  CHECK(!rsp_overlay_active(), "all unregistered");
 }
 
 int main(void) {
@@ -277,6 +334,8 @@ int main(void) {
   check_game_state("image_destroy");
   CHECK(g_calls == 1 && g_run2_calls == 2, "callbacks after unregister %d %d", g_calls, g_run2_calls);
   CHECK(rs_overlay_unregister(empty_cb, NULL) == 0 && !rsp_overlay_active(), "unregister all");
+  CHECK(rs_overlay_read_pixels(&fake, 0, 0, 1, 1, &fake) == -1, "read_pixels outside a callback");
+  test_unregister_races();
 
   CGLSetCurrentContext(NULL);
   CGLDestroyContext(ctx);

@@ -376,6 +376,7 @@ typedef struct {
     // Recycled MTLBuffers from renamed GL buffers.
     rsm_chunk *pool;
     int n_pool, cap_pool;
+    size_t pool_bytes;
 }
 @end
 

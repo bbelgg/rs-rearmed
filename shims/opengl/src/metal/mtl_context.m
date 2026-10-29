@@ -256,14 +256,21 @@ void *rsm_transient(RSMContext *ctx, size_t size, size_t align, id<MTLBuffer> *b
     return (uint8_t *)b.contents + o;
 }
 
+// Retired buffers wait in a FIFO in serial order; the front ones are the first to be
+// free again, so the search stops at the first one still in flight.
+enum { RSM_POOL_MAX = 4096 };
+static const size_t RSM_POOL_BYTES = 256u << 20;
+
 id<MTLBuffer> rsm_new_buffer(RSMContext *ctx, size_t size) {
     if (!size)
         size = 4;
     uint64_t done = atomic_load(&ctx->completed);
-    for (int i = 0; i < ctx->n_pool; i++) {
-        if (ctx->pool[i].serial <= done && RSM_CHUNK_BUF(ctx->pool[i]).length == size) {
+    for (int i = 0; i < ctx->n_pool && ctx->pool[i].serial <= done; i++) {
+        if (RSM_CHUNK_BUF(ctx->pool[i]).length == size) {
             id<MTLBuffer> b = CFBridgingRelease(ctx->pool[i].buf);
-            ctx->pool[i] = ctx->pool[--ctx->n_pool];
+            ctx->pool_bytes -= size;
+            memmove(ctx->pool + i, ctx->pool + i + 1, (size_t)(ctx->n_pool - i - 1) * sizeof(rsm_chunk));
+            ctx->n_pool--;
             return b;
         }
     }
@@ -273,17 +280,25 @@ id<MTLBuffer> rsm_new_buffer(RSMContext *ctx, size_t size) {
 void rsm_retire_buffer(RSMContext *ctx, id<MTLBuffer> b, uint64_t serial) {
     if (!b)
         return;
-    enum { POOL_MAX = 64 };
-    if (ctx->n_pool == POOL_MAX) {  // drop the oldest
+    while (ctx->n_pool && (ctx->n_pool >= RSM_POOL_MAX || ctx->pool_bytes + b.length > RSM_POOL_BYTES)) {
+        // drop the oldest
+        ctx->pool_bytes -= RSM_CHUNK_BUF(ctx->pool[0]).length;
         CFRelease(ctx->pool[0].buf);
-        memmove(ctx->pool, ctx->pool + 1, (POOL_MAX - 1) * sizeof(rsm_chunk));
+        memmove(ctx->pool, ctx->pool + 1, (size_t)(ctx->n_pool - 1) * sizeof(rsm_chunk));
         ctx->n_pool--;
     }
     if (ctx->n_pool == ctx->cap_pool) {
         ctx->cap_pool = ctx->cap_pool ? ctx->cap_pool * 2 : 16;
-        ctx->pool = realloc(ctx->pool, ctx->cap_pool * sizeof(rsm_chunk));
+        ctx->pool = realloc(ctx->pool, (size_t)ctx->cap_pool * sizeof(rsm_chunk));
     }
-    ctx->pool[ctx->n_pool++] = (rsm_chunk){(void *)CFBridgingRetain(b), serial};
+    // Keep the FIFO sorted by serial (a buffer unused for a while may retire with an old one).
+    int i = ctx->n_pool;
+    while (i > 0 && ctx->pool[i - 1].serial > serial)
+        i--;
+    memmove(ctx->pool + i + 1, ctx->pool + i, (size_t)(ctx->n_pool - i) * sizeof(rsm_chunk));
+    ctx->pool[i] = (rsm_chunk){(void *)CFBridgingRetain(b), serial};
+    ctx->n_pool++;
+    ctx->pool_bytes += b.length;
 }
 
 // --- Contexts -------------------------------------------------------------------

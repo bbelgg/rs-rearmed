@@ -1605,7 +1605,72 @@ static int compare(const char *self, const test_case *c) {
     return failed != 0;
 }
 
+
+// --- Benchmark (not a test): a Scaleform-like frame of small draws -------------------
+#include <time.h>
+static double now_ms(void) {
+    struct timespec t;
+    clock_gettime(CLOCK_MONOTONIC, &t);
+    return t.tv_sec * 1e3 + t.tv_nsec / 1e6;
+}
+
+static int bench(int frames, int draws, int subdata) {
+    g_backend = rs_gfx_backend() == RS_GFX_METAL ? "metal" : "gl";
+    rs_gfx_context *ctx = rs_gfx_create_offscreen(1280, 720);
+    if (!ctx)
+        return 1;
+    rs_gfx_make_current(ctx);
+    GLuint p = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(p, "tex"), 0);
+    static unsigned char tex[64 * 64 * 4];
+    memset(tex, 200, sizeof tex);
+    GLuint t[4];
+    for (int i = 0; i < 4; i++)
+        t[i] = texture_rgba(64, 64, tex, GL_LINEAR);
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, 64 * 1024, NULL, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 16, 0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 16, (void *)8);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    GLint lc = glGetUniformLocation(p, "tex");
+    double t0 = 0;
+    for (int f = 0; f < frames + 10; f++) {
+        if (f == 10)
+            t0 = now_ms();
+        glClear(GL_COLOR_BUFFER_BIT);
+        for (int d = 0; d < draws; d++) {
+            float v[16] = {-0.1f, -0.1f, 0, 0, 0.1f, -0.1f, 1, 0, -0.1f, 0.1f, 0, 1, 0.1f, 0.1f, 1, 1};
+            v[0] += (float)(d % 10) * 0.05f;
+            if (subdata || f == 0)
+                glBufferSubData(GL_ARRAY_BUFFER, (d % 64) * 64, sizeof v, v);
+            glBindTexture(GL_TEXTURE_2D, t[d & 3]);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+            glUniform1i(lc, 0);
+            glEnable(GL_SCISSOR_TEST);
+            glDisable(GL_SCISSOR_TEST);
+            glDrawArrays(GL_TRIANGLE_STRIP, (d % 64) * 4, 4);
+        }
+        rs_gfx_present(ctx);
+    }
+    unsigned char sync[4];
+    glReadPixels(0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, sync);  // waits for the GPU
+    double ms = now_ms() - t0;
+    printf("%s: %d frames x %d draws (%s): %.3f ms/frame wall, %.2f us/draw\n", g_backend, frames, draws,
+           subdata ? "glBufferSubData per draw" : "static buffer",
+           ms / frames, ms * 1000 / frames / draws);
+    rs_gfx_make_current(NULL);
+    rs_gfx_destroy(ctx);
+    return 0;
+}
+
 int main(int argc, char **argv) {
+    if (argc >= 2 && !strcmp(argv[1], "--bench"))
+        return bench(argc > 2 ? atoi(argv[2]) : 200, argc > 3 ? atoi(argv[3]) : 500, argc > 4 ? atoi(argv[4]) : 1);
     if (argc >= 2 && !strcmp(argv[1], "--list")) {
         for (int i = 0; i < N_CASES; i++)
             printf("%s\n", kCases[i].name);

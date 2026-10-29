@@ -1045,6 +1045,8 @@ void rsmtl_glActiveTexture(GLenum texture) {
 void rsmtl_glBindTexture(GLenum target, GLuint texture) {
     RSM_CTX()
     GLuint *slot;
+    if (target == GL_TEXTURE_1D)  // a 2D texture of height 1 (the translator's sampler1D)
+        target = GL_TEXTURE_2D;
     if (target == GL_TEXTURE_2D)
         slot = &ctx->tex2d[ctx->active_unit];
     else if (target == GL_TEXTURE_CUBE_MAP)
@@ -1070,6 +1072,8 @@ void rsmtl_glBindTexture(GLenum target, GLuint texture) {
 
 static RSMTexture *rsm_bound_texture(RSMContext *ctx, GLenum target, int *face) {
     *face = 0;
+    if (target == GL_TEXTURE_1D)
+        target = GL_TEXTURE_2D;
     GLuint name;
     if (target == GL_TEXTURE_2D)
         name = ctx->tex2d[ctx->active_unit];
@@ -1091,7 +1095,7 @@ static RSMTexture *rsm_bound_texture(RSMContext *ctx, GLenum target, int *face) 
 // --- Texture parameters / samplers ------------------------------------------------------
 static void rsm_tex_param(RSMContext *ctx, GLenum target, GLenum pname, float v) {
     int face;
-    if (target != GL_TEXTURE_2D && target != GL_TEXTURE_CUBE_MAP) {
+    if (target != GL_TEXTURE_2D && target != GL_TEXTURE_CUBE_MAP && target != GL_TEXTURE_1D) {
         rsm_error(ctx, GL_INVALID_ENUM);
         return;
     }

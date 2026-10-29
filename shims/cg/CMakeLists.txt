@@ -40,8 +40,7 @@ endforeach()
 # answers for it (tools/cg_reference.c). Skipped when they haven't been made.
 set(RS_CG_CORPUS "${CMAKE_SOURCE_DIR}/analysis/cg" CACHE PATH "Output of shims/cg/tools/extract_corpus.py")
 if(EXISTS "${RS_CG_CORPUS}/corpus")
-  file(GLOB cg_corpus "${RS_CG_CORPUS}/corpus/*.?po")
-  list(FILTER cg_corpus EXCLUDE REGEX "/\\._[^/]*$")  # macOS metadata files on exFAT/FAT
+  rs_glob(cg_corpus "${RS_CG_CORPUS}/corpus/*.?po")
   foreach(backend glsl arb)
     add_test(NAME cg.corpus.load.${backend} COMMAND cg_corpus_load ${cg_corpus})
     set_tests_properties(cg.corpus.load.${backend} PROPERTIES ENVIRONMENT "RS_CG_BACKEND=${backend}")

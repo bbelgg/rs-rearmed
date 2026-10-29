@@ -30,10 +30,7 @@ set_target_properties(rs_online PROPERTIES OSX_ARCHITECTURES "arm64;x86_64")
 
 # Third-party libraries the original links statically, rebuilt from upstream
 # source (see THIRD_PARTY_NOTICES.md). Configured like the game's copy.
-# The globs leave out "._" files, which macOS writes next to every file on
-# a drive without extended attributes (exFAT, FAT).
-file(GLOB rsg_lua_src third_party/lua-5.1.4-lnum/src/*.c)
-list(FILTER rsg_lua_src EXCLUDE REGEX "/\\._[^/]*$")
+rs_glob(rsg_lua_src third_party/lua-5.1.4-lnum/src/*.c)
 add_library(rs_lua51 STATIC ${rsg_lua_src})
 target_include_directories(rs_lua51 PUBLIC third_party/lua-5.1.4-lnum/src)
 target_compile_definitions(rs_lua51 PUBLIC LNUM_DOUBLE LNUM_INT64)
@@ -43,8 +40,7 @@ target_compile_options(rs_lua51 PRIVATE -O2 -fwrapv -ffp-contract=off -w)
 set_target_properties(rs_lua51 PROPERTIES OSX_ARCHITECTURES "arm64;x86_64"
   C_STANDARD 90 C_EXTENSIONS ON)
 
-file(GLOB rsg_png_src third_party/libpng-1.5.13/*.c)
-list(FILTER rsg_png_src EXCLUDE REGEX "/\\._[^/]*$")
+rs_glob(rsg_png_src third_party/libpng-1.5.13/*.c)
 add_library(rs_png15 STATIC ${rsg_png_src})
 target_include_directories(rs_png15 PUBLIC third_party/libpng-1.5.13)
 # pngpriv.h would pick the classic Mac OS <fp.h> because TARGET_OS_MAC is set.
@@ -52,8 +48,7 @@ target_compile_options(rs_png15 PRIVATE -O2 -w -include math.h)
 target_link_libraries(rs_png15 PUBLIC z)
 set_target_properties(rs_png15 PROPERTIES OSX_ARCHITECTURES "arm64;x86_64")
 
-file(GLOB rsg_jpeg_src third_party/jpeg-8d/*.c)
-list(FILTER rsg_jpeg_src EXCLUDE REGEX "/\\._[^/]*$")
+rs_glob(rsg_jpeg_src third_party/jpeg-8d/*.c)
 add_library(rs_jpeg8 STATIC ${rsg_jpeg_src})
 target_include_directories(rs_jpeg8 PUBLIC third_party/jpeg-8d)
 # No FMA contraction: JDCT_FLOAT must round like the game's x86_64 SSE code.

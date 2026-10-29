@@ -111,7 +111,7 @@ if(TARGET opengl)
   endif()
 endif()
 # The Metal presentation path on a CAMetalLayer in no window (rsp_present_metal.m). Needs
-# libRSOpenGL; the Metal variant waits for the Metal core's rs_gfx_create_layer (step 5).
+# libRSOpenGL; the Metal variant needs the Metal core (metal.cmake) in it.
 if(TARGET opengl)
   add_executable(rsp_present_test test/rsp_present_test.m src/rsp_present_metal.m)
   target_link_libraries(rsp_present_test PRIVATE opengl "-framework Foundation" "-framework AppKit"
@@ -127,7 +127,7 @@ if(TARGET opengl)
   add_test(NAME platform.present.metal COMMAND arch -arm64 ${rsp_dyld} -e RS_GL_BACKEND=metal
     $<TARGET_FILE:rsp_present_test>)
   set_tests_properties(platform.present.metal PROPERTIES
-    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed" DISABLED TRUE)
+    PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
 endif()
 if(EXISTS "${RS_GAME_PLAIN}")
   add_test(NAME platform.difftest.x86_64 COMMAND $<TARGET_FILE:rsp_platform_difftest> "${RS_GAME_PLAIN}")

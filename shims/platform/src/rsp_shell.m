@@ -248,6 +248,9 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
                                           NSOpenGLPFAStencilSize,
                                           8,
                                           0};
+  // Not in the original: the app is high-resolution capable (Info.plist, for Metal's opt-in
+  // RS_METAL_RETINA); GL keeps a point-sized surface, which the engine's resolution matches.
+  [self setWantsBestResolutionOpenGLSurface:NO];
   pixelFormat = [[NSOpenGLPixelFormat alloc] initWithAttributes:attrs];
   if (!pixelFormat) NSLog(@"No OpenGL pixel format");
   openGLContext = [[NSOpenGLContext alloc] initWithFormat:pixelFormat shareContext:share];
@@ -332,10 +335,30 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 - (void)rsp_screenChanged:(NSNotification *)n {
   if (displayLink) CVDisplayLinkSetCurrentCGDisplay(displayLink, rsp_mtl_display(self));
   rsp_mtl_view_resized(rsp_g_mtl, self);
+  [self rsp_renderScaleChanged];
 }
 - (void)viewDidChangeBackingProperties {
   [super viewDidChangeBackingProperties];
-  if (rsp_g_mtl) rsp_mtl_view_resized(rsp_g_mtl, self);
+  if (rsp_g_mtl) {
+    rsp_mtl_view_resized(rsp_g_mtl, self);
+    [self rsp_renderScaleChanged];
+  }
+}
+// RS_METAL_RETINA=1: the engine renders at the drawable's pixel size. A new backing scale (the
+// window moved to another screen) re-sends the current resolution, converted (rsp_set_display_mode).
+- (void)rsp_renderScaleChanged {
+  double s = rsp_mtl_scale(rsp_g_mtl);
+  if (s == rsp_render_scale()) return;
+  int w = rsp_screen_width(), h = rsp_screen_height();  // points, at the old scale
+  rsp_set_render_scale(s);
+  fprintf(stderr, "[rsp] render scale %.1f: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
+          (int)lround(h * s), w, h);
+  if (controller && w > 0 && h > 0) {
+    controller->CurrentSetting_Width = w;
+    controller->CurrentSetting_Height = h;
+    controller->CurrentSetting_FullScreen = rsp_is_fullscreen();
+    controller->CurrentSetting_NeedsUpdate = YES;  // applied by updateScreenSize on the frame thread
+  }
 }
 
 - (id)initWithFrame:(NSRect)frame {  // 0x100184700
@@ -683,7 +706,8 @@ static atomic_int rsp_quitting;
 
 - (void)mouseMoved:(NSEvent *)e {  // 0x100185b40
   NSPoint p = [openGLView convertPoint:[e locationInWindow] fromView:nil];
-  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_coord(p.x), rsp_mouse_coord(p.y));
+  double s = rsp_render_scale();  // engine pixels per point (not in the original; 1 by default)
+  rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_coord(p.x * s), rsp_mouse_coord(p.y * s));
 }
 
 - (void)customEventTimer:(NSTimer *)t {  // 0x100185bd0

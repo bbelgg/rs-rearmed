@@ -33,7 +33,7 @@
 	<key>LSMinimumSystemVersion</key>
 	<string>11.0</string>
 	<key>NSHighResolutionCapable</key>
-	<false/>
+	<true/>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>This app requires microphone access to hear your guitar.</string>
 	<key>NSPrincipalClass</key>

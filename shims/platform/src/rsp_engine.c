@@ -1,6 +1,7 @@
 // The C layer between the ObjC shell and the engine (originally a C++ file
 // next to main, 0x100179dc0-0x10017a3b0), the input queue that lived on
 // MainService_MacOS, and the stub engine. See rsp_platform.h.
+#include <math.h>
 #include "rsp_platform.h"
 
 #include <pthread.h>
@@ -242,8 +243,14 @@ int rsp_focused(void) { return g_focused; }
 // ---------------------------------------------------------------------------
 // Display mode (GRDisplaySettings through the hooks)
 
+static double g_render_scale = 1.0;
+void rsp_set_render_scale(double s) { g_render_scale = s > 0 ? s : 1.0; }
+double rsp_render_scale(void) { return g_render_scale; }
+static int to_engine(int v) { return (int)lround(v * g_render_scale); }
+static int from_engine(int v) { return (int)lround(v / g_render_scale); }
+
 void rsp_set_display_mode(int fs, int w, int h) {  // 0x10017a1f0
-  if (H->set_resolution) H->set_resolution(H->ctx, w, h);
+  if (H->set_resolution) H->set_resolution(H->ctx, to_engine(w), to_engine(h));
   if (H->set_fullscreen) H->set_fullscreen(H->ctx, fs & 0xff);
 }
 int rsp_is_fullscreen(void) {  // 0x10017a210
@@ -255,12 +262,12 @@ int rsp_no_vsync(void) {  // 0x10017a220
 int rsp_screen_width(void) {  // 0x10017a310
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return w;
+  return from_engine(w);
 }
 int rsp_screen_height(void) {  // 0x10017a330
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return h;
+  return from_engine(h);
 }
 
 // ---------------------------------------------------------------------------

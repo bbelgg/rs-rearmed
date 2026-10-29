@@ -58,6 +58,8 @@ void rsp_mtl_size(rsp_mtl *m, int *w, int *h);
 void rsp_mtl_resize(rsp_mtl *m, int w, int h);
 // The size the drawable should have for `view` now, then rsp_mtl_resize (takes the lock).
 void rsp_mtl_view_resized(rsp_mtl *m, NSView *view);
+// Drawable pixels per view point: the backing scale with RS_METAL_RETINA=1, else 1.
+double rsp_mtl_scale(rsp_mtl *m);
 // Any thread; the layer is changed by the next rsp_mtl_present (the frame thread).
 void rsp_mtl_set_swap_interval(rsp_mtl *m, int interval);
 // End of frame (with the lock held, like flushBuffer).

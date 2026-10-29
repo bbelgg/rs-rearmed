@@ -188,6 +188,8 @@ void rsp_mtl_view_resized(rsp_mtl *m, NSView *view) {
   rsp_mtl_resize(m, w, h);
 }
 
+double rsp_mtl_scale(rsp_mtl *m) { return rsp_mtl_retina() ? m->layer.contentsScale : 1.0; }
+
 void rsp_mtl_set_swap_interval(rsp_mtl *m, int interval) { atomic_store(&m->want_swap, interval); }
 
 void rsp_mtl_present(rsp_mtl *m) {

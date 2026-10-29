@@ -124,6 +124,11 @@ int rsp_is_fullscreen(void);                       // 0x10017a210
 int rsp_no_vsync(void);                            // 0x10017a220
 int rsp_screen_width(void);                        // 0x10017a310
 int rsp_screen_height(void);                       // 0x10017a330
+// Engine pixels per window point (not in the original): 1, or the backing scale with Metal and
+// RS_METAL_RETINA=1. The shell works in points; rsp_set_display_mode, rsp_screen_width/height and
+// mouse positions convert at the engine boundary, so the engine renders at the drawable's size.
+void rsp_set_render_scale(double s);
+double rsp_render_scale(void);
 void rsp_request_quit(void);                       // 0x10017a350 / 0x10017a380
 void rsp_set_exit(void (*fn)(int status));         // _Exit by default
 void rsp_exit(int status);                         // the shell's _Exit(0)s go here

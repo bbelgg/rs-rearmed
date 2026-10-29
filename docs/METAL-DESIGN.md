@@ -26,6 +26,15 @@ them only together with every user.
 - The Cg shim links `libRSOpenGL` instead of `OpenGL.framework`, so its calls take the same path. On Metal
   (asked from `rs_gfx_backend()`, not from the environment) the Cg shim always uses its `glsl` backend:
   ARB programs never reach the Metal core.
+- Every gl/CGL name any client of `libRSOpenGL` calls must be in one of the two lists: a missing one still
+  links through the re-exported system framework and on Metal would run Apple's GL with no context. The
+  test `opengl.table.clients` (`tools/check-gl-clients.py`) checks the imports of every built client.
+- Wrappers cost a flag test and a tail call; counting (`rs_gl_stats`) only with `RS_GL_LOG`,
+  `RS_GL_CHECK`, `RS_GL_TRACE_DIR` or `RS_GL_STATS` set. `rs_gl_current_program()` answers the program
+  `glUseProgram` last bound in the current context (or -1 when not known exactly) without a GL query; the
+  Cg shim uses it to re-take GL after Scaleform's `glUseProgram(0)`. The Cg shim also records the program
+  pairs the game linked (`cg-pairs.txt` in `~/Library/Caches/rs-rearmed`, `RS_CG_PAIR_CACHE`) and links
+  them at load on later runs, so no link (and on Metal no compile) lands in the middle of a song.
 - `CGL*` (game imports `CGLLockContext`/`CGLUnlockContext`) and `NSOpenGLContext` are only used on GL. On
   Metal the shell uses `rs_gfx_*` and `CGLLockContext` takes the context's mutex.
 

@@ -42,6 +42,8 @@ This project does not include any game code or assets; you need your own copy of
 - **Your profiles, kept separately.** On the first launch your Steam saves for Rocksmith 2014 are copied
   once into the RS Re-ARMed folder. From then on the native build uses only that copy; your Steam saves
   are never written. Stored Ubisoft credentials (`crd`) are never copied.
+- **Metal renderer.** The game draws through Apple's Metal by default; OpenGL stays available as a choice
+  and as an automatic fallback (see [Renderer](#renderer-metal-or-opengl)).
 - **Your DLC, linked automatically.** The launcher mirrors your game folder with symlinks on every launch,
   so new DLC folders in your install show up without reinstalling.
 
@@ -58,7 +60,9 @@ These are compiled into the app. Where a switch exists, it is an environment var
 | **Song ownership**: the offline Steam layer reports the base game, the DLC your account owns (the DLC Steam installed) and 248750, the free DLC that custom songs carry, as owned, so their songs show up | on | `RS_STEAM_DLC=all` reports every AppID as owned, for custom songs that carry another AppID |
 | **"Re-ARMed" title logo**: a tag over the title-screen logo, built automatically from your own `static.psarc` by `tools/loadscreen` | on | `RS_REARMED=0` shows the original logo; or delete `static.psarc.rearmed` |
 | **Frame rate**: the game renders at the display's refresh rate (a 75 Hz or 120 Hz display gets 75 or 120 fps; the game keeps song time at any rate). A fixed rate can be set instead, with vsync off: higher to test, or lower (e.g. 30) to save power | display | `RS_FPS=N` |
-| **Multithreaded GL engine**: Apple's driver does its work on a thread of its own. Measured: the frame thread 4% shorter, total CPU 2% higher | off | `RS_GL_MTENGINE=1` |
+| **Renderer**: Metal, or Apple's OpenGL (see [Renderer](#renderer-metal-or-opengl)) | Metal | the `renderer` file, the installer, or `RS_GL_BACKEND=gl` |
+| **Retina** (Metal only): the game renders at the screen's full resolution on a Retina screen | off | `RS_METAL_RETINA=1` |
+| **Multithreaded GL engine** (OpenGL only): Apple's driver does its work on a thread of its own. Measured: the frame thread 4% shorter, total CPU 2% higher | off | `RS_GL_MTENGINE=1` |
 
 `RS_MODS_LOG=1` writes what the mods apply to `logs/last-run.log`.
 
@@ -71,6 +75,27 @@ them for your login session with `launchctl` before starting the game, for examp
 launchctl setenv RS_MODS_BYPASS 0     # takes effect on the next launch
 launchctl unsetenv RS_MODS_BYPASS     # back to the default
 ```
+
+### Renderer: Metal or OpenGL
+
+The game draws through **Metal** by default. **OpenGL** (Apple's, which macOS still ships) is the
+alternative; both look the same. Metal uses a little less CPU per frame and does not depend on
+OpenGL, which Apple deprecated.
+
+- **Choose** in the installer (Renderer: Metal / OpenGL), or with `RS_RENDERER=opengl` when running
+  `tools/play-native/install.sh`, or later without reinstalling:
+
+  ```bash
+  echo opengl > ~/Library/Application\ Support/RS\ Re-ARMed/renderer   # or: echo metal
+  ```
+
+- **Fallback:** if Metal can't start on your Mac, the game starts with OpenGL. If two starts with Metal
+  in a row end abnormally (a crash, or a force quit), the next start uses OpenGL, sets the `renderer`
+  file to `opengl` and says so in `renderer-fallback.txt` in the same folder. Write `metal` into the file
+  to try Metal again.
+- **Shaders:** Metal compiles the game's shaders once. The installer does this in its "Preparing
+  shaders" step (a few minutes the first time). After a macOS update the game recompiles them on its
+  next start, showing "Preparing shaders… N of M" on a black screen before it loads.
 
 ### The title logo
 
@@ -128,7 +153,8 @@ Then start **RS Re-ARMed** from `~/Applications` (double-click, Launchpad or Spo
   automatically.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.
 - With a fast-load `cache.psarc` mod, a start can now and then stay on the white loading screen,
-  more often when the Mac is busy. Quit and start again.
+  more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares its shaders
+  before the game loads when it sees such a mod, which avoids the stall it would otherwise cause.
 
 ## FAQ
 

@@ -13,6 +13,9 @@
 #                      default: tools/ws7/recomp/overrides/build/liboverrides.a if it exists)
 #       RC_PY          python with capstone       (default analysis/venv/bin/python)
 #       SHIM_STEAM / SHIM_BINK / SHIM_CG   arm64 dylibs to bundle (defaults: first arm64 build found)
+#       SHIM_OPENGL    libRSOpenGL.dylib (shims/opengl; default build/shims/opengl/libRSOpenGL.dylib):
+#                      the app links it instead of OpenGL.framework (it re-exports the framework) and
+#                      bundles it as Contents/MacOS/libRSOpenGL.dylib
 #       RC_UNIT_TEST=1 also build and run test/seam_test (no game needed)
 #       RC_LTO, RC_LTO_JOBS, RC_LTO_CACHE (default OUTDIR/lto-cache), RC_PGO, RC_PGO_DIR (default
 #                      OUTDIR/pgo): see tools/ws7/recomp/build/optflags.sh (libgame_rc.a must be built with the same)
@@ -52,6 +55,10 @@ arm64_of() {
 shim_steam=${SHIM_STEAM:-$(arm64_of "$root/shims/steam/build/libsteam_api.dylib" "$root/build-rosetta/shims/steam/libsteam_api.dylib")}
 shim_bink=${SHIM_BINK:-$(arm64_of "$root/build/shims/bink/libBink2Macx64.dylib" "$root/build-rosetta/shims/bink/libBink2Macx64.dylib")}
 shim_cg=${SHIM_CG:-$(arm64_of "$root/build/shims/cg/Cg" "$root/build-rosetta/shims/cg/Cg")}
+shim_opengl=${SHIM_OPENGL:-$(arm64_of "$root/build/shims/opengl/libRSOpenGL.dylib" "$root/build-rosetta/shims/opengl/libRSOpenGL.dylib")}
+# GL (game, shell, Cg) goes through libRSOpenGL: linked, not only bundled, so it is required.
+[ -n "$shim_opengl" ] && [ -f "$shim_opengl" ] ||
+  { echo "no arm64 libRSOpenGL.dylib (build the opengl target, or set SHIM_OPENGL)" >&2; exit 1; }
 
 CF="-arch arm64 -O2 -g -mmacosx-version-min=11.0 -fno-strict-aliasing -ffp-contract=off -Wall -Wno-unused-parameter -Wno-unused-function -I$rt -I$plat/include -I$here $rc_pgo"
 mkdir -p "$work/o"
@@ -69,7 +76,7 @@ objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-decla
 objs="$objs $(cc_obj "$here/seam_platform.c")"
 for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done
 for s in "$rt"/rc_*.S; do objs="$objs $(cc_obj "$s")"; done
-FW="-framework AppKit -framework OpenGL -framework CoreVideo -framework IOKit -framework Foundation -framework CoreFoundation -lobjc -lz"
+FW="-framework AppKit $shim_opengl -framework CoreVideo -framework IOKit -framework Foundation -framework CoreFoundation -lobjc -lz"
 exe=$app/Contents/MacOS/Rocksmith2014
 # rc_main.o names the profile file of a gen build (the image TUs carry the counters only)
 pgo_main=$(rc_pgo_main "$out/pgo")
@@ -116,11 +123,13 @@ printf 'APPL????' > "$app/Contents/PkgInfo"
 [ -n "$shim_steam" ] && cp "$shim_steam" "$app/Contents/MacOS/libsteam_api.dylib" || echo "warning: no arm64 libsteam_api.dylib" >&2
 [ -n "$shim_bink" ] && cp "$shim_bink" "$app/Contents/MacOS/libBink2Macx64.dylib" || echo "warning: no arm64 libBink2Macx64.dylib" >&2
 [ -n "$shim_cg" ] && cp "$shim_cg" "$app/Contents/Frameworks/Cg.framework/Cg" || echo "warning: no arm64 Cg" >&2
+cp "$shim_opengl" "$app/Contents/MacOS/libRSOpenGL.dylib"
+shims="$app/Contents/MacOS/libsteam_api.dylib $app/Contents/MacOS/libBink2Macx64.dylib $app/Contents/MacOS/libRSOpenGL.dylib $app/Contents/Frameworks/Cg.framework/Cg"
 # lipo -thin when a fat shim was found, so every bundled Mach-O is arm64
-for f in "$app/Contents/MacOS/libsteam_api.dylib" "$app/Contents/MacOS/libBink2Macx64.dylib" "$app/Contents/Frameworks/Cg.framework/Cg"; do
+for f in $shims; do
   [ -f "$f" ] && [ "$(lipo -archs "$f")" != arm64 ] && lipo -thin arm64 "$f" -output "$f.thin" && mv "$f.thin" "$f"
 done
-codesign --force -s - "$app/Contents/MacOS/libsteam_api.dylib" "$app/Contents/MacOS/libBink2Macx64.dylib" "$app/Contents/Frameworks/Cg.framework/Cg" 2>/dev/null || true
+for f in $shims; do [ -f "$f" ] && codesign --force -s - "$f" 2>/dev/null || true; done
 codesign --force -s - "$exe" 2>/dev/null
 echo "built $app"
 lipo -archs "$exe"

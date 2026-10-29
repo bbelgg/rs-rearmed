@@ -3,6 +3,7 @@
 // game's method at the address in its comment (unslid, decrypted binary). MRC.
 #import "rsp_shell.h"
 #import "rsp_present.h"
+#include "rsp_renderer.h"
 
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl.h>
@@ -476,6 +477,9 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   if (f0) rsp_ft_mark_fn()('F', f0, mach_absolute_time(), 0, 0);
   rsp_mtl_unlock(m);
   if (d0) rsp_ft_mark_fn()('D', d0, mach_absolute_time(), 0, 0);
+  // The game chose to quit: the session ended well for Metal, whatever its shutdown does next (a crash
+  // or a hang in the game's own teardown is not Metal's).
+  if (done) rsp_metal_session_end();
   if (done) [self dealloc];
 }
 

@@ -1528,11 +1528,13 @@ int rsm_cache_prepare(RSMContext *ctx, double max_s) {
     RSMShaderCache *c = rsm_cache_for(ctx->dev);
     uint64_t t0 = rsm_now_ns();
     int rc = 0;
-    c->preparing = true;
     g_warm_boost = true;
     rsm_pool_push(@[], true);  // the whole machine for what warming has queued
     uint64_t corpus_id = 0;
     bool corpus = rsm_corpus_start(c, &corpus_id);
+    // Progress only from here: while the corpus was being listed its count was missing from the total,
+    // and a reader saw "all done" (done == total) and never went back below it.
+    c->preparing = true;
     int total = c->warm_total + c->corpus_total;
     if (total) {
         rsm_log("safe load: compiling %d libraries (cache manifest %d, shader corpus %d) before the game loads "

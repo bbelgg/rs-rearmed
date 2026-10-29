@@ -48,6 +48,7 @@
 #include "gltrace.h"
 #include "rs_gfx.h"
 
+#include <ctype.h>
 #include <dlfcn.h>
 #include <errno.h>
 #include <pthread.h>
@@ -673,9 +674,21 @@ static rs_gfx_backend_t rs_backend_get(void) {
 #else
         const char *e = getenv("RS_GL_BACKEND");
         b = RS_GFX_METAL;
-        if (e && (!strcmp(e, "gl") || !strcmp(e, "opengl")))
+        // As the shell's rsp_renderer_parse reads it: any case, white space around it.
+        char v[16] = "";
+        if (e) {
+            while (isspace((unsigned char)*e))
+                e++;
+            size_t n = 0;
+            for (; e[n] && n < sizeof v - 1; n++)
+                v[n] = (char)tolower((unsigned char)e[n]);
+            while (n && isspace((unsigned char)v[n - 1]))
+                n--;
+            v[n] = 0;
+        }
+        if (!strcmp(v, "gl") || !strcmp(v, "opengl"))
             b = RS_GFX_GL;
-        else if (e && *e && strcmp(e, "metal"))
+        else if (*v && strcmp(v, "metal"))
             fprintf(stderr, "[rs-gl] unknown RS_GL_BACKEND=%s, using metal\n", e);
 #endif
         rs_backend = b;

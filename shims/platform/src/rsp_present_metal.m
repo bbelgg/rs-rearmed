@@ -419,7 +419,7 @@ static void *warm_thread(void *arg) {
 }
 
 int rsp_mtl_warm_only(double max_seconds, double interval, FILE *out) {
-  if (!rsp_mtl_selected() || !gfx.create_offscreen || !gfx.prepare || !gfx.prepare_progress) {
+  if (!rsp_mtl_selected() || !gfx.create_offscreen || !gfx.prepare || !gfx.prepare_progress || !gfx.destroy) {
     fprintf(stderr, "[rsp] warm-shaders: no Metal backend (libRSOpenGL with RS_GL_BACKEND=metal is needed)\n");
     return 2;
   }

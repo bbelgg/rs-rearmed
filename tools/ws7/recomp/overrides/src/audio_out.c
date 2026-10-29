@@ -213,6 +213,7 @@ void F_100b049b0(rc_ctx *c) {
       uint32_t g = atomic_load_explicit(&g_out_gen, memory_order_acquire);
       if (g != gen) {
         gen = g;
+        make_realtime();  // the period and budget follow the new device's buffer
         wg_join(&wg, atomic_load(&g_out_dev));
       }
     }

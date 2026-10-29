@@ -7,7 +7,9 @@ import os
 import struct
 import sys
 
-MAGIC = b'RSMSLC2\0'
+MAGIC = b'RSMSLC3\0'
+ENTRY = '<QQIIIIII'  # key, key2, vs_len, fs_len, offset, size, flags, check
+ENTRY_SIZE = struct.calcsize(ENTRY)
 HEADER = 24
 
 
@@ -24,11 +26,11 @@ def read(path):
         o += 4 + n
     entries = {}
     for i in range(count):
-        key, vs_len, fs_len, off, size, flags, _ = struct.unpack_from('<QIIIIII', d, HEADER + 32 * i)
+        key, key2, vs_len, fs_len, off, size, flags, check = struct.unpack_from(ENTRY, d, HEADER + ENTRY_SIZE * i)
         blob = d[off:off + size]
         nseg, = struct.unpack_from('<I', blob, 0)
         segs = [pool[k] for k in struct.unpack_from('<%dI' % nseg, blob, 4)]
-        entries[key] = (vs_len, fs_len, flags, segs, blob[4 + 4 * nseg:])
+        entries[key] = (key2, vs_len, fs_len, flags, check, segs, blob[4 + 4 * nseg:])
     return ver, entries
 
 
@@ -45,10 +47,10 @@ def main():
         sys.exit('no input')
     keys = sorted(merged)
     pool_idx, pool = {}, []
-    off = HEADER + 32 * len(keys)
+    off = HEADER + ENTRY_SIZE * len(keys)
     index, blobs = [], []
     for k in keys:
-        vs_len, fs_len, flags, segs, rest = merged[k]
+        key2, vs_len, fs_len, flags, check, segs, rest = merged[k]
         ids = []
         for sg in segs:
             if sg not in pool_idx:
@@ -56,7 +58,8 @@ def main():
                 pool.append(sg)
             ids.append(pool_idx[sg])
         b = struct.pack('<I%dI' % len(ids), len(ids), *ids) + rest
-        index.append(struct.pack('<QIIIIII', k, vs_len, fs_len, off, len(b), flags, 0))
+        # `check` covers `rest` and the MSL, not the pool indices: it stays valid
+        index.append(struct.pack(ENTRY, k, key2, vs_len, fs_len, off, len(b), flags, check))
         blobs.append(b)
         off += len(b)
     head = MAGIC + struct.pack('<IIII', version, len(keys), len(pool), off)

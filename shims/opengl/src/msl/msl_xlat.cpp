@@ -2237,13 +2237,3 @@ extern "C" void rsmsl_free(rsmsl_program *p) {
     free(p->samplers);
     free(p);
 }
-
-extern "C" uint64_t rsmsl_key(const char *vs, const char *fs) {
-    // FNV-1a 64 over both sources, separated by a 0 byte.
-    uint64_t h = 0xcbf29ce484222325ull;
-    for (const char *s : {vs ? vs : "", fs ? fs : ""}) {
-        for (const unsigned char *p = (const unsigned char *)s; *p; p++) h = (h ^ *p) * 0x100000001b3ull;
-        h = (h ^ 0) * 0x100000001b3ull;
-    }
-    return h;
-}

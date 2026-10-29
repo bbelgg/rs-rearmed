@@ -68,7 +68,9 @@ rsmsl_program *rsmsl_translate(const char *vs_glsl, const char *fs_glsl,
                                const rsmsl_attrib *bound_attribs, int n_bound, char **error);
 void rsmsl_free(rsmsl_program *p);
 
-// Key of a pair in the offline corpus (stable across runs and builds).
+// Key of a pair in the offline corpus: a 64-bit hash of both sources (the corpus also checks a
+// second 64-bit hash and the lengths). Stable across runs and builds; it changes only with the
+// corpus format (RSMSL_VERSION).
 uint64_t rsmsl_key(const char *vs_glsl, const char *fs_glsl);
 
 #ifdef __cplusplus

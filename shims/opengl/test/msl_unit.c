@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "msl_internal.h"
@@ -112,7 +113,19 @@ static void test_key(void) {
     CHECK(rsmsl_key("a", "b") == rsmsl_key("a", "b"));
     CHECK(rsmsl_key("ab", "") != rsmsl_key("a", "b"));
     CHECK(rsmsl_key(NULL, NULL) == rsmsl_key("", ""));
-    CHECK(rsmsl_key("", "") == 0x08328807b4eb6fedull);  // FNV-1a 64 of two 0 bytes: stable across builds
+    CHECK(rsmsl_key("", "") == 0x1dd1fba3a0365d2full);  // pinned: stable across runs and builds
+    CHECK(rsmsl_key("a", "b") == 0x1d473c4a8ff231fbull);
+    // Every length around the 16-byte blocks hashes differently (the tail is length-tagged).
+    char buf[40] = {0};
+    uint64_t seen[40];
+    int distinct = 1;
+    for (int n = 0; n < 40; n++) {
+        buf[n] = 0;
+        seen[n] = rsmsl_key(buf, "x");
+        for (int m = 0; m < n; m++) distinct &= seen[m] != seen[n];
+        buf[n] = 'a';
+    }
+    CHECK(distinct);
 }
 
 // Deeply nested input fails with a message, within a 512 KB stack (a secondary thread's default).
@@ -160,6 +173,90 @@ static void test_nesting(void) {
     free(err);
 }
 
+static int same_program(const rsmsl_program *a, const rsmsl_program *b) {
+    if (strcmp(a->msl, b->msl) || a->n_attribs != b->n_attribs || a->n_uniforms != b->n_uniforms ||
+        a->n_samplers != b->n_samplers || a->vs_uniform_size != b->vs_uniform_size || a->fs_uniform_size != b->fs_uniform_size)
+        return 0;
+    for (int i = 0; i < a->n_attribs; i++)
+        if (strcmp(a->attribs[i].name, b->attribs[i].name) || a->attribs[i].location != b->attribs[i].location ||
+            a->attribs[i].type != b->attribs[i].type)
+            return 0;
+    for (int i = 0; i < a->n_uniforms; i++) {
+        const rsmsl_uniform *x = &a->uniforms[i], *y = &b->uniforms[i];
+        if (strcmp(x->name, y->name) || x->type != y->type || x->array_size != y->array_size || x->stages != y->stages ||
+            x->vs_offset != y->vs_offset || x->fs_offset != y->fs_offset || x->stride != y->stride)
+            return 0;
+    }
+    for (int i = 0; i < a->n_samplers; i++)
+        if (strcmp(a->samplers[i].name, b->samplers[i].name) || a->samplers[i].index != b->samplers[i].index ||
+            a->samplers[i].type != b->samplers[i].type || a->samplers[i].stages != b->samplers[i].stages)
+            return 0;
+    return 1;
+}
+
+// A damaged corpus (truncated, bytes changed, another version) is ignored entry by entry or as a
+// whole: every lookup still returns the right program (from the corpus only when intact) and
+// never crashes. Each variant runs in a child process (the corpus is opened once per process).
+static void test_corpus_damage(const char *path, const rsmsl_program *ref, const rsmsl_attrib *bound, int nb) {
+    FILE *f = fopen(path, "rb");
+    if (!f) { CHECK(0); return; }
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    unsigned char *orig = malloc((size_t)size);
+    CHECK(fread(orig, 1, (size_t)size, f) == (size_t)size);
+    fclose(f);
+    char dpath[1024];
+    snprintf(dpath, sizeof dpath, "%s.damaged", path);
+    int variants = 0, bad = 0, from_corpus = 0;
+    unsigned seed = 12345;
+    for (int v = 0; v < 600; v++) {
+        unsigned char *d = malloc((size_t)size);
+        memcpy(d, orig, (size_t)size);
+        long n = size;
+        if (v < 150) {
+            n = (long)((double)size * v / 150);  // truncated
+        } else if (v < 150 + 24) {
+            d[8 + (v - 150) / 3] ^= (unsigned char)(1u << ((v - 150) % 3 * 3));  // version, counts, pool offset
+        } else {
+            for (int k = 0; k < 1 + v % 3; k++) {  // random bytes changed anywhere
+                seed = seed * 1103515245u + 12345u;
+                d[(seed >> 8) % (unsigned)size] ^= (unsigned char)(1 + (seed >> 24) % 255);
+            }
+        }
+        FILE *o = fopen(dpath, "wb");
+        fwrite(d, 1, (size_t)n, o);
+        fclose(o);
+        free(d);
+        fflush(stderr);
+        pid_t pid = fork();
+        if (pid == 0) {
+            rsmsl_corpus_override(dpath);
+            rsmsl_program *c = rsmsl_translate(VS, FS, bound, nb, NULL);
+            int ok = c && same_program(c, ref);
+            int fc = c && c->from_corpus;
+            rsmsl_free(c);
+            rsmsl_corpus_flags(VS, "x");
+            _exit(ok ? (fc ? 0 : 1) : 2);
+        }
+        int st = 0;
+        waitpid(pid, &st, 0);
+        variants++;
+        if (!WIFEXITED(st) || WEXITSTATUS(st) > 1) {
+            bad++;
+            fprintf(stderr, "damaged corpus variant %d: %s %d\n", v, WIFEXITED(st) ? "exit" : "signal",
+                    WIFEXITED(st) ? WEXITSTATUS(st) : WTERMSIG(st));
+        } else if (WEXITSTATUS(st) == 0) {
+            from_corpus++;
+        }
+    }
+    printf("damaged corpus: %d variants, %d from the corpus, the rest translated at run time\n", variants, from_corpus);
+    CHECK(bad == 0);
+    CHECK(from_corpus > 0 && from_corpus < variants);  // intact variants (n == size, harmless bytes) still hit
+    remove(dpath);
+    free(orig);
+}
+
 static void test_corpus(const char *path) {
     rsmsl_attrib bound[] = {{"nrm", 5, 0}};
     rsmsl_program *p = rsmsl_translate_direct(VS, FS, bound, 1, NULL);
@@ -173,6 +270,7 @@ static void test_corpus(const char *path) {
     const char *FS2 = "#version 120\nvarying vec2 tc;\nvoid main() { gl_FragColor = vec4(tc, 0.0, 1.0); }\n";
     rsmsl_corpus_add(w, VS, FS2, &q, 0);
     CHECK(rsmsl_corpus_finish(w, path) == 0);
+    test_corpus_damage(path, p, bound, 1);
 
     rsmsl_corpus_override(path);
     int n = 0;

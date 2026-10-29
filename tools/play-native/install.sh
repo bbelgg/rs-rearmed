@@ -44,12 +44,14 @@ for r in RS2014.icns en.lproj; do  # the original app's icon and strings
 done
 # From a drive without extended attributes (exFAT, FAT), cp copies the "._" file macOS keeps next to each file.
 find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
-# Builds from before CFBundleIconFile was in app/Info.plist: add it (the Dock icon), re-sign the executable.
+# Builds from before CFBundleIconFile was in app/Info.plist: add it (the Dock icon).
 plist="$home/game/Rocksmith2014.app.new/Contents/Info.plist"
 if ! /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$plist" >/dev/null 2>&1; then
     plutil -insert CFBundleIconFile -string RS2014.icns "$plist"
-    codesign --force -s - "$home/game/Rocksmith2014.app.new/Contents/MacOS/Rocksmith2014" 2>/dev/null || true
 fi
+# Re-sign: the files added above are outside the build's signature, which broke the bundle's seal.
+codesign --force -s - "$home/game/Rocksmith2014.app.new/Contents/MacOS/Rocksmith2014" 2>/dev/null || true
+find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
 rm -rf "$home/game/Rocksmith2014.app"
 mv "$home/game/Rocksmith2014.app.new" "$home/game/Rocksmith2014.app"
 cp "$netguard" "$home/libnetguard.dylib"

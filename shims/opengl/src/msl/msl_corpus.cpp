@@ -480,6 +480,23 @@ extern "C" const char *rsmsl_corpus_path(int *n_entries) {
     return g.count ? g.path.c_str() : nullptr;
 }
 
+extern "C" int rsmsl_corpus_count(void) {
+    init();
+    return (int)g.count;
+}
+
+extern "C" char *rsmsl_corpus_msl(int i) {
+    init();
+    if (i < 0 || (uint32_t)i >= g.count) return nullptr;
+    // The whole entry is checked (its hash covers the reflection too), then only the MSL is kept.
+    rsmsl_program *p = decode(&g.index[i]);
+    if (!p) return nullptr;
+    char *msl = p->msl;
+    p->msl = nullptr;
+    rsmsl_free(p);
+    return msl;
+}
+
 extern "C" int rsmsl_corpus_flags(const char *vs, const char *fs) {
     const IndexEntry *e = find(pair_key(vs, fs));
     return e ? (int)e->flags : -1;

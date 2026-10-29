@@ -73,6 +73,14 @@ void rsmsl_free(rsmsl_program *p);
 // corpus format (RSMSL_VERSION).
 uint64_t rsmsl_key(const char *vs_glsl, const char *fs_glsl);
 
+// The offline corpus's programs, for warming shader compiles ahead of the game (the Metal core's
+// safe load). rsmsl_corpus_count: entries in the corpus in use (0 when there is none; opens it on
+// the first call). rsmsl_corpus_msl: the MSL of entry i (0 <= i < count, in index order, so not
+// grouped by content: different pairs can have the same MSL), malloc'd, the caller frees it;
+// NULL when i is out of range or the entry does not check out. Any thread.
+int rsmsl_corpus_count(void);
+char *rsmsl_corpus_msl(int i);
+
 #ifdef __cplusplus
 }
 #endif

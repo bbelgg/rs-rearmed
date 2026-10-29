@@ -197,7 +197,10 @@ static int same_program(const rsmsl_program *a, const rsmsl_program *b) {
 // A damaged corpus (truncated, bytes changed, another version) is ignored entry by entry or as a
 // whole: every lookup still returns the right program (from the corpus only when intact) and
 // never crashes. Each variant runs in a child process (the corpus is opened once per process).
-static void test_corpus_damage(const char *path, const rsmsl_program *ref, const rsmsl_attrib *bound, int nb) {
+// msls: the MSL of every entry of the intact corpus; an entry read from a damaged one is either
+// rejected (NULL) or one of them.
+static void test_corpus_damage(const char *path, const rsmsl_program *ref, const rsmsl_attrib *bound, int nb,
+                               const char *const *msls, int n_msls) {
     FILE *f = fopen(path, "rb");
     if (!f) { CHECK(0); return; }
     fseek(f, 0, SEEK_END);
@@ -237,6 +240,15 @@ static void test_corpus_damage(const char *path, const rsmsl_program *ref, const
             int fc = c && c->from_corpus;
             rsmsl_free(c);
             rsmsl_corpus_flags(VS, "x");
+            int n = rsmsl_corpus_count();
+            for (int i = -1; i <= n; i++) {
+                char *m = rsmsl_corpus_msl(i);
+                int known = 0;
+                for (int k = 0; m && k < n_msls; k++)
+                    known |= !strcmp(m, msls[k]);
+                if (m && !known) ok = 0;
+                free(m);
+            }
             _exit(ok ? (fc ? 0 : 1) : 2);
         }
         int st = 0;
@@ -270,11 +282,20 @@ static void test_corpus(const char *path) {
     const char *FS2 = "#version 120\nvarying vec2 tc;\nvoid main() { gl_FragColor = vec4(tc, 0.0, 1.0); }\n";
     rsmsl_corpus_add(w, VS, FS2, &q, 0);
     CHECK(rsmsl_corpus_finish(w, path) == 0);
-    test_corpus_damage(path, p, bound, 1);
+    const char *msls[] = {p->msl, q.msl};
+    test_corpus_damage(path, p, bound, 1, msls, 2);
 
     rsmsl_corpus_override(path);
     int n = 0;
     CHECK(rsmsl_corpus_path(&n) && n == 2);
+    // Enumeration: every entry's MSL once (index order), nothing out of range.
+    CHECK(rsmsl_corpus_count() == 2);
+    char *m0 = rsmsl_corpus_msl(0), *m1 = rsmsl_corpus_msl(1);
+    CHECK(m0 && m1 && strcmp(m0, m1) && (!strcmp(m0, p->msl) || !strcmp(m0, q.msl)) &&
+          (!strcmp(m1, p->msl) || !strcmp(m1, q.msl)));
+    free(m0);
+    free(m1);
+    CHECK(rsmsl_corpus_msl(-1) == NULL && rsmsl_corpus_msl(2) == NULL);
     CHECK(rsmsl_corpus_flags(VS, FS) == RSMSL_CORPUS_VERIFIED && rsmsl_corpus_flags(VS, FS2) == 0);
     CHECK(rsmsl_corpus_flags(VS, "x") == -1);
 

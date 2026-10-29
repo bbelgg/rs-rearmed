@@ -529,6 +529,8 @@ static id<MTLRenderPipelineState> rsm_pipeline(RSMContext *ctx, RSMProgram *p, c
     id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, k);
     if (ps)
         return ps;
+    if (!rsm_program_ready(ctx, p, true))  // waits for the library compile (once per program)
+        return nil;
     ps = rsm_cache_pipeline(ctx, p->entry, k);
     if (ps)
         rsm_map_put(&p->pipelines, k, ps);

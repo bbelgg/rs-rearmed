@@ -3,6 +3,12 @@
 //   metal_cache_test <dir>                 runs the scenario below, children share <dir>
 //   metal_cache_test --child <nonce>       one run: link N programs, draw each with V pipeline
 //                                          variants (checking a pixel), print timings
+//   metal_cache_test --async <nonce>       one run: GL semantics of asynchronous library compiles
+//                                          (status, uniforms and draws right after the link, a
+//                                          compile that fails after the link reported success)
+//   metal_cache_test --bench <dir> [N]     not a test: time from the first link to all N programs
+//                                          drawn, cold (RS_MTL_SALT: no system Metal cache) and
+//                                          warm, synchronous compiles vs the compile pool
 //
 // Scenario (fresh MSL per invocation via <nonce>, so the system's Metal cache starts cold too):
 //   cold        empty cache: every pipeline is an archive miss
@@ -11,7 +17,9 @@
 //   warm-async  as the game sees it: warming races the first draws; no misses
 //   no-cache    RS_METAL_CACHE=0, same MSL: what the system Metal cache alone gives
 //   corrupt     garbage archive and a torn manifest; then a garbage manifest: discarded, no crash
-//   stale       directories of other builds are removed, foreign files left alone
+//   stale       directories of other formats/OS/GPUs are removed, foreign files left alone
+//   async       --async children with the compile pool and with RS_MTL_COMPILE_THREADS=0
+//   prune       the game links other MSL for a few runs: the old libraries leave the manifest
 // Output ends with "N passed, M failed".
 #define GL_SILENCE_DEPRECATION
 #include <OpenGL/gl.h>
@@ -181,6 +189,247 @@ static int child(int nonce) {
     return bad || err ? 1 : 0;
 }
 
+// --- Child: asynchronous link semantics ------------------------------------------------------
+// Run with a fresh RS_MTL_SALT (compiles really pending at link time) and
+// RS_MTL_TEST_FAIL=rs_fail_me. argv: sync = 1 when RS_MTL_COMPILE_THREADS=0.
+enum { NASYNC = 24 };
+
+static GLuint link_pair(const char *vs, const char *fs) {
+    GLuint p = glCreateProgram();
+    glAttachShader(p, shader(GL_VERTEX_SHADER, vs));
+    glAttachShader(p, shader(GL_FRAGMENT_SHADER, fs));
+    glBindAttribLocation(p, 0, "pos");
+    glBindAttribLocation(p, 1, "col");
+    glLinkProgram(p);
+    return p;
+}
+
+static void quad_buffers(void) {
+    static const float quad[] = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1};
+    float col[6][4];
+    for (int v = 0; v < 6; v++)
+        col[v][0] = 0, col[v][1] = 128 / 255.0f, col[v][2] = 0, col[v][3] = 1;
+    GLuint vb[2];
+    glGenBuffers(2, vb);
+    glBindBuffer(GL_ARRAY_BUFFER, vb[0]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof quad, quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glBindBuffer(GL_ARRAY_BUFFER, vb[1]);
+    glBufferData(GL_ARRAY_BUFFER, sizeof col, col, GL_STATIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glViewport(0, 0, W, H);
+}
+
+// Clear to blue, draw, read the centre pixel.
+static void draw_px(unsigned char px[4]) {
+    glClearColor(0, 0, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glReadPixels(W / 2, H / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+}
+
+static int child_async(int nonce, int sync) {
+    rs_gfx_context *c = rs_gfx_create_offscreen(W, H);
+    if (!c) {
+        printf("no context\n");
+        return 1;
+    }
+    rs_gfx_make_current(c);
+    quad_buffers();
+    static const char *vs =
+        "attribute vec2 pos;\n"
+        "attribute vec4 col;\n"
+        "varying vec4 v_col;\n"
+        "void main() { v_col = col; gl_Position = vec4(pos, 0.0, 1.0); }\n";
+    GLuint prog[NASYNC + 1];
+    GLint ktab[NASYNC + 1];
+    for (int i = 0; i <= NASYNC; i++) {
+        // Program NASYNC has program 0's sources: one compile for both.
+        int n = i == NASYNC ? 0 : i;
+        char fs[768];
+        snprintf(fs, sizeof fs,
+                 "varying vec4 v_col;\n"
+                 "uniform vec4 tint;\n"
+                 "uniform float k[3];\n"
+                 "void main() {\n"
+                 "    vec4 c = v_col * tint;\n"
+                 "    c.r = k[1] + float(%d) * 1.0e-12;\n"
+                 "    c.b = float(%d) * 1.0e-12;\n"
+                 "    gl_FragColor = c;\n"
+                 "}\n",
+                 n, nonce);
+        GLuint p = link_pair(vs, fs);
+        prog[i] = p;
+        // Right after the link: status, log, reflection, uniforms.
+        GLint ok = 0, loglen = -1;
+        glGetProgramiv(p, GL_LINK_STATUS, &ok);
+        glGetProgramiv(p, GL_INFO_LOG_LENGTH, &loglen);
+        check(ok == 1 && loglen == 0, "program %d: LINK_STATUS %d, log length %d right after the link", i, ok,
+              loglen);
+        GLint tint = glGetUniformLocation(p, "tint"), k = glGetUniformLocation(p, "k"),
+              k1 = glGetUniformLocation(p, "k[1]");
+        check(tint >= 0 && k >= 0 && k1 == k + 1, "program %d: uniform locations tint %d k %d k[1] %d", i, tint, k,
+              k1);
+        GLint nu = 0, na = 0;
+        glGetProgramiv(p, GL_ACTIVE_UNIFORMS, &nu);
+        glGetProgramiv(p, GL_ACTIVE_ATTRIBUTES, &na);
+        check(nu == 2 && na == 2, "program %d: %d active uniforms, %d attributes", i, nu, na);
+        glUseProgram(p);
+        glUniform4f(tint, 1, 1, 1, 1);
+        float kv[3] = {0.25f, (float)(i * 8) / 255.0f, 0.75f};
+        glUniform1fv(k, 3, kv);
+        GLfloat back[4] = {0};
+        glGetUniformfv(p, k1, back);
+        check(back[0] == kv[1], "program %d: glGetUniformfv right after the link: %g want %g", i, back[0], kv[1]);
+        ktab[i] = k1;
+        // Draw right after the link (every fourth program; the rest are drawn below).
+        if (i % 4 == 0) {
+            unsigned char px[4];
+            draw_px(px);
+            check(abs(px[0] - i * 8) <= 1 && abs(px[1] - 128) <= 1 && px[2] <= 1,
+                  "program %d drawn right after the link: %d,%d,%d want %d,128,0", i, px[0], px[1], px[2], i * 8);
+        }
+    }
+    for (int i = 0; i <= NASYNC; i++) {
+        glUseProgram(prog[i]);
+        unsigned char px[4];
+        draw_px(px);
+        check(abs(px[0] - i * 8) <= 1 && abs(px[1] - 128) <= 1 && px[2] <= 1, "program %d: %d,%d,%d want %d,128,0",
+              i, px[0], px[1], px[2], i * 8);
+        // Uniform changes after the compile finished still land.
+        float kv = (float)(255 - i * 8) / 255.0f;
+        glUniform1f(ktab[i], kv);
+        draw_px(px);
+        check(abs(px[0] - (255 - i * 8)) <= 1, "program %d after glUniform1f: red %d want %d", i, px[0], 255 - i * 8);
+    }
+    check(glGetError() == GL_NO_ERROR, "no GL errors in the good programs");
+
+    // A program whose MSL fails to compile (RS_MTL_TEST_FAIL): the link reports success when the
+    // compile runs on the pool (sync: failure at once). The first draw finds the failure: it draws
+    // nothing, raises no error, and the program is unlinked from then on with the compiler's log.
+    static const char *bad_fs =
+        "varying vec4 v_col;\n"
+        "uniform float rs_fail_me;\n"
+        "void main() { gl_FragColor = v_col * rs_fail_me; }\n";
+    GLuint bad = link_pair(vs, bad_fs);
+    GLint ok = -1;
+    glGetProgramiv(bad, GL_LINK_STATUS, &ok);
+    if (sync) {
+        check(ok == 0, "sync: the failing program does not link (%d)", ok);
+    } else {
+        // Normally still compiling here (queued behind nothing, but a compile takes milliseconds).
+        printf("async: failing program's LINK_STATUS right after the link: %d\n", ok);
+        if (ok) {
+            check(glGetUniformLocation(bad, "rs_fail_me") >= 0, "failing program: uniform location while pending");
+            glUseProgram(bad);
+            unsigned char px[4];
+            draw_px(px);
+            check(px[0] == 0 && px[1] == 0 && px[2] == 255, "failing program draws nothing: %d,%d,%d", px[0], px[1],
+                  px[2]);
+            check(glGetError() == GL_NO_ERROR, "failing program's draw raises no GL error");
+        }
+    }
+    glGetProgramiv(bad, GL_LINK_STATUS, &ok);
+    char log[4096] = "";
+    GLint loglen = 0;
+    glGetProgramiv(bad, GL_INFO_LOG_LENGTH, &loglen);
+    glGetProgramInfoLog(bad, sizeof log, NULL, log);
+    check(ok == 0, "failing program is unlinked after its compile (LINK_STATUS %d)", ok);
+    check(strstr(log, "MSL compile failed") && strstr(log, "RS_MTL_TEST_FAIL") && loglen == (GLint)strlen(log) + 1,
+          "failing program's info log (%d): %.200s", loglen, log);
+    glGetError();
+    glUseProgram(bad);
+    check(glGetError() == GL_INVALID_OPERATION, "glUseProgram of the unlinked program: GL_INVALID_OPERATION");
+    // The good programs still work.
+    glUseProgram(prog[3]);
+    glUniform1f(ktab[3], 24 / 255.0f);
+    unsigned char px[4];
+    draw_px(px);
+    check(abs(px[0] - 24) <= 1 && abs(px[1] - 128) <= 1, "a good program after the failure: %d,%d", px[0], px[1]);
+    rs_gfx_make_current(NULL);
+    rs_gfx_destroy(c);
+    printf("CHILD async done: %d passed, %d failed\n", passed, failed);
+    return failed ? 1 : 0;
+}
+
+// --- Child: benchmark ----------------------------------------------------------------------
+// N programs with fragment shaders of a size like the game's (loops over texture fetches and
+// some arithmetic); time from the first link to the last one drawn.
+static int child_bench(int n) {
+    rs_gfx_context *c = rs_gfx_create_offscreen(W, H);
+    if (!c)
+        return 1;
+    rs_gfx_make_current(c);
+    quad_buffers();
+    static const char *vs =
+        "attribute vec2 pos;\n"
+        "attribute vec4 col;\n"
+        "varying vec4 v_col;\n"
+        "varying vec2 v_uv;\n"
+        "uniform mat4 mvp;\n"
+        "void main() { v_col = col; v_uv = pos * 0.5 + 0.5; gl_Position = mvp * vec4(pos, 0.0, 1.0); }\n";
+    GLuint *prog = calloc((size_t)n, sizeof *prog);
+    double t0 = now_ms();
+    for (int i = 0; i < n; i++) {
+        char fs[4096];
+        snprintf(fs, sizeof fs,
+                 "varying vec4 v_col;\n"
+                 "varying vec2 v_uv;\n"
+                 "uniform sampler2D t0;\n"
+                 "uniform sampler2D t1;\n"
+                 "uniform vec4 p[8];\n"
+                 "vec4 blur(sampler2D t, vec2 uv, float r) {\n"
+                 "    vec4 s = vec4(0.0);\n"
+                 "    for (int j = 0; j < %d; j++) {\n"
+                 "        float a = float(j) * 0.7 + r;\n"
+                 "        s += texture2D(t, uv + vec2(cos(a), sin(a)) * r * p[j - (j / 8) * 8].x);\n"
+                 "    }\n"
+                 "    return s / %d.0;\n"
+                 "}\n"
+                 "void main() {\n"
+                 "    vec4 a = blur(t0, v_uv, p[1].y + %d.0 * 0.001);\n"
+                 "    vec4 b = blur(t1, v_uv.yx, p[2].z);\n"
+                 "    vec3 l = normalize(vec3(p[3].xy, 1.0));\n"
+                 "    float d = max(dot(l, normalize(b.xyz * 2.0 - 1.0)), 0.0);\n"
+                 "    vec4 c = mix(a, b, smoothstep(0.0, 1.0, d)) * v_col;\n"
+                 "    c.rgb = pow(c.rgb, vec3(p[4].w + 1.0)) + vec3(%d.0 / 1.0e9);\n"
+                 "    gl_FragColor = c * 0.0 + v_col;\n"
+                 "}\n",
+                 4 + i % 13, 4 + i % 13, i % 7, i);
+        prog[i] = link_pair(vs, fs);
+        GLint ok = 0;
+        glGetProgramiv(prog[i], GL_LINK_STATUS, &ok);
+        if (!ok) {
+            char log[2048] = "";
+            glGetProgramInfoLog(prog[i], sizeof log, NULL, log);
+            printf("bench: link %d failed: %s\n", i, log);
+            return 1;
+        }
+    }
+    double link_ms = now_ms() - t0;
+    static const float id[16] = {1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1};
+    int bad = 0;
+    for (int i = 0; i < n; i++) {
+        glUseProgram(prog[i]);
+        glUniformMatrix4fv(glGetUniformLocation(prog[i], "mvp"), 1, GL_FALSE, id);
+        unsigned char px[4];
+        glClearColor(0, 0, 1, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        if (i == n - 1 || i % 16 == 15) {
+            glReadPixels(W / 2, H / 2, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, px);
+            bad += abs(px[1] - 128) > 1;
+        }
+    }
+    double total_ms = now_ms() - t0;
+    printf("CHILD bench n=%d link_ms=%.1f total_ms=%.1f bad=%d\n", n, link_ms, total_ms, bad);
+    rs_gfx_make_current(NULL);
+    rs_gfx_destroy(c);
+    return bad ? 1 : 0;
+}
+
 // --- Parent --------------------------------------------------------------------------------
 typedef struct {
     int rc;
@@ -200,6 +449,7 @@ static double num(const char *s, const char *key) {
 
 static char g_self[1024], g_dir[1024];
 static int g_nonce;
+static const char *g_mode = "--child", *g_arg2;  // child mode, extra child argument
 
 static run_result run(const char *name, const char *extra_env[]) {
     run_result r;
@@ -208,12 +458,12 @@ static run_result run(const char *name, const char *extra_env[]) {
     snprintf(logpath, sizeof logpath, "%s.%s.log", g_dir, name);
     char nonce[32];
     snprintf(nonce, sizeof nonce, "%d", g_nonce);
-    char *argv[] = {g_self, "--child", nonce, NULL};
+    char *argv[] = {g_self, (char *)g_mode, nonce, (char *)g_arg2, NULL};
     // Environment: ours minus the cache knobs, then the run's.
     char *env[512];
     int n = 0;
     for (char **e = environ; *e && n < 480; e++)
-        if (strncmp(*e, "RS_METAL_CACHE", 14) && strncmp(*e, "RS_GL_BACKEND=", 14))
+        if (strncmp(*e, "RS_METAL_CACHE", 14) && strncmp(*e, "RS_GL_BACKEND=", 14) && strncmp(*e, "RS_MTL_", 7))
             env[n++] = *e;
     static char dirvar[1100];
     snprintf(dirvar, sizeof dirvar, "RS_METAL_CACHE_DIR=%s", g_dir);
@@ -308,10 +558,60 @@ static off_t file_size(const char *path) {
     return stat(path, &sb) ? -1 : sb.st_size;
 }
 
+// --- Benchmark (not a test) ------------------------------------------------------------------
+static double bench_one(const char *name, int n, const char *salt, const char *const *env) {
+    static char saltvar[128];
+    snprintf(saltvar, sizeof saltvar, "RS_MTL_SALT=%s", salt);
+    const char *e[8];
+    int k = 0;
+    e[k++] = saltvar;
+    for (int i = 0; env && env[i]; i++)
+        e[k++] = env[i];
+    e[k] = NULL;
+    char ns[16];
+    snprintf(ns, sizeof ns, "%d", n);
+    g_mode = "--bench-child";
+    g_arg2 = ns;
+    run_result r = run(name, e);
+    double t = num(strstr(r.log, "CHILD bench"), "total_ms=");
+    printf("  => %-22s first link to all %d drawn: %8.1f ms (links %.1f ms) rc=%d\n", name, n, t,
+           num(strstr(r.log, "CHILD bench"), "link_ms="), r.rc);
+    return t;
+}
+
+static int bench(const char *self, const char *dir, int n) {
+    if (!realpath(self, g_self))
+        snprintf(g_self, sizeof g_self, "%s", self);
+    snprintf(g_dir, sizeof g_dir, "%s", dir);
+    char s1[64], s2[64];
+    snprintf(s1, sizeof s1, "b%d-%ld-sync", (int)getpid(), (long)time(NULL));
+    snprintf(s2, sizeof s2, "b%d-%ld-async", (int)getpid(), (long)time(NULL));
+    const char *sync_nocache[] = {"RS_MTL_COMPILE_THREADS=0", "RS_METAL_CACHE=0", NULL};
+    const char *sync_cache[] = {"RS_MTL_COMPILE_THREADS=0", NULL};
+    // Cold: new salt (system Metal cache cold), empty disk cache.
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+    bench_one("cold sync", n, s1, sync_nocache);
+    sh("rm -rf '%s' && mkdir -p '%s'", g_dir, g_dir);
+    bench_one("cold pool", n, s2, NULL);
+    // Warm: same salts. The system Metal cache alone, then with the disk cache of the cold pool
+    // run (archive + manifest warming), as a second game start sees it.
+    bench_one("warm sync, sys cache", n, s1, sync_nocache);
+    bench_one("warm pool, sys cache", n, s2, (const char *[]){"RS_METAL_CACHE=0", NULL});
+    bench_one("warm sync, +disk", n, s2, sync_cache);
+    bench_one("warm pool, +disk", n, s2, NULL);
+    return 0;
+}
+
 int main(int argc, char **argv) {
     setvbuf(stdout, NULL, _IOLBF, 0);
     if (argc >= 3 && !strcmp(argv[1], "--child"))
         return child(atoi(argv[2]));
+    if (argc >= 4 && !strcmp(argv[1], "--async"))
+        return child_async(atoi(argv[2]), atoi(argv[3]));
+    if (argc >= 4 && !strcmp(argv[1], "--bench-child"))
+        return child_bench(atoi(argv[3]));
+    if (argc >= 3 && !strcmp(argv[1], "--bench"))
+        return bench(argv[0], argv[2], argc >= 4 ? atoi(argv[3]) : 256);
     if (argc < 2) {
         fprintf(stderr, "usage: %s <cache dir>\n", argv[0]);
         return 2;
@@ -344,8 +644,9 @@ int main(int argc, char **argv) {
     // Only the core's internal shaders are compiled on the drawing thread.
     check(warm.lib_compiled <= 1 && warm.pipe_built == 0, "warm: drawing thread compiled %d libraries, %d pipelines",
           warm.lib_compiled, warm.pipe_built);
-    check(warm.link_ms < cold.link_ms, "warm link %.1f ms < cold %.1f ms", warm.link_ms, cold.link_ms);
-    check(warm.draw1_ms < cold.draw1_ms, "warm first draws %.1f ms < cold %.1f ms", warm.draw1_ms, cold.draw1_ms);
+    // Links only queue the compiles: compare link + first draws.
+    check(warm.link_ms + warm.draw1_ms < cold.link_ms + cold.draw1_ms, "warm link + first draws %.1f ms < cold %.1f ms",
+          warm.link_ms + warm.draw1_ms, cold.link_ms + cold.draw1_ms);
 
     run_result async = run("warm-async", NULL);
     check(async.rc == 0 && async.bad == 0, "warm-async run draws correctly (rc %d)", async.rc);
@@ -419,6 +720,49 @@ int main(int argc, char **argv) {
     check(file_size(path) > 0, "unknown files in a stale directory left alone");
     snprintf(path, sizeof path, "%s/keep.txt", g_dir);
     check(file_size(path) > 0, "unrelated files in the cache directory left alone");
+
+    // The cache directory's name has no build identity (rebuilding the app keeps the cache).
+    const char *leaf = strrchr(sub, '/');
+    check(leaf && !strncmp(leaf, "/rsm3-k", 7), "cache directory %s is rsm<format>-k<conventions>-<os>-<gpu>",
+          leaf ? leaf + 1 : sub);
+
+    // Asynchronous compiles: GL semantics with the pool and without (RS_MTL_COMPILE_THREADS=0).
+    char salt[64], saltvar[96];
+    snprintf(salt, sizeof salt, "%d-%d", g_nonce, (int)getpid());
+    snprintf(saltvar, sizeof saltvar, "RS_MTL_SALT=%s", salt);
+    g_mode = "--async";
+    g_arg2 = "0";
+    const char *async_env[] = {saltvar, "RS_MTL_TEST_FAIL=rs_fail_me", NULL};
+    run_result as = run("async", async_env);
+    check(as.rc == 0, "async semantics with the compile pool (rc %d)", as.rc);
+    check(as.lib_compiled >= 24 && num(as.log, "lib_async=") >= 12 && as.lib_reused >= 1,
+          "async: %d compiled, %d on the pool, %d shared", as.lib_compiled, (int)num(as.log, "lib_async="),
+          as.lib_reused);
+    snprintf(saltvar, sizeof saltvar, "RS_MTL_SALT=%s-sync", salt);
+    g_arg2 = "1";
+    const char *sync_env2[] = {saltvar, "RS_MTL_TEST_FAIL=rs_fail_me", "RS_MTL_COMPILE_THREADS=0", NULL};
+    run_result sy = run("async-off", sync_env2);
+    check(sy.rc == 0, "the same semantics with synchronous compiles (rc %d)", sy.rc);
+    check(num(sy.log, "lib_async=") == 0, "RS_MTL_COMPILE_THREADS=0: nothing on the pool");
+    g_mode = "--child";
+    g_arg2 = NULL;
+
+    // Pruning: two runs link other MSL (another nonce); at the third start the first MSL's
+    // libraries (unlinked for 2 runs, RS_METAL_CACHE_KEEP_RUNS=2) leave the manifest.
+    int nonce1 = g_nonce;
+    g_nonce = nonce1 ^ 0x5a5a5;
+    const char *keep_env[] = {"RS_METAL_CACHE_KEEP_RUNS=2", NULL};
+    const char *keep_sync[] = {"RS_METAL_CACHE_KEEP_RUNS=2", "RS_METAL_CACHE_WARM_SYNC=1", NULL};
+    run_result b1 = run("other-msl1", keep_env);
+    run_result b2 = run("other-msl2", keep_sync);
+    run_result b3 = run("pruned", keep_sync);
+    check(b1.rc == 0 && b2.rc == 0 && b3.rc == 0, "other-MSL runs (rc %d %d %d)", b1.rc, b2.rc, b3.rc);
+    check(b2.lib_warmed >= 2 * NPROG - 2, "before pruning both sets are warmed (%d)", b2.lib_warmed);
+    check(b3.lib_warmed == NPROG && b3.misses == 0 && strstr(b3.log, "keeping 16 of"),
+          "pruned: only the current MSL is warmed (%d libraries, %d misses)", b3.lib_warmed, b3.misses);
+    g_nonce = nonce1;
+    run_result back = run("old-msl", sync_env);
+    check(back.rc == 0 && back.bad == 0, "the pruned MSL still works (compiled again, rc %d)", back.rc);
 
     printf("%d passed, %d failed\n", passed, failed);
     return failed ? 1 : 0;

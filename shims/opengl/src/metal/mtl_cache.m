@@ -4,19 +4,28 @@
 // and per library rsm_pkey -> MTLRenderPipelineState. Each item is built once; a thread that
 // needs an item another thread is building waits for it instead of compiling it again.
 //
-// On disk (one directory per libRSOpenGL build (LC_UUID), OS build, cache format and GPU):
+// Library compiles (newLibraryWithSource, 0.1-0.5 s each when the system's Metal cache is cold)
+// run on a pool of worker threads ("Compile pool" below): glLinkProgram queues the compile and
+// returns; the first pipeline needed for that library waits for it, or compiles it on the calling
+// thread if no worker has started it yet. Warming (below) uses the same pool at a lower priority.
+//
+// On disk (one directory per cache format, core conventions, OS build and GPU; not per build of
+// libRSOpenGL: rebuilding the app keeps the cache, and libraries are keyed by their MSL text):
 //   archive-<seq>.bin  MTLBinaryArchives with the GPU code of the pipelines built so far. New
 //                  pipeline descriptors look there first (MTLPipelineOptionFailOnBinaryArchiveMiss
 //                  tells a hit from a miss); a miss is compiled as usual and added to a fresh
 //                  archive afterwards, on a background queue. See "Archives" below for why there
 //                  are several files.
 //   manifest.bin   append-only records: the MSL of each library and the rsm_pkey of each pipeline,
-//                  in first-use order. At the next start a background queue (utility QoS) compiles
-//                  those libraries and prebuilds the pipelines, so the game's first use finds them
-//                  done ("warming"). newLibraryWithSource has no binary form we can keep (only
-//                  MTLDynamicLibrary serialises, and it cannot hold vertex/fragment functions), so
-//                  warming is what hides the MSL front-end compile; the system's Metal cache makes
-//                  repeated compiles of the same source cheap too, but may be evicted.
+//                  in first-use order, plus a mark per run and per library the game linked in it.
+//                  At the next start the compile pool compiles those libraries and prebuilds the
+//                  pipelines, so the game's first use finds them done ("warming"). Libraries the
+//                  game has not linked in the last RSM_KEEP_RUNS runs (an older translator's MSL)
+//                  are dropped then (the manifest is rewritten). newLibraryWithSource has no binary
+//                  form we can keep (only MTLDynamicLibrary serialises, and it cannot hold
+//                  vertex/fragment functions), so warming is what hides the MSL front-end compile;
+//                  the system's Metal cache makes repeated compiles of the same source cheap too,
+//                  but may be evicted.
 //
 // Archive access: adds and serialisation run on one serial queue (concurrent add + serialise
 // crashes in Metal); lookups from pipeline creation run on any thread (concurrent with both, as
@@ -25,9 +34,9 @@
 // renamed into place, so a crash leaves the previous files.
 //
 // Corrupt or foreign files are discarded (bad manifest records: the file is cut at the first one;
-// an archive Metal rejects: deleted). Disk use: the directories of other builds and OS versions
-// are deleted at start (only our own files in them); the manifest stops growing at
-// RSM_MAX_MANIFEST bytes, the archives at RSM_MAX_ARCHIVE (over it at start: deleted), and more
+// an archive Metal rejects: deleted). Disk use: the directories of other formats, conventions, OS
+// versions and GPUs are deleted at start (only our own files in them); the manifest stops growing
+// at RSM_MAX_MANIFEST bytes, the archives at RSM_MAX_ARCHIVE (over it at start: deleted), and more
 // than RSM_MAX_ARCHIVE_FILES archive files are compacted into one during warming.
 //
 // Environment:
@@ -39,13 +48,18 @@
 //   RS_METAL_CACHE_STATS=1    print counters (hits, misses, compile times) when the last context
 //                             goes and at exit; 2: also log every archive hit and miss
 //   RS_METAL_CACHE_WARM_SYNC=1  wait for warming before the first context returns (tests)
+//   RS_MTL_COMPILE_THREADS=<n>  compile pool size (default: CPUs - 2, 2..8); 0: every library is
+//                             compiled synchronously in glLinkProgram (the old behaviour; benchmarks)
+//   RS_MTL_SALT=<text>        diagnostics only: append "// salt <text>" to every MSL, so the system's
+//                             Metal cache cannot help (cold-compile measurements)
+//   RS_MTL_TEST_FAIL=<text>   tests only: MSL containing <text> gets an #error (compile failure path)
+//   RS_METAL_CACHE_KEEP_RUNS=<n>  tests only: RSM_KEEP_RUNS
 #include "mtl_internal.h"
 
 #include <dirent.h>
-#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <mach-o/loader.h>
+#include <pthread/qos.h>
 #include <mach/mach_time.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,10 +70,15 @@
 #include <unistd.h>
 
 enum {
-    RSM_CACHE_VERSION = 2,       // bump when the manifest or rsm_pkey meaning changes
+    RSM_CACHE_VERSION = 3,       // bump when the manifest format or the rsm_pkey layout changes
+    // Bump when the core's pipeline or shader conventions change in a way the cache cannot see
+    // (rsm_pipeline_desc maps an rsm_pkey differently, bindings move, ...): the new value starts
+    // a new cache directory. MSL changes need no bump: libraries are keyed by their text.
+    RSM_CORE_CONVENTIONS = 1,
+    RSM_KEEP_RUNS = 8,           // manifest: drop libraries not linked in this many runs
     RSM_SERIALIZE_EVERY = 32,    // new pipelines between archive writes
     RSM_SERIALIZE_DELAY_MS = 3000,
-    RSM_WARM_QUEUES = 2,
+    RSM_MAX_THREADS = 8,
     RSM_MAX_ARCHIVE_FILES = 8,
     RSM_MAX_LIBS = 8192,
     RSM_MAX_PIPES = 65536,
@@ -68,7 +87,9 @@ enum {
 #define RSM_MAX_ARCHIVE (1024ull << 20)
 
 static const char kManifestMagic[8] = {'R', 'S', 'M', 'C', 'M', 'A', 'N', '1'};
-enum { REC_LIB = 1, REC_PIPE = 2 };
+// REC_RUN (8 zero bytes) starts each run's records; REC_SEEN (lib hash): the game linked that
+// already-recorded library in this run (REC_LIB counts as seen too).
+enum { REC_LIB = 1, REC_PIPE = 2, REC_RUN = 3, REC_SEEN = 4 };
 
 typedef struct {
     char magic[8];
@@ -89,7 +110,7 @@ typedef struct {
 
 // --- Counters ----------------------------------------------------------------------------
 static struct {
-    _Atomic int lib_compiled, lib_warmed, lib_reused, lib_waited, lib_failed;
+    _Atomic int lib_compiled, lib_warmed, lib_reused, lib_waited, lib_failed, lib_async, lib_stolen;
     _Atomic int pipe_hits, pipe_misses, pipe_built, pipe_warmed, pipe_reused, pipe_waited;
     _Atomic uint64_t lib_ns, pipe_ns, wait_ns, warm_ns, serialize_ns;
     _Atomic int serialized, discarded, compacted;
@@ -142,6 +163,8 @@ static uint64_t rsm_now_ns(void) {
     int n_libs_rec, n_pipes_rec;
     rsm_map recorded;              // pipe_key -> @YES (in the manifest)
     NSMutableSet<NSNumber *> *recorded_libs;
+    bool run_marked;               // this run's REC_RUN is written
+    NSMutableSet<NSNumber *> *linked_libs;  // hashes the game linked in this run (under m)
     int unsaved;                   // pipelines added to the archive since the last write
     uint64_t save_gen;
 
@@ -163,28 +186,7 @@ static bool rsm_env_on(const char *name) {
     return e && *e && strcmp(e, "0") != 0;
 }
 
-// --- Build-time identity -------------------------------------------------------------------
-static void rsm_build_id(char out[33]) {
-    strcpy(out, "nouuid");
-    Dl_info di;
-    if (!dladdr((const void *)&rsm_build_id, &di) || !di.dli_fbase)
-        return;
-    const struct mach_header_64 *mh = di.dli_fbase;
-    if (mh->magic != MH_MAGIC_64)
-        return;
-    const uint8_t *p = (const uint8_t *)(mh + 1);
-    for (uint32_t i = 0; i < mh->ncmds; i++) {
-        const struct load_command *lc = (const struct load_command *)p;
-        if (lc->cmd == LC_UUID) {
-            const struct uuid_command *u = (const struct uuid_command *)lc;
-            for (int j = 0; j < 16; j++)
-                snprintf(out + j * 2, 3, "%02x", u->uuid[j]);
-            return;
-        }
-        p += lc->cmdsize;
-    }
-}
-
+// --- Cache identity ------------------------------------------------------------------------
 static void rsm_sanitize(const char *in, char *out, size_t n) {
     size_t j = 0;
     for (; *in && j + 1 < n; in++)
@@ -194,15 +196,14 @@ static void rsm_sanitize(const char *in, char *out, size_t n) {
     out[j] = 0;
 }
 
-// "rsm<version>-<build uuid>-<os build>-": directories with another prefix are stale.
+// "rsm<version>-k<conventions>-<os build>-" (+ GPU name): directories with another prefix are stale.
 static NSString *rsm_cache_prefix(void) {
-    char uuid[33], os[64] = "unknown", oss[64];
-    rsm_build_id(uuid);
+    char os[64] = "unknown", oss[64];
     size_t n = sizeof os;
     if (sysctlbyname("kern.osversion", os, &n, NULL, 0))
         strcpy(os, "unknown");
     rsm_sanitize(os, oss, sizeof oss);
-    return [NSString stringWithFormat:@"rsm%d-%s-%s-", RSM_CACHE_VERSION, uuid, oss];
+    return [NSString stringWithFormat:@"rsm%d-k%d-%s-", RSM_CACHE_VERSION, RSM_CORE_CONVENTIONS, oss];
 }
 
 static NSString *rsm_cache_base(void) {
@@ -228,14 +229,15 @@ static void rsm_remove_cache_dir(NSString *path) {
         return;
     struct dirent *de;
     while ((de = readdir(d))) {
-        if (!strcmp(de->d_name, "manifest.bin") || !strncmp(de->d_name, "archive-", 8))
+        if (!strncmp(de->d_name, "manifest.bin", 12) || !strncmp(de->d_name, "archive-", 8))
             unlink([path stringByAppendingPathComponent:@(de->d_name)].fileSystemRepresentation);
     }
     closedir(d);
     rmdir(path.fileSystemRepresentation);
 }
 
-static void rsm_clean_base(NSString *base, NSString *prefix) {
+// Every cache directory of ours but `keep` (other formats, conventions, OS builds, GPUs) goes.
+static void rsm_clean_base(NSString *base, NSString *keep) {
     DIR *d = opendir(base.fileSystemRepresentation);
     if (!d)
         return;
@@ -243,7 +245,7 @@ static void rsm_clean_base(NSString *base, NSString *prefix) {
     NSMutableArray *stale = [NSMutableArray new];
     while ((de = readdir(d)))
         if (de->d_type == DT_DIR && !strncmp(de->d_name, "rsm", 3) && de->d_name[3] >= '0' &&
-            de->d_name[3] <= '9' && ![@(de->d_name) hasPrefix:prefix])
+            de->d_name[3] <= '9' && ![@(de->d_name) isEqualToString:keep])
             [stale addObject:@(de->d_name)];
     closedir(d);
     for (NSString *s in stale) {
@@ -303,25 +305,53 @@ static bool rsm_write_all(int fd, const void *p, size_t n) {
     return true;
 }
 
+static void rsm_record(uint8_t **buf, size_t *len, size_t *cap, uint32_t type, const void *a, size_t na,
+                       const void *b, size_t nb) {
+    size_t n = sizeof(record_header) + na + nb;
+    if (*len + n > *cap) {
+        *cap = (*len + n) * 2;
+        *buf = realloc(*buf, *cap);
+    }
+    uint8_t *r = *buf + *len;
+    record_header *h = (record_header *)r;
+    memcpy(r + sizeof *h, a, na);
+    if (nb)
+        memcpy(r + sizeof *h + na, b, nb);
+    h->type = type;
+    h->len = (uint32_t)(na + nb);
+    h->check = rsm_hash(r + sizeof *h, na + nb) ^ type;
+    *len += n;
+}
+
 // Called on c->io.
 static void rsm_manifest_append(RSMShaderCache *c, uint32_t type, const void *a, size_t na, const void *b,
                                 size_t nb) {
-    if (c->manifest_fd < 0 || c->manifest_bytes + sizeof(record_header) + na + nb > RSM_MAX_MANIFEST)
+    if (c->manifest_fd < 0)
         return;
-    size_t n = sizeof(record_header) + na + nb;
-    uint8_t *buf = malloc(n);
-    record_header *h = (record_header *)buf;
-    memcpy(buf + sizeof *h, a, na);
-    if (nb)
-        memcpy(buf + sizeof *h + na, b, nb);
-    h->type = type;
-    h->len = (uint32_t)(na + nb);
-    h->check = rsm_hash(buf + sizeof *h, na + nb) ^ type;
+    uint8_t *buf = NULL;
+    size_t n = 0, cap = 0;
+    static const uint64_t zero = 0;
+    if (!c->run_marked)
+        rsm_record(&buf, &n, &cap, REC_RUN, &zero, 8, NULL, 0);
+    rsm_record(&buf, &n, &cap, type, a, na, b, nb);
     // One write per record (O_APPEND): a crash leaves at most one torn record at the end.
-    if (rsm_write_all(c->manifest_fd, buf, n))
+    if (c->manifest_bytes + n <= RSM_MAX_MANIFEST && rsm_write_all(c->manifest_fd, buf, n)) {
         c->manifest_bytes += n;
+        c->run_marked = true;
+    }
     free(buf);
 }
+
+// On c->io: the game linked this library in this run.
+static void rsm_note_seen(RSMShaderCache *c, uint64_t hash) {
+    if ([c->recorded_libs containsObject:@(hash)])  // else REC_LIB comes with its first pipeline
+        rsm_manifest_append(c, REC_SEEN, &hash, 8, NULL, 0);
+}
+
+typedef struct {
+    RSMLibEntry *e;
+    int last_run;  // index of the last run that linked it
+} manifest_lib;
 
 static void rsm_manifest_open(RSMShaderCache *c, warm_list *wl) {
     NSString *path = [c->dir stringByAppendingPathComponent:@"manifest.bin"];
@@ -345,10 +375,15 @@ static void rsm_manifest_open(RSMShaderCache *c, warm_list *wl) {
     memcpy(want.magic, kManifestMagic, 8);
     want.version = RSM_CACHE_VERSION;
     want.pkey_size = sizeof(rsm_pkey);
-    bool bad = false;
+    NSMutableArray<RSMLibEntry *> *libs = [NSMutableArray new];       // file order
+    NSMutableDictionary<NSNumber *, NSNumber *> *last = [NSMutableDictionary new];  // hash -> last run
+    NSMutableDictionary<NSNumber *, NSMutableArray<NSData *> *> *pipes = [NSMutableDictionary new];
+    int runs = 0, n_seen = 0, n_pipes = 0;
     if (size >= sizeof want && !memcmp(data, &want, sizeof want)) {
         size_t off = sizeof want;
         NSMutableDictionary<NSNumber *, RSMLibEntry *> *byhash = [NSMutableDictionary new];
+        rsm_map seen_pk;
+        rsm_map_init(&seen_pk, sizeof(pipe_key));
         good = off;
         while (off + sizeof(record_header) <= size) {
             record_header h;
@@ -364,48 +399,118 @@ static void rsm_manifest_open(RSMShaderCache *c, warm_list *wl) {
                 NSString *msl = [[NSString alloc] initWithBytes:pl + 8 length:h.len - 8 encoding:NSUTF8StringEncoding];
                 if (!msl || rsm_hash(pl + 8, h.len - 8) != hash)
                     break;
-                if (!byhash[@(hash)] && wl->libs.count < RSM_MAX_LIBS) {
+                if (!byhash[@(hash)] && libs.count < RSM_MAX_LIBS) {
                     RSMLibEntry *e = [RSMLibEntry new];
                     e->msl = msl;
                     e->hash = hash;
                     e->record = true;
                     byhash[@(hash)] = e;
-                    [wl->libs addObject:e];
-                    [c->recorded_libs addObject:@(hash)];
-                    c->n_libs_rec++;
+                    [libs addObject:e];
                 }
+                last[@(hash)] = @(runs);
             } else if (h.type == REC_PIPE && h.len == sizeof(pipe_key)) {
                 pipe_key pk;
                 memcpy(&pk, pl, sizeof pk);
                 if (!rsm_pkey_ok(&pk.k) || !byhash[@(pk.lib)])
                     break;
-                if (!rsm_map_get(&c->recorded, &pk) && c->n_pipes_rec < RSM_MAX_PIPES) {
-                    rsm_map_put(&c->recorded, &pk, @YES);
-                    NSMutableArray *a = wl->pipes[@(pk.lib)];
+                if (!rsm_map_get(&seen_pk, &pk) && n_pipes < RSM_MAX_PIPES) {
+                    rsm_map_put(&seen_pk, &pk, @YES);
+                    NSMutableArray *a = pipes[@(pk.lib)];
                     if (!a)
-                        wl->pipes[@(pk.lib)] = a = [NSMutableArray new];
+                        pipes[@(pk.lib)] = a = [NSMutableArray new];
                     [a addObject:[NSData dataWithBytes:&pk.k length:sizeof pk.k]];
-                    c->n_pipes_rec++;
+                    n_pipes++;
                 }
+            } else if (h.type == REC_RUN && h.len == 8) {
+                runs++;
+            } else if (h.type == REC_SEEN && h.len == 8) {
+                uint64_t hash;
+                memcpy(&hash, pl, 8);
+                if (byhash[@(hash)])
+                    last[@(hash)] = @(runs);
+                n_seen++;
             } else {
                 break;
             }
             off += sizeof h + h.len;
             good = off;
         }
+        rsm_map_free(&seen_pk);
         if (good < size) {
             rsm_log("cache: manifest damaged at byte %zu of %zu: dropping the rest", good, size);
             st.discarded++;
         }
     } else {
-        bad = size > 0;
-        if (bad) {
+        if (size > 0) {
             rsm_log("cache: manifest is from another format or damaged: starting a new one");
             st.discarded++;
         }
         good = 0;
     }
     free(data);
+    // Keep the libraries linked in the last RSM_KEEP_RUNS runs.
+    const char *ke = getenv("RS_METAL_CACHE_KEEP_RUNS");
+    int keep_runs = ke && atoi(ke) > 0 ? atoi(ke) : RSM_KEEP_RUNS;
+    NSMutableArray<RSMLibEntry *> *keep = [NSMutableArray new];
+    for (RSMLibEntry *e in libs)
+        if (runs - last[@(e->hash)].intValue < keep_runs)
+            [keep addObject:e];
+    // Rewrite without the others, or when the per-run marks outgrow the rest.
+    bool rewrite = good && (keep.count < libs.count || n_seen > 4 * (int)libs.count + 1024);
+    if (rewrite) {
+        rsm_log("cache: manifest: keeping %lu of %lu libraries (%d runs)", (unsigned long)keep.count,
+                (unsigned long)libs.count, runs);
+        uint8_t *buf = NULL;
+        size_t len = 0, cap = 0;
+        static const uint64_t zero = 0;
+        rsm_record(&buf, &len, &cap, REC_RUN, &zero, 8, NULL, 0);
+        for (RSMLibEntry *e in keep) {
+            const char *msl = e->msl.UTF8String;
+            rsm_record(&buf, &len, &cap, REC_LIB, &e->hash, 8, msl, strlen(msl));
+            for (NSData *kd in pipes[@(e->hash)]) {
+                pipe_key pk;
+                memset(&pk, 0, sizeof pk);
+                pk.lib = e->hash;
+                memcpy(&pk.k, kd.bytes, sizeof pk.k);
+                rsm_record(&buf, &len, &cap, REC_PIPE, &pk, sizeof pk, NULL, 0);
+            }
+        }
+        NSString *tmp = [path stringByAppendingFormat:@".tmp.%d", (int)getpid()];
+        int tfd = open(tmp.fileSystemRepresentation, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        bool ok = tfd >= 0 && rsm_write_all(tfd, &want, sizeof want) && rsm_write_all(tfd, buf, len);
+        if (tfd >= 0)
+            close(tfd);
+        free(buf);
+        if (ok && !rename(tmp.fileSystemRepresentation, fp)) {
+            close(fd);
+            fd = open(fp, O_RDWR);
+            good = sizeof want + len;
+            size = good;
+            if (fd < 0) {
+                c->manifest_fd = -1;
+                return;
+            }
+        } else {
+            unlink(tmp.fileSystemRepresentation);
+            keep = libs;  // could not rewrite: keep everything
+        }
+    }
+    for (RSMLibEntry *e in keep) {
+        [wl->libs addObject:e];
+        [c->recorded_libs addObject:@(e->hash)];
+        c->n_libs_rec++;
+        NSArray<NSData *> *a = pipes[@(e->hash)];
+        if (a)
+            wl->pipes[@(e->hash)] = (NSMutableArray *)a;
+        for (NSData *kd in a) {
+            pipe_key pk;
+            memset(&pk, 0, sizeof pk);
+            pk.lib = e->hash;
+            memcpy(&pk.k, kd.bytes, sizeof pk.k);
+            rsm_map_put(&c->recorded, &pk, @YES);
+            c->n_pipes_rec++;
+        }
+    }
     if (!good) {
         if (ftruncate(fd, 0) || !rsm_write_all(fd, &want, sizeof want)) {
             close(fd);
@@ -609,15 +714,18 @@ static void rsm_note_pipeline(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey 
 }
 
 // --- Once-only builds ------------------------------------------------------------------------
-// Under c->m: true = the caller builds (state set to 1); false = done (waited for if needed).
+// Library states (RSMLibEntry.state); pipeline slots and fragment variants use the first three.
+enum { RSM_NEW = 0, RSM_BUILDING = 1, RSM_DONE = 2, RSM_QUEUED = 3 };
+
+// Under c->m: true = the caller builds (state set to BUILDING); false = done (waited for if needed).
 static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *waited) {
-    if (*state == 0) {
-        *state = 1;
+    if (*state == RSM_NEW || *state == RSM_QUEUED) {
+        *state = RSM_BUILDING;
         return true;
     }
-    if (*state == 1) {
+    if (*state == RSM_BUILDING) {
         uint64_t t0 = render ? rsm_now_ns() : 0;
-        while (*state == 1)
+        while (*state == RSM_BUILDING)
             pthread_cond_wait(&c->cv, &c->m);
         if (render) {
             (*waited)++;
@@ -629,7 +737,7 @@ static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *w
 
 static void rsm_publish(RSMShaderCache *c, int *state) {
     pthread_mutex_lock(&c->m);
-    __atomic_store_n(state, 2, __ATOMIC_RELEASE);  // rsm_cache_fragment reads it without the lock
+    __atomic_store_n(state, RSM_DONE, __ATOMIC_RELEASE);  // rsm_cache_library_state reads it without the lock
     pthread_cond_broadcast(&c->cv);
     pthread_mutex_unlock(&c->m);
 }
@@ -650,11 +758,10 @@ static MTLCompileOptions *rsm_compile_options(void) {
 // (a compile that never returns leaves its source behind).
 static void rsm_dump_msl(RSMLibEntry *e) {
     static const char *dir;
-    static int init;
-    if (!init) {
-        init = 1;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
         dir = getenv("RS_MTL_DUMP_MSL");
-    }
+    });
     if (!dir)
         return;
     char path[1024];
@@ -666,17 +773,19 @@ static void rsm_dump_msl(RSMLibEntry *e) {
     }
 }
 
+// render: compiled for the game (on its thread or by the pool for a link); else warming.
 static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
     rsm_dump_msl(e);
     uint64_t t0 = rsm_now_ns();
     NSError *err = nil;
-    e->lib = [c->dev newLibraryWithSource:e->msl options:rsm_compile_options() error:&err];
-    if (e->lib) {
-        e->vs = [e->lib newFunctionWithName:@"rs_vs"];
+    id<MTLLibrary> lib = [c->dev newLibraryWithSource:e->msl options:rsm_compile_options() error:&err];
+    if (lib) {
+        e->vs = [lib newFunctionWithName:@"rs_vs"];
     } else {
         e->error = err.localizedDescription ?: @"unknown error";
         st.lib_failed++;
     }
+    e->lib = lib;
     uint64_t dt = rsm_now_ns() - t0;
     if (dt > 1000000000ull)
         rsm_log("slow library compile: %.1f s (%016llx)", dt / 1e9, (unsigned long long)e->hash);
@@ -689,9 +798,8 @@ static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
     }
 }
 
-// The entry for this MSL, built (by this thread or another) when it returns.
-static RSMLibEntry *rsm_library(RSMShaderCache *c, NSString *msl, bool record, bool render, RSMLibEntry *seed) {
-    pthread_mutex_lock(&c->m);
+// Under c->m: the entry for this MSL (created RSM_NEW if there is none).
+static RSMLibEntry *rsm_entry(RSMShaderCache *c, NSString *msl, RSMLibEntry *seed) {
     RSMLibEntry *e = c->libs[msl];
     if (!e) {
         e = seed ?: [RSMLibEntry new];
@@ -703,6 +811,13 @@ static RSMLibEntry *rsm_library(RSMShaderCache *c, NSString *msl, bool record, b
         rsm_map_init(&e->pipes, sizeof(rsm_pkey));
         c->libs[msl] = e;
     }
+    return e;
+}
+
+// The entry for this MSL, built (by this thread or another) when it returns.
+static RSMLibEntry *rsm_library(RSMShaderCache *c, NSString *msl, bool record, bool render, RSMLibEntry *seed) {
+    pthread_mutex_lock(&c->m);
+    RSMLibEntry *e = rsm_entry(c, msl, seed);
     e->record |= record;
     bool mine = rsm_claim(c, &e->state, render, &st.lib_waited);
     pthread_mutex_unlock(&c->m);
@@ -715,11 +830,226 @@ static RSMLibEntry *rsm_library(RSMShaderCache *c, NSString *msl, bool record, b
     return e;
 }
 
-RSMLibEntry *rsm_cache_library(RSMContext *ctx, const char *msl, bool record) {
-    RSMShaderCache *c = rsm_cache_for(ctx->dev);
+// Wait until e is built; if no worker has started it, build it on this thread.
+static void rsm_library_wait(RSMShaderCache *c, RSMLibEntry *e, bool render) {
+    if (__atomic_load_n(&e->state, __ATOMIC_ACQUIRE) == RSM_DONE)
+        return;
+    pthread_mutex_lock(&c->m);
+    bool mine = rsm_claim(c, &e->state, render, &st.lib_waited);
+    pthread_mutex_unlock(&c->m);
+    if (mine) {
+        if (render)
+            st.lib_stolen++;
+        rsm_build_library(c, e, render);
+        rsm_publish(c, &e->state);
+    }
+}
+
+static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey *k, bool render);
+
+// --- Compile pool ----------------------------------------------------------------------------
+// Up to g_pool_max worker threads (created on demand, never exit) take jobs from two FIFOs: the
+// game's links first, then warming. A job only builds its library if it is still RSM_QUEUED (a
+// waiting thread may have taken it, or the other FIFO's job for the same entry); a warming job
+// then prebuilds that library's pipelines from the manifest. Workers run link jobs at
+// user-initiated QoS and warming at utility (the compile itself runs in Metal's compiler
+// service, which inherits the requester's QoS).
+@interface RSMJob : NSObject {
+@public
+    RSMShaderCache *c;
+    RSMLibEntry *e;
+    NSArray<NSData *> *keys;  // warming: pipelines to prebuild
+    bool warm;
+}
+@end
+@implementation RSMJob
+@end
+
+static pthread_mutex_t g_pool_m = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_pool_cv = PTHREAD_COND_INITIALIZER;
+static NSMutableArray<RSMJob *> *g_jobs[2];  // [0] links, [1] warming
+static int g_pool_threads, g_pool_idle;
+
+static int rsm_pool_max(void) {
+    static int n = -1;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        const char *e = getenv("RS_MTL_COMPILE_THREADS");
+        if (e && *e) {
+            n = atoi(e);
+        } else {
+            int cpus = 0;
+            size_t len = sizeof cpus;
+            if (sysctlbyname("hw.activecpu", &cpus, &len, NULL, 0))
+                cpus = 4;
+            n = cpus - 2;  // the game's render and main threads keep a core each
+        }
+        n = n < 0 ? 0 : n > RSM_MAX_THREADS ? RSM_MAX_THREADS : n;
+        if (e && *e)
+            return;
+        n = n < 2 ? 2 : n;
+    });
+    return n;
+}
+
+static void rsm_run_job(RSMJob *j) {
+    RSMShaderCache *c = j->c;
+    RSMLibEntry *e = j->e;
+    if (!(j->warm && c->closing)) {
+        pthread_set_qos_class_self_np(j->warm ? QOS_CLASS_UTILITY : QOS_CLASS_USER_INITIATED, 0);
+        pthread_mutex_lock(&c->m);
+        bool mine = e->state == RSM_QUEUED || e->state == RSM_NEW;
+        if (mine)
+            e->state = RSM_BUILDING;
+        pthread_mutex_unlock(&c->m);
+        if (mine) {
+            if (!j->warm)
+                st.lib_async++;
+            rsm_build_library(c, e, !j->warm);
+            rsm_publish(c, &e->state);
+        }
+        for (NSData *kd in j->keys) {
+            if (c->closing)
+                break;
+            rsm_pipeline_for(c, e, kd.bytes, false);
+        }
+    }
+    if (j->warm)
+        dispatch_group_leave(c->warm);
+}
+
+static void *rsm_worker(void *arg) {
+    (void)arg;
+    pthread_setname_np("rs.metal.compile");
+    for (;;) {
+        RSMJob *j;
+        pthread_mutex_lock(&g_pool_m);
+        while (!g_jobs[0].count && !g_jobs[1].count) {
+            g_pool_idle++;
+            pthread_cond_wait(&g_pool_cv, &g_pool_m);
+            g_pool_idle--;
+        }
+        NSMutableArray *q = g_jobs[0].count ? g_jobs[0] : g_jobs[1];
+        j = q[0];
+        [q removeObjectAtIndex:0];
+        pthread_mutex_unlock(&g_pool_m);
+        @autoreleasepool {
+            rsm_run_job(j);
+            j = nil;
+        }
+    }
+    return NULL;
+}
+
+static void rsm_pool_push(NSArray<RSMJob *> *jobs, bool warm) {
+    if (!jobs.count)
+        return;
+    pthread_mutex_lock(&g_pool_m);
+    if (!g_jobs[0]) {
+        g_jobs[0] = [NSMutableArray new];
+        g_jobs[1] = [NSMutableArray new];
+    }
+    [g_jobs[warm] addObjectsFromArray:jobs];
+    int want = (int)(g_jobs[0].count + g_jobs[1].count);
+    int max = rsm_pool_max() ?: (g_jobs[1].count ? 2 : 0);  // 0: warming still runs in the background
+    while (g_pool_idle < want && g_pool_threads < max) {
+        pthread_attr_t attr;
+        pthread_attr_init(&attr);
+        pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_DETACHED);
+        pthread_attr_set_qos_class_np(&attr, QOS_CLASS_USER_INITIATED, 0);
+        pthread_t t;
+        int rc = pthread_create(&t, &attr, rsm_worker, NULL);
+        pthread_attr_destroy(&attr);
+        if (rc)
+            break;
+        g_pool_threads++;
+        want--;
+    }
+    pthread_cond_broadcast(&g_pool_cv);
+    pthread_mutex_unlock(&g_pool_m);
+}
+
+// At exit: queued jobs are dropped (running ones finish or are cut off by the exit).
+static void rsm_pool_drain(void) {
+    pthread_mutex_lock(&g_pool_m);
+    NSArray *warm = [g_jobs[1] copy];
+    [g_jobs[0] removeAllObjects];
+    [g_jobs[1] removeAllObjects];
+    pthread_mutex_unlock(&g_pool_m);
+    for (RSMJob *j in warm)
+        dispatch_group_leave(j->c->warm);
+}
+
+static NSString *rsm_msl_string(const char *msl) {
     NSString *s = [[NSString alloc] initWithUTF8String:msl]
                       ?: [[NSString alloc] initWithCString:msl encoding:NSISOLatin1StringEncoding];
-    return rsm_library(c, s, record, true, nil);
+    static NSString *salt, *fail;
+    static dispatch_once_t once;
+    dispatch_once(&once, ^{
+        const char *e = getenv("RS_MTL_SALT");
+        if (e && *e && !strpbrk(e, "\r\n"))
+            salt = [NSString stringWithFormat:@"\n// salt %s\n", e];
+        e = getenv("RS_MTL_TEST_FAIL");
+        if (e && *e)
+            fail = @(e);
+    });
+    if (salt)
+        s = [s stringByAppendingString:salt];
+    if (fail && [s containsString:fail])
+        s = [s stringByAppendingString:@"\n#error RS_MTL_TEST_FAIL\n"];
+    return s;
+}
+
+RSMLibEntry *rsm_cache_library(RSMContext *ctx, const char *msl, bool record) {
+    RSMShaderCache *c = rsm_cache_for(ctx->dev);
+    return rsm_library(c, rsm_msl_string(msl), record, true, nil);
+}
+
+RSMLibEntry *rsm_cache_library_async(RSMContext *ctx, const char *msl, bool record) {
+    RSMShaderCache *c = rsm_cache_for(ctx->dev);
+    NSString *s = rsm_msl_string(msl);
+    bool async = rsm_pool_max() > 0;
+    pthread_mutex_lock(&c->m);
+    RSMLibEntry *e = rsm_entry(c, s, nil);
+    e->record |= record;
+    // New, or queued for warming only: queue it as a link (ahead of warming).
+    bool push = async && (e->state == RSM_NEW || e->state == RSM_QUEUED) && !e->link_queued;
+    if (push) {
+        e->state = RSM_QUEUED;
+        e->link_queued = true;
+    } else if (async && e->state == RSM_DONE) {
+        st.lib_reused++;
+    }
+    bool seen = record && c->persist && ![c->linked_libs containsObject:@(e->hash)];
+    if (seen)
+        [c->linked_libs addObject:@(e->hash)];
+    pthread_mutex_unlock(&c->m);
+    if (seen) {
+        uint64_t h = e->hash;
+        dispatch_async(c->io, ^{
+            rsm_note_seen(c, h);
+        });
+    }
+    if (!async)
+        return rsm_library(c, s, record, true, nil);
+    if (push) {
+        RSMJob *j = [RSMJob new];
+        j->c = c;
+        j->e = e;
+        rsm_pool_push(@[ j ], false);
+    }
+    return e;
+}
+
+int rsm_cache_library_state(RSMLibEntry *e) {
+    if (__atomic_load_n(&e->state, __ATOMIC_ACQUIRE) != RSM_DONE)
+        return 0;
+    return e->lib ? 1 : -1;
+}
+
+bool rsm_cache_library_wait(RSMContext *ctx, RSMLibEntry *e) {
+    rsm_library_wait(rsm_cache_for(ctx->dev), e, true);
+    return e->lib != nil;
 }
 
 static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha) {
@@ -743,14 +1073,6 @@ static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha
         rsm_publish(c, &e->fs_state[alpha]);
     }
     return e->fs[alpha];
-}
-
-id<MTLFunction> rsm_cache_fragment(RSMLibEntry *e, int alpha) {
-    if (!e || !e->lib)
-        return nil;
-    if (alpha >= 0 && alpha <= 8 && __atomic_load_n(&e->fs_state[alpha], __ATOMIC_ACQUIRE) == 2)
-        return e->fs[alpha];
-    return rsm_fragment(rsm_cache_for(e->lib.device), e, alpha);
 }
 
 static id<MTLRenderPipelineState> rsm_build_pipeline(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey *k, bool render) {
@@ -808,7 +1130,10 @@ static id<MTLRenderPipelineState> rsm_build_pipeline(RSMShaderCache *c, RSMLibEn
 }
 
 static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey *k, bool render) {
-    if (!e || !e->lib)
+    if (!e)
+        return nil;
+    rsm_library_wait(c, e, render);
+    if (!e->lib)
         return nil;
     pthread_mutex_lock(&c->m);
     RSMPipeSlot *s = rsm_map_get(&e->pipes, k);
@@ -837,30 +1162,25 @@ static void rsm_warm_start(RSMShaderCache *c, warm_list *wl) {
         return;
     c->warm = dispatch_group_create();
     c->compacting = c->compact;
-    dispatch_queue_attr_t attr =
-        dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0);
-    dispatch_queue_t q[RSM_WARM_QUEUES];
-    for (int i = 0; i < RSM_WARM_QUEUES; i++)
-        q[i] = dispatch_queue_create("rs.metal.cache.warm", attr);
-    NSArray<RSMLibEntry *> *libs = wl->libs;
-    NSDictionary *pipes = wl->pipes;
-    // Libraries in first-use order, interleaved over the queues; each one's pipelines right after it.
-    for (NSUInteger i = 0; i < libs.count; i++) {
-        RSMLibEntry *seed = libs[i];
-        NSArray<NSData *> *keys = pipes[@(seed->hash)];
-        dispatch_group_async(c->warm, q[i % RSM_WARM_QUEUES], ^{
-            if (c->closing)
-                return;
-            @autoreleasepool {
-                RSMLibEntry *e = rsm_library(c, seed->msl, true, false, seed);
-                for (NSData *kd in keys) {
-                    if (c->closing)
-                        break;
-                    rsm_pipeline_for(c, e, kd.bytes, false);
-                }
-            }
-        });
+    // Libraries in first-use order, each one's pipelines right after it, on the compile pool
+    // behind the game's own links.
+    NSMutableArray<RSMJob *> *jobs = [NSMutableArray new];
+    pthread_mutex_lock(&c->m);
+    for (RSMLibEntry *seed in wl->libs) {
+        RSMLibEntry *e = rsm_entry(c, seed->msl, seed);
+        e->record = true;
+        if (e->state == RSM_NEW)
+            e->state = RSM_QUEUED;
+        RSMJob *j = [RSMJob new];
+        j->c = c;
+        j->e = e;
+        j->keys = wl->pipes[@(seed->hash)];
+        j->warm = true;
+        [jobs addObject:j];
+        dispatch_group_enter(c->warm);
     }
+    pthread_mutex_unlock(&c->m);
+    rsm_pool_push(jobs, true);
     // After the blocks above (a notify on an empty group would run at once).
     if (c->compact) {
         NSArray *old = [c->files copy];
@@ -877,11 +1197,11 @@ static void rsm_print_stats(const char *when) {
     if (!rsm_env_on("RS_METAL_CACHE_STATS"))
         return;
     fprintf(stderr,
-            "[rs-mtl] cache stats (%s): lib_compiled=%d lib_ms=%.1f lib_reused=%d lib_waited=%d lib_warmed=%d "
-            "lib_failed=%d pipe_built=%d pipe_ms=%.1f pipe_reused=%d pipe_waited=%d pipe_warmed=%d "
+            "[rs-mtl] cache stats (%s): lib_compiled=%d lib_ms=%.1f lib_async=%d lib_stolen=%d lib_reused=%d "
+            "lib_waited=%d lib_warmed=%d lib_failed=%d pipe_built=%d pipe_ms=%.1f pipe_reused=%d pipe_waited=%d pipe_warmed=%d "
             "archive_hits=%d archive_misses=%d wait_ms=%.1f warm_ms=%.1f archive_writes=%d write_ms=%.1f "
             "discarded=%d compacted=%d\n",
-            when, st.lib_compiled, st.lib_ns / 1e6, st.lib_reused, st.lib_waited, st.lib_warmed, st.lib_failed,
+            when, st.lib_compiled, st.lib_ns / 1e6, st.lib_async, st.lib_stolen, st.lib_reused, st.lib_waited, st.lib_warmed, st.lib_failed,
             st.pipe_built, st.pipe_ns / 1e6, st.pipe_reused, st.pipe_waited, st.pipe_warmed, st.pipe_hits,
             st.pipe_misses, st.wait_ns / 1e6, st.warm_ns / 1e6, st.serialized, st.serialize_ns / 1e6, st.discarded,
             st.compacted);
@@ -901,10 +1221,11 @@ static void rsm_cache_atexit(void) {
     pthread_mutex_lock(&g_caches_lock);
     NSArray *caches = [g_caches copy];
     pthread_mutex_unlock(&g_caches_lock);
-    for (RSMShaderCache *c in caches) {
+    for (RSMShaderCache *c in caches)
         c->closing = true;
+    rsm_pool_drain();
+    for (RSMShaderCache *c in caches)
         rsm_flush(c);
-    }
     rsm_print_stats("exit");
 }
 
@@ -922,15 +1243,15 @@ static void rsm_open_disk(RSMShaderCache *c, warm_list *wl) {
         rsm_log("cache: cannot create %s: %s", dir.fileSystemRepresentation, e.localizedDescription.UTF8String);
         return;
     }
-    rsm_clean_base(base, prefix);
-    // Leftovers of interrupted archive writes (".tmp.<pid>"), unless that process still runs: a
+    rsm_clean_base(base, dir.lastPathComponent);
+    // Leftovers of interrupted archive and manifest writes (".tmp.<pid>"), unless that process still runs: a
     // second game instance must not delete the first one's file while it is being written.
     DIR *d = opendir(dir.fileSystemRepresentation);
     if (d) {
         struct dirent *de;
         while ((de = readdir(d))) {
             const char *t = strstr(de->d_name, ".tmp");
-            if (strncmp(de->d_name, "archive-", 8) || !t)
+            if ((strncmp(de->d_name, "archive-", 8) && strncmp(de->d_name, "manifest.bin", 12)) || !t)
                 continue;
             int pid = t[4] == '.' ? atoi(t + 5) : 0;
             if (pid > 0 && pid != getpid() && (kill(pid, 0) == 0 || errno == EPERM))
@@ -945,6 +1266,7 @@ static void rsm_open_disk(RSMShaderCache *c, warm_list *wl) {
                                   dispatch_queue_attr_make_with_qos_class(DISPATCH_QUEUE_SERIAL, QOS_CLASS_UTILITY, 0));
     rsm_map_init(&c->recorded, sizeof(pipe_key));
     c->recorded_libs = [NSMutableSet new];
+    c->linked_libs = [NSMutableSet new];
     rsm_manifest_open(c, wl);
     rsm_archive_open(c);
     atexit(rsm_cache_atexit);

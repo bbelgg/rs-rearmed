@@ -49,8 +49,20 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
 - **Framebuffers**: attachments → `MTLRenderPassDescriptor`, rebuilt on change. Default framebuffer = the
   context's own colour + depth/stencil textures (drawable-sized). Depth+stencil formats →
   `Depth32Float_Stencil8`.
-- **Programs**: `glLinkProgram` hands vertex + fragment GLSL to `rsmsl_translate` (`src/msl/msl_xlat.h`),
-  compiles the MSL with `newLibraryWithSource:`, and keeps the reflection (attributes, uniforms, samplers).
+- **Programs**: `glLinkProgram` hands vertex + fragment GLSL to `rsmsl_translate` (`src/msl/msl_xlat.h`)
+  and keeps the reflection (attributes, uniforms, samplers), so status, locations and `glUniform*` work at
+  once; the MSL compile (`newLibraryWithSource:`, 0.1–0.5 s cold) goes to a compile pool (CPUs − 2 worker
+  threads, `RS_MTL_COMPILE_THREADS`; programs with the same MSL share one compile). The first draw with
+  the program waits for its library, or compiles it itself if no worker has started it. The link reports
+  success when the translation succeeded and the MSL is not already known to fail: the Cg shim (and
+  Scaleform) query `GL_LINK_STATUS` right after every link, so waiting there would serialise the compiles
+  again. A compile that fails later unlinks the program at its first draw or status query (logged with
+  the MSL, draws skipped, `LINK_STATUS` false and the compiler's message in the info log).
+  Libraries and pipelines are cached in memory per device and on disk (`mtl_cache.m`: an
+  `MTLBinaryArchive` plus a manifest of the libraries and pipelines used, warmed on the compile pool at
+  the next start behind the game's own links). The disk cache's key is the cache format, a
+  core-conventions constant, the OS build and the GPU, not the build of libRSOpenGL: libraries are keyed
+  by their MSL text, and ones the game has not linked for 8 runs leave the manifest.
   Uniforms live in CPU shadow blocks per stage, uploaded per draw with `setVertexBytes`/`setFragmentBytes`
   (or a ring buffer when over 4 KB).
 - **Pipelines**: key = program, vertex layout (formats, strides, step functions), colour/depth formats,

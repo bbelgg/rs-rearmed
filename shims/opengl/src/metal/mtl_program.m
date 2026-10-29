@@ -329,7 +329,7 @@ void rsmtl_glLinkProgram(GLuint program) {
         p->vs_block = p->fs_block = NULL;
         p->n_uniforms = p->n_locations = p->n_tex = 0;
         p->entry = nil;
-        p->vs = nil;
+        p->ready = false;
         rsm_map_free(&p->pipelines);
         p->linked = false;
         p->attrib_mask = 0;
@@ -356,22 +356,21 @@ void rsmtl_glLinkProgram(GLuint program) {
             free(err);
             return;
         }
-        // Libraries are shared by MSL (mtl_cache.m): programs with the same pair reuse it, and the
-        // disk cache may have built it already on its background queue.
-        RSMLibEntry *le = rsm_cache_library(ctx, r->msl, true);
-        if (!le->lib) {
-            p->log = [NSString stringWithFormat:@"MSL compile failed: %@", le->error];
-            rsm_log("%s\n--- MSL ---\n%s", p->log.UTF8String, r->msl);
+        // Libraries are shared by MSL (mtl_cache.m): programs with the same pair reuse it, and
+        // warming may have built it already. The compile itself runs on the compile pool: the
+        // link reports success when the translation succeeded and the MSL is not known to fail
+        // (the Cg shim and Scaleform ask for LINK_STATUS right after every link, so waiting there
+        // would serialise the compiles again; translated MSL compiles in practice). A compile
+        // that fails later unlinks the program at its first draw or status query
+        // (rsm_program_ready): logged, draws skipped, LINK_STATUS false from then on.
+        RSMLibEntry *le = rsm_cache_library_async(ctx, r->msl, true);
+        if (rsm_cache_library_state(le) < 0 || (rsm_cache_library_state(le) > 0 && !le->vs)) {
+            p->log = le->lib ? @"MSL has no rs_vs" : [NSString stringWithFormat:@"MSL compile failed: %@", le->error];
+            rsm_log("link: %s\n--- MSL ---\n%s", p->log.UTF8String, r->msl);
             rsmsl_free(r);
             return;
         }
         p->entry = le;
-        p->vs = le->vs;
-        if (!p->vs) {
-            p->log = @"MSL has no rs_vs";
-            rsmsl_free(r);
-            return;
-        }
         p->refl = r;
         for (int i = 0; i < r->n_attribs; i++)
             if (r->attribs[i].location >= 0 && r->attribs[i].location < RSM_MAX_ATTRIBS)
@@ -414,9 +413,22 @@ void rsmtl_glLinkProgram(GLuint program) {
     }
 }
 
-id<MTLFunction> rsm_fragment_variant(RSMContext *ctx, RSMProgram *p, int alpha) {
-    (void)ctx;
-    return rsm_cache_fragment(p->entry, alpha);
+bool rsm_program_ready(RSMContext *ctx, RSMProgram *p, bool wait) {
+    if (!p->linked || p->ready || !p->entry)
+        return p->linked;
+    int state = wait ? (rsm_cache_library_wait(ctx, p->entry) ? 1 : -1) : rsm_cache_library_state(p->entry);
+    if (state == 0)
+        return true;  // still compiling: linked as far as anyone can tell yet
+    RSMLibEntry *le = p->entry;
+    if (state > 0 && le->vs) {
+        p->ready = true;
+        return true;
+    }
+    p->linked = false;
+    p->log = le->lib ? @"MSL has no rs_vs" : [NSString stringWithFormat:@"MSL compile failed: %@", le->error];
+    rsm_log("program %u: %s (unlinked after the link reported success)\n--- MSL ---\n%s", p->name,
+            p->log.UTF8String, le->msl.UTF8String);
+    return false;
 }
 
 void rsmtl_glUseProgram(GLuint program) {
@@ -442,7 +454,9 @@ void rsmtl_glUseProgram(GLuint program) {
 
 void rsmtl_glValidateProgram(GLuint program) {
     RSM_CTX()
-    rsm_program(ctx, program);
+    RSMProgram *p = rsm_program(ctx, program);
+    if (p)
+        rsm_program_ready(ctx, p, false);
 }
 
 void rsmtl_glGetProgramiv(GLuint program, GLenum pname, GLint *params) {
@@ -450,6 +464,8 @@ void rsmtl_glGetProgramiv(GLuint program, GLenum pname, GLint *params) {
     RSMProgram *p = rsm_program(ctx, program);
     if (!p)
         return;
+    if (pname == GL_LINK_STATUS || pname == GL_VALIDATE_STATUS || pname == GL_INFO_LOG_LENGTH)
+        rsm_program_ready(ctx, p, false);  // a compile that failed by now shows
     switch (pname) {
     case GL_LINK_STATUS: *params = p->linked; break;
     case GL_VALIDATE_STATUS: *params = p->linked; break;
@@ -485,8 +501,10 @@ void rsmtl_glGetProgramiv(GLuint program, GLenum pname, GLint *params) {
 void rsmtl_glGetProgramInfoLog(GLuint program, GLsizei bufSize, GLsizei *length, GLchar *infoLog) {
     RSM_CTX()
     RSMProgram *p = rsm_program(ctx, program);
-    if (p)
+    if (p) {
+        rsm_program_ready(ctx, p, false);
         rsm_copy_log(p->log.UTF8String, bufSize, length, infoLog);
+    }
 }
 
 // No program binary formats (GL_NUM_PROGRAM_BINARY_FORMATS = 0): the game then

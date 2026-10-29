@@ -227,8 +227,10 @@ typedef struct {
     GLuint name;           // a deleted program keeps its name while current
     NSString *log;
     uint64_t uid;          // unique per link: pipeline keys and "program changed"
-    RSMLibEntry *entry;    // compiled MSL, shared by every program with the same MSL (mtl_cache.m)
-    id<MTLFunction> vs;
+    // The MSL's library, shared by every program with the same MSL (mtl_cache.m). Linking only
+    // queues its compile; the first draw waits for it (rsm_program_ready).
+    RSMLibEntry *entry;
+    bool ready;            // entry compiled and usable (checked once)
     rsmsl_program *refl;
     // Active attributes: name -> location (glGetAttribLocation) and the mask.
     uint32_t attrib_mask;
@@ -445,7 +447,9 @@ void rsm_pack_pixels(RSMContext *ctx, const void *src, MTLPixelFormat sfmt, int 
                      GLenum format, GLenum type, void *dst);
 
 // Programs (mtl_program.m).
-id<MTLFunction> rsm_fragment_variant(RSMContext *ctx, RSMProgram *p, int alpha);
+// Wait for the program's library (wait = false: only look). false: the compile failed and the
+// program is now unlinked (logged, LINK_STATUS false from here on).
+bool rsm_program_ready(RSMContext *ctx, RSMProgram *p, bool wait);
 
 // Shader and pipeline cache (mtl_cache.m): one per device, shared by its contexts. Libraries are
 // keyed by their MSL, pipelines by (library, rsm_pkey); on disk an MTLBinaryArchive plus a
@@ -458,7 +462,8 @@ id<MTLFunction> rsm_fragment_variant(RSMContext *ctx, RSMProgram *p, int alpha);
     id<MTLFunction> vs;           // rs_vs, when present
     id<MTLFunction> fs[9];        // rs_fs per alpha-test variant (GL func - GL_NEVER, 8 = off)
     NSString *error;
-    int state;                    // 0 new, 1 being built, 2 done
+    int state;                    // 0 new, 1 being built, 2 done, 3 queued on the compile pool
+    bool link_queued;             // a link job for it is on the pool
     int fs_state[9];
     rsm_map pipes;                // rsm_pkey -> RSMPipeSlot
     bool record;                  // the game's program: goes into the manifest
@@ -467,7 +472,11 @@ id<MTLFunction> rsm_fragment_variant(RSMContext *ctx, RSMProgram *p, int alpha);
 // Compile (or find) the library for this MSL. Never nil; ->lib is nil on failure.
 // record: list it in the manifest (game programs; not the core's internal shaders).
 RSMLibEntry *rsm_cache_library(RSMContext *ctx, const char *msl, bool record);
-id<MTLFunction> rsm_cache_fragment(RSMLibEntry *e, int alpha);
+// The same without waiting: the compile is queued on the compile pool (RS_MTL_COMPILE_THREADS=0:
+// compiled here). Read ->lib/->vs/->error only after rsm_cache_library_state != 0 or _wait.
+RSMLibEntry *rsm_cache_library_async(RSMContext *ctx, const char *msl, bool record);
+int rsm_cache_library_state(RSMLibEntry *e);  // 0 pending, 1 compiled, -1 failed (no waiting)
+bool rsm_cache_library_wait(RSMContext *ctx, RSMLibEntry *e);  // compiled (builds it here if queued)
 id<MTLRenderPipelineState> rsm_cache_pipeline(RSMContext *ctx, RSMLibEntry *e, const rsm_pkey *k);
 void rsm_cache_context_created(RSMContext *ctx);    // first one: open the disk cache, start warming
 void rsm_cache_context_destroyed(RSMContext *ctx);  // last one: write the archive

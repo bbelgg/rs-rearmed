@@ -399,8 +399,16 @@ static void rsm_manifest_open(RSMShaderCache *c, warm_list *wl) {
     if (!fstat(fd, &sb) && sb.st_size > 0 && (uint64_t)sb.st_size <= RSM_MAX_MANIFEST) {
         size = (size_t)sb.st_size;
         data = malloc(size);
-        if (pread(fd, data, size, 0) != (ssize_t)size)
-            size = 0;
+        ssize_t n = pread(fd, data, size, 0);
+        if (n < 0) {
+            // Unreadable now: run without the manifest rather than truncate it (rewritten below when empty).
+            rsm_log("cache: cannot read %s: %s", fp, strerror(errno));
+            free(data);
+            close(fd);
+            c->manifest_fd = -1;
+            return;
+        }
+        size = (size_t)n;  // a short read (another process truncating it): what was read
     }
     manifest_header want;
     memcpy(want.magic, kManifestMagic, 8);
@@ -750,10 +758,6 @@ enum { RSM_NEW = 0, RSM_BUILDING = 1, RSM_DONE = 2, RSM_QUEUED = 3 };
 
 // Under c->m: true = the caller builds (state set to BUILDING); false = done (waited for if needed).
 static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *waited) {
-    if (*state == RSM_NEW || *state == RSM_QUEUED) {
-        *state = RSM_BUILDING;
-        return true;
-    }
     if (*state == RSM_BUILDING) {
         uint64_t t0 = render ? rsm_now_ns() : 0;
         while (*state == RSM_BUILDING)
@@ -763,14 +767,27 @@ static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *w
             st.wait_ns += rsm_now_ns() - t0;
         }
     }
+    // NEW again after the wait: a warming compile failed and left it to be retried (rsm_publish_lib).
+    if (*state == RSM_NEW || *state == RSM_QUEUED) {
+        *state = RSM_BUILDING;
+        return true;
+    }
     return false;
 }
 
-static void rsm_publish(RSMShaderCache *c, int *state) {
+static void rsm_publish_state(RSMShaderCache *c, int *state, int to) {
     pthread_mutex_lock(&c->m);
-    __atomic_store_n(state, RSM_DONE, __ATOMIC_RELEASE);  // rsm_cache_library_state reads it without the lock
+    __atomic_store_n(state, to, __ATOMIC_RELEASE);  // rsm_cache_library_state reads it without the lock
     pthread_cond_broadcast(&c->cv);
     pthread_mutex_unlock(&c->m);
+}
+
+static void rsm_publish(RSMShaderCache *c, int *state) { rsm_publish_state(c, state, RSM_DONE); }
+
+// A library that failed to compile while warming stays NEW, so the game's own use compiles it again: a
+// failure there may be the compiler service's (busy with the warm-up's parallel compiles), not the MSL's.
+static void rsm_publish_lib(RSMShaderCache *c, RSMLibEntry *e, bool render) {
+    rsm_publish_state(c, &e->state, e->lib || render ? RSM_DONE : RSM_NEW);
 }
 
 static RSMShaderCache *rsm_cache_for(id<MTLDevice> dev);
@@ -830,6 +847,7 @@ static void rsm_build_library(RSMShaderCache *c, RSMLibEntry *e, bool render) {
     id<MTLLibrary> lib = rsm_compile(c, e->msl, &err);
     if (lib) {
         e->vs = [lib newFunctionWithName:@"rs_vs"];
+        e->error = nil;
     } else {
         e->error = err.localizedDescription ?: @"unknown error";
         st.lib_failed++;
@@ -872,7 +890,7 @@ static RSMLibEntry *rsm_library(RSMShaderCache *c, NSString *msl, bool record, b
     pthread_mutex_unlock(&c->m);
     if (mine) {
         rsm_build_library(c, e, render);
-        rsm_publish(c, &e->state);
+        rsm_publish_lib(c, e, render);
     } else if (render) {
         st.lib_reused++;
     }
@@ -890,7 +908,7 @@ static void rsm_library_wait(RSMShaderCache *c, RSMLibEntry *e, bool render) {
         if (render)
             st.lib_stolen++;
         rsm_build_library(c, e, render);
-        rsm_publish(c, &e->state);
+        rsm_publish_lib(c, e, render);
     }
 }
 
@@ -1011,7 +1029,7 @@ static void rsm_run_job(RSMJob *j) {
             if (!j->warm)
                 st.lib_async++;
             rsm_build_library(c, e, !j->warm);
-            rsm_publish(c, &e->state);
+            rsm_publish_lib(c, e, !j->warm);
         }
         for (NSData *kd in j->keys) {
             if (c->closing)
@@ -1271,8 +1289,9 @@ static id<MTLRenderPipelineState> rsm_build_pipeline(RSMShaderCache *c, RSMLibEn
         return nil;
     }
     if (c->persist) {
-        // Compaction: warming copies hits into the fresh archive too (cheap: the code is at hand).
-        MTLRenderPipelineDescriptor *add = miss || (c->compacting && !render) ? d : nil;
+        // Compaction: hits go into the fresh archive too (cheap: the code is at hand), the game's own
+        // as well, since warming then finds their slots done and the old files are deleted.
+        MTLRenderPipelineDescriptor *add = miss || c->compacting ? d : nil;
         rsm_pkey kk = *k;
         dispatch_async(c->io, ^{
             rsm_note_pipeline(c, e, &kk, add);

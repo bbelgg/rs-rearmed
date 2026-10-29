@@ -351,6 +351,7 @@ static void rsm_clear_quad(RSMContext *ctx, unsigned mask) {
     ctx->cur_pipeline = nil;
     ctx->cur_pkey_valid = false;
     ctx->cur_ds = nil;
+    ctx->cur_prog_uid = 0;  // buffer(0) of both stages gets the clear's color and depth below
     if (ctx->skip_raster)
         return;
     struct {
@@ -735,7 +736,8 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
                 continue;
             const rsm_attrib *a = &ctx->vao->a[i];
             MTLVertexFormat f = a->enabled ? rsm_vertex_format(a->size, a->type, a->normalized) : MTLVertexFormatInvalid;
-            if (!a->enabled || f == MTLVertexFormatInvalid) {
+            // A buffer with no storage yet (no glBufferData) reads as the constant, like the binding below.
+            if (!a->enabled || f == MTLVertexFormatInvalid || (a->bo && !a->bo->mtl)) {
                 k.vl.fmt[i] = MTLVertexFormatFloat4;
                 k.vl.step[i] = RSM_STEP_CONSTANT;
                 k.vl.stride[i] = 16;
@@ -775,8 +777,12 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             ctx->cur_pkey_valid = true;
             ctx->dirty |= RSM_DIRTY_ALPHA_REF;
         }
-        if (!rsm_apply_dynamic(ctx))
+        if (!rsm_apply_dynamic(ctx)) {
+            // Skipped (empty scissor): the pipeline is p's but the uniforms are still cur_prog_uid's,
+            // so the next draw must not take the pipeline as current.
+            ctx->cur_pkey_valid = false;
             return;
+        }
 
         // Vertex buffers.
         for (int i = 0; i < RSM_MAX_ATTRIBS; i++) {

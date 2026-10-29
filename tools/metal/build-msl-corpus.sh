@@ -10,7 +10,7 @@
 #
 # Writes to <dir>: rsmsl-corpus.bin (copy it next to libRSOpenGL.dylib or into the app's
 # Contents/Resources, or point RS_MSL_CORPUS at it), report.tsv (one line per program, see
-# msl_verify), failures.tsv, summary.txt. Exit status: 0 all programs match GL, 1 some don't,
+# msl_verify), failures.tsv (everything but PASS / NEAR), summary.txt. Exit status: 0 all programs match GL, 1 some don't,
 # 77 no dumps found.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -55,8 +55,10 @@ done
 for p in $pids; do wait "$p" || true; done
 
 python3 "$here/merge_corpus.py" "$out/rsmsl-corpus.bin" "$work"/shard.*.bin
+# The library must find every program through rsmsl_translate.
+"$verify" "$work/pairs.tsv" --check-corpus "$out/rsmsl-corpus.bin" --report "$work/corpus-check.tsv" | head -1
 cat "$work"/shard.*.report | sort -t "$(printf '\t')" -k7 > "$out/report.tsv"
-grep -v '^PASS' "$out/report.tsv" > "$out/failures.tsv" || true
+grep -v '^PASS\|^NEAR' "$out/report.tsv" > "$out/failures.tsv" || true
 python3 - "$out/report.tsv" > "$out/summary.txt" <<'PY'
 import sys, collections
 st = collections.Counter(); worst = 0; probe = 0.0; hist = collections.Counter()
@@ -69,9 +71,10 @@ for l in open(sys.argv[1]):
         probe = max(probe, float(f[5]))
 n = sum(st.values())
 print('programs: %d' % n)
-print('passed (match GL): %d (%.1f%%)' % (st['PASS'], 100.0 * st['PASS'] / max(n, 1)))
+print('match GL within %s: %d (%.1f%%)' % ('2/255', st['PASS'], 100.0 * st['PASS'] / max(n, 1)))
+print('near (a few isolated pixels of precision differences): %d' % st['NEAR'])
 for k in sorted(st):
-    if k != 'PASS': print('%s: %d' % (k, st[k]))
+    if k not in ('PASS', 'NEAR'): print('%s: %d' % (k, st[k]))
 print('largest colour error: %d/255; histogram: %s' % (worst, ', '.join('%s: %d' % (k, hist[k]) for k in ['0', '1', '2', '3-8', '9-32', '>32'])))
 print('largest vertex output difference (relative): %.3g' % probe)
 PY

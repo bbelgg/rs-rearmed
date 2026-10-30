@@ -9,8 +9,9 @@
 //   * the output device's I/O buffer, which the game never sets (the system default, 512 frames).
 // This module sets the output device's buffer (RS_AUDIO_FRAMES, default 256; never above half the ring,
 // see audio_out.c), runs the LEngine thread as a real-time thread in the output device's
-// audio workgroup (RS_AUDIO_RT), keeps the input queue from holding stale audio (RS_AUDIO_INPUT_TRIM), and lists
-// input devices first so an interface past the 10th device still shows up (RS_AUDIO_INPUTS_FIRST).
+// audio workgroup (RS_AUDIO_RT), keeps the input queue from holding stale audio (RS_AUDIO_INPUT_TRIM), lists
+// input devices first so an interface past the 10th device still shows up (RS_AUDIO_INPUTS_FIRST), and gives
+// each device one UID string so the device scan doesn't skip an interface as failed (RS_AUDIO_STABLE_UIDS).
 // LatencyBuffer is also the audio engine setting in the game's Audio settings (Get/SetAudioLatency,
 // 0x100093040/0x100093560), which the game saves to Rocksmith.ini; Wwise reads it at start-up only. At 1 the
 // engine runs with 2 and only the sink's ring with 1 (audio_ring.c).

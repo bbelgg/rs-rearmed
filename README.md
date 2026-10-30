@@ -64,7 +64,7 @@ These are compiled into the app. Where a switch exists, it is an environment var
 | **"Re-ARMed" title logo**: a tag over the title-screen logo, built automatically from your own `static.psarc` by `tools/loadscreen` | on | `RS_REARMED=0` shows the original logo; or delete `static.psarc.rearmed` |
 | **Frame rate**: the game renders at the display's refresh rate (a 75 Hz or 120 Hz display gets 75 or 120 fps; the game keeps song time at any rate). A fixed rate can be set instead, with vsync off: higher to test, or lower (e.g. 30) to save power | display | `RS_FPS=N` |
 | **Lower guitar latency**: the output device runs with a 256-frame buffer instead of the system's 512 (at most half the game's own buffer, `LatencyBuffer` x 256 frames, so 128 at `LatencyBuffer=1`; see the FAQ); the game's audio thread runs as a real-time thread in the output device's audio workgroup; stale guitar audio queued from the cable is dropped instead of played late | on | `RS_AUDIO_FRAMES=N` sets the output buffer (e.g. 128; 0 leaves the system's), `RS_LATENCY_BUFFER=N` the game's (1-16). `RS_AUDIO_RT=0` and `RS_AUDIO_INPUT_TRIM=0` turn off the other two. `RS_AUDIO_LOG=1` logs the audio setup |
-| **All guitar interfaces listed**: Direct Connect offers input devices first, so an interface still shows up on a Mac with more than 10 audio devices (the game only looks at the first 10, outputs included) | on | `RS_AUDIO_INPUTS_FIRST=0` turns it off |
+| **All guitar interfaces listed**: Direct Connect offers input devices first, so an interface still shows up on a Mac with more than 10 audio devices (the game only looks at the first 10, outputs included); and an interface is no longer skipped after another device fails to open (such as a webcam that can't run at 48 kHz), which the original game does now and then | on | `RS_AUDIO_INPUTS_FIRST=0` and `RS_AUDIO_STABLE_UIDS=0` turn them off |
 | **Renderer**: Metal, or Apple's OpenGL (see [Renderer](#renderer-metal-or-opengl)) | Metal | the `renderer` file, the installer, or `RS_GL_BACKEND=gl` |
 | **Retina** (Metal only): the game renders at the screen's full resolution on a Retina screen | off | `RS_METAL_RETINA=1` |
 | **Multithreaded GL engine** (OpenGL only): Apple's driver does its work on a thread of its own. Measured: the frame thread 4% shorter, total CPU 2% higher | off | `RS_GL_MTENGINE=1` |
@@ -214,17 +214,18 @@ logo, also delete `static.psarc.rearmed` from your game folder.
 No. A built app contains the game's code, recompiled from your copy, so it can't be shared. Build it
 yourself from your own copy, with the installer or by hand.
 
-**How do I lower the delay between playing and hearing the guitar?**
-Three things add most of it. Your Mac's built-in speakers process the sound for about 20 ms: headphones or
-a USB audio interface avoid that. The game's own output buffer is `LatencyBuffer`, in steps of 256
-frames (5.3 ms): 1 is the lowest, 2 a safe value, 4 the game's default. It is the audio engine setting
-in the game's Audio settings, and the launcher keeps what you choose there; `launchctl setenv
-RS_LATENCY_BUFFER 1` overrides it. The output device's buffer is `RS_AUDIO_FRAMES` (default 256, and 128 at
-`LatencyBuffer` 1, which is why 1 does not crackle here as it does under Rosetta). At 1 only the game's
-output buffer is that small; the rest of its audio engine runs as at 2 (`RS_AUDIO_RING_SPLIT=0` turns that
-off). If the sound crackles, raise one of them
-again. Both are read when the game starts, so a change in the game takes effect on the
-next start.
+**How do I get the lowest delay between playing and hearing the guitar?**
+1. In the game's Audio settings, set the audio engine setting to 1, then quit and start the game again (it
+   is read at start-up). 1 is the lowest; if the sound crackles, use 2. The game's default is 4.
+2. Listen through headphones or a USB audio interface, not your Mac's built-in speakers, which process the
+   sound for about 20 ms.
+
+The audio engine setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer, in steps of 256
+frames (5.3 ms). The launcher keeps what you choose in the game; `launchctl setenv RS_LATENCY_BUFFER 1`
+overrides it. The output device's buffer is `RS_AUDIO_FRAMES` (default 256, and 128 at `LatencyBuffer` 1,
+which is why 1 does not crackle here as it does under Rosetta). At 1 only the game's output buffer is that
+small; the rest of its audio engine runs as at 2 (`RS_AUDIO_RING_SPLIT=0` turns that off). Both are read
+when the game starts.
 
 **Where do I report bugs?**
 In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check that the bug doesn't also happen in the original game

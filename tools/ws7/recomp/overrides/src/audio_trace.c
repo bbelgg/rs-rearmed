@@ -1,12 +1,14 @@
 // Override module `audio`, input-device trace (src/audio.h): why a device is missing from Direct Connect.
 //
-// SoundInput's open (0x10133bee0, a hook point: (this, slot) -> bool) takes entry `slot` of the device list
-// and drops it on the first of a dozen checks: input stream configuration, buffer-size range, a 128-frame
-// buffer, the switch to 48 kHz (polled up to 50 s), stream and physical format (linear PCM), the I/O proc and
-// the start. Only devices it opens are listed under Direct Connect. With RS_AUDIO_LOG=1 this logs each slot's
-// device and result, and for a failed open the CoreAudio property calls it made (the import thunks send the
-// game's AudioObjectGetPropertyData/GetPropertyDataSize/SetPropertyData calls here); a slot is logged again
-// only when its device or result changes (the game retries closed slots on every hot-plug check).
+// The device scan (0x10133ccb0) skips some devices (see audio_devs.c) and opens the others in a free slot.
+// SoundInput's open (0x10133bee0, a hook point: (this, entry) -> bool) takes `entry` of the device list and
+// drops it on the first of a dozen checks: input stream configuration, buffer-size range, a 128-frame buffer,
+// the switch to 48 kHz (polled up to 50 s), stream and physical format (linear PCM), the I/O proc and the
+// start. Only devices it opens are listed under Direct Connect. With RS_AUDIO_LOG=1 this logs each device it
+// tries and the result, and for a failed open the CoreAudio property calls it made (the import thunks send
+// the game's AudioObjectGetPropertyData/GetPropertyDataSize/SetPropertyData calls here); an entry is logged
+// again only when its device or result changes (the game scans the devices again on hot-plug). A device the
+// scan skips is not logged.
 #include <CoreAudio/CoreAudio.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -18,7 +20,7 @@
 #define SI_OPEN 0x10133bee0ull  // SoundInput slot open (this, slot) -> bool
 #define SI_STATE 0x228          // u32: 2 = closed, to be opened
 #define SI_DEV 0x30             // u8 selected, u32 AudioObjectID at +4 (0x10133ab30)
-#define SLOTS 10
+#define ENTRIES 64             // device list entries traced
 
 static _Thread_local struct {
   int active;
@@ -31,7 +33,7 @@ static _Thread_local struct {
 static struct {
   uint32_t dev;
   int result;  // -1: not logged yet
-} g_slot[SLOTS] = {[0 ... SLOTS - 1] = {0, -1}};
+} g_entry[ENTRIES] = {[0 ... ENTRIES - 1] = {0, -1}};
 
 static void fourcc(uint32_t v, char out[5]) {
   for (int i = 0; i < 4; i++) {
@@ -74,7 +76,7 @@ static void trace(char op, uint32_t obj, const AudioObjectPropertyAddress *a, OS
     step("=%u buf:", l->mNumberBuffers);
     for (uint32_t i = 0; i < l->mNumberBuffers && 8 + 16 * (i + 1) <= size && i < 4; i++)
       step(" %uch", l->mBuffers[i].mNumberChannels);
-  } else if (size == sizeof(AudioStreamBasicDescription)) {
+  } else if (size == sizeof(AudioStreamBasicDescription) && a->mSelector != kAudioHardwarePropertyDevices) {
     const AudioStreamBasicDescription *f = data;
     char fm[5];
     fourcc(f->mFormatID, fm);
@@ -109,7 +111,7 @@ static int before_open(rc_ctx *c, void *user) {
   OV_ARGS(a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint32_t slot = (uint32_t)OV_U64(a);
-  t_open.active = self && slot < SLOTS && *(uint32_t *)(self + SI_STATE) == 2;
+  t_open.active = self && slot < ENTRIES && *(uint32_t *)(self + SI_STATE) == 2;
   t_open.self = self;
   t_open.slot = slot;
   t_open.len = 0;
@@ -125,16 +127,17 @@ static void after_open(rc_ctx *c, void *user) {
   uint8_t *self = t_open.self;
   uint32_t dev = self[SI_DEV] ? *(uint32_t *)(self + SI_DEV + 4) : 0;
   uint32_t slot = t_open.slot;
-  if (g_slot[slot].dev == dev && g_slot[slot].result == ok) return;
-  g_slot[slot].dev = dev;
-  g_slot[slot].result = ok;
+  if (g_entry[slot].dev == dev && g_entry[slot].result == ok) return;
+  g_entry[slot].dev = dev;
+  g_entry[slot].result = ok;
   char name[128];
   device_name(dev, name, sizeof name);
   if (ok)
-    rs_audio_log("input slot %u: device %u \"%s\" opened, %u channel(s)", slot, dev, name,
+    rs_audio_log("input device %u \"%s\" (list entry %u) opened, %u channel(s)", dev, name, slot,
                  *(uint32_t *)(self + 0x20));
   else
-    rs_audio_log("input slot %u: device %u \"%s\" not opened; its calls:%s", slot, dev, name, t_open.steps);
+    rs_audio_log("input device %u \"%s\" (list entry %u) not opened; its calls:%s", dev, name, slot,
+                 t_open.steps);
 }
 
 __attribute__((constructor)) static void trace_init(void) {

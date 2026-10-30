@@ -121,14 +121,14 @@ From 1.2.0 the game loads every `.dylib` in `~/Library/Application Support/RS Re
 mods can change how it works without a rebuild. A reinstall keeps that folder. The build gives them **hook
 points**, game functions they can run code before and after (`tools/ws7/recomp/overrides/hooks.skip`,
 `tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports its runtime to them.
-[rearmed-mods](https://github.com/glebb/rearmed-mods) uses this to bring many [RSMods](https://github.com/Lovrom8/RSMods)
-features to RS Re-ARMed.
 
 `RS_LOAD_MODS=0` starts the game without them; `RS_MODS_PATH` loads another folder or a single library.
 
-### Works with your mods
+### Legacy mods
 
-- A modified `cache.psarc` in your install (for example a fast-load mod) is used as-is.
+Legacy mods, the ones made for the original game that change its files, might work as before. Verified:
+
+- A modified `cache.psarc` in your install (for example the fast-load mod) is used as-is.
 - Custom songs (CDLC) in your install are used as-is, with the RSBypass behaviour above.
 
 ## How to Install
@@ -156,15 +156,16 @@ Then start **RS Re-ARMed** from `~/Applications` (double-click, Launchpad or Spo
 - Progress made in the native build is kept separately and is not copied back to your Steam saves
   automatically.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.
-- With a fast-load `cache.psarc` mod, a start can now and then stay on the white loading screen,
-  more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares its shaders
-  before the game loads when it sees such a mod, which avoids the stall it would otherwise cause.
+- With the legacy fast-load mod (a modified `cache.psarc`), a start can now and then stay on the white
+  loading screen, more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares
+  its shaders before the game loads when it sees such a mod, which avoids the stall it would otherwise
+  cause.
 - With Metal, the first time a song, venue or mode is played, a few short stutters (up
   to about half a second) can show in its first half-minute while Metal compiles what it draws for the
   first time. It keeps the result, so later plays are smooth.
-- Mods that draw on the screen with OpenGL themselves, such as rearmed-mods 0.1.0 (its song timer,
-  accuracy and other on-screen text), show nothing with Metal; the rest of the mod works. Use a version
-  that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL renderer.
+- Mods that draw on the screen with OpenGL themselves show nothing with Metal; the rest of the mod
+  works. Use a version that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL
+  renderer.
 
 ## Under Investigation
 

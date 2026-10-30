@@ -215,7 +215,7 @@ runs the installed game once with `--warm-shaders`, which opens no window and st
 game, and compiles the shader corpus and the shaders of earlier runs into the caches the game reads,
 showing `Preparing shaders… N of M`. That takes a few minutes the first time (about 4.5 minutes for
 3880 shaders on an M2); on later installs it compiles only what changed, usually in a second or so. Without it the first start with Metal does the same behind a black window with
-the same message (and with a fast-load `cache.psarc` it would otherwise hang on the loading screen).
+the same message (and with the legacy fast-load mod, a modified `cache.psarc`, it would otherwise hang on the loading screen).
 Metal keeps compiled shaders per app and per install location, so only the installed game itself can do
 this, and moving the install means preparing again. `RS_WARM_SHADERS=0` skips the step; run
 `tools/play-native/warm-shaders.sh` later to do it then.

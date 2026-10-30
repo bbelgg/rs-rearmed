@@ -1,7 +1,7 @@
 # Hook points (gen_image.py --skip, `ADDR wrap`): the function is translated as W_ADDR and F_ADDR runs the
 # hooks registered at run time around it (runtime/rc_hook.h), by the mods the game loads from the mods folder
-# (app/rc_main.c), e.g. rearmed-mods (github.com/glebb/rearmed-mods). A point without hooks costs one call. Add
-# points here; removing one breaks a mod that hooks it (and needs a new release).
+# (app/rc_main.c). A point without hooks costs one call. Add points here; removing one breaks a mod that
+# hooks it (and needs a new release).
 10017a020 wrap  # game_frame          GameFrame() -> bool quit: once per frame on the game thread
 100ba1190 wrap  # input_sink          (int code, int a, int b): input events, code 0/1 = key down/up, a = key code
 100ab2c60 wrap  # ak_post_event_name  AK::SoundEngine::PostEvent(const char *, ...)

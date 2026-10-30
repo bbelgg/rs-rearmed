@@ -1,4 +1,4 @@
-// Override module `audio`: lower guitar-to-sound latency (audio_out.c, audio_in.c, audio_devs.c).
+// Override module `audio`: lower guitar-to-sound latency (audio_out.c, audio_in.c, audio_devs.c, audio_ring.c).
 //
 // The guitar reaches the speakers through three buffers the game sets up (Wwise 2013-era integration):
 //   * the cable's I/O buffer (128 frames) and a 5-slot queue of such buffers that the Wwise thread drains
@@ -11,7 +11,8 @@
 // audio workgroup (RS_AUDIO_RT), keeps the input queue from holding stale audio (RS_AUDIO_INPUT_TRIM), and lists
 // input devices first so an interface past the 10th device still shows up (RS_AUDIO_INPUTS_FIRST).
 // LatencyBuffer is also the audio engine setting in the game's Audio settings (Get/SetAudioLatency,
-// 0x100093040/0x100093560), which the game saves to Rocksmith.ini; Wwise reads it at start-up only.
+// 0x100093040/0x100093560), which the game saves to Rocksmith.ini; Wwise reads it at start-up only. At 1 the
+// engine runs with 2 and only the sink's ring with 1, which keeps Direct Connect working (audio_ring.c).
 // RS_AUDIO_LOG=1 logs what it does to stderr (logs/last-run.log).
 #ifndef RS_AUDIO_H
 #define RS_AUDIO_H
@@ -38,6 +39,9 @@ void rs_audio_output_device(uint32_t device);
 // (kAudioHardwarePropertyDevices) in place of the call: the same call, input devices first (audio_devs.c).
 int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t *size, void *data);
+
+// The sink's ring in refills of 256 frames: LatencyBuffer, also when the engine runs with more (audio_ring.c).
+uint32_t rs_audio_ring_refills(void);
 
 int rs_audio_log_on(void);
 void rs_audio_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));

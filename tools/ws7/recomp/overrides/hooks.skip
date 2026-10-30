@@ -11,3 +11,4 @@
 1002ddd70 wrap  # rr_speed_ratio      float (float slider percent): Riff Repeater slider -> song speed ratio
 100ab1b20 wrap  # ak_set_rtpc_name    AK::SoundEngine::SetRTPCValue(const char *, float, unsigned long long, int, AkCurveInterpolation)
 100e438c0 wrap  # camera_set_frustum  NiCamera::SetViewFrustum(const NiFrustum &): every camera, every frame
+100ab0a30 wrap  # ak_init             AK::SoundEngine::Init(AkInitSettings *, AkPlatformInitSettings *): +0x54 = refills (LatencyBuffer); audio_ring.c

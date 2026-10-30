@@ -9,7 +9,8 @@
 // is kept within the device's range and at most half the sink's ring (LatencyBuffer x 256 frames): the
 // HAL callback can take no more than the ring holds, and with no block to spare (a 256-frame ring and a
 // 256-frame buffer) the game lists no audio interface under Direct Connect. So LatencyBuffer=1 gets a
-// 128-frame buffer. The sink is rebuilt on a device change, which calls this again.
+// 128-frame buffer (the ring's count, audio_ring.c: at 1 the engine itself runs with 2). The sink is rebuilt
+// on a device change, which calls this again.
 //
 // F_100b049b0, the LEngine thread entry (the thread Wwise renders on, 256 frames per block, woken by the
 // HAL callback through a mach semaphore): the original is
@@ -99,15 +100,9 @@ static uint32_t frames_wanted(uint32_t dflt) {
   return (uint32_t)n;
 }
 
-// The sink's ring in refills of 256 frames: LatencyBuffer as Wwise took it
-static uint32_t ring_refills(void) {
-  uint32_t r = RC_LD(uint16_t, RC_A(AK_PD_REFILLS));
-  return r ? r : 4;  // what Wwise uses for 0 (0x100ad1f08)
-}
-
 void rs_audio_output_device(uint32_t dev) {
   if (dev == kAudioObjectUnknown) return;
-  uint32_t refills = ring_refills();
+  uint32_t refills = rs_audio_ring_refills();
   uint32_t ring = refills * AK_REFILL_FRAMES, cap = ring / 2;
   uint32_t want = frames_wanted(DEFAULT_FRAMES < cap ? DEFAULT_FRAMES : cap), n = want;
   char name[128];

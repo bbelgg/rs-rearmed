@@ -822,9 +822,10 @@ class InstallerWindow: NSWindow {
         rendererPopup.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(rendererPopup)
 
-        let rendererHint = NSTextField(labelWithString: "Change it later without reinstalling: the file \"renderer\" in ~/Library/Application Support/RS Re-ARMed")
+        let rendererHint = NSTextField(labelWithString: "Switch later without reinstalling (README: Renderer)")
         rendererHint.font = .systemFont(ofSize: 11)
         rendererHint.textColor = .secondaryLabelColor
+        rendererHint.toolTip = "The file \"renderer\" in ~/Library/Application Support/RS Re-ARMed: metal or opengl"
         rendererHint.lineBreakMode = .byTruncatingTail
         rendererHint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         rendererHint.translatesAutoresizingMaskIntoConstraints = false

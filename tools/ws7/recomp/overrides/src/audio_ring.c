@@ -1,13 +1,13 @@
-// Override module `audio`, the sink's ring (src/audio.h): LatencyBuffer=1 without losing Direct Connect.
+// Override module `audio`, the sink's ring (src/audio.h): at LatencyBuffer=1 only the output ring is small.
 //
 // LatencyBuffer (the audio engine setting in the game's Audio settings, 0x101873e0c) has one effect: the game
 // copies it into AkPlatformInitSettings+0x54 (uNumRefillsInVoice, 0x101326ae9) before AK::SoundEngine::Init
 // (0x100ab0a30), which keeps it for the whole engine (0x101907df4). The CoreAudio sink reads it once more
 // when it is created (0x100aa6792 -> Init 0x100aa7be0: ring = refills x 256 frames per channel, kept at
-// sink+0x94); the ring is the only part that adds output latency. With the engine at 1 refill the game lists
-// no audio interface under Direct Connect; with the engine at 2, a 256-frame ring and a 128-frame output
-// buffer it does (checked with a UR22mkII). So at 1 (RS_AUDIO_RING_SPLIT=0 turns this off) the engine gets 2
-// and only the sink's ring stays at 1 x 256 frames; the game's setting, its menu and Rocksmith.ini keep 1:
+// sink+0x94); the ring is the only part that adds output latency. So at 1 (RS_AUDIO_RING_SPLIT=0 turns this
+// off) the engine runs as at 2, the setting it was tested with most, and only the sink's ring stays at
+// 1 x 256 frames; the game's setting, its menu and Rocksmith.ini keep 1. (It was added for an audio interface
+// missing from Direct Connect at 1, but that interface also went missing at 2: see audio_trace.c.)
 //   - a pre hook on the AK::SoundEngine::Init hook point raises the settings' 1 to 2;
 //   - F_100aa7be0, the sink's Init, sizes the ring from the requested count instead;
 //   - the output device's buffer is capped at half the ring, not half the engine's count (audio_out.c).

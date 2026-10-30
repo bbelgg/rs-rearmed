@@ -62,7 +62,8 @@ build_module efd_ds "$SH" "$here/gen/efd_ds.c"
 build_module crypto "$SH" "$here/gen/crypto.c" "$here/src/crypto_glue.c"
 build_module online "$SH" "$here/gen/online.c" "$here/src/online_glue.c"
 build_module dsp "" "$here/src/dsp_glue.c"
-build_module audio "" "$here/src/audio_out.c" "$here/src/audio_in.c" "$here/src/audio_devs.c" "$here/src/audio_ring.c"
+build_module audio "" "$here/src/audio_out.c" "$here/src/audio_in.c" "$here/src/audio_devs.c" "$here/src/audio_ring.c" \
+  "$here/src/audio_trace.c"
 
 # one library with the default set
 rm -f "$out/lib/liboverrides.a"

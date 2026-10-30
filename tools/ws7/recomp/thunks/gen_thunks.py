@@ -71,14 +71,25 @@ HOOKS = {
         "uint64_t cb_tmp[2];",
         "if ((%s == 23 || %s == 2005) && %s && %s == 16) { memcpy(cb_tmp, %s, 16); "
         "cb_tmp[0] = (uint64_t)rc_tramp_get(cb_tmp[0]); %s = cb_tmp; }" % (p[1], p[1], p[4], p[5], p[4], p[4])],
-    # kAudioHardwarePropertyDevices ('dev#') of the system object: the audio override module makes the call and
-    # puts the input devices first (overrides/src/audio_devs.c: the game opens only the first 10 as inputs).
+    # The audio override module makes these calls: for kAudioHardwarePropertyDevices ('dev#') of the system
+    # object it puts the input devices first (overrides/src/audio_devs.c: the game opens only the first 10 as
+    # inputs), and with RS_AUDIO_LOG=1 it records the calls made while an input device opens
+    # (overrides/src/audio_trace.c).
     "AudioObjectGetPropertyData": lambda p: [
         "extern int32_t rs_audio_get_property_data(uint32_t, const void *, uint32_t, const void *, uint32_t *, void *)"
         " __attribute__((weak_import));",
-        "if (%s == 1 && %s && *(const uint32_t *)%s == 0x64657623u && rs_audio_get_property_data) { "
-        "c->r[0] = (uint64_t)(uint32_t)rs_audio_get_property_data(%s, %s, %s, %s, %s, %s); return; }"
-        % ((p[0], p[1], p[1]) + tuple(p))],
+        "if (rs_audio_get_property_data) { "
+        "c->r[0] = (uint64_t)(uint32_t)rs_audio_get_property_data(%s, %s, %s, %s, %s, %s); return; }" % tuple(p)],
+    "AudioObjectGetPropertyDataSize": lambda p: [
+        "extern int32_t rs_audio_get_property_data_size(uint32_t, const void *, uint32_t, const void *, uint32_t *)"
+        " __attribute__((weak_import));",
+        "if (rs_audio_get_property_data_size) { "
+        "c->r[0] = (uint64_t)(uint32_t)rs_audio_get_property_data_size(%s, %s, %s, %s, %s); return; }" % tuple(p)],
+    "AudioObjectSetPropertyData": lambda p: [
+        "extern int32_t rs_audio_set_property_data(uint32_t, const void *, uint32_t, const void *, uint32_t, "
+        "const void *) __attribute__((weak_import));",
+        "if (rs_audio_set_property_data) { "
+        "c->r[0] = (uint64_t)(uint32_t)rs_audio_set_property_data(%s, %s, %s, %s, %s, %s); return; }" % tuple(p)],
 }
 # Steam (the stub shim calls back into these natively):
 #   SteamInternal_ContextInit(data): data->pFn(ctx) is a guest function

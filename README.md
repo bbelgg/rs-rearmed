@@ -221,8 +221,8 @@ frames (5.3 ms): 1 is the lowest, 2 a safe value, 4 the game's default. It is th
 in the game's Audio settings, and the launcher keeps what you choose there; `launchctl setenv
 RS_LATENCY_BUFFER 1` overrides it. The output device's buffer is `RS_AUDIO_FRAMES` (default 256, and 128 at
 `LatencyBuffer` 1, which is why 1 does not crackle here as it does under Rosetta). At 1 only the game's
-output buffer is that small; the rest of its audio engine runs as at 2, which keeps audio interfaces listed
-under Direct Connect (`RS_AUDIO_RING_SPLIT=0` turns that off). If the sound crackles, raise one of them
+output buffer is that small; the rest of its audio engine runs as at 2 (`RS_AUDIO_RING_SPLIT=0` turns that
+off). If the sound crackles, raise one of them
 again. Both are read when the game starts, so a change in the game takes effect on the
 next start.
 

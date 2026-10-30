@@ -24,6 +24,7 @@ static int has_input(AudioObjectID dev) {
 int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t *size, void *data) {
   OSStatus st = AudioObjectGetPropertyData(obj, addr, qsize, qdata, size, data);
+  rs_audio_trace_get(obj, addr, st, size ? *size : 0, data);
   const AudioObjectPropertyAddress *a = addr;
   if (st != noErr || obj != kAudioObjectSystemObject || a->mSelector != kAudioHardwarePropertyDevices ||
       !size || !data || !rs_audio_env_on("RS_AUDIO_INPUTS_FIRST", 1))

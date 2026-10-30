@@ -12,3 +12,4 @@
 100ab1b20 wrap  # ak_set_rtpc_name    AK::SoundEngine::SetRTPCValue(const char *, float, unsigned long long, int, AkCurveInterpolation)
 100e438c0 wrap  # camera_set_frustum  NiCamera::SetViewFrustum(const NiFrustum &): every camera, every frame
 100ab0a30 wrap  # ak_init             AK::SoundEngine::Init(AkInitSettings *, AkPlatformInitSettings *): +0x54 = refills (LatencyBuffer); audio_ring.c
+10133bee0 wrap  # si_open             SoundInput open (this, int slot) -> bool: opens device list entry `slot` as a guitar input; audio_trace.c

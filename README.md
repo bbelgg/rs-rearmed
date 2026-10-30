@@ -131,7 +131,7 @@ points**, game functions they can run code before and after (`tools/ws7/recomp/o
 Legacy mods, the ones made for the original game that change its files, might work as before. Verified:
 
 - A modified `cache.psarc` in your install (for example the fast-load mod) is used as-is.
-- Custom songs (CDLC) in your install are used as-is, with the RSBypass behaviour above.
+- Custom songs (CDLC) in your game's `dlc` folder load as they are; the CDLC bypass they need is built in.
 
 ## How to Install
 

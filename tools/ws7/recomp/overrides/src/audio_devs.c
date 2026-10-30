@@ -1,11 +1,12 @@
 // Override module `audio`, device list (src/audio.h): input devices first in the system's device list.
 //
-// SoundInput keeps 10 device slots (0x10131aff0), and slot i opens entry i of the system object's
-// kAudioHardwarePropertyDevices list (0x10133bee0 -> 0x10133ab30). That list holds every device, output-only
-// ones too (displays, docks, speakers), so on a Mac with more than 10 devices an interface past the 10th
-// entry never shows up under Direct Connect. The import thunk of AudioObjectGetPropertyData
-// (thunks/gen_thunks.py) sends the game's device-list reads here; the list comes back with the devices that
-// have input streams first, each group in the system's order. RS_AUDIO_INPUTS_FIRST=0 turns it off.
+// The device scan (0x10133ccb0) goes through the system object's kAudioHardwarePropertyDevices list, which
+// holds output-only devices too, and opens each device with input channels in a free one of SoundInput's 10
+// slots (0x10131aff0; 0x10133bee0 opens list entry i, 0x10133ab30). It gives up on the rest of the list at
+// the first device whose output or input stream configuration, maker or name it can't read. The import thunk
+// of AudioObjectGetPropertyData (thunks/gen_thunks.py) sends the game's device-list reads here; the list comes
+// back with the devices that have input streams first, each group in the system's order, so an output-only
+// device the game can't read doesn't hide an interface. RS_AUDIO_INPUTS_FIRST=0 turns it off.
 //
 // Device UIDs, one string per device: the device scan (0x10133ccb0) tells devices apart by comparing their
 // kAudioDevicePropertyDeviceUID CFStrings by pointer, against the UIDs of the open slots (+0x50) and of the
@@ -77,6 +78,6 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
   // Logged once per distinct device count (the list is read on start-up and on every hot-plug check).
   static _Atomic uint32_t last_n;
   if (moved && atomic_exchange(&last_n, n) != n)
-    rs_audio_log("device list: %u devices, the %u with inputs first (the game opens only the first 10)", n, ni);
+    rs_audio_log("device list: %u devices, the %u with inputs first", n, ni);
   return st;
 }

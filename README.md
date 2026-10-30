@@ -17,6 +17,7 @@ This project does not include any game code or assets; you need your own copy of
 - [Built-in patches and mods](#built-in-patches-and-mods)
 - [How to Install](#how-to-install)
 - [Known Issues](#known-issues)
+- [Under Investigation](#under-investigation)
 - [FAQ](#faq)
 - [Building](#building)
 - [Credits](#credits)
@@ -164,6 +165,14 @@ Then start **RS Re-ARMed** from `~/Applications` (double-click, Launchpad or Spo
 - Mods that draw on the screen with OpenGL themselves, such as rearmed-mods 0.1.0 (its song timer,
   accuracy and other on-screen text), show nothing with Metal; the rest of the mod works. Use a version
   that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL renderer.
+
+## Under Investigation
+
+Being looked into for future releases, with no promise of if or when:
+
+- **RSMods:** more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
+- **Input channel selection:** choosing which input of an external audio interface the game listens to,
+  on interfaces with more than one input.
 
 ## FAQ
 

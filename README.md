@@ -47,6 +47,8 @@ This project does not include any game code or assets; you need your own copy of
   and as an automatic fallback (see [Renderer](#renderer-metal-or-opengl)).
 - **Your DLC, linked automatically.** The launcher mirrors your game folder with symlinks on every launch,
   so new DLC folders in your install show up without reinstalling.
+- **Custom songs (CDLC) out of the box.** The CDLC signature bypass (RSBypass's behaviour) is built in and
+  on by default: put custom songs in your game's `dlc` folder as usual, with no CDLC patch to install.
 
 ## Built-in patches and mods
 
@@ -196,7 +198,8 @@ Steam saves are read once, on the first launch.
 
 **Do DLC and custom songs work?**
 The DLC folders in your install are linked in on every launch, including ones you add later. Custom songs
-load because the RSBypass behaviour is built in and on by default.
+load because the RSBypass behaviour is built in and on by default: there is no separate CDLC patch to
+install.
 
 **How do I update?**
 Pull the latest changes, rebuild (see [docs/BUILDING.md](docs/BUILDING.md)) and run

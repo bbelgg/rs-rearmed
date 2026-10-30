@@ -76,8 +76,10 @@ Steps:
 1. Extracts the x86_64 thin slice from the fat binary
 2. Replaces `__text` with the decrypted dump
 3. Fixes `LC_UNIXTHREAD` entry point if needed
-4. Re-signs with ad-hoc codesign
-5. Verifies the result disassembles correctly
+4. Verifies the result disassembles correctly
+
+It leaves the result unsigned and prints the `RC_IMAGE` line for the build
+(docs/BUILDING.md, Manual build, step 3).
 
 ## Workflow
 

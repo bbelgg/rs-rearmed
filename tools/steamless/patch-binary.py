@@ -190,7 +190,8 @@ def main():
         pass
 
     print(f"\nDone. Decrypted binary: {args.output}")
-    print("Next: run tools/steamless/launch.sh to test it.")
+    print("Next: point the build at it (docs/BUILDING.md, Manual build, step 3):")
+    print(f'  export RC_IMAGE="{os.path.abspath(args.output)}"')
 
 
 if __name__ == "__main__":

@@ -92,11 +92,12 @@ OpenGL, which Apple deprecated.
   ```
 
 - **Fallback:** if Metal can't start on your Mac, the game starts with OpenGL. If two starts with Metal
-  in a row end abnormally (a crash, or a force quit), the next start uses OpenGL, sets the `renderer`
-  file to `opengl` and says so in `renderer-fallback.txt` in the same folder. Write `metal` into the file
-  to try Metal again.
+  in a row end abnormally (a crash, or a force quit; not a crash while quitting), the next start uses
+  OpenGL, sets the `renderer` file to `opengl` and says so in `renderer-fallback.txt` in the same
+  folder. Write `metal` into the file to try Metal again, or choose Metal in the installer.
 - **Shaders:** Metal compiles the game's shaders once. The installer does this in its "Preparing
-  shaders" step (a few minutes the first time). After a macOS update the game recompiles them on its
+  shaders" step (a few minutes the first time; Skip leaves it to the game's first start). After a macOS
+  update the game recompiles them on its
   next start, showing "Preparing shaders… N of M" on a black screen before it loads.
 
 ### The title logo
@@ -157,6 +158,12 @@ Then start **RS Re-ARMed** from `~/Applications` (double-click, Launchpad or Spo
 - With a fast-load `cache.psarc` mod, a start can now and then stay on the white loading screen,
   more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares its shaders
   before the game loads when it sees such a mod, which avoids the stall it would otherwise cause.
+- With Metal, the first time a song, venue or mode is played, a few short stutters (up
+  to about half a second) can show in its first half-minute while Metal compiles what it draws for the
+  first time. It keeps the result, so later plays are smooth.
+- Mods that draw on the screen with OpenGL themselves, such as rearmed-mods 0.1.0 (its song timer,
+  accuracy and other on-screen text), show nothing with Metal; the rest of the mod works. Use a version
+  that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL renderer.
 
 ## FAQ
 

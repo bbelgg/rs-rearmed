@@ -1,9 +1,9 @@
 // RS Re-ARMed overlay API: 2D drawing over the game's frame for mods (MIT).
 //
-// Exported by the game executable (Rocksmith2014) of builds after RS Re-ARMed 1.2.0. A mod registers a callback;
+// Exported by the game executable (Rocksmith2014) from RS Re-ARMed 1.3.0 on. A mod registers a callback;
 // the shell calls it on the render thread once per frame, after the game has drawn the frame and before it
 // is shown. Inside the callback, and only there, the mod draws with the rs_overlay_* calls below. The calls
-// are backend-neutral: the mod never sees the graphics API (OpenGL today, Metal later) and must not call it
+// are backend-neutral: the mod never sees the graphics API (Metal or OpenGL) and must not call it
 // itself. The implementation saves and restores the game's state around the callbacks.
 //
 // Rules (as X-Plane's for its plugins): no GL calls and no glGet of your own, no access to the game's

@@ -27,6 +27,6 @@
     "Audio interfaces and inputs other than the Real Tone cable",
     "Bug reports from long play sessions, DLC and custom songs"
   ],
-  "notes": "Native arm64 build for Apple Silicon Macs, no Rosetta at run time. Builds from your own Steam copy with an installer; ships no game code. Offline by design (a network guard refuses every non-local connection). Gameplay CPU is about that of the original under Rosetta at 60 fps; the frame rate follows the display (75/120 Hz). Songs, DLC, custom songs, Session Mode and lessons work.",
+  "notes": "Native arm64 build for Apple Silicon Macs, no Rosetta at run time. Builds from your own Steam copy with an installer; ships no game code. Offline by design (a network guard refuses every non-local connection). Renders through its own GL-on-Metal layer by default, with Apple's OpenGL as the choice and the fallback. Gameplay CPU is about that of the original under Rosetta at 60 fps; the frame rate follows the display (75/120 Hz). Songs, DLC, custom songs, Session Mode and lessons work.",
   "tags": ["arm64", "apple-silicon", "music", "guitar", "offline"]
 }

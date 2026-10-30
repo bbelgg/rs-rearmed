@@ -12,10 +12,13 @@ the source of its own release, checks prerequisites, builds everything and insta
 `tools/play-native/install.sh` (see [Install](#6-install) below): the launcher
 `~/Applications/RS Re-ARMed.app`, which you start the game with, and the game build with your saves in
 `~/Library/Application Support/RS Re-ARMed/`. **Renderer** chooses how the game draws: **Metal
-(recommended)** or **OpenGL** (see [Renderer](#renderer)); the installer remembers the choice. With
+(recommended)** or **OpenGL** (see [Renderer](#renderer)); it starts on the renderer your install uses
+(OpenGL after a [fallback](#renderer)), else on the one chosen last time. With
 Metal its last step, **Preparing shaders**, compiles the game's Metal shaders once (see
 [Install](#6-install)): a few minutes on a first install, seconds after an update; with OpenGL there is
-no such step. When it's done it says so and offers to start the game. A
+no such step. **Skip** ends that step early; the game then prepares the rest on its first start with
+Metal. When it's done it says so and offers to start the game. Quitting the installer while it works
+stops the build (it asks first); Build & Install starts it again. A
 progress bar and live log keep you informed; if anything fails it shows the error. The log of every run is
 kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 
@@ -23,6 +26,9 @@ The build files go in `~/Library/Caches/rs-rearmed-build` unless you choose anot
 (for example on an external drive); the installer makes a `rs-rearmed-build` folder inside the one you
 pick and remembers it. The folder's path must not contain spaces. Tick **Delete build files after install** to remove them when it's done. If you
 choose a folder on an external drive, macOS asks once whether the installer may use it.
+
+**Rocksmith 2014 game folder** starts on the game folder of your current install, else on Steam's default
+library; choose another one if your game is in a Steam library elsewhere (another drive, say).
 
 The installer needs the same prerequisites as a manual build (see below). It will ask you to launch
 Rocksmith 2014 through Steam once, to decrypt the game binary.
@@ -248,11 +254,13 @@ game:
   with OpenGL right away (`[rsp] no usable Metal device; starting with OpenGL`). This changes nothing
   for later starts.
 - When the last two starts with Metal both ended abnormally (a crash, or the game had to be
-  force-quit; a normal quit, also with Cmd+Q or by closing the window, resets the count), the
+  force-quit; a normal quit, also with Cmd+Q or by closing the window, resets the count, and so does
+  a crash or hang after you chose to quit, in the game's own shutdown), the
   next start uses OpenGL and writes `opengl` into `renderer`, so later starts keep using OpenGL. The log
   says `[rsp] Metal ended abnormally twice in a row; starting with OpenGL`, a notification tells you,
   and `renderer-fallback.txt` in the same folder says what happened. To try Metal again (after an update,
-  say), write `metal` into `renderer` again; reinstalling with Metal does the same. An explicit
+  say), write `metal` into `renderer` again; reinstalling with Metal does the same (the installer then
+  shows OpenGL: choose Metal; or `RS_RENDERER=metal tools/play-native/install.sh`). An explicit
   `RS_GL_BACKEND=metal` always uses Metal.
 
 The game applies the file and the fallback itself (the launcher only hands `opengl` on as

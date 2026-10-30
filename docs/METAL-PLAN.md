@@ -1,7 +1,7 @@
 # Metal backend plan
 
-A Metal renderer for RS Re-ARMed, as an alternative to Apple's OpenGL. Work happens on the `metal-backend`
-branch. Metal is now the default; OpenGL stays selectable and is the automatic fallback.
+A Metal renderer for RS Re-ARMed, as an alternative to Apple's OpenGL. Developed on the `metal-backend`
+branch and merged for 1.3.0. Metal is the default; OpenGL stays selectable and is the automatic fallback.
 
 ## Why
 
@@ -95,7 +95,7 @@ overlay do at 2x.
 
 ## Status
 
-**Where things stand (2026-10-29).** Steps 1-8 are done on `metal-backend` and checked in the game on one
+**Where things stand (2026-10-29).** Steps 1-8 are done (merged into main) and checked in the game on one
 Mac (M2, a 75 Hz external display and the built-in Retina screen): Metal is the default (04fc2cc), OpenGL
 is selectable (`renderer` file, installer, `RS_GL_BACKEND=gl`) and the fallback (no Metal device, or two
 abnormal Metal exits in a row; 607ba56, c11ea2e; checked in the game with two `kill -9`s). GL and Metal
@@ -103,12 +103,24 @@ match in frame diffs; Metal uses ~5% less CPU per frame. Shaders: a corpus made 
 build time, warmed by the installer ("Preparing shaders", ~5 min the first time); safe load and an
 in-game "Preparing shaders" screen protect against the fast-load `cache.psarc` mod's loading stall.
 
-Before a release: the GUI installer end to end (its Renderer popup and the Preparing shaders step have
-not been looked at), a second Mac/GPU, a long Metal session (leaks), Session Mode, lessons, Bink videos,
-sleep/wake, display unplug, window drag-resize, the Retina mouse in songs; rearmed-mods 0.2.0 (overlay
-API; 0.1.0 draws with OpenGL directly and does nothing or crashes on Metal) is on its own branch and was
-left out on purpose. Known open items: the bundle seal is broken by `install.sh` adding the icon after
-signing (also on main); `build.sh --stub` exits silently without `SHIM_STEAM`/`SHIM_BINK`;
+**Release check (2026-10-30, for 1.3.0).** A review of everything since 1.2.0 fixed draw-state bugs
+(a clear quad's uniforms, a scissor-skipped draw's pipeline), cache retries and compaction, the crash
+count (a crash after the game chose to quit no longer counts), `RS_GL_BACKEND` spelling, the warm-up's
+progress and the installer's renderer popup (it shows the install's renderer, so a fallback is not
+undone by an update), Skip and quit during Preparing shaders. Checked in the game on Metal, test
+install, unattended and by hand: six full songs in a row (37 min; footprint 943-983 MB from the first
+song to the last, 74.7 fps, no frames > 50 ms outside song loads), Session Mode 10 min (flat), the chord
+book, a lesson with its Bink video, Guitarcade menus, minimise (keeps presenting, no stall), live
+drag-resize, full screen and back, EXIT GAME (marker removed), OpenGL (`RS_GL_BACKEND=GL`) and
+rearmed-mods 0.1.0 (no crash; its on-screen text does not show on Metal). The first play of a song after
+an install has a few 0.3-0.8 s stalls in its first half-minute (pipelines compiled on first use; the
+second play has none). The GUI installer end to end with a test home: a fresh build and install
+(about 15 min, then Preparing shaders: 3880 libraries in 375 s cold), Skip during the shaders, an update
+after a simulated fallback (the popup shows OpenGL), quit mid-build (asks; stops the whole build), the
+standalone download of a release's source; the installed game boots on Metal. Not checked: a second
+Mac/GPU, sleep/wake, display unplug, the Retina mouse in songs. rearmed-mods 0.2.0 (overlay API) is on
+its own branch, unreleased. Known open items:
+`build.sh --stub` exits silently without `SHIM_STEAM`/`SHIM_BINK`;
 `tools/ws7/recomp/app/test/build.sh` fails to link on `rc_fail`; RS_GL_CHECK keeps one pending error per
 thread, not per context; GL_TEXTURE_BASE_LEVEL/LOD_BIAS are ignored on Metal; shared CGL contexts are
 not supported on Metal (the game uses one context).

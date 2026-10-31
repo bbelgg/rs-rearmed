@@ -1,7 +1,8 @@
 # Plan: one installer for the Mac and the Windows ("Learn & Play") game
 
-*Design note. Nothing here is built yet. It records the goal, the decisions that shape the work and the
-order to do it in.*
+*Design note. It records the goal, the decisions that shape the work and the order to do it in. P0 (the
+Mac build made name-keyed) is done, see [P0 status](#p0-status); nothing of the Windows target is built
+yet.*
 
 ## Goal
 
@@ -82,8 +83,8 @@ convention-aware, driven by the prototype in `symbols.map`:
   `thiscall`, `ecx`/`edx` for `fastcall`) on `win-x86`.
 - **Returns**: `ov_ret_*` pop the return address, and on `win-x86` also the callee-cleaned arguments of a
   `stdcall` / `thiscall` function; float results go to `xmm0` or to x87 `st0`.
-- **Pointers**: `OV_PTR` / `RC_H(guest)` turn a guest pointer into a host one, and `RC_G(host)` the other
-  way. On `mac-x64` both are what they are today (the image slide); on `win-x86` they add or subtract the
+- **Pointers**: `OV_PTR` / `RC_HOST(guest)` turn a guest pointer into a host one, and `RC_GUEST(host)` the
+  other way. On `mac-x64` both are what they are today (the image slide); on `win-x86` they add or subtract the
   base of the 32-bit guest window (see [Memory](#memory-a-4-gb-guest-window)).
 - **Struct fields**: native code reads game structs with `RC_OFF(name)` from `offsets.map` instead of
   literal offsets. Layouts differ between the two games because pointers are 4 bytes on Windows.
@@ -256,12 +257,72 @@ targets use the same build folder layout, the same logs and the same update path
 
 | Phase | Work | Done when |
 |---|---|---|
-| **P0** Mac refactor | `tools/targets/`, name-keyed lists, the convention-aware ABI layer, `rc_hook_add_name`, `check.py` | the `mac-x64` build is byte-identical and all tests pass. Useful on its own; no Windows work yet |
+| **P0** Mac refactor | `tools/targets/`, name-keyed lists, the convention-aware ABI layer, `rc_hook_add_name`, `check.py` | the `mac-x64` build is byte-identical and all tests pass. Useful on its own; no Windows work yet. **Done**, see below |
 | **P1** Spikes (in parallel) | (a) unpack to the entry point with Unicorn and synthetic DLLs only; (b) inventory of the unpacked image: imports (CRT, `d3d9`, `d3dx9`, Cg, XInput, Uplay), leftover virtualised functions; (c) shader source of the PC build, and one PC shader through bytecode → GLSL → MSL | each answer written here. **Gate**: if (a) needs real DLLs or (b) shows much virtualised game code, stop and rethink |
 | **P2** Front end | 32-bit decode, window memory model, x87, conventions, SEH, PE thunks; differential tests | the whole image translates and links against the runtime with stub seams |
 | **P3** Boot to menu | `shims/win32`, Steam/Uplay faces, the core `win-x86` tables, `shims/d3d9` far enough for Scaleform | the Windows build reaches the main menu on Metal. **Gate**: effort and fidelity review |
 | **P4** Parity | every name in `names/`, audio adapters (latency and Direct Connect), Bink, songs, DLC and CDLC, modes, built-in fixes, the hook points | the Mac test checklist passes on `win-x86`; a sample mod runs unchanged on both |
 | **P5** Installer | game detection, depot help, the unpack step, `RC_TARGET`, docs | one-click install from a fresh Learn & Play download |
+
+### P0 status
+
+Done on the `win-port` branch. What it is, as built:
+
+- **Tables.** `tools/targets/mac-x64/` holds `target.toml` (image SHA-256, front end `x86-64-macho`, ABI
+  `sysv64`, `__text` bounds), `symbols.map` (1,078 names: 739 overridden functions, 11 hook points, the
+  seam's 16 functions and 5 globals, 259 efd class-info tables, and what the override and app code calls or
+  reads), `offsets.map` (70 fields, sizes and vtable slots) and `drops.map` (742 dead functions of the
+  libraries replaced wholesale: per target and unnamed, since another binary has its own dead set).
+  `tools/targets/names/` has `overrides/<module>.list` (replacing `overrides/*.skip` and `mods/mods.skip`),
+  `hooks.list` (replacing `hooks.skip`), `seam.list`, `refs.list`, `offsets.list` and `relaxed.list` (the
+  translator's fence-free functions, formerly addresses in `xlat/relaxed.py`). Map conventions so far:
+  `sysv`, `data`, `code` (an address inside a function, such as a return site); `cdecl`, `stdcall`,
+  `thiscall`, `fastcall` are accepted for win-x86. `NAME unsupported REASON` marks a missing counterpart.
+- **Build.** `RC_TARGET` (default `mac-x64`) is read by `build-m4.sh`, which runs
+  `tools/targets/targets.py gen OUTDIR/target`: `rc_target_names.h` (`RC_ADDR_` / `RC_FN_` / `RC_CC_` /
+  `RC_OFF_` defines), `rc_target.c` (hook names for the runtime) and the skip files. `overrides/build.sh`,
+  `mods/build.sh`, `app/build.sh` and the seam test use it through `RC_TARGET_DIR` or make their own.
+  `gen_image.py --target` (default `$RC_TARGET`) refuses a target whose front end it lacks and warns when
+  the image's SHA-256 is not the target's.
+- **ABI layer.** `runtime/rc_abi.h`: `RC_ADDR`, `RC_FN`, `RC_GA`, `RC_OFF`, `RC_SLOT`, `RC_CC`,
+  `RC_HOST` / `RC_GUEST`, `RC_RET_ADDR`, `RC_FRAME_PTR`, with the mac-x64 (`RC_TARGET_ABI_SYSV64`)
+  implementation and an `#error` for any other ABI. `overrides/rc_ov.h`: `OV_GUEST(name, ...)`,
+  `OV_GUESTV(name, ints, n)`, `OV_ALIAS(name, fn)`, `OV_ARGS_OF(name, a, c)` (reads arguments by
+  `RC_CC_<name>`). Every adapter, the seam and `app/rc_main.c` now use names only; the names are pasted,
+  never macro-expanded first. The `RC_H` / `RC_G` of the design became `RC_HOST` / `RC_GUEST` (`RC_H` is
+  `rc.h`'s include guard). Decided for win-x86: callee-cleaned argument bytes of a `stdcall` / `thiscall`
+  override are popped by a per-name wrapper that `targets.py gen` will emit from `symbols.map`, so adapters
+  and `ov_ret_*` stay convention-free; `OV_ARGS_OF` covers `thiscall` / `fastcall` register arguments.
+- **Mods.** `rc_hook_add_name(name, pre, post, user)` and `rc_target()` are exported next to `rc_hook_add`,
+  documented in `rc_hook.h` and the README. `rc_hook_add` also accepts the mac-x64 address of a hook point
+  on any target (the generated table carries both addresses).
+- **Check.** `tools/targets/check.py` (and `test_targets.py`, ctest `targets.check`): every name in `names/`
+  resolves in every target or is `unsupported`; overridden and hooked names are functions; no stale map
+  entries; and every name the native sources use (`RC_*`, `OV_*`, the seam's `G`, `rc_hook_add_name`) is
+  listed.
+- **Verification.** Against a build of `main` from the same image: the generated C (`gen/`, `thunks.c`)
+  and `skip.txt` are byte-identical; every override object is byte-identical except `mods.o` and the
+  `crypto_mods` copy of `crypto.o`, whose only difference is the renamed DSA-verify symbol
+  (`rs_crypto_dsa_verify`); the adapter tables in `gen/*_adapters.h` preprocess to the same tokens (one
+  offset now written `(-0x3f0)` instead of `-1008`); the full build passes its smoke and `--init-only`
+  checks; the app reaches the main menu on Metal with the test profile and input script, nothing blocked by
+  the network guard. `check.py` and `test_targets.py` pass (also as ctest `targets.check`).
+
+Later work found on the way (not P0):
+
+- `shims/game/include/*.h` still carry about 225 `RS_ORIG_*` Mac addresses (used by the shims' difftests,
+  and `RS_GAME_INTERFACE_SLOT_EVENT` by `online_glue.c`); they move to names when the shims gain a win-x86
+  side.
+- Pointer-width layouts in `mods.c` (the JSON number table's `T[]` words and nodes) and `audio_in.c` (the
+  queue's 8-byte buffer pointers) are written for 8-byte pointers; P4 names or marks them per target.
+- Helpers shared by many adapters (`qi` in `gen/efd_qi.c`, `key_event` in `mods.c`) read arguments with
+  plain `OV_ARGS`; on win-x86 they need `thiscall` (an `OV_ARGS_CC` variant).
+- Hooks: `rc_args` in a mod's hook reads SysV registers; a win-x86 hook needs the point's convention
+  (`rc_hook_call` can pass it).
+- The thunks (`thunks/`) are keyed by import symbol names and the vtables tool (`vtables/macho.py`) is the
+  Mach-O reader: neither holds game addresses; the win-x86 PE imports are P2 front-end work.
+- `app/test/build.sh` (the seam unit test) no longer links, on `main` too: `rc_native.c` needs `rc_fail`,
+  `rc_lookup`, `rc_tramp_guest_of` and `rc_unwind_sync`, which the test does not build.
 
 ## Risks, largest first
 

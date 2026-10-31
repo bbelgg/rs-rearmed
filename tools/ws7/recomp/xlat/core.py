@@ -69,6 +69,10 @@ RO_SECTS = {("__DATA", "__const"), ("__DATA", "__got"), ("__DATA", "__nl_symbol_
 RELAXED_ON = os.environ.get("RC_RELAXED", "1") != "0"
 
 class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
+    # mnemonics after which a path ends (x86_32.py adds int3 and the far returns)
+    STOP = ("ret", "ud2", "hlt")
+    LOOPS = ()     # branches Capstone does not put in X86_GRP_JUMP (x86_32.py: loop*, jecxz)
+
     def __init__(self, image_path):
         self.img = macho.Image(image_path)
         for line in self.img._objdump("--lazy-bind").splitlines():
@@ -116,9 +120,9 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 path.append(i)
                 m = i.mnemonic
                 nxt = a + i.size
-                if m in ("ret", "ud2", "hlt"):
+                if m in self.STOP:
                     break
-                if x86.X86_GRP_JUMP in i.groups:
+                if x86.X86_GRP_JUMP in i.groups or m in self.LOOPS:
                     op = i.operands[0]
                     if op.type != x86.X86_OP_IMM:
                         if m != "jmp":
@@ -439,7 +443,7 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                             else "  " + s)
             # falls through to an address that is not emitted next: jump there
             nxt = a + i.size
-            ends = i.mnemonic in ("jmp", "ret", "ud2", "hlt") or (
+            ends = i.mnemonic in ("jmp",) + self.STOP or (
                 i.mnemonic == "call" and i.operands[0].type == x86.X86_OP_IMM
                 and self.stubs.get(i.operands[0].imm, (0, ""))[1] in NORETURN)
             if a in self.noret:

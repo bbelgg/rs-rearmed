@@ -170,7 +170,28 @@ to its original entry point, adds:
   `symbols.map` / `offsets.map` the parallel refactor introduces): the convention and
   callee-cleanup of each named function (inferred here and recorded in `manifest.json`), the
   override and hook points, and the handful of functions whose discovery or jump tables need a
-  pinned entry (the four `systemdetection` cases are the template for that).
+  pinned entry (the five `systemdetection` cases are the template for that).
+
+### Mapping `manifest.json` → `symbols.map`
+
+The front end does **not** write `symbols.map` directly; the inference lands in a separate JSON
+schema, so the win-x86 target assembly reads it mechanically. `manifest.json` has, per function,
+`per_function["<addr-hex>"] = [status, reason, ninsn, chunk, conv]` where `conv` is
+`{"pops": <callee-cleaned bytes from ret N>, "conv": "cdecl|stdcall|thiscall|fastcall"}` (or
+`null` for a stub). The `symbols.map` row `NAME  ADDRESS  CONVENTION  PROTOTYPE` is built from it:
+
+- **ADDRESS** — the `per_function` key, an absolute VA at the preferred image base (not an RVA).
+- **CONVENTION** — `conv["conv"]`; `conv["pops"]` is the exact callee-cleanup in bytes
+  (`4 * args` for stdcall/thiscall/fastcall, `0` for cdecl), kept because it is observed from the
+  `ret N`, not derived.
+- **NAME** — the PE export name where the function is exported (`xlat/pe.Image.exports`, which the
+  generator already uses for the C comment); otherwise synthesise `F_<addr>`.
+- **PROTOTYPE** — *not* inferred. The front end recovers the convention and arg-area size but not
+  argument types; the prototype is still the maintainer's / the thunk signatures' to fill.
+
+The convention is an inference (reads the first ~64 instructions for ecx/edx use and the `ret`
+form), so treat it as a default the target may override, not ground truth — the same status it
+has in P0's `symbols.map`.
 
 ## Running it
 

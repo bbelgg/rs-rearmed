@@ -1,0 +1,12 @@
+# Override module `online`: the game functions liboverrides_online.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+efd_get_config_bool
+rsconnect_factory
+signin_start_no_uplay
+dlc_worker_flush
+dlc_job_preview
+dlc_job_request
+open_uplay_url
+dlc_connection_changed
+autologin

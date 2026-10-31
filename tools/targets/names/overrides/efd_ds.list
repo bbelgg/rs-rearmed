@@ -1,0 +1,13 @@
+# Override module `efd_ds`: the game functions liboverrides_efd_ds.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+rsg_efd_datastream_init
+rsg_efd_datastream_init_copy
+rsg_efd_datastream_destroy
+rsg_efd_datastream_read
+rsg_efd_datastream_write
+rsg_efd_datastream_seek
+rsg_efd_datastream_write_stream
+rsg_efd_datastream_read_stream
+rsg_efd_datastream_write_id
+rsg_efd_datastream_read_id

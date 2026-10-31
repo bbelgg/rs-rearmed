@@ -13,15 +13,15 @@
 
 #include "rc_ov.h"
 
-#define WIN_COS_SLOT 0x1017e8b68ull  // __la_symbol_ptr slot of _vcosf
-#define WIN_TWO_PI 0x1013ead64ull    // float 2pi (mode 1, 2: step = 2pi / (n - 1))
-#define WIN_TWO 0x1013ea36cull       // float 2 (mode 0: step = 2 / (n / 4))
-#define WIN_RAMP0 0x1013ead90ull     // {0, 1, 2, 3}
-#define WIN_HALF 0x1013eada0ull      // {0.5 x4} (mode 2)
-#define WIN_FOUR 0x1013eadb0ull      // {4 x4}, the ramp step
-#define WIN_K046 0x1013eadc0ull      // {0.46 x4} (mode 1)
-#define WIN_K054 0x1013eadd0ull      // {0.54 x4} (mode 1)
-#define WIN_ONE 0x1013eade0ull       // {1 x4} (mode 0, second half)
+#define WIN_COS_SLOT RC_ADDR(la_vcosf)  // __la_symbol_ptr slot of _vcosf
+#define WIN_TWO_PI RC_ADDR(dsp_two_pi)  // float 2pi (mode 1, 2: step = 2pi / (n - 1))
+#define WIN_TWO RC_ADDR(dsp_two)        // float 2 (mode 0: step = 2 / (n / 4))
+#define WIN_RAMP0 RC_ADDR(dsp_ramp0)    // {0, 1, 2, 3}
+#define WIN_HALF RC_ADDR(dsp_half4)     // {0.5 x4} (mode 2)
+#define WIN_FOUR RC_ADDR(dsp_four4)     // {4 x4}, the ramp step
+#define WIN_K046 RC_ADDR(dsp_k046)      // {0.46 x4} (mode 1)
+#define WIN_K054 RC_ADDR(dsp_k054)      // {0.54 x4} (mode 1)
+#define WIN_ONE RC_ADDR(dsp_one4)       // {1 x4} (mode 0, second half)
 
 static inline float32x4_t win_c4(uint64_t vmaddr) {
   float32x4_t v;
@@ -148,11 +148,12 @@ static const float32x4_t *win_get(int mode, int32_t n, uint32_t steps) {
 
 static int win_nocache = -1;
 
-/* 0x10010da10 analysis window (mode, buf, n) */
-void F_10010da10(rc_ctx *c) {
-  int mode = (int)(uint32_t)c->r[7];
-  float *buf = (float *)(uintptr_t)c->r[6];
-  int32_t n = (int32_t)(uint32_t)c->r[2];
+/* analysis window (mode, buf, n) */
+void RC_FN(dsp_analysis_window)(rc_ctx *c) {
+  OV_ARGS_OF(dsp_analysis_window, a, c);
+  int mode = (int)OV_U32(a);
+  float *buf = OV_PTR(a, float);
+  int32_t n = OV_I32(a);
   if ((unsigned)mode <= 2) {
     uint32_t steps = win_steps(mode, n);
     if (win_nocache < 0) win_nocache = getenv("RC_OV_WIN_NOCACHE") != 0;

@@ -5,6 +5,9 @@
 # support every adapter needs), OUTDIR/lib/liboverrides.a (all default modules and the support in one), the
 # arm64 slices of the shims/game libraries the adapters call (OUTDIR/lib/librs_*.a), and OUTDIR/overrides.skip
 # (gen_image.py --skip). The generated adapters are in gen/ and are checked in.
+# Game names resolve through the target's tables (tools/targets): RC_TARGET_DIR is a directory made by
+# `tools/targets/targets.py gen` (build-m4.sh makes one); without it this script makes OUTDIR/target for
+# RC_TARGET (default mac-x64) with RC_PY (default python3).
 #
 # Modules (default set): lua png jpeg zlib efd efd_qi crypto online dsp. Also audio (latency, see src/audio.h),
 # which build-m4.sh links; it is not in liboverrides.a or overrides.skip. Optional: efd_ds (DataStream: malloc
@@ -18,6 +21,8 @@ rt=$here/../runtime
 out=${1:?usage: build.sh OUTDIR}
 shims=${SHIMS_BUILD:-$root/build/shims/game}
 mkdir -p "$out/lib" "$out/obj"
+tgt=${RC_TARGET_DIR:-$out/target}
+[ -n "${RC_TARGET_DIR:-}" ] || "${RC_PY:-python3}" -I "$root/tools/targets/targets.py" gen "$tgt"
 
 # arm64 slices of the shims libraries
 for l in game lua51 png15 jpeg8 online; do
@@ -31,7 +36,7 @@ for l in game lua51 png15 jpeg8 online; do
   fi
 done
 
-CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$here -I$here/src -I$rt $rc_lto $rc_pgo"  # RC_LTO, RC_PGO: build/optflags.sh
+CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-strict-aliasing -I$here -I$here/src -I$rt -I$tgt $rc_lto $rc_pgo"  # RC_LTO, RC_PGO: build/optflags.sh
 G=$root/shims/game
 LUA="-DLNUM_DOUBLE -DLNUM_INT64 -I$G/third_party/lua-5.1.4-lnum/src"
 PNG="-include math.h -I$G/third_party/libpng-1.5.13"
@@ -70,6 +75,6 @@ rm -f "$out/lib/liboverrides.a"
 libtool -static -o "$out/lib/liboverrides.a" $(for m in rt lua png jpeg zlib efd efd_qi crypto online dsp; do echo "$out/lib/liboverrides_$m.a"; done) 2>/dev/null
 
 # the skip file for gen_image.py: the default modules.
-cat "$here/lua.skip" "$here/png.skip" "$here/jpeg.skip" "$here/zlib.skip" "$here/efd.skip" "$here/efd_qi.skip" \
-    "$here/crypto.skip" "$here/online.skip" "$here/dsp.skip" > "$out/overrides.skip"
+(cd "$tgt/skip" && cat lua.skip png.skip jpeg.skip zlib.skip efd.skip efd_qi.skip crypto.skip online.skip dsp.skip) \
+  > "$out/overrides.skip"
 echo "overrides: $(grep -vc '^#' "$out/overrides.skip") skip entries; libraries in $out/lib"

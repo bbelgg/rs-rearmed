@@ -3,23 +3,23 @@
 #define OV_GEN_ZLIB_H
 #include "rc.h"
 #include "rc_ov.h"
-void F_100e07620(rc_ctx *c);
-void F_100e076d0(rc_ctx *c);
-void F_100e076f0(rc_ctx *c);
-void F_100e0b070(rc_ctx *c);
-void F_100e0b120(rc_ctx *c);
-void F_100e0b260(rc_ctx *c);
-void F_100e0cf20(rc_ctx *c);
-void F_100e0fa10(rc_ctx *c);
+void RC_FN(compress2)(rc_ctx *c);
+void RC_FN(compressBound)(rc_ctx *c);
+void RC_FN(crc32)(rc_ctx *c);
+void RC_FN(inflateReset)(rc_ctx *c);
+void RC_FN(inflateInit_)(rc_ctx *c);
+void RC_FN(inflate)(rc_ctx *c);
+void RC_FN(inflateEnd)(rc_ctx *c);
+void RC_FN(uncompress)(rc_ctx *c);
 static const ov_entry ov_zlib_entries[] = {
-  {0x100e07620ull, "compress2", F_100e07620},
-  {0x100e076d0ull, "compressBound", F_100e076d0},
-  {0x100e076f0ull, "crc32", F_100e076f0},
-  {0x100e0b070ull, "inflateReset", F_100e0b070},
-  {0x100e0b120ull, "inflateInit_", F_100e0b120},
-  {0x100e0b260ull, "inflate", F_100e0b260},
-  {0x100e0cf20ull, "inflateEnd", F_100e0cf20},
-  {0x100e0fa10ull, "uncompress", F_100e0fa10},
+  {RC_ADDR(compress2), "compress2", RC_FN(compress2)},
+  {RC_ADDR(compressBound), "compressBound", RC_FN(compressBound)},
+  {RC_ADDR(crc32), "crc32", RC_FN(crc32)},
+  {RC_ADDR(inflateReset), "inflateReset", RC_FN(inflateReset)},
+  {RC_ADDR(inflateInit_), "inflateInit_", RC_FN(inflateInit_)},
+  {RC_ADDR(inflate), "inflate", RC_FN(inflate)},
+  {RC_ADDR(inflateEnd), "inflateEnd", RC_FN(inflateEnd)},
+  {RC_ADDR(uncompress), "uncompress", RC_FN(uncompress)},
 };
 #define OV_ZLIB_COUNT 8
 #endif

@@ -3,25 +3,25 @@
 #define OV_GEN_ONLINE_H
 #include "rc.h"
 #include "rc_ov.h"
-void F_100373cd0(rc_ctx *c);
-void F_100a0c360(rc_ctx *c);
-void F_100a13950(rc_ctx *c);
-void F_100a24d90(rc_ctx *c);
-void F_100a24e70(rc_ctx *c);
-void F_100a25170(rc_ctx *c);
-void F_100a2a530(rc_ctx *c);
-void F_100a2c720(rc_ctx *c);
-void F_101315d70(rc_ctx *c);
+void RC_FN(efd_get_config_bool)(rc_ctx *c);
+void RC_FN(rsconnect_factory)(rc_ctx *c);
+void RC_FN(signin_start_no_uplay)(rc_ctx *c);
+void RC_FN(dlc_worker_flush)(rc_ctx *c);
+void RC_FN(dlc_job_preview)(rc_ctx *c);
+void RC_FN(dlc_job_request)(rc_ctx *c);
+void RC_FN(open_uplay_url)(rc_ctx *c);
+void RC_FN(dlc_connection_changed)(rc_ctx *c);
+void RC_FN(autologin)(rc_ctx *c);
 static const ov_entry ov_online_entries[] = {
-  {0x100373cd0ull, "efd_get_config_bool", F_100373cd0},
-  {0x100a0c360ull, "rsconnect_factory", F_100a0c360},
-  {0x100a13950ull, "signin_start_no_uplay", F_100a13950},
-  {0x100a24d90ull, "dlc_worker_flush", F_100a24d90},
-  {0x100a24e70ull, "dlc_job_preview", F_100a24e70},
-  {0x100a25170ull, "dlc_job_request", F_100a25170},
-  {0x100a2a530ull, "open_uplay_url", F_100a2a530},
-  {0x100a2c720ull, "dlc_connection_changed", F_100a2c720},
-  {0x101315d70ull, "autologin", F_101315d70},
+  {RC_ADDR(efd_get_config_bool), "efd_get_config_bool", RC_FN(efd_get_config_bool)},
+  {RC_ADDR(rsconnect_factory), "rsconnect_factory", RC_FN(rsconnect_factory)},
+  {RC_ADDR(signin_start_no_uplay), "signin_start_no_uplay", RC_FN(signin_start_no_uplay)},
+  {RC_ADDR(dlc_worker_flush), "dlc_worker_flush", RC_FN(dlc_worker_flush)},
+  {RC_ADDR(dlc_job_preview), "dlc_job_preview", RC_FN(dlc_job_preview)},
+  {RC_ADDR(dlc_job_request), "dlc_job_request", RC_FN(dlc_job_request)},
+  {RC_ADDR(open_uplay_url), "open_uplay_url", RC_FN(open_uplay_url)},
+  {RC_ADDR(dlc_connection_changed), "dlc_connection_changed", RC_FN(dlc_connection_changed)},
+  {RC_ADDR(autologin), "autologin", RC_FN(autologin)},
 };
 #define OV_ONLINE_COUNT 9
 #endif

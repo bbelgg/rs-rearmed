@@ -148,6 +148,7 @@ Environment variables the build reads:
 |---|---|---|
 | `RS_BUILD_DIR` | `build` in the repository | where the app build goes when no output directory is given (the shims and network guard stay in `build/`) |
 | `RC_IMAGE` | `analysis/cg/Rocksmith2014_x64_plain` | the game image to recompile (step 3) |
+| `RC_TARGET` | `mac-x64` | which game the image is from: the tables in `tools/targets/<target>` (only `mac-x64` so far) |
 | `RC_PY` | `analysis/venv/bin/python` | Python with Capstone (step 2) |
 | `RS_GAME_DIR` | the default Steam library | the game folder; the app's icon is copied from it |
 | `SHIM_STEAM`, `SHIM_BINK`, `SHIM_CG` | the builds from step 4 | other arm64 builds of the Steam, Bink and Cg shims to bundle |

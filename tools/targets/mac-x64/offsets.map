@@ -1,0 +1,73 @@
+# Struct field offsets, sizes and vtable slots of the mac-x64 game: NAME VALUE (tools/targets/targets.py).
+# Native code reads them with RC_OFF(name); a name ending in _slot is a vtable slot index (RC_SLOT).
+# `NAME unsupported REASON` = no counterpart in this game.
+UIMenu_LAS_SongsList_qi_this_adj  -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopSongs_qi_this_adj      -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopGear_qi_this_adj       -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopPacks_qi_this_adj      -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
+service_manager_quit              0x144   # ServiceManager: u8 quit flag
+game_config_vsync                 0x3c    # config block: u32 vsync
+input_sink_full_char              -0x28   # input_sink's frame (frame pointer relative): the full character
+thread_priority_index             0x20    # engine thread: int32 priority index
+thread_pthread                    0x30    # engine thread: pthread_t
+path_obj_refs                     0x28    # interned path object: int refcount
+rmutex_owner                      0x40    # the game's recursive mutex: pthread_t owner
+rmutex_depth                      0x48    # the game's recursive mutex: int depth
+dlc_installing                    0xa     # DLC coordinator: u8 installing flag
+dlc_pending                       0x8     # DLC coordinator: u8
+dlc_check_on                      0x9     # DLC coordinator: u8
+dlc_first_done                    0x1a0   # DLC coordinator: u8
+dlc_tail_done                     0x1a1   # DLC coordinator: u8
+dlc_clear_map                     0xc8    # DLC coordinator: u8 clear-the-map request
+dlc_map                           0x48    # DLC coordinator: std::map
+dlc_map_root                      0x50    # DLC coordinator: map root node
+dlc_map_begin                     0x58    # DLC coordinator: map begin node
+dlc_map_end                       0x60    # DLC coordinator: map end node
+dlc_map_size                      0x68    # DLC coordinator: map size
+json_number_refs                  0x8     # number object: int32 refcount
+json_number_value                 0x10    # number object: double value
+json_number_add_ref_slot          0x0     # number object vtable: AddRef
+json_number_release_slot          0x1     # number object vtable: Release
+ak_ps_refills                     0x54    # AkPlatformInitSettings: u16 uNumRefillsInVoice
+ak_sink_refills                   0x94    # CoreAudio sink: u32 ring refill count
+ak_sink_ring                      0x28    # CoreAudio sink: ring buffer pointer
+si_state                          0x228   # SoundInput: u32 state (2 = closed, to be opened)
+si_dev                            0x30    # SoundInput: u8 selected, u32 AudioObjectID at +4
+si_channels                       0x20    # SoundInput: u32 channel count
+ak_lengine_stop                   0x4     # LEngine thread argument: u8 stop flag (+0 mach semaphore)
+siq_bufs                          0x8     # SoundInput queue: slot buffer pointers (5)
+siq_filled                        0x30    # SoundInput queue: int32 filled flags (5)
+siq_slot_size                     0x44    # SoundInput queue: u16 slot size (bytes)
+siq_read_off                      0x46    # SoundInput queue: u16 read offset
+siq_read_idx                      0x4a    # SoundInput queue: u16 read index
+siq_empty                         0x4d    # SoundInput queue: u8 reader found the slot empty
+siq_lock                          0x50    # SoundInput queue: pthread mutex
+guest_jmp_buf_size                0x94    # sizeof(jmp_buf) of the game's C library
+service_holder_sm                 0x8     # ServiceManager holder: the ServiceManager
+efd_inc_ref_slot                  0x1     # efd IBase vtable: IncRefCount
+efd_dec_ref_slot                  0x2     # efd IBase vtable: DecRefCount
+efd_query_interface_slot          0x4     # efd IBase vtable: QueryInterface
+sm_get_system_service_slot        0xf     # ServiceManager vtable: GetSystemService
+config_get_bool_slot              0x15    # config manager vtable: GetValue(bool)
+connect_set_dlc_service_slot      0x87    # RSConnectService vtable: set DLC service
+connect_set_profile_service_slot  0x88    # RSConnectService vtable: set profile service
+connect_set_extension_slot        0x89    # RSConnectService vtable: set extension service
+rs_object_size_steam_service      0x148   # sizeof RSSteamService
+rs_object_size_connect_service    0x198   # sizeof RSConnectService_Steam
+rs_object_size_dlc_service        0x1c0   # sizeof RSDLCService_Steam
+rs_object_size_profile_service    0xf0    # sizeof RSProfileService_MacOS
+rs_object_size_property_object    0x78    # sizeof the empty property object
+property_object_ref_slot          0x0     # empty property object vtable: the reference its maker takes
+profile_regs_pad                  0x8     # RSProfileService: int[2] pad of each player
+profile_pad_player                0x10    # RSProfileService: int[4] player of each pad, -1 = none
+profile_active                    0x28    # RSProfileService: byte[2]
+profile_prev                      0x2c    # RSProfileService: int
+profile_state                     0x30    # RSProfileService: int sign-in state
+profile_player                    0x68    # RSProfileService: int player
+profile_sub                       0xe8    # RSProfileService: int sub-state
+profile_block_a                   0x7d    # RSProfileService: byte, StartSignIn refuses when set
+profile_block_b                   0x7f    # RSProfileService: byte, StartSignIn refuses when set
+profile_block_c                   0x80    # RSProfileService: byte, StartSignIn refuses when set
+profile_set_pad_slot              0x11    # RSProfileService vtable: SetPad(this, player, pad)
+dlc_job_delete_slot               0x1     # DLC-preview job functor vtable: delete
+dlc_job_fail_slot                 0x4     # DLC-preview job functor vtable: completion (job, bool failed)

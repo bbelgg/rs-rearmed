@@ -44,6 +44,7 @@
 #include <execinfo.h>
 #include <sys/ucontext.h>
 
+#include "rc_abi.h"
 #include "rc_rt.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
@@ -187,7 +188,7 @@ static void load_mods(const char *where) {
 // rewrite in shims/platform defines).
 
 static int fix_objc(void) {
-  const struct mach_header_64 *mh = (const void *)(rc_slide + 0x100000000ull);
+  const struct mach_header_64 *mh = (const void *)RC_GA(mach_header);
   if (mh->magic != MH_MAGIC_64) {
     fprintf(stderr, "[rc] image header not mapped\n");
     return -1;
@@ -364,7 +365,7 @@ int main(int argc, char **argv, char **envp, char **apple) {
   if (init_only) {
     Class mb = objc_getClass("MessageBox");
     printf("init-only: MessageBox classref %s, instance ShowAlert:withDescription: %s\n",
-           mb && *(uint64_t *)(rc_slide + 0x10186da28ull) == (uint64_t)(uintptr_t)mb ? "-> native class" : "NOT redirected",
+           mb && *(uint64_t *)RC_GA(objc_classref_MessageBox) == (uint64_t)(uintptr_t)mb ? "-> native class" : "NOT redirected",
            mb && class_getInstanceMethod(mb, sel_registerName("ShowAlert:withDescription:")) ? "present" : "MISSING");
     printf("init-only: image loaded in %.3f s, %d initializers run in %.3f s; classrefs redirected: %d; "
            "unresolved %llu slots / %llu symbols\n",

@@ -153,7 +153,13 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
     def is_noreturn(self, f):
         """True if no path through in-image function f returns: no `ret`, no
         indirect tail jump, no tail call to a returning function. Cached;
-        functions on the current recursion stack count as returning."""
+        functions on the current recursion stack count as returning, so on a
+        recursion cycle the answers depend on which function was asked first:
+        a build answers them all once, in address order (noreturn_table), and
+        hands the table to every worker (set_noreturn_table)."""
+        fixed = self.__dict__.get("_noret_fixed")
+        if fixed is not None and f in fixed:
+            return fixed[f]
         cache = self.__dict__.setdefault("_noret_cache", {})
         if f in cache:
             return cache[f]
@@ -181,6 +187,21 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 break
         cache[f] = res
         return res
+
+    def noreturn_table(self):
+        """is_noreturn of every function start, asked in address order: the same
+        table whatever order the functions are later translated in."""
+        out = {}
+        for f in self.fsorted:
+            self.tables, self.noret = {}, set()
+            try:
+                out[f] = self.is_noreturn(f)
+            except Exception:  # left out: a worker meets the same error and stubs the function, as before
+                pass
+        return out
+
+    def set_noreturn_table(self, table):
+        self._noret_fixed = table
 
     # --- operands ----------------------------------------------------------
     def reg(self, i, r):

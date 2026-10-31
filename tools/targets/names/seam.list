@@ -1,0 +1,22 @@
+# Game functions and globals the platform seam (tools/ws7/recomp/app/seam_platform.c) calls and reads.
+game_bootstrap      # GameBootstrap: SetGameRoot, efd path hooks, Lua owner, LoadConfig, VFS, MainService init
+game_frame          # GameFrame: one frame; returns quit
+game_shutdown       # GameShutdown
+set_app_focus       # SetAppFocus: focus gained / lost (pauses audio)
+input_sink          # engine input queue sink
+set_resolution      # GRDisplaySettings resolution
+set_fullscreen      # GRDisplaySettings full screen
+get_fullscreen      # GRDisplaySettings full screen
+get_resolution      # GRDisplaySettings resolution
+set_visual_quality  # GRDisplaySettings visual quality
+service_manager     # the efd ServiceManager, or NULL
+ui_current          # current UI object, or NULL
+ui_menu             # its menu, or NULL
+ui_accepts          # menu takes UI events
+ui_event            # send a UI event
+efd_set_path_hooks  # efd path callbacks
+app_focus           # focus byte (SetFocus)
+main_service        # MainService_MacOS instance
+lua_owner           # the Lua owner GameBootstrap creates
+gl_context          # g_glContext: the NSOpenGLContext
+game_config         # the engine's config block (0x4c bytes, layout == rsp_config)

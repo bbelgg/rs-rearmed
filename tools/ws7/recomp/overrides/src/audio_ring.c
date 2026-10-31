@@ -14,9 +14,7 @@
 #include "audio.h"
 #include "rc_hook.h"
 
-#define AK_INIT 0x100ab0a30ull          // AK::SoundEngine::Init(AkInitSettings *, AkPlatformInitSettings *)
-#define PS_REFILLS 0x54                 // AkPlatformInitSettings: u16 uNumRefillsInVoice
-#define SINK_RING_ALLOC 0x100aa75b0ull  // (sink, frames per channel): allocates the ring
+#define PS_REFILLS RC_OFF(ak_ps_refills)  // AkPlatformInitSettings: u16 uNumRefillsInVoice
 #define AK_SUCCESS 1u
 #define AK_INSUFFICIENT_MEMORY 0x34u
 
@@ -42,18 +40,18 @@ static int before_ak_init(rc_ctx *c, void *user) {
 }
 
 __attribute__((constructor)) static void ring_init(void) {
-  if (rc_hook_add(AK_INIT, before_ak_init, NULL, NULL)) rs_audio_log("no AK::SoundEngine::Init hook point");
+  if (rc_hook_add(RC_ADDR(ak_init), before_ak_init, NULL, NULL)) rs_audio_log("no AK::SoundEngine::Init hook point");
 }
 
 // Sink Init(this, const u32 *refills): the original stores *refills at +0x94, allocates the ring and
 // returns AK_Success when it got one (+0x28), else AK_InsufficientMemory.
-void F_100aa7be0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(ak_sink_ring_init)(rc_ctx *c) {
+  OV_ARGS_OF(ak_sink_ring_init, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint32_t refills = *OV_PTR(a, uint32_t);
   uint32_t ring = atomic_load(&g_ring_refills);
   if (!ring) ring = refills;
-  *(uint32_t *)(self + 0x94) = ring;
-  OV_GUEST(SINK_RING_ALLOC, (uint64_t)(uintptr_t)self, (uint64_t)ring << 8);
-  ov_ret_u32(c, *(uint64_t *)(self + 0x28) ? AK_SUCCESS : AK_INSUFFICIENT_MEMORY);
+  *(uint32_t *)(self + RC_OFF(ak_sink_refills)) = ring;
+  OV_GUEST(ak_sink_ring_alloc, (uint64_t)(uintptr_t)self, (uint64_t)ring << 8);
+  ov_ret_u32(c, *(uint64_t *)(self + RC_OFF(ak_sink_ring)) ? AK_SUCCESS : AK_INSUFFICIENT_MEMORY);
 }

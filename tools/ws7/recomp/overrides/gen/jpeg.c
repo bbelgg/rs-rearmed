@@ -5,9 +5,8 @@
 #include "jpeglib.h"
 #include "jpeg_glue.h"
 
-/* 0x100b40bf0 jpeg_CreateDecompress */
-void F_100b40bf0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_CreateDecompress)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_CreateDecompress, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   int p1 = (int)OV_U64(a);
   size_t p2 = (size_t)OV_U64(a);
@@ -16,18 +15,16 @@ void F_100b40bf0(rc_ctx *c) {
   ov_ret_void(c);
 }
 
-/* 0x100b41030 jpeg_finish_decompress */
-void F_100b41030(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_finish_decompress)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_finish_decompress, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   ov_jpeg_fix(p0);
   boolean r = jpeg_finish_decompress(p0);
   OV_RET_I32(c, r);
 }
 
-/* 0x100b41100 jpeg_read_header */
-void F_100b41100(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_read_header)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_read_header, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   boolean p1 = (boolean)OV_U64(a);
   ov_jpeg_fix(p0);
@@ -35,36 +32,32 @@ void F_100b41100(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100b41180 jpeg_abort_decompress */
-void F_100b41180(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_abort_decompress)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_abort_decompress, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   ov_jpeg_fix(p0);
   jpeg_abort_decompress(p0);
   ov_ret_void(c);
 }
 
-/* 0x100b41190 jpeg_destroy_decompress */
-void F_100b41190(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_destroy_decompress)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_destroy_decompress, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   ov_jpeg_fix(p0);
   jpeg_destroy_decompress(p0);
   ov_ret_void(c);
 }
 
-/* 0x100b411a0 jpeg_start_decompress */
-void F_100b411a0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_start_decompress)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_start_decompress, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   ov_jpeg_fix(p0);
   boolean r = jpeg_start_decompress(p0);
   OV_RET_I32(c, r);
 }
 
-/* 0x100b413b0 jpeg_read_scanlines */
-void F_100b413b0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_read_scanlines)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_read_scanlines, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   JSAMPARRAY p1 = (JSAMPARRAY)(uintptr_t)OV_U64(a);
   JDIMENSION p2 = (JDIMENSION)OV_U64(a);
@@ -73,18 +66,16 @@ void F_100b413b0(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100b42800 jpeg_read_coefficients */
-void F_100b42800(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_read_coefficients)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_read_coefficients, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   ov_jpeg_fix(p0);
   jvirt_barray_ptr * r = jpeg_read_coefficients(p0);
   OV_RET_PTR(c, r);
 }
 
-/* 0x100b44270 jpeg_resync_to_restart */
-void F_100b44270(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_resync_to_restart)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_resync_to_restart, a, c);
   j_decompress_ptr p0 = (j_decompress_ptr)(uintptr_t)OV_U64(a);
   int p1 = (int)OV_U64(a);
   ov_jpeg_fix(p0);
@@ -92,9 +83,8 @@ void F_100b44270(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100b57920 jpeg_std_error */
-void F_100b57920(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(jpeg_std_error)(rc_ctx *c) {
+  OV_ARGS_OF(jpeg_std_error, a, c);
   struct jpeg_error_mgr * p0 = (struct jpeg_error_mgr *)(uintptr_t)OV_U64(a);
   struct jpeg_error_mgr * r = jpeg_std_error(p0);
   OV_RET_PTR(c, r);

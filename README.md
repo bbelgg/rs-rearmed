@@ -121,8 +121,10 @@ whenever it is there.
 
 From 1.2.0 the game loads every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` at startup, so
 mods can change how it works without a rebuild. A reinstall keeps that folder. The build gives them **hook
-points**, game functions they can run code before and after (`tools/ws7/recomp/overrides/hooks.skip`,
-`tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports its runtime to them.
+points**, game functions they can run code before and after (`tools/targets/names/hooks.list`,
+`tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports its runtime to them. A mod finds a
+hook point by its name, `rc_hook_add_name("game_frame", pre, post, user)`; `rc_hook_add` with a game
+address keeps working, and `rc_target()` says which game the app was built from (`mac-x64`).
 
 `RS_LOAD_MODS=0` starts the game without them; `RS_MODS_PATH` loads another folder or a single library.
 

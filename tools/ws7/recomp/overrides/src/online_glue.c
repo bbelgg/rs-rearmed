@@ -4,7 +4,8 @@
 #include "rc_ov.h"
 #include "rs_online.h"
 
-#define EFD_ALLOC 0x1012efc90ull /* (size, hint) */
+#define INCREF RC_SLOT(efd_inc_ref)
+#define DECREF RC_SLOT(efd_dec_ref)
 
 // --- RSConnectGameInterface as the stub sees it ---------------------------------------------------
 // The stub posts its events through slot 58 of the game's RSConnectGameInterface. That object's vtable
@@ -25,7 +26,7 @@ static void gi_event(gi_proxy *self, void *name, void *param, void **extra) {
 }
 static void *hook_game_interface(void *ctx) {
   (void)ctx;
-  uint64_t real = RC_LD(uint64_t, RC_A(0x1019033a0 /* RS_ORIG_CONNECT_GAME_INTERFACE */));
+  uint64_t real = RC_LD(uint64_t, RC_GA(rs_connect_game_interface));
   if (!real) return NULL;
   gi.real = real;
   gi_vtbl[RS_GAME_INTERFACE_SLOT_EVENT] = (void *)gi_event;
@@ -34,34 +35,34 @@ static void *hook_game_interface(void *ctx) {
 // Slot 28's empty property object: what 0x100a20570 makes (efd alloc 0x78, ctor 0x1000f9ad0, one reference).
 static void *hook_empty_object(void *ctx) {
   (void)ctx;
-  uint64_t o = ov_call_guest(EFD_ALLOC, (uint64_t[]){0x78, 0}, 2);
-  ov_call_guest(0x1000f9ad0, &o, 1);
-  OV_VCALL(o, 0);
+  uint64_t o = OV_GUESTV(efd_alloc, (uint64_t[]){RC_OFF(rs_object_size_property_object), 0}, 2);
+  OV_GUESTV(property_object_ctor, &o, 1);
+  OV_VCALL(o, RC_SLOT(property_object_ref));
   ov_native_vtable((void *)(uintptr_t)o);
   return (void *)(uintptr_t)o;
 }
 
-static uint64_t alloc_obj(uint64_t size) { return ov_call_guest(EFD_ALLOC, (uint64_t[]){size, 0}, 2); }
+static uint64_t alloc_obj(uint64_t size) { return OV_GUESTV(efd_alloc, (uint64_t[]){size, 0}, 2); }
 
-/* 0x100a0c360 the RSConnect factory (disassembly of the original; slots: 1 IncRefCount, 2 DecRefCount,
+/* the RSConnect factory (disassembly of the original; slots: 1 IncRefCount, 2 DecRefCount,
  * 135/136/137 RSConnectService set DLC / profile / extension service). */
-void F_100a0c360(rc_ctx *c) {
-  uint64_t g = ov_call_guest(0x1003720e0, NULL, 0);  // the 0x10-byte game interface helper
-  if (g) OV_VCALL(g, 1);
-  uint64_t steam = alloc_obj(0x148);  // RSSteamService
-  ov_call_guest(0x100a06650, &steam, 1);
-  if (steam) OV_VCALL(steam, 1);
-  uint64_t svc = alloc_obj(0x198);  // RSConnectService_Steam
-  ov_call_guest(0x100a04e80, (uint64_t[]){svc, steam}, 2);
-  if (svc) OV_VCALL(svc, 1);
-  uint64_t dlc = alloc_obj(0x1c0);  // RSDLCService_Steam
-  ov_call_guest(0x100a0d560, &dlc, 1);
-  if (dlc) OV_VCALL(dlc, 1);
-  uint64_t prof = alloc_obj(0xf0);  // RSProfileService_MacOS
-  ov_call_guest(0x100a0f9d0, &prof, 1);
-  if (prof) OV_VCALL(prof, 1);
-  OV_VCALL(svc, 135, dlc);
-  OV_VCALL(svc, 136, prof);
+void RC_FN(rsconnect_factory)(rc_ctx *c) {
+  uint64_t g = OV_GUESTV(game_interface_helper_new, NULL, 0);  // the 0x10-byte game interface helper
+  if (g) OV_VCALL(g, INCREF);
+  uint64_t steam = alloc_obj(RC_OFF(rs_object_size_steam_service));  // RSSteamService
+  OV_GUESTV(rs_steam_service_ctor, &steam, 1);
+  if (steam) OV_VCALL(steam, INCREF);
+  uint64_t svc = alloc_obj(RC_OFF(rs_object_size_connect_service));  // RSConnectService_Steam
+  OV_GUESTV(rs_connect_service_steam_ctor, (uint64_t[]){svc, steam}, 2);
+  if (svc) OV_VCALL(svc, INCREF);
+  uint64_t dlc = alloc_obj(RC_OFF(rs_object_size_dlc_service));  // RSDLCService_Steam
+  OV_GUESTV(rs_dlc_service_steam_ctor, &dlc, 1);
+  if (dlc) OV_VCALL(dlc, INCREF);
+  uint64_t prof = alloc_obj(RC_OFF(rs_object_size_profile_service));  // RSProfileService_MacOS
+  OV_GUESTV(rs_profile_service_ctor, &prof, 1);
+  if (prof) OV_VCALL(prof, INCREF);
+  OV_VCALL(svc, RC_SLOT(connect_set_dlc_service), dlc);
+  OV_VCALL(svc, RC_SLOT(connect_set_profile_service), prof);
   rsg_online_config cfg = {hook_game_interface, hook_empty_object, NULL};
   uint64_t ext = (uint64_t)(uintptr_t)rsg_online_extension_create(&cfg);  // RSConnectExtension_Offline
   {
@@ -75,47 +76,47 @@ void F_100a0c360(rc_ctx *c) {
     rc_native_register_sret(vt[29]);
     rc_native_register_sret(vt[37]);
   }
-  OV_VCALL(ext, 1);
-  OV_VCALL(svc, 137, ext);
-  uint64_t *gsvc = (uint64_t *)(uintptr_t)RC_A(0x101903398 /* RS_ORIG_CONNECT_SERVICE */);
-  uint64_t *ggi = (uint64_t *)(uintptr_t)RC_A(0x1019033a0 /* RS_ORIG_CONNECT_GAME_INTERFACE */);
+  OV_VCALL(ext, INCREF);
+  OV_VCALL(svc, RC_SLOT(connect_set_extension), ext);
+  uint64_t *gsvc = (uint64_t *)(uintptr_t)RC_GA(rs_connect_service);
+  uint64_t *ggi = (uint64_t *)(uintptr_t)RC_GA(rs_connect_game_interface);
   if (*gsvc != svc) {
-    if (*gsvc) OV_VCALL(*gsvc, 2);
+    if (*gsvc) OV_VCALL(*gsvc, DECREF);
     *gsvc = svc;
-    OV_VCALL(svc, 1);
+    OV_VCALL(svc, INCREF);
   }
   if (*ggi != g) {
-    if (*ggi) OV_VCALL(*ggi, 2);
+    if (*ggi) OV_VCALL(*ggi, DECREF);
     *ggi = g;
-    if (g) OV_VCALL(g, 1);
+    if (g) OV_VCALL(g, INCREF);
   }
-  if (ext) OV_VCALL(ext, 2);
-  if (prof) OV_VCALL(prof, 2);
-  if (dlc) OV_VCALL(dlc, 2);
-  if (svc) OV_VCALL(svc, 2);
-  if (steam) OV_VCALL(steam, 2);
-  if (g) OV_VCALL(g, 2);
+  if (ext) OV_VCALL(ext, DECREF);
+  if (prof) OV_VCALL(prof, DECREF);
+  if (dlc) OV_VCALL(dlc, DECREF);
+  if (svc) OV_VCALL(svc, DECREF);
+  if (steam) OV_VCALL(steam, DECREF);
+  if (g) OV_VCALL(g, DECREF);
   ov_ret_void(c);
 }
 
-/* 0x100373cd0 GameInterface slot 68: GetConfigBool(this, key, default). The original asks the efd
+/* GameInterface slot 68: GetConfigBool(this, key, default). The original asks the efd
  * ConfigManager (ClassID 0x7000005): sm = [0x1000dc450()+8]; svc = sm->GetSystemService(id) (slot 15);
  * svc->QueryInterface(id, &out) (slot 4); out->GetBool(key, default) (slot 21). Same here, except
  * that "RendezVous.SkipLogin" has default true: with no [RendezVous] section (the shipped
  * pkgconfig.ini has none) the sign-in state machine (0x100a13ee0, state 9) never starts a login. */
-void F_100373cd0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(efd_get_config_bool)(rc_ctx *c) {
+  OV_ARGS_OF(efd_get_config_bool, a, c);
   (void)OV_U64(a);  // this
   const char *key = OV_PTR(a, const char);
   uint8_t dflt = (uint8_t)OV_U64(a);
   if (key && strcmp(key, "RendezVous.SkipLogin") == 0) dflt = 1;
   uint8_t res = dflt;
-  uint64_t holder = ov_call_guest(0x1000dc450, NULL, 0);
-  uint64_t sm = RC_LD(uint64_t, holder + 8);
-  uint64_t svc = OV_VCALL(sm, 15, 0x7000005);
+  uint64_t holder = OV_GUESTV(service_manager_holder, NULL, 0);
+  uint64_t sm = RC_LD(uint64_t, holder + RC_OFF(service_holder_sm));
+  uint64_t svc = OV_VCALL(sm, RC_SLOT(sm_get_system_service), 0x7000005);
   uint64_t out = 0;
-  if (svc && (uint8_t)OV_VCALL(svc, 4, 0x7000005, (uint64_t)(uintptr_t)&out) && out)
-    res = (uint8_t)OV_VCALL(out, 21, (uint64_t)(uintptr_t)key, dflt);
+  if (svc && (uint8_t)OV_VCALL(svc, RC_SLOT(efd_query_interface), 0x7000005, (uint64_t)(uintptr_t)&out) && out)
+    res = (uint8_t)OV_VCALL(out, RC_SLOT(config_get_bool), (uint64_t)(uintptr_t)key, dflt);
   ov_ret_u32(c, res);
 }
 
@@ -133,22 +134,22 @@ void F_100373cd0(rc_ctx *c) {
  * 0x100a05e70: sub-state 4 (plus "save crd if logged in", never true offline). Sub-state 4 lets the machine run.
  * State 1 is written only here, so setting sub-state 4 at this point is that same end state, reached before the
  * Tick can take the branch. Player 1 (+0x68 != 0) never takes it; a nonzero sub-state is left alone. */
-#define PS_REGS_PAD 0x08   /* int[2]: pad of each player */
-#define PS_PAD_PLAYER 0x10 /* int[4]: player of each pad, -1 = none */
-#define PS_ACTIVE 0x28     /* byte[2] */
-#define PS_PREV 0x2c
-#define PS_STATE 0x30
-#define PS_PLAYER 0x68
-#define PS_SUB 0xe8
+#define PS_REGS_PAD RC_OFF(profile_regs_pad)     /* int[2]: pad of each player */
+#define PS_PAD_PLAYER RC_OFF(profile_pad_player) /* int[4]: player of each pad, -1 = none */
+#define PS_ACTIVE RC_OFF(profile_active)         /* byte[2] */
+#define PS_PREV RC_OFF(profile_prev)
+#define PS_STATE RC_OFF(profile_state)
+#define PS_PLAYER RC_OFF(profile_player)
+#define PS_SUB RC_OFF(profile_sub)
 #define PS_SUB_DIALOG_DONE 4
-#define PS_SLOT_SET_PAD 17 /* 0x100a13850 (this, player, pad) */
-void F_100a13950(rc_ctx *c) {
-  OV_ARGS(a, c);
+#define PS_SLOT_SET_PAD RC_SLOT(profile_set_pad) /* (this, player, pad) */
+void RC_FN(signin_start_no_uplay)(rc_ctx *c) {
+  OV_ARGS_OF(signin_start_no_uplay, a, c);
   uint8_t *p = OV_PTR(a, uint8_t);
   int32_t player = OV_I32(a), pad = OV_I32(a);
 #define I32AT(off) (*(int32_t *)(p + (off)))
-  if (I32AT(PS_PREV) != 0 || I32AT(PS_STATE) != 0 || p[0x7d] || p[0x7f] || (uint32_t)pad > 3 || (uint32_t)player > 1 ||
-      p[0x80]) {
+  if (I32AT(PS_PREV) != 0 || I32AT(PS_STATE) != 0 || p[RC_OFF(profile_block_a)] || p[RC_OFF(profile_block_b)] || (uint32_t)pad > 3 || (uint32_t)player > 1 ||
+      p[RC_OFF(profile_block_c)]) {
     ov_ret_u32(c, 0);
     return;
   }
@@ -177,22 +178,22 @@ void F_100a13950(rc_ctx *c) {
  * coordinator +0x54, buffers) and asks the tick for the "DLCPreview/DownloadEnded" event. Offline every request
  * therefore ends as a failed transfer, at once, on the calling thread. The builders return true like the original
  * when a job was accepted. */
-#define JOB_SLOT_DELETE 1
-#define JOB_SLOT_FAIL 4
+#define JOB_SLOT_DELETE RC_SLOT(dlc_job_delete)
+#define JOB_SLOT_FAIL RC_SLOT(dlc_job_fail)
 static uint64_t dlc_job_fail(uint64_t job) {
   if (!job) return 0;
   OV_VCALL(job, JOB_SLOT_FAIL, 1);
   OV_VCALL(job, JOB_SLOT_DELETE);
   return 1;
 }
-void F_100a24e70(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(dlc_job_preview)(rc_ctx *c) {
+  OV_ARGS_OF(dlc_job_preview, a, c);
   (void)OV_U64(a);  // worker (NULL)
   (void)OV_U64(a);  // std::string item name
   ov_ret_u32(c, (uint32_t)dlc_job_fail(OV_U64(a)));
 }
-void F_100a25170(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(dlc_job_request)(rc_ctx *c) {
+  OV_ARGS_OF(dlc_job_request, a, c);
   (void)OV_U64(a);  // worker (NULL)
   (void)OV_U64(a);  // request type 0..2
   ov_ret_u32(c, (uint32_t)dlc_job_fail(OV_U64(a)));

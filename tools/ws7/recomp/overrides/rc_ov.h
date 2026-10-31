@@ -1,6 +1,7 @@
 // Recompiler overrides: adapters between translated guest code and native functions.
 //
-// An override module defines `void F_<addr>(rc_ctx *c)` for a guest function. The
+// An override module defines `void RC_FN(name)(rc_ctx *c)` (the function's F_<addr> on the
+// target being built, rc_abi.h) for a guest function named in tools/targets/names. The
 // translated caller has pushed the return address (c->r[4] points at it), put the
 // SysV arguments in rdi rsi rdx rcx r8 r9 / xmm0-7, and further arguments on the guest
 // stack above the return address. The adapter reads the arguments, calls the native
@@ -8,8 +9,8 @@
 // (`c->r[4] += 8`), like the callee's `ret` would. It never touches rbx rbp r12-r15
 // (a native function preserves them), so the caller's callee-saved state is intact.
 //
-//   void F_100e0fcf0(rc_ctx *c) {            // lua_gettop
-//     OV_ARGS(a, c);
+//   void RC_FN(lua_gettop)(rc_ctx *c) {
+//     OV_ARGS_OF(lua_gettop, a, c);
 //     lua_State *L = OV_PTR(a, lua_State);
 //     OV_RET_I32(c, lua_gettop(L));
 //   }
@@ -18,7 +19,7 @@
 //   * a guest function pointer argument or struct field the native code will call:
 //     ov_fn() turns it into a native-callable pointer (the runtime's trampoline pool, or a
 //     native alias registered with ov_alias_add);
-//   * calls back into translated code: ov_call_guest();
+//   * calls back into translated code: OV_GUEST(name, ...);
 //   * a native function that can longjmp out (Lua errors): OV_PROTECT around it.
 #ifndef RC_OV_H
 #define RC_OV_H
@@ -27,6 +28,7 @@
 #include <stdint.h>
 #include <string.h>
 
+#include "rc_abi.h"
 #include "rc_call.h"
 #include "rc_rt.h"
 
@@ -45,6 +47,14 @@ static inline void ov_args_init(rc_args *a, rc_ctx *c) {
   a->sp += 8;
 }
 #define OV_ARGS(a, c) rc_args a; ov_args_init(&a, (c))
+static inline void ov_args_init_cc(rc_args *a, rc_ctx *c, int cc) {
+  (void)cc;  // mac-x64: every function is SysV
+  ov_args_init(a, c);
+}
+// The arguments of the override of `name`, read by its calling convention (RC_CC_<name>: the same as
+// OV_ARGS on mac-x64; on win-x86 thiscall / fastcall take the first ones from ecx / edx). Use it in an
+// adapter; OV_ARGS stays for helpers that serve several functions of the target's default convention.
+#define OV_ARGS_OF(name, a, c) rc_args a; ov_args_init_cc(&a, (c), RC_CC_##name)
 #define OV_U64(a) rc_arg_i(&(a))
 #define OV_I32(a) ((int32_t)rc_arg_i(&(a)))
 #define OV_U32(a) ((uint32_t)rc_arg_i(&(a)))
@@ -73,6 +83,7 @@ static inline void ov_ret_rax_rdx(rc_ctx *c, uint64_t a, uint64_t d) { c->r[0] =
 // native function with the same C signature, so no trampoline round trip), and else
 // rc_tramp_get(p), a native-callable stub that runs the guest function.
 void ov_alias_add(uint64_t vmaddr, void *native);
+#define OV_ALIAS(name, native) ov_alias_add(RC_ADDR_##name, (native))
 void *ov_fn(uint64_t p);
 #define OV_FN(T, p) ((T)ov_fn((uint64_t)(uintptr_t)(p)))
 // In-place version for callback fields of a structure that guest code filled in.
@@ -109,13 +120,16 @@ int ov_is_libc_longjmp(const void *fn);
     (c)->r[13] = ov_sv_[4]; (c)->r[14] = ov_sv_[5]; (c)->r[15] = ov_sv_[6]; (c)->mxcsr = (uint32_t)ov_sv_[7]; } while (0)
 
 // --- native -> guest ------------------------------------------------------------------
-// Call the translated function at image address vmaddr (the unslid address, as in the
-// comments above each override) with up to 6 integer arguments; returns rax.
+// Call the translated function at image address vmaddr (unslid) with up to 6 integer
+// arguments; returns rax.
 static inline uint64_t ov_call_guest(uint64_t vmaddr, const uint64_t *ints, int nint) {
   return rc_call_guest(RC_A(vmaddr), ints, nint, 0, 0, 0);
 }
-#define OV_GUEST(vmaddr, ...) ({ const uint64_t ov_args_[] = {__VA_ARGS__}; \
-    ov_call_guest((vmaddr), ov_args_, (int)(sizeof ov_args_ / sizeof *ov_args_)); })
+// Call the game function `name` (tools/targets) with integer arguments, by its convention.
+#define OV_GUEST(name, ...) ({ const uint64_t ov_args_[] = {__VA_ARGS__}; \
+    ov_call_guest(RC_ADDR_##name, ov_args_, (int)(sizeof ov_args_ / sizeof *ov_args_)); })
+// The same with the arguments in an array: OV_GUESTV(name, ints, nint)
+#define OV_GUESTV(name, ...) ov_call_guest(RC_ADDR_##name, __VA_ARGS__)
 
 
 // A virtual call on an object that is either translated guest code's (vtable entries are image

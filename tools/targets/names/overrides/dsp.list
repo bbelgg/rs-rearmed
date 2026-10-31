@@ -1,0 +1,5 @@
+# Override module `dsp`: the game functions liboverrides_dsp.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+# Native DSP functions, bit-identical to the translation of the original (src/dsp_glue.c).
+dsp_analysis_window  # analysis window (ramp / Hamming / Hann), windows cached per thread

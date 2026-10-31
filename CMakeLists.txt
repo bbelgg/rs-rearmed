@@ -52,3 +52,9 @@ enable_testing()
 foreach(shim libstdcxx bink opengl cg game platform)
   add_subdirectory(shims/${shim})
 endforeach()
+
+# The per-game name tables (tools/targets): every name resolves in every target.
+find_package(Python3 COMPONENTS Interpreter)
+if(Python3_FOUND)
+  add_test(NAME targets.check COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/targets/test_targets.py)
+endif()

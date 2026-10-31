@@ -25,35 +25,12 @@
 #include <sys/mman.h>
 
 #include "rc.h"
+#include "rc_abi.h"
 #include "rc_rt.h"
 #include "seam.h"
 
-// Image addresses (unslid). One place, so the report can list them.
-enum {
-  A_GAME_BOOTSTRAP = 0x100179dc0,  // (const char *appDir, const char *cwd)
-  A_GAME_FRAME = 0x10017a020,      // () -> bool quit
-  A_GAME_SHUTDOWN = 0x10017a0d0,
-  A_SET_APP_FOCUS = 0x1000e1e70,   // (bool)
-  A_INPUT_SINK = 0x100ba1190,      // (int code, int a, int b)
-  A_SET_RESOLUTION = 0x1008bb1a0,  // (w, h)
-  A_SET_FULLSCREEN = 0x1008bb350,  // (uint8_t)
-  A_GET_FULLSCREEN = 0x1008bb390,  // () -> int
-  A_GET_RESOLUTION = 0x1008bb850,  // (int *w, int *h)
-  A_SET_QUALITY = 0x1008bb670,     // (int)
-  A_SERVICE_MANAGER = 0x1002a74f0, // () -> sm or NULL
-  A_UI_CURRENT = 0x100365e30,      // () -> obj or NULL
-  A_UI_MENU = 0x100365e50,         // (obj) -> menu or NULL
-  A_UI_ACCEPTS = 0x1003151a0,      // (menu) -> bool
-  A_UI_EVENT = 0x100314f70,        // (menu, int event, int arg)
-  A_EFD_PATH_HOOKS = 0x1012f6ce0,  // (0, 0, cb x4)
-  D_FOCUS_BYTE = 0x10194b391,
-  D_MAIN_SERVICE = 0x1018e7470,
-  D_LUA_OWNER = 0x1018e7478,
-  D_GL_CONTEXT = 0x1018e7488,
-  D_CONFIG = 0x101873e08,  // 0x4c bytes, layout == rsp_config
-  SM_QUIT_FLAG = 0x144,
-};
-#define GA(a) (rc_slide + (uint64_t)(a))
+// Game functions and data by name (tools/targets/names/seam.list; addresses, prototypes and offsets in the
+// target's symbols.map / offsets.map).
 
 // ---------------------------------------------------------------------------
 // Large native stack for non-main threads.
@@ -127,12 +104,12 @@ static void gjob_run(void *p) {
   j->ret = rc_call_guest(j->fn, j->args, j->n, NULL, 0, NULL);
 }
 uint64_t rcapp_gcall(uint64_t vmaddr, int nargs, const uint64_t *args) {
-  gjob j = {GA(vmaddr), args, nargs, 0};
+  gjob j = {RC_A(vmaddr), args, nargs, 0};
   rcapp_on_big_stack(gjob_run, &j);
   return j.ret;
 }
-#define G0(va) rcapp_gcall((va), 0, NULL)
-#define G(va, ...) ({ const uint64_t a_[] = {__VA_ARGS__}; rcapp_gcall((va), (int)(sizeof a_ / 8), a_); })
+#define G0(name) rcapp_gcall(RC_ADDR_##name, 0, NULL)
+#define G(name, ...) ({ const uint64_t a_[] = {__VA_ARGS__}; rcapp_gcall(RC_ADDR_##name, (int)(sizeof a_ / 8), a_); })
 
 // ---------------------------------------------------------------------------
 // State
@@ -150,18 +127,18 @@ static int h_bootstrap(void *ctx, const rsp_boot *b) {
   (void)ctx;
   if (g_booted) return 0;
   // 0x100179dc0 returns early once the Lua owner is set, so a second call is harmless.
-  G(A_GAME_BOOTSTRAP, (uint64_t)(uintptr_t)b->app_dir, (uint64_t)(uintptr_t)b->cwd);
-  if (!*(uint64_t *)GA(D_LUA_OWNER) || !*(uint64_t *)GA(D_MAIN_SERVICE)) {
+  G(game_bootstrap, (uint64_t)(uintptr_t)b->app_dir, (uint64_t)(uintptr_t)b->cwd);
+  if (!*(uint64_t *)RC_GA(lua_owner) || !*(uint64_t *)RC_GA(main_service)) {
     rsp_log("seam: GameBootstrap did not create the Lua owner / MainService_MacOS");
     return -1;
   }
   // efd path hooks with the native functions: copy the root verbatim; the
   // getters return the root. The image calls them through rc_icall, which
   // marshals SysV registers into rc_native_call (signatures are compatible).
-  G(A_EFD_PATH_HOOKS, 0, 0, (uint64_t)(uintptr_t)rsp_path_copy_root, (uint64_t)(uintptr_t)rsp_path_root,
+  G(efd_set_path_hooks, 0, 0, (uint64_t)(uintptr_t)rsp_path_copy_root, (uint64_t)(uintptr_t)rsp_path_root,
     (uint64_t)(uintptr_t)rsp_path_copy_root, (uint64_t)(uintptr_t)rsp_path_root);
   // The engine's config block is the live one; mirror it for native readers.
-  memcpy(rsp_config_global(), (const void *)GA(D_CONFIG), sizeof(rsp_config));
+  memcpy(rsp_config_global(), (const void *)RC_GA(game_config), sizeof(rsp_config));
   g_booted = 1;
   return 0;
 }
@@ -169,52 +146,52 @@ static int h_bootstrap(void *ctx, const rsp_boot *b) {
 static int h_frame(void *ctx) {
   (void)ctx;
   if (!g_booted) return 1;
-  return (int)(G0(A_GAME_FRAME) & 0xff);
+  return (int)(G0(game_frame) & 0xff);
 }
 
 static void h_input(void *ctx, int code, int a, int b) {
   (void)ctx;
   if (!g_booted) return;
-  G(A_INPUT_SINK, (uint32_t)code, (uint32_t)a, (uint32_t)b);
+  G(input_sink, (uint32_t)code, (uint32_t)a, (uint32_t)b);
 }
 
 // SetFocus 0x10017a180, first half: the focus byte, then SetAppFocus.
 static void h_app_active(void *ctx, int active) {
   (void)ctx;
-  *(uint8_t *)GA(D_FOCUS_BYTE) = active ? 1 : 0;
-  if (g_booted) G(A_SET_APP_FOCUS, active ? 1 : 0);
+  *(uint8_t *)RC_GA(app_focus) = active ? 1 : 0;
+  if (g_booted) G(set_app_focus, active ? 1 : 0);
 }
 
 // SetFocus second half (focus lost): UI event 0x98 (pause) if the current menu takes it.
 static void h_focus_lost(void *ctx) {
   (void)ctx;
   if (!g_booted) return;
-  if (!G0(A_UI_CURRENT)) return;
-  uint64_t menu = G(A_UI_MENU, G0(A_UI_CURRENT));
+  if (!G0(ui_current)) return;
+  uint64_t menu = G(ui_menu, G0(ui_current));
   if (!menu) return;
-  if (!(G(A_UI_ACCEPTS, menu) & 0xff)) return;
-  G(A_UI_EVENT, menu, 0x98, 0);
+  if (!(G(ui_accepts, menu) & 0xff)) return;
+  G(ui_event, menu, 0x98, 0);
 }
 
 static void h_set_resolution(void *ctx, int w, int h) {
   (void)ctx;
   g_pend.w = w;
   g_pend.h = h;
-  if (g_booted) G(A_SET_RESOLUTION, (uint32_t)w, (uint32_t)h);
+  if (g_booted) G(set_resolution, (uint32_t)w, (uint32_t)h);
 }
 static void h_set_fullscreen(void *ctx, int mode) {
   (void)ctx;
   g_pend.fs = mode;
-  if (g_booted) G(A_SET_FULLSCREEN, (uint64_t)(mode & 0xff));
+  if (g_booted) G(set_fullscreen, (uint64_t)(mode & 0xff));
 }
 static int h_get_fullscreen(void *ctx) {
   (void)ctx;
-  return g_booted ? (int)(uint32_t)G0(A_GET_FULLSCREEN) : g_pend.fs;
+  return g_booted ? (int)(uint32_t)G0(get_fullscreen) : g_pend.fs;
 }
 static void h_set_visual_quality(void *ctx, int q) {
   (void)ctx;
   g_pend.q = q;
-  if (g_booted) G(A_SET_QUALITY, (uint32_t)q);
+  if (g_booted) G(set_visual_quality, (uint32_t)q);
 }
 static void h_get_resolution(void *ctx, int *w, int *h) {
   (void)ctx;
@@ -224,7 +201,7 @@ static void h_get_resolution(void *ctx, int *w, int *h) {
     return;
   }
   int tw = 0, th = 0;  // guest memory is host memory: the engine writes through these
-  G(A_GET_RESOLUTION, (uint64_t)(uintptr_t)&tw, (uint64_t)(uintptr_t)&th);
+  G(get_resolution, (uint64_t)(uintptr_t)&tw, (uint64_t)(uintptr_t)&th);
   *w = tw;
   *h = th;
 }
@@ -251,23 +228,23 @@ static int h_no_vsync(void *ctx) {
   if (!g_booted) return 0;
   if (forced >= 0 && (clock_gettime_nsec_np(CLOCK_UPTIME_RAW) - t0) / 1e9 >= after) return forced;
   uint32_t v;
-  memcpy(&v, (const void *)GA(D_CONFIG + 0x3c), 4);
+  memcpy(&v, (const void *)(RC_GA(game_config) + RC_OFF(game_config_vsync)), 4);
   return v != 0;
 }
 
 // 0x10017a350: ServiceManager +0x144 = 1; no ServiceManager -> the shell exits.
 static int h_request_quit(void *ctx) {
   (void)ctx;
-  uint64_t sm = G0(A_SERVICE_MANAGER);
+  uint64_t sm = G0(service_manager);
   if (!sm) return 0;
-  *(uint8_t *)(sm + SM_QUIT_FLAG) = 1;
+  *(uint8_t *)(sm + RC_OFF(service_manager_quit)) = 1;
   return 1;
 }
 
 static void h_shutdown(void *ctx) {
   (void)ctx;
   if (!g_booted) return;
-  G0(A_GAME_SHUTDOWN);
+  G0(game_shutdown);
   g_booted = 0;
 }
 
@@ -275,7 +252,7 @@ static void h_shutdown(void *ctx) {
 // (which messages it through objc_msgSend thunks, natively).
 static void h_gl_context(void *ctx, void *glctx) {
   (void)ctx;
-  *(uint64_t *)GA(D_GL_CONTEXT) = (uint64_t)(uintptr_t)glctx;
+  *(uint64_t *)RC_GA(gl_context) = (uint64_t)(uintptr_t)glctx;
 }
 
 static const rsp_engine_hooks g_hooks = {

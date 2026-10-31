@@ -300,8 +300,18 @@ Done on the `win-port` branch. What it is, as built:
   resolves in every target or is `unsupported`; overridden and hooked names are functions; no stale map
   entries; and every name the native sources use (`RC_*`, `OV_*`, the seam's `G`, `rc_hook_add_name`) is
   listed.
-- **Verification.** Against a build of `main` from the same image: the generated C (`gen/`, `thunks.c`)
-  and `skip.txt` are byte-identical; every override object is byte-identical except `mods.o` and the
+- **Deterministic translation.** `gen_image.py` was not deterministic: `is_noreturn` cached its answers per
+  worker, and on a recursion cycle (`luaL_error` -> `lua_error` -> ... ) the answer depended on which function
+  the worker had been asked about first, so the order in which batches reached the workers decided whether a
+  call got its "return from no-return call" `rc_fail`. Two runs of `main` without skip lists differ in
+  `part_100e27b80.c`. Now `gen_image.py` answers every function start once, in address order, before it starts
+  the workers (`noreturn_table`, about 50 s), and the workers only look answers up; the output is the same for
+  any `--jobs` / `--batch` and equal to what `main` produced in the runs that agreed.
+- **Verification.** Against `main` from the same image: the generated C (`gen/`, every file), `thunks.c` and
+  `skip.txt` are byte-identical, and stay so across runs: three branch gens with different scheduling
+  (`--jobs 8`, `--jobs 5 --batch 7`, `--jobs 2 --batch 101`), two `main` gens (`--jobs 8`, `--jobs 3 --batch 17`)
+  and the branch's full build all agree on all 245 files (in the P0 configuration `main` itself happened to be
+  stable; without skip lists it is not, the branch is); every override object is byte-identical except `mods.o` and the
   `crypto_mods` copy of `crypto.o`, whose only difference is the renamed DSA-verify symbol
   (`rs_crypto_dsa_verify`); the adapter tables in `gen/*_adapters.h` preprocess to the same tokens (one
   offset now written `(-0x3f0)` instead of `-1008`); the full build passes its smoke and `--init-only`

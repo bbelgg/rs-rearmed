@@ -1,0 +1,11 @@
+# Override module `zlib`: the game functions liboverrides_zlib.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+compress2
+compressBound
+crc32
+inflateReset
+inflateInit_
+inflate
+inflateEnd
+uncompress

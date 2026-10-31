@@ -36,15 +36,15 @@ rs_mods_stats rs_mods_stats_get(void);
 void rs_mods_stats_reset(void);
 
 // The overrides (guest function entry points).
-void F_1000f8d20(rc_ctx *c);  // JSON number object destructor (removes its node)
-void F_1000f8f10(rc_ctx *c);  // JSON number interning (insert/find)
-void F_1000f9920(rc_ctx *c);  // JSON number table rehash
-void F_100158b70(rc_ctx *c);  // path -> interned path object (MD5 cache)
-void F_100a0d730(rc_ctx *c);  // DLC coordinator per-frame update (batched mounting)
-void F_101135520(rc_ctx *c);  // game keyboard: key down
-void F_101135560(rc_ctx *c);  // game keyboard: key up
-void F_101313170(rc_ctx *c);  // thread class SetPriority
-void F_10137683d(rc_ctx *c);  // DSA verify (the SNG caller is bypassed)
+void RC_FN(num_dtor)(rc_ctx *c);  // JSON number object destructor (removes its node)
+void RC_FN(num_intern)(rc_ctx *c);  // JSON number interning (insert/find)
+void RC_FN(num_rehash)(rc_ctx *c);  // JSON number table rehash
+void RC_FN(path_md5)(rc_ctx *c);  // path -> interned path object (MD5 cache)
+void RC_FN(dlc_update)(rc_ctx *c);  // DLC coordinator per-frame update (batched mounting)
+void RC_FN(key_down)(rc_ctx *c);  // game keyboard: key down
+void RC_FN(key_up)(rc_ctx *c);  // game keyboard: key up
+void RC_FN(thread_set_priority)(rc_ctx *c);  // thread class SetPriority
+void RC_FN(sng_verify)(rc_ctx *c);  // DSA verify (the SNG caller is bypassed)
 
 // Addresses of the overrides, like the generated modules' tables (tests register them in a fake image).
 extern const ov_entry ov_mods_entries[];

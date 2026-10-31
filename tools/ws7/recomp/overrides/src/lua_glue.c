@@ -38,11 +38,11 @@ void ov_lua_trace(lua_State *L, int status, const char *what, const char *chunk)
   fprintf(stderr, "[lua] %s%s%s -> %d: %s\n", what, chunk ? " " : "", chunk ? chunk : "", status, msg);
 }
 
-/* 0x100e10680 (no name in the image; one caller, 0x1001767f0): true if the value converts to a
+/* (no name in the image; one caller, 0x1001767f0): true if the value converts to a
    number (tonumber) and the result is an integer-typed one (LUA_TINT). Unlike lua_isinteger, an
    integral float such as 2.0 does not count. */
-void F_100e10680(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(lua_isintvalue)(rc_ctx *c) {
+  OV_ARGS_OF(lua_isintvalue, a, c);
   lua_State *L = OV_PTR(a, lua_State);
   int idx = (int)OV_U64(a);
   TValue tmp;
@@ -53,9 +53,8 @@ void F_100e10680(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100e11940 lua_pushfstring */
-void F_100e11940(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(lua_pushfstring)(rc_ctx *c) {
+  OV_ARGS_OF(lua_pushfstring, a, c);
   lua_State *L = OV_PTR(a, lua_State);
   const char *fmt = OV_PTR(a, const char);
   uint64_t slots[rc_va_max(fmt)];
@@ -68,9 +67,9 @@ void F_100e11940(rc_ctx *c) {
   OV_RET_PTR(c, r);
 }
 
-/* 0x100e133c0 luaL_error: luaL_where(L, 1), the formatted message, lua_concat, lua_error (never returns) */
-void F_100e133c0(rc_ctx *c) {
-  OV_ARGS(a, c);
+/* luaL_error: luaL_where(L, 1), the formatted message, lua_concat, lua_error (never returns) */
+void RC_FN(luaL_error)(rc_ctx *c) {
+  OV_ARGS_OF(luaL_error, a, c);
   lua_State *L = OV_PTR(a, lua_State);
   const char *fmt = OV_PTR(a, const char);
   uint64_t slots[rc_va_max(fmt)];
@@ -85,9 +84,9 @@ void F_100e133c0(rc_ctx *c) {
   ov_ret_u32(c, 0);
 }
 
-/* 0x100e13d70 luaL_register(L, libname, const luaL_Reg *l) */
-void F_100e13d70(rc_ctx *c) {
-  OV_ARGS(a, c);
+/* luaL_register(L, libname, const luaL_Reg *l) */
+void RC_FN(luaL_register)(rc_ctx *c) {
+  OV_ARGS_OF(luaL_register, a, c);
   lua_State *L = OV_PTR(a, lua_State);
   const char *libname = OV_PTR(a, const char);
   const luaL_Reg *l = OV_PTR(a, const luaL_Reg);

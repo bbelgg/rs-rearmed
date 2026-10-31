@@ -1,0 +1,13 @@
+# Override module `mods`: the game functions liboverrides_mods.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+# The rsmacfixes and RSBypass patches (mods/mods.c). Nothing is dropped.
+num_dtor             # rsmacfixes: JSON-number hash (remove site 0x1000f8d59)
+num_intern           # rsmacfixes: JSON-number hash (insert site 0x1000f8f61)
+num_rehash           # rsmacfixes: JSON-number hash (rehash site 0x1000f9a35)
+path_md5             # rsmacfixes: path MD5 cache (hook at function entry)
+dlc_update           # rsmacfixes: batched DLC mounting (call site 0x100a0d742)
+key_down             # rsmacfixes: game keyboard (hook at function entry)
+key_up               # rsmacfixes: game keyboard (hook at function entry)
+thread_set_priority  # rsmacfixes: Floodgate thread priority (call site 0x1013131c4)
+sng_verify           # RSBypass: .sng signature check (test/je at 0x1001eb784, caller of this)

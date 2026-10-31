@@ -1,0 +1,13 @@
+# Override module `jpeg`: the game functions liboverrides_jpeg.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+jpeg_CreateDecompress
+jpeg_finish_decompress
+jpeg_read_header
+jpeg_abort_decompress
+jpeg_destroy_decompress
+jpeg_start_decompress
+jpeg_read_scanlines
+jpeg_read_coefficients
+jpeg_resync_to_restart
+jpeg_std_error

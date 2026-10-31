@@ -1,0 +1,16 @@
+# Hook points: the build wraps each of these functions (gen_image.py `ADDR wrap`: translated as W_ADDR, and
+# F_ADDR runs the hooks registered at run time around it, runtime/rc_hook.h), for the mods the game loads
+# from the mods folder (app/rc_main.c) and the native code that hooks them. Mods find a point by its name
+# (rc_hook_add_name). A point without hooks costs one call. Add points here; removing or renaming one breaks
+# a mod that hooks it (and needs a new release).
+game_frame          # GameFrame() -> bool quit: once per frame on the game thread
+input_sink          # (int code, int a, int b): input events, code 0/1 = key down/up, a = key code
+ak_post_event_name  # AK::SoundEngine::PostEvent(const char *, ...)
+too_many_inputs     # (input manager) -> bool: a second guitar input is active; only for the "two cables" popup
+set_app_focus       # SetAppFocus(bool): focus gained / lost (pauses audio)
+ui_event            # (menu, int event, int arg): UI events; the shell sends 0x98 (pause) on focus loss
+rr_speed_ratio      # float (float slider percent): Riff Repeater slider -> song speed ratio
+ak_set_rtpc_name    # AK::SoundEngine::SetRTPCValue(const char *, float, unsigned long long, int, AkCurveInterpolation)
+camera_set_frustum  # NiCamera::SetViewFrustum(const NiFrustum &): every camera, every frame
+ak_init             # AK::SoundEngine::Init(AkInitSettings *, AkPlatformInitSettings *): +0x54 = refills (LatencyBuffer); audio_ring.c
+si_open             # SoundInput open (this, int slot) -> bool: opens device list entry `slot` as a guitar input; audio_trace.c

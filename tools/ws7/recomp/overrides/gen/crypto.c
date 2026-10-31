@@ -3,9 +3,8 @@
 #include "rc_ov.h"
 #include "rs_crypto.h"
 
-/* 0x100001b40 rsg_rijndael_key_setup_enc */
-void F_100001b40(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_rijndael_key_setup_enc)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_rijndael_key_setup_enc, a, c);
   uint32_t * p0 = (uint32_t *)(uintptr_t)OV_U64(a);
   const uint8_t * p1 = (const uint8_t *)(uintptr_t)OV_U64(a);
   int p2 = (int)OV_U64(a);
@@ -13,9 +12,8 @@ void F_100001b40(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100001eb0 rsg_rijndael_key_setup_dec */
-void F_100001eb0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_rijndael_key_setup_dec)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_rijndael_key_setup_dec, a, c);
   uint32_t * p0 = (uint32_t *)(uintptr_t)OV_U64(a);
   const uint8_t * p1 = (const uint8_t *)(uintptr_t)OV_U64(a);
   int p2 = (int)OV_U64(a);
@@ -23,9 +21,8 @@ void F_100001eb0(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x100002080 rsg_rijndael_encrypt */
-void F_100002080(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_rijndael_encrypt)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_rijndael_encrypt, a, c);
   const uint32_t * p0 = (const uint32_t *)(uintptr_t)OV_U64(a);
   int p1 = (int)OV_U64(a);
   const uint8_t * p2 = (const uint8_t *)(uintptr_t)OV_U64(a);
@@ -34,9 +31,8 @@ void F_100002080(rc_ctx *c) {
   ov_ret_void(c);
 }
 
-/* 0x100002df0 rsg_rijndael_decrypt */
-void F_100002df0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_rijndael_decrypt)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_rijndael_decrypt, a, c);
   const uint32_t * p0 = (const uint32_t *)(uintptr_t)OV_U64(a);
   int p1 = (int)OV_U64(a);
   const uint8_t * p2 = (const uint8_t *)(uintptr_t)OV_U64(a);
@@ -45,9 +41,8 @@ void F_100002df0(rc_ctx *c) {
   ov_ret_void(c);
 }
 
-/* 0x1001eaa70 rsg_bpe_expand */
-void F_1001eaa70(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_bpe_expand)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_bpe_expand, a, c);
   const uint8_t * p0 = (const uint8_t *)(uintptr_t)OV_U64(a);
   int p1 = (int)OV_U64(a);
   uint8_t * p2 = (uint8_t *)(uintptr_t)OV_U64(a);
@@ -55,9 +50,8 @@ void F_1001eaa70(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x101376328 rsg_cryptopp_aes_ctr_decrypt */
-void F_101376328(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_cryptopp_aes_ctr_decrypt)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_cryptopp_aes_ctr_decrypt, a, c);
   const uint8_t * p0 = (const uint8_t *)(uintptr_t)OV_U64(a);
   uint64_t p1 = (uint64_t)OV_U64(a);
   const char * p2 = (const char *)(uintptr_t)OV_U64(a);
@@ -68,9 +62,8 @@ void F_101376328(rc_ctx *c) {
   OV_RET_I32(c, r);
 }
 
-/* 0x10137683d rsg_cryptopp_dsa_sha1_verify */
-void F_10137683d(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(rsg_cryptopp_dsa_sha1_verify)(rc_ctx *c) {
+  OV_ARGS_OF(rsg_cryptopp_dsa_sha1_verify, a, c);
   const uint8_t * p0 = (const uint8_t *)(uintptr_t)OV_U64(a);
   uint32_t p1 = (uint32_t)OV_U64(a);
   const char * p2 = (const char *)(uintptr_t)OV_U64(a);

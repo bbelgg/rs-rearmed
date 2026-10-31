@@ -20,6 +20,8 @@
 #                      build-msl-corpus.sh; default build/metal/msl-corpus/ or build/shims/opengl/msl-corpus/
 #                      if one exists): bundled as Contents/Resources/rsmsl-corpus.bin, where libRSOpenGL
 #                      looks; optional (without it shaders are translated at run time)
+#       RC_TARGET_DIR  the target's generated names (tools/targets/targets.py gen; default: made into
+#                      OUTDIR/work/target for RC_TARGET, default mac-x64)
 #       RC_UNIT_TEST=1 also build and run test/seam_test (no game needed)
 #       RC_LTO, RC_LTO_JOBS, RC_LTO_CACHE (default OUTDIR/lto-cache), RC_PGO, RC_PGO_DIR (default
 #                      OUTDIR/pgo): see tools/ws7/recomp/build/optflags.sh (libgame_rc.a must be built with the same)
@@ -49,6 +51,8 @@ work=$out/work
 . "$root/tools/ws7/recomp/build/optflags.sh"
 app=$out/Rocksmith2014.app
 mkdir -p "$work" "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/Frameworks/Cg.framework"
+tgt=${RC_TARGET_DIR:-$work/target}
+[ -n "${RC_TARGET_DIR:-}" ] || "${RC_PY:-python3}" -I "$root/tools/targets/targets.py" gen "$tgt" > /dev/null
 
 # first existing arm64 slice among the candidates
 arm64_of() {
@@ -78,7 +82,8 @@ objs=""
 for s in rsp_engine.c rsp_paths.c rsp_config.c rsp_logic.c rsp_renderer.c rsp_overlay.c; do objs="$objs $(cc_obj "$plat/src/$s")"; done
 objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-declarations)"
 objs="$objs $(cc_obj "$plat/src/rsp_present_metal.m" -fno-objc-arc)"
-objs="$objs $(cc_obj "$here/seam_platform.c")"
+objs="$objs $(cc_obj "$here/seam_platform.c" -I"$tgt")"
+objs="$objs $(cc_obj "$tgt/rc_target.c" -w)"  # the target's name tables for the runtime (rc_hook_add_name)
 for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done
 for s in "$rt"/rc_*.S; do objs="$objs $(cc_obj "$s")"; done
 FW="-framework AppKit $shim_opengl -framework CoreVideo -framework IOKit -framework CoreAudio -framework Metal -framework QuartzCore -framework Foundation -framework CoreFoundation -lobjc -lz"
@@ -88,7 +93,7 @@ pgo_main=$(rc_pgo_main "$out/pgo")
 LF="$(rc_lto_link "$out/lto-cache") ${pgo_main:+-fprofile-instr-generate}"
 
 if [ $stub = 1 ]; then
-  objs="$objs $(cc_obj "$here/rc_main.c" -DRCAPP_STUB $pgo_main) $(cc_obj "$here/stub_main.c")"
+  objs="$objs $(cc_obj "$here/rc_main.c" -I"$tgt" -DRCAPP_STUB $pgo_main) $(cc_obj "$here/stub_main.c")"
   clang -arch arm64 $LF $objs $FW -Wl,-undefined,error -o "$exe"
 else
   [ -f "$obj/libgame_rc.a" ] || { echo "no $obj/libgame_rc.a (run tools/ws7/recomp/build/build.sh, or use --stub)" >&2; exit 1; }
@@ -97,7 +102,7 @@ else
     "$py" -I "$root/tools/ws7/recomp/thunks/gen_thunks.py" "$img" "$thunks" --report "$work/thunks.json" > "$work/thunks.log" 2>&1 ||
       { echo "thunk generation failed, see $work/thunks.log" >&2; exit 1; }
   fi
-  objs="$objs $(cc_obj "$here/rc_main.c" $pgo_main) $(cc_obj "$thunks" -w -DRC_ABI_TRUST)"
+  objs="$objs $(cc_obj "$here/rc_main.c" -I"$tgt" $pgo_main) $(cc_obj "$thunks" -w -DRC_ABI_TRUST)"
   ovr=${RC_OVERRIDES:-}
   [ -n "$ovr" ] || { [ -f "$root/tools/ws7/recomp/overrides/build/liboverrides.a" ] && ovr=$root/tools/ws7/recomp/overrides/build/liboverrides.a || true; }
   link() {  # extra objects...

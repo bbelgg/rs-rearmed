@@ -1,0 +1,8 @@
+# Override module `audio`: the game functions liboverrides_audio.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+# Native replacements that lower guitar-to-sound latency (src/audio.h, src/audio_out.c, src/audio_in.c,
+# src/audio_ring.c).
+ak_lengine_thread  # Wwise LEngine thread entry: real-time policy, output device's audio workgroup
+input_queue_read   # SoundInput queue reader: drops stale slots (RS_AUDIO_INPUT_TRIM)
+ak_sink_ring_init  # CoreAudio sink Init: ring from LatencyBuffer even when the engine gets 2 (audio_ring.c)

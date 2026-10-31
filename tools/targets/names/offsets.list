@@ -1,0 +1,84 @@
+# Struct fields, sizes and vtable slots (NAME_slot) native code uses, by the module that uses them (paths
+# under tools/ws7/recomp/).
+
+# efd_qi (overrides/gen/efd_qi.c)
+UIMenu_LAS_SongsList_qi_this_adj  # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopSongs_qi_this_adj      # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopGear_qi_this_adj       # this adjustment of its QueryInterface (IBase sub-object to the object)
+UIMenu_ShopPacks_qi_this_adj      # this adjustment of its QueryInterface (IBase sub-object to the object)
+
+# seam (app/seam_platform.c)
+service_manager_quit  # ServiceManager: u8 quit flag
+game_config_vsync     # config block: u32 vsync
+
+# mods (overrides/mods/mods.c)
+input_sink_full_char      # input_sink's frame (frame pointer relative): the full character
+thread_priority_index     # engine thread: int32 priority index
+thread_pthread            # engine thread: pthread_t
+path_obj_refs             # interned path object: int refcount
+rmutex_owner              # the game's recursive mutex: pthread_t owner
+rmutex_depth              # the game's recursive mutex: int depth
+dlc_installing            # DLC coordinator: u8 installing flag
+dlc_pending               # DLC coordinator: u8
+dlc_check_on              # DLC coordinator: u8
+dlc_first_done            # DLC coordinator: u8
+dlc_tail_done             # DLC coordinator: u8
+dlc_clear_map             # DLC coordinator: u8 clear-the-map request
+dlc_map                   # DLC coordinator: std::map
+dlc_map_root              # DLC coordinator: map root node
+dlc_map_begin             # DLC coordinator: map begin node
+dlc_map_end               # DLC coordinator: map end node
+dlc_map_size              # DLC coordinator: map size
+json_number_refs          # number object: int32 refcount
+json_number_value         # number object: double value
+json_number_add_ref_slot  # number object vtable: AddRef
+json_number_release_slot  # number object vtable: Release
+
+# audio (overrides/src/audio_*.c)
+ak_ps_refills    # AkPlatformInitSettings: u16 uNumRefillsInVoice
+ak_sink_refills  # CoreAudio sink: u32 ring refill count
+ak_sink_ring     # CoreAudio sink: ring buffer pointer
+si_state         # SoundInput: u32 state (2 = closed, to be opened)
+si_dev           # SoundInput: u8 selected, u32 AudioObjectID at +4
+si_channels      # SoundInput: u32 channel count
+ak_lengine_stop  # LEngine thread argument: u8 stop flag (+0 mach semaphore)
+siq_bufs         # SoundInput queue: slot buffer pointers (5)
+siq_filled       # SoundInput queue: int32 filled flags (5)
+siq_slot_size    # SoundInput queue: u16 slot size (bytes)
+siq_read_off     # SoundInput queue: u16 read offset
+siq_read_idx     # SoundInput queue: u16 read index
+siq_empty        # SoundInput queue: u8 reader found the slot empty
+siq_lock         # SoundInput queue: pthread mutex
+
+# png (overrides/src/png_glue.c)
+guest_jmp_buf_size  # sizeof(jmp_buf) of the game's C library
+
+# online (overrides/src/online_glue.c)
+service_holder_sm                 # ServiceManager holder: the ServiceManager
+efd_inc_ref_slot                  # efd IBase vtable: IncRefCount
+efd_dec_ref_slot                  # efd IBase vtable: DecRefCount
+efd_query_interface_slot          # efd IBase vtable: QueryInterface
+sm_get_system_service_slot        # ServiceManager vtable: GetSystemService
+config_get_bool_slot              # config manager vtable: GetValue(bool)
+connect_set_dlc_service_slot      # RSConnectService vtable: set DLC service
+connect_set_profile_service_slot  # RSConnectService vtable: set profile service
+connect_set_extension_slot        # RSConnectService vtable: set extension service
+rs_object_size_steam_service      # sizeof RSSteamService
+rs_object_size_connect_service    # sizeof RSConnectService_Steam
+rs_object_size_dlc_service        # sizeof RSDLCService_Steam
+rs_object_size_profile_service    # sizeof RSProfileService_MacOS
+rs_object_size_property_object    # sizeof the empty property object
+property_object_ref_slot          # empty property object vtable: the reference its maker takes
+profile_regs_pad                  # RSProfileService: int[2] pad of each player
+profile_pad_player                # RSProfileService: int[4] player of each pad, -1 = none
+profile_active                    # RSProfileService: byte[2]
+profile_prev                      # RSProfileService: int
+profile_state                     # RSProfileService: int sign-in state
+profile_player                    # RSProfileService: int player
+profile_sub                       # RSProfileService: int sub-state
+profile_block_a                   # RSProfileService: byte, StartSignIn refuses when set
+profile_block_b                   # RSProfileService: byte, StartSignIn refuses when set
+profile_block_c                   # RSProfileService: byte, StartSignIn refuses when set
+profile_set_pad_slot              # RSProfileService vtable: SetPad(this, player, pad)
+dlc_job_delete_slot               # DLC-preview job functor vtable: delete
+dlc_job_fail_slot                 # DLC-preview job functor vtable: completion (job, bool failed)

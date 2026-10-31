@@ -1,0 +1,11 @@
+# Override module `crypto`: the game functions liboverrides_crypto.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+rsg_rijndael_key_setup_enc
+rsg_rijndael_key_setup_dec
+rsg_rijndael_encrypt
+rsg_rijndael_decrypt
+rsg_bpe_expand
+rsg_cryptopp_aes_ctr_decrypt
+rsg_cryptopp_dsa_sha1_verify
+rsg_cryptopp_aes_cfb_decrypt

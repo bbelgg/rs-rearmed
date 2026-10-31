@@ -35,10 +35,6 @@
 
 #include "audio.h"
 
-#define LENGINE_THREAD 0x101908418ull  // pthread_t of the LEngine thread (written by the entry)
-#define LENGINE_START 0x101907c10ull   // u32 time(0) at thread start
-#define AK_RENDER_LOOP 0x100ab7200ull  // renders the blocks the sink needs: (engine)
-#define AK_ENGINE_PTR 0x101907bb0ull   // its argument
 #define SAMPLE_RATE 48000u             // the sink forces 48 kHz ('nsrt', 0x100aa6a10)
 #define DEFAULT_FRAMES 256u
 #define MIN_FRAMES 32u
@@ -194,11 +190,11 @@ static void wg_join(workgroup_state *s, uint32_t dev) {
   else rs_audio_log("Wwise thread: joined output device %u's workgroup", dev);
 }
 
-void F_100b049b0(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(ak_lengine_thread)(rc_ctx *c) {
+  OV_ARGS_OF(ak_lengine_thread, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);  // +0 mach semaphore, +4 stop flag
-  RC_ST(uint64_t, RC_A(LENGINE_THREAD), (uint64_t)(uintptr_t)pthread_self());
-  RC_ST(uint32_t, RC_A(LENGINE_START), (uint32_t)time(NULL));
+  RC_ST(uint64_t, RC_GA(ak_lengine_thread_id), (uint64_t)(uintptr_t)pthread_self());
+  RC_ST(uint32_t, RC_GA(ak_lengine_start_time), (uint32_t)time(NULL));
   int rt = rs_audio_env_on("RS_AUDIO_RT", 1);
   if (rt) make_realtime();
   workgroup_state wg = {0};
@@ -212,9 +208,9 @@ void F_100b049b0(rc_ctx *c) {
         wg_join(&wg, atomic_load(&g_out_dev));
       }
     }
-    OV_GUEST(AK_RENDER_LOOP, RC_LD(uint64_t, RC_A(AK_ENGINE_PTR)));
+    OV_GUEST(ak_render_loop, RC_LD(uint64_t, RC_GA(ak_render_engine)));
     semaphore_wait(RC_LD(uint32_t, self));
-  } while (!RC_LD(uint8_t, self + 4));
+  } while (!RC_LD(uint8_t, self + RC_OFF(ak_lengine_stop)));
   wg_leave(&wg);
   ov_ret_u32(c, 0);
 }

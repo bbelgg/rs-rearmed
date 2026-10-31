@@ -1,0 +1,329 @@
+# Game functions and globals native code calls or reads without overriding them, by the module that uses
+# them (paths under tools/ws7/recomp/).
+
+# mods (overrides/mods/mods.c)
+scaleform_keycode_table  # macOS keycode -> Scaleform key
+game_char_to_key         # character -> KEY_* index
+game_key_state           # KEY_* state array
+thread_priority_table    # engine thread priorities
+path_table_lock          # recursive mutex of the interned path table
+path_table               # the interned path table
+path_intern              # interned refcounted path object (+1 reference); len -1 = strlen
+path_release             # drops a path object reference
+dlc_update_head          # first call of the DLC coordinator's update
+dlc_install_step         # mounts one pending archive, or clears the installing flag
+dlc_enum_check           # DLC coordinator check (clears the pending flags when true)
+dlc_update_tail          # DLC coordinator follow-up
+std_tree_destroy         # std::map node destruction
+json_number_table        # global table of JSON number values
+json_number_table_lock   # its recursive mutex
+json_number_vtable       # number object vtable
+const_two_pow_63         # 2^63
+hashtable_prime_sizes    # table sizes, lower_bound'ed by rehash
+efd_alloc                # efd allocator
+json_number_base_ctor    # number object base constructor
+json_number_base_dtor    # number object base destructor
+sng_load_verify_ret      # SNG loader: return address of its DSA verify call
+
+# audio (overrides/src/audio_*.c)
+ak_platform_settings   # Wwise's AkPlatformInitSettings copy
+ak_init                # AK::SoundEngine::Init
+ak_sink_ring_alloc     # CoreAudio sink: allocates the ring
+si_open                # SoundInput slot open
+ak_lengine_thread_id   # pthread_t of the LEngine thread
+ak_lengine_start_time  # time(0) at LEngine thread start
+ak_render_loop         # renders the blocks the sink needs
+ak_render_engine       # its argument
+
+# dsp (overrides/src/dsp_glue.c)
+la_vcosf    # __la_symbol_ptr slot of _vcosf
+dsp_two_pi  # 2pi
+dsp_two     # 2
+dsp_ramp0   # {0, 1, 2, 3}
+dsp_half4   # {0.5 x4}
+dsp_four4   # {4 x4}
+dsp_k046    # {0.46 x4}
+dsp_k054    # {0.54 x4}
+dsp_one4    # {1 x4}
+
+# efd (overrides/src/efd_glue.c)
+efd_malloc  # efd allocator (the fast-sqrt table's)
+
+# crypto (overrides/src/crypto_glue.c)
+psarc_key_iv  # PSARC table-of-contents AES-CFB IV
+
+# online (overrides/src/online_glue.c)
+property_object_ctor           # empty property object constructor
+game_interface_helper_new      # the 0x10-byte game interface helper
+rs_steam_service_ctor          # RSSteamService constructor
+rs_connect_service_steam_ctor  # RSConnectService_Steam constructor
+rs_dlc_service_steam_ctor      # RSDLCService_Steam constructor
+rs_profile_service_ctor        # RSProfileService_MacOS constructor
+rs_connect_service             # the RSConnectService global
+rs_connect_game_interface      # the RSConnectGameInterface global
+service_manager_holder         # holder of the efd ServiceManager
+
+# efd_qi (overrides/gen/efd_qi.c)
+GRCamera_class_info                                    # class-info table
+GRCameraBackground_class_info                          # class-info table
+GRCameraBGBehavior_Animated_class_info                 # class-info table
+GRCameraBGBehavior_BuildUp_class_info                  # class-info table
+GRCameraBGBehavior_Customize_class_info                # class-info table
+GRCameraBGBehavior_Debug_class_info                    # class-info table
+GRCameraBGBehavior_Panning_class_info                  # class-info table
+CameraSong_class_info                                  # class-info table
+GRCameraDebug_class_info                               # class-info table
+GRCameraScripted_class_info                            # class-info table
+GRCameraService_class_info                             # class-info table
+IGRCameraImpl_class_info                               # class-info table
+DatabaseCommandQueue_class_info                        # class-info table
+DatabaseMessageSystem_class_info                       # class-info table
+DatabaseService_class_info                             # class-info table
+GRCrowdBox_class_info                                  # class-info table
+GRCrowdSystem_class_info                               # class-info table
+GRLightService_class_info                              # class-info table
+GRMusicService_class_info                              # class-info table
+JSONFactory_class_info                                 # class-info table
+JSONFactory__Response_class_info                       # class-info table
+PostEffectColorCorrect_class_info                      # class-info table
+PostEffectsService_class_info                          # class-info table
+GRClipFadeEffectComponent_class_info                   # class-info table
+GRDisplayRatioAdjuster_class_info                      # class-info table
+GRShowLightsSystem_class_info                          # class-info table
+GRVenueMenuPresentation_Flow_class_info                # class-info table
+MainService_MacOS_class_info                           # class-info table
+NSP_PlayListService_class_info                         # class-info table
+RSLogger_class_info                                    # class-info table
+RSDejaOutDestination_class_info                        # class-info table
+GuitarService_class_info                               # class-info table
+GRLocalization_class_info                              # class-info table
+GRSongDirectory_class_info                             # class-info table
+DetectionService_class_info                            # class-info table
+VenueService_class_info                                # class-info table
+GameService_class_info                                 # class-info table
+GRAlphaSortingComponent_class_info                     # class-info table
+GRBackground_class_info                                # class-info table
+GRBackgroundService_class_info                         # class-info table
+GRObjectEffectComponent_class_info                     # class-info table
+GRWorldTextManager_class_info                          # class-info table
+GraphAssetFactory_class_info                           # class-info table
+GraphAssetFactory__Response_class_info                 # class-info table
+GRComponent_class_info                                 # class-info table
+MainService_class_info                                 # class-info table
+PreloadHelper_class_info                               # class-info table
+PreloadHelperResponse_class_info                       # class-info table
+PreloadItem_class_info                                 # class-info table
+RSBootService_class_info                               # class-info table
+RSRenderService_class_info                             # class-info table
+GCTickable_class_info                                  # class-info table
+RSAudioService_class_info                              # class-info table
+UIManagerI_class_info                                  # class-info table
+UIMenu_LAS_SongsList_class_info                        # class-info table
+UIService_class_info                                   # class-info table
+ResourceService_class_info                             # class-info table
+GRMinigameCamera_class_info                            # class-info table
+OscilleratorScopeModel_class_info                      # class-info table
+ReactiveEffectsService_class_info                      # class-info table
+GCColorShift_class_info                                # class-info table
+GC2DAssetHelper_class_info                             # class-info table
+GCAccumulatedActor_class_info                          # class-info table
+GCPauseManager_class_info                              # class-info table
+GRCameraNarniaVenue_class_info                         # class-info table
+FormLoader_class_info                                  # class-info table
+ClipFadeManager_class_info                             # class-info table
+GEService_class_info                                   # class-info table
+NarniaPortalModel_class_info                           # class-info table
+SongListService_class_info                             # class-info table
+NarniaService_class_info                               # class-info table
+GRSL2Spawner_class_info                                # class-info table
+NarniaFogModel_class_info                              # class-info table
+NarniaFogParticle_class_info                           # class-info table
+MissionService_class_info                              # class-info table
+ToneService_class_info                                 # class-info table
+StringTuner_class_info                                 # class-info table
+TunerService_class_info                                # class-info table
+InstrumentLoader_class_info                            # class-info table
+GRCrowdPoint_class_info                                # class-info table
+GearManager_class_info                                 # class-info table
+GearService_class_info                                 # class-info table
+FogService_class_info                                  # class-info table
+GlobalFogSettings_class_info                           # class-info table
+ManifestManager_class_info                             # class-info table
+StatsService_class_info                                # class-info table
+GRCameraLoft_class_info                                # class-info table
+GEVideoScreenModel_class_info                          # class-info table
+TunerProgressBuiltin_class_info                        # class-info table
+GameColorManager_class_info                            # class-info table
+GRCameraSessionMode_class_info                         # class-info table
+GCAttachmentManager_class_info                         # class-info table
+UIMenu_ShopSongs_class_info                            # class-info table
+GRLoftAmbientLight_class_info                          # class-info table
+GRLoftSpotLight_class_info                             # class-info table
+GRLoftState_class_info                                 # class-info table
+LoftPostEffectsManager_class_info                      # class-info table
+RSVenueForkEmitterGear_class_info                      # class-info table
+UIMenu_ShopGear_class_info                             # class-info table
+UIMenu_ShopPacks_class_info                            # class-info table
+GearPlacementNode_class_info                           # class-info table
+GearLava_class_info                                    # class-info table
+GearNifCache_class_info                                # class-info table
+GRVenueAmbientAnimations_class_info                    # class-info table
+GRSoundIntensity_class_info                            # class-info table
+GRVenuePointLight_class_info                           # class-info table
+GRLoftCabinetScreen_class_info                         # class-info table
+GCLdbChlgService_class_info                            # class-info table
+GearChangeController_class_info                        # class-info table
+GCGFxMouseEventHandler_class_info                      # class-info table
+AchievementService_class_info                          # class-info table
+PrizeService_class_info                                # class-info table
+GCKinectEventHandler_class_info                        # class-info table
+FavoritesService_class_info                            # class-info table
+RSConnectExtension_RDV_class_info                      # class-info table
+RSConnectService_Steam_class_info                      # class-info table
+RSSteamService_class_info                              # class-info table
+RSDLCService_Steam_class_info                          # class-info table
+RSProfileService_MacOS_class_info                      # class-info table
+RSSteamAchievement_class_info                          # class-info table
+RSSteamActivityFeed_class_info                         # class-info table
+RSSteamCloudFile_class_info                            # class-info table
+RSSteamDownloadableContent_class_info                  # class-info table
+RSSteamLeaderboards_class_info                         # class-info table
+RSSteamLeaderboardRequest_class_info                   # class-info table
+RSSteamLeaderboardRequestUpload_class_info             # class-info table
+RSSteamLeaderboardRequestDownload_class_info           # class-info table
+RSSteamWebApi_class_info                               # class-info table
+FrkService_class_info                                  # class-info table
+GFxAssetTaskAssetFactory_class_info                    # class-info table
+GFxInputRouterModel_class_info                         # class-info table
+GFxMovieModel_class_info                               # class-info table
+GFxService_class_info                                  # class-info table
+sub_LuaResumeCoroutineTask_class_info                  # class-info table
+LuaScriptFactory_class_info                            # class-info table
+SchedulerLua_class_info                                # class-info table
+AttachNifData_class_info                               # class-info table
+CameraService_class_info                               # class-info table
+LightService_class_info                                # class-info table
+NIFFactory_class_info                                  # class-info table
+RenderService_class_info                               # class-info table
+SceneGraphCache_class_info                             # class-info table
+SceneGraphService_class_info                           # class-info table
+ShaderService_class_info                               # class-info table
+InputActionMessage_class_info                          # class-info table
+InputHandler_class_info                                # class-info table
+InputService_class_info                                # class-info table
+InputStickMessage_class_info                           # class-info table
+KeyDownMessage_class_info                              # class-info table
+KeyUpMessage_class_info                                # class-info table
+MouseMoveMessage_class_info                            # class-info table
+MouseDownMessage_class_info                            # class-info table
+MouseUpMessage_class_info                              # class-info table
+Entity_class_info                                      # class-info table
+sub_EntityChangeMessage_class_info                     # class-info table
+EntityFactory_class_info                               # class-info table
+EntityLoadRequest_class_info                           # class-info table
+EntityLoadResult_class_info                            # class-info table
+EntityPreloadRequest_class_info                        # class-info table
+EntityPreloadResponse_class_info                       # class-info table
+EntityLoaderService_class_info                         # class-info table
+EntityManager_class_info                               # class-info table
+EntitySetLoadState_class_info                          # class-info table
+sub_EventMessage_class_info                            # class-info table
+FlatModelFactory_class_info                            # class-info table
+FlatModelManager_class_info                            # class-info table
+PendingBehavior_class_info                             # class-info table
+Scheduler_class_info                                   # class-info table
+ScriptFactoryResponse_class_info                       # class-info table
+WorldFactory_class_info                                # class-info table
+AnimationService_class_info                            # class-info table
+KFMFactory_class_info                                  # class-info table
+KFMFactory__ResponseData_class_info                    # class-info table
+AssetCacheResponse_class_info                          # class-info table
+AssetConfigService_class_info                          # class-info table
+AssetFactoryManager_class_info                         # class-info table
+AssetLoadRequest_class_info                            # class-info table
+AssetLoadResponse_class_info                           # class-info table
+sub_AssetLocatorRequest_class_info                     # class-info table
+sub_AssetConfigurationMessage_class_info               # class-info table
+sub_AssetLocatorResponse_class_info                    # class-info table
+AssetTagsInfoResponse_class_info                       # class-info table
+AssetLocatorService_class_info                         # class-info table
+ConfigManager_class_info                               # class-info table
+SectionEntry_class_info                                # class-info table
+ConfigSource_class_info                                # class-info table
+CommandLineSource_class_info                           # class-info table
+IniSource_class_info                                   # class-info table
+EnvVarSource_class_info                                # class-info table
+DebugOutDestination_class_info                         # class-info table
+FileDestination_class_info                             # class-info table
+GenericAssetFactory_class_info                         # class-info table
+GenericAssetLoadResponse_class_info                    # class-info table
+sub_IMessage_class_info                                # class-info table
+Logger_class_info                                      # class-info table
+MessageService_class_info                              # class-info table
+NetMessage_class_info                                  # class-info table
+AssignNetIDMessage_class_info                          # class-info table
+PrintDestination_class_info                            # class-info table
+ServiceManager_class_info                              # class-info table
+sub_StreamMessage_class_info                           # class-info table
+MacOSPlatformService_class_info                        # class-info table
+AudioBankAssetFactory_class_info                       # class-info table
+AudioBankAssetLoadResponse_class_info                  # class-info table
+AudioMessage_class_info                                # class-info table
+AudioService_class_info                                # class-info table
+SceneGraphRemovedMessage_class_info                    # class-info table
+SceneGraphAddedMessage_class_info                      # class-info table
+SceneGraphsUpdatedMessage_class_info                   # class-info table
+SceneGraphMessage_class_info                           # class-info table
+JSONFactory__JSONFactoryData_class_info                # class-info table
+ReturnToTitleScreen_class_info                         # class-info table
+PreloadHelperComplete_class_info                       # class-info table
+SceneGraphCacheResponse_class_info                     # class-info table
+PreloadGroup_class_info                                # class-info table
+GCPauseMessage_class_info                              # class-info table
+RSGraphAssetFactoryLoadResponse_class_info             # class-info table
+RSConnectGameInterface_Impl_class_info                 # class-info table
+ReactiveRingModel_class_info                           # class-info table
+RingParticleEmitter_class_info                         # class-info table
+GCGFxMouseEventMessage_class_info                      # class-info table
+GCKinectEventMessage_class_info                        # class-info table
+NiFrkParticleEffectModel_class_info                    # class-info table
+GFxAssetTaskRequest_class_info                         # class-info table
+GFXModelResponse_class_info                            # class-info table
+LuaScriptFactoryResponseData_class_info                # class-info table
+NIFFactoryResponse_class_info                          # class-info table
+AttachmentMadeMessage_class_info                       # class-info table
+AttachmentMessage_class_info                           # class-info table
+AttachmentBrokenMessage_class_info                     # class-info table
+InputActionMapsLoaded_class_info                       # class-info table
+ScheduledTask_class_info                               # class-info table
+EntityFactory__EntityFactoryData_class_info            # class-info table
+EntityFactoryRequest_class_info                        # class-info table
+EntityFactoryResponse_class_info                       # class-info table
+ResponseData_class_info                                # class-info table
+FlatModelFactoryRequest_class_info                     # class-info table
+FlatModelFactoryResponse_class_info                    # class-info table
+ScriptFactoryRequest_class_info                        # class-info table
+WorldFactoryData_class_info                            # class-info table
+WorldFactoryRequest_class_info                         # class-info table
+WorldFactoryResponse_class_info                        # class-info table
+ActorAddedMessage_class_info                           # class-info table
+ActorRemovedMessage_class_info                         # class-info table
+KFMFactoryRequest_class_info                           # class-info table
+KFMFactoryResponse_class_info                          # class-info table
+AssetLocationMap_class_info                            # class-info table
+ResponseData2_class_info                               # class-info table
+AudioBankAssetLoadRequest_class_info                   # class-info table
+PostEventMessage_class_info                            # class-info table
+PostTriggerMessage_class_info                          # class-info table
+SetParamMessage_class_info                             # class-info table
+SetStateMessage_class_info                             # class-info table
+SetSwitchMessage_class_info                            # class-info table
+DoPrepareEventCallbackBehaviorMessage_class_info       # class-info table
+DoUnprepareEventCallbackBehaviorMessage_class_info     # class-info table
+DoLoadBankCallbackBehaviorMessage_class_info           # class-info table
+DoUnloadBankCallbackBehaviorMessage_class_info         # class-info table
+DoPostEventExNotifyCallbackBehaviorMessage_class_info  # class-info table
+
+# app (app/rc_main.c)
+mach_header               # the image's Mach-O header (start of __TEXT)
+objc_classref_MessageBox  # the image's classref of MessageBox, redirected to the rewrite's class

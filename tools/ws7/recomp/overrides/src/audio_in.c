@@ -21,13 +21,13 @@
 #include "audio.h"
 
 #define Q_SLOTS 5
-#define Q_BUF(q, i) (*(uint8_t **)((q) + 0x08 + 8 * (i)))
-#define Q_FLAG(q, i) ((int32_t *)((q) + 0x30 + 4 * (i)))
-#define Q_SIZE(q) (*(uint16_t *)((q) + 0x44))
-#define Q_OFF(q) (*(uint16_t *)((q) + 0x46))
-#define Q_RD(q) (*(uint16_t *)((q) + 0x4a))
-#define Q_EMPTY(q) (*(uint8_t *)((q) + 0x4d))
-#define Q_LOCK(q) ((pthread_mutex_t *)((q) + 0x50))
+#define Q_BUF(q, i) (*(uint8_t **)((q) + RC_OFF(siq_bufs) + 8 * (i)))
+#define Q_FLAG(q, i) ((int32_t *)((q) + RC_OFF(siq_filled) + 4 * (i)))
+#define Q_SIZE(q) (*(uint16_t *)((q) + RC_OFF(siq_slot_size)))
+#define Q_OFF(q) (*(uint16_t *)((q) + RC_OFF(siq_read_off)))
+#define Q_RD(q) (*(uint16_t *)((q) + RC_OFF(siq_read_idx)))
+#define Q_EMPTY(q) (*(uint8_t *)((q) + RC_OFF(siq_empty)))
+#define Q_LOCK(q) ((pthread_mutex_t *)((q) + RC_OFF(siq_lock)))
 
 static atomic_ulong g_trims, g_dropped;
 
@@ -99,8 +99,8 @@ static uint16_t rs_queue_read(uint8_t *q, void *dst, uint16_t req, unsigned limi
 
 static int g_trim = -1;
 
-void F_10133b310(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(input_queue_read)(rc_ctx *c) {
+  OV_ARGS_OF(input_queue_read, a, c);
   uint8_t *q = OV_PTR(a, uint8_t);
   void *dst = OV_PTR(a, void);
   uint16_t req = (uint16_t)OV_U64(a);

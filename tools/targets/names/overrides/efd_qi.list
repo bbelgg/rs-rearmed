@@ -1,0 +1,522 @@
+# Override module `efd_qi`: the game functions liboverrides_efd_qi.a replaces (paths under tools/ws7/recomp/overrides).
+# tools/targets/targets.py makes gen_image.py's skip file of it for the target being built; the target's
+# drops.map adds the dead code of a library the module replaces wholesale.
+# IBase::QueryInterface (slots 4 and 5) of the efd classes with a class-info table.
+GRCamera_QueryInterface                                          # GRCamera QueryInterface
+GRCamera_QueryInterface_const                                    # GRCamera QueryInterface const
+GRCameraBackground_QueryInterface                                # GRCameraBackground QueryInterface
+GRCameraBackground_QueryInterface_const                          # GRCameraBackground QueryInterface const
+GRCameraBGBehavior_Animated_QueryInterface                       # GRCameraBGBehavior_Animated QueryInterface
+GRCameraBGBehavior_Animated_QueryInterface_const                 # GRCameraBGBehavior_Animated QueryInterface const
+GRCameraBGBehavior_BuildUp_QueryInterface                        # GRCameraBGBehavior_BuildUp QueryInterface
+GRCameraBGBehavior_BuildUp_QueryInterface_const                  # GRCameraBGBehavior_BuildUp QueryInterface const
+GRCameraBGBehavior_Customize_QueryInterface                      # GRCameraBGBehavior_Customize QueryInterface
+GRCameraBGBehavior_Customize_QueryInterface_const                # GRCameraBGBehavior_Customize QueryInterface const
+GRCameraBGBehavior_Debug_QueryInterface                          # GRCameraBGBehavior_Debug QueryInterface
+GRCameraBGBehavior_Debug_QueryInterface_const                    # GRCameraBGBehavior_Debug QueryInterface const
+GRCameraBGBehavior_Panning_QueryInterface                        # GRCameraBGBehavior_Panning QueryInterface
+GRCameraBGBehavior_Panning_QueryInterface_const                  # GRCameraBGBehavior_Panning QueryInterface const
+CameraSong_QueryInterface                                        # CameraSong QueryInterface
+CameraSong_QueryInterface_const                                  # CameraSong QueryInterface const
+GRCameraDebug_QueryInterface                                     # GRCameraDebug QueryInterface
+GRCameraDebug_QueryInterface_const                               # GRCameraDebug QueryInterface const
+GRCameraScripted_QueryInterface                                  # GRCameraScripted QueryInterface
+GRCameraScripted_QueryInterface_const                            # GRCameraScripted QueryInterface const
+GRCameraService_QueryInterface                                   # GRCameraService QueryInterface
+GRCameraService_QueryInterface_const                             # GRCameraService QueryInterface const
+IGRCameraImpl_QueryInterface                                     # IGRCameraImpl QueryInterface
+IGRCameraImpl_QueryInterface_const                               # IGRCameraImpl QueryInterface const
+DatabaseCommandQueue_QueryInterface                              # DatabaseCommandQueue QueryInterface
+DatabaseCommandQueue_QueryInterface_const                        # DatabaseCommandQueue QueryInterface const
+DatabaseMessageSystem_QueryInterface                             # DatabaseMessageSystem QueryInterface
+DatabaseMessageSystem_QueryInterface_const                       # DatabaseMessageSystem QueryInterface const
+DatabaseService_QueryInterface                                   # DatabaseService QueryInterface
+DatabaseService_QueryInterface_const                             # DatabaseService QueryInterface const
+GRCrowdBox_QueryInterface                                        # GRCrowdBox QueryInterface
+GRCrowdBox_QueryInterface_const                                  # GRCrowdBox QueryInterface const
+GRCrowdSystem_QueryInterface                                     # GRCrowdSystem QueryInterface
+GRCrowdSystem_QueryInterface_const                               # GRCrowdSystem QueryInterface const
+GRLightService_QueryInterface                                    # GRLightService QueryInterface
+GRLightService_QueryInterface_const                              # GRLightService QueryInterface const
+GRMusicService_QueryInterface                                    # GRMusicService QueryInterface
+GRMusicService_QueryInterface_const                              # GRMusicService QueryInterface const
+JSONFactory_QueryInterface                                       # JSONFactory QueryInterface
+JSONFactory_QueryInterface_const                                 # JSONFactory QueryInterface const
+JSONFactory__Response_QueryInterface                             # JSONFactory::Response QueryInterface
+JSONFactory__Response_QueryInterface_const                       # JSONFactory::Response QueryInterface const
+PostEffectColorCorrect_QueryInterface                            # PostEffectColorCorrect QueryInterface
+PostEffectColorCorrect_QueryInterface_const                      # PostEffectColorCorrect QueryInterface const
+PostEffectsService_QueryInterface                                # PostEffectsService QueryInterface
+PostEffectsService_QueryInterface_const                          # PostEffectsService QueryInterface const
+GRClipFadeEffectComponent_QueryInterface                         # GRClipFadeEffectComponent QueryInterface
+GRClipFadeEffectComponent_QueryInterface_const                   # GRClipFadeEffectComponent QueryInterface const
+GRDisplayRatioAdjuster_QueryInterface                            # GRDisplayRatioAdjuster QueryInterface
+GRDisplayRatioAdjuster_QueryInterface_const                      # GRDisplayRatioAdjuster QueryInterface const
+GRShowLightsSystem_QueryInterface                                # GRShowLightsSystem QueryInterface
+GRShowLightsSystem_QueryInterface_const                          # GRShowLightsSystem QueryInterface const
+GRVenueMenuPresentation_Flow_QueryInterface                      # GRVenueMenuPresentation_Flow QueryInterface
+GRVenueMenuPresentation_Flow_QueryInterface_const                # GRVenueMenuPresentation_Flow QueryInterface const
+MainService_MacOS_QueryInterface                                 # MainService_MacOS QueryInterface
+MainService_MacOS_QueryInterface_const                           # MainService_MacOS QueryInterface const
+NSP_PlayListService_QueryInterface                               # NSP_PlayListService QueryInterface
+NSP_PlayListService_QueryInterface_const                         # NSP_PlayListService QueryInterface const
+RSLogger_QueryInterface                                          # RSLogger QueryInterface
+RSLogger_QueryInterface_const                                    # RSLogger QueryInterface const
+RSDejaOutDestination_QueryInterface                              # RSDejaOutDestination QueryInterface
+RSDejaOutDestination_QueryInterface_const                        # RSDejaOutDestination QueryInterface const
+GuitarService_QueryInterface                                     # GuitarService QueryInterface
+GuitarService_QueryInterface_const                               # GuitarService QueryInterface const
+GRLocalization_QueryInterface                                    # GRLocalization QueryInterface
+GRLocalization_QueryInterface_const                              # GRLocalization QueryInterface const
+GRSongDirectory_QueryInterface                                   # GRSongDirectory QueryInterface
+GRSongDirectory_QueryInterface_const                             # GRSongDirectory QueryInterface const
+DetectionService_QueryInterface                                  # DetectionService QueryInterface
+DetectionService_QueryInterface_const                            # DetectionService QueryInterface const
+VenueService_QueryInterface                                      # VenueService QueryInterface
+VenueService_QueryInterface_const                                # VenueService QueryInterface const
+GameService_QueryInterface                                       # GameService QueryInterface
+GameService_QueryInterface_const                                 # GameService QueryInterface const
+GRAlphaSortingComponent_QueryInterface                           # GRAlphaSortingComponent QueryInterface
+GRAlphaSortingComponent_QueryInterface_const                     # GRAlphaSortingComponent QueryInterface const
+GRBackground_QueryInterface                                      # GRBackground QueryInterface
+GRBackground_QueryInterface_const                                # GRBackground QueryInterface const
+GRBackgroundService_QueryInterface                               # GRBackgroundService QueryInterface
+GRBackgroundService_QueryInterface_const                         # GRBackgroundService QueryInterface const
+GRObjectEffectComponent_QueryInterface                           # GRObjectEffectComponent QueryInterface
+GRObjectEffectComponent_QueryInterface_const                     # GRObjectEffectComponent QueryInterface const
+GRWorldTextManager_QueryInterface                                # GRWorldTextManager QueryInterface
+GRWorldTextManager_QueryInterface_const                          # GRWorldTextManager QueryInterface const
+GraphAssetFactory_QueryInterface                                 # GraphAssetFactory QueryInterface
+GraphAssetFactory_QueryInterface_const                           # GraphAssetFactory QueryInterface const
+GraphAssetFactory__Response_QueryInterface                       # GraphAssetFactory::Response QueryInterface
+GraphAssetFactory__Response_QueryInterface_const                 # GraphAssetFactory::Response QueryInterface const
+GRComponent_QueryInterface                                       # GRComponent QueryInterface
+GRComponent_QueryInterface_const                                 # GRComponent QueryInterface const
+MainService_QueryInterface                                       # MainService QueryInterface
+MainService_QueryInterface_const                                 # MainService QueryInterface const
+PreloadHelper_QueryInterface                                     # PreloadHelper QueryInterface
+PreloadHelper_QueryInterface_const                               # PreloadHelper QueryInterface const
+PreloadHelperResponse_QueryInterface                             # PreloadHelperResponse QueryInterface
+PreloadHelperResponse_QueryInterface_const                       # PreloadHelperResponse QueryInterface const
+PreloadItem_QueryInterface                                       # PreloadItem QueryInterface
+PreloadItem_QueryInterface_const                                 # PreloadItem QueryInterface const
+RSBootService_QueryInterface                                     # RSBootService QueryInterface
+RSBootService_QueryInterface_const                               # RSBootService QueryInterface const
+RSRenderService_QueryInterface                                   # RSRenderService QueryInterface
+RSRenderService_QueryInterface_const                             # RSRenderService QueryInterface const
+GCTickable_QueryInterface                                        # GCTickable QueryInterface
+GCTickable_QueryInterface_const                                  # GCTickable QueryInterface const
+RSAudioService_QueryInterface                                    # RSAudioService QueryInterface
+RSAudioService_QueryInterface_const                              # RSAudioService QueryInterface const
+UIManagerI_QueryInterface                                        # UIManagerI QueryInterface
+UIManagerI_QueryInterface_const                                  # UIManagerI QueryInterface const
+UIMenu_LAS_SongsList_QueryInterface                              # UIMenu_LAS_SongsList QueryInterface
+UIMenu_LAS_SongsList_QueryInterface_const                        # UIMenu_LAS_SongsList QueryInterface const
+UIService_QueryInterface                                         # UIService QueryInterface
+UIService_QueryInterface_const                                   # UIService QueryInterface const
+ResourceService_QueryInterface                                   # ResourceService QueryInterface
+ResourceService_QueryInterface_const                             # ResourceService QueryInterface const
+GRMinigameCamera_QueryInterface                                  # GRMinigameCamera QueryInterface
+GRMinigameCamera_QueryInterface_const                            # GRMinigameCamera QueryInterface const
+OscilleratorScopeModel_QueryInterface                            # OscilleratorScopeModel QueryInterface
+OscilleratorScopeModel_QueryInterface_const                      # OscilleratorScopeModel QueryInterface const
+ReactiveEffectsService_QueryInterface                            # ReactiveEffectsService QueryInterface
+ReactiveEffectsService_QueryInterface_const                      # ReactiveEffectsService QueryInterface const
+GCColorShift_QueryInterface                                      # GCColorShift QueryInterface
+GCColorShift_QueryInterface_const                                # GCColorShift QueryInterface const
+GC2DAssetHelper_QueryInterface                                   # GC2DAssetHelper QueryInterface
+GC2DAssetHelper_QueryInterface_const                             # GC2DAssetHelper QueryInterface const
+GCAccumulatedActor_QueryInterface                                # GCAccumulatedActor QueryInterface
+GCAccumulatedActor_QueryInterface_const                          # GCAccumulatedActor QueryInterface const
+GCPauseManager_QueryInterface                                    # GCPauseManager QueryInterface
+GCPauseManager_QueryInterface_const                              # GCPauseManager QueryInterface const
+GRCameraNarniaVenue_QueryInterface                               # GRCameraNarniaVenue QueryInterface
+GRCameraNarniaVenue_QueryInterface_const                         # GRCameraNarniaVenue QueryInterface const
+FormLoader_QueryInterface                                        # FormLoader QueryInterface
+FormLoader_QueryInterface_const                                  # FormLoader QueryInterface const
+ClipFadeManager_QueryInterface                                   # ClipFadeManager QueryInterface
+ClipFadeManager_QueryInterface_const                             # ClipFadeManager QueryInterface const
+GEService_QueryInterface                                         # GEService QueryInterface
+GEService_QueryInterface_const                                   # GEService QueryInterface const
+NarniaPortalModel_QueryInterface                                 # NarniaPortalModel QueryInterface
+NarniaPortalModel_QueryInterface_const                           # NarniaPortalModel QueryInterface const
+SongListService_QueryInterface                                   # SongListService QueryInterface
+SongListService_QueryInterface_const                             # SongListService QueryInterface const
+NarniaService_QueryInterface                                     # NarniaService QueryInterface
+NarniaService_QueryInterface_const                               # NarniaService QueryInterface const
+GRSL2Spawner_QueryInterface                                      # GRSL2Spawner QueryInterface
+GRSL2Spawner_QueryInterface_const                                # GRSL2Spawner QueryInterface const
+NarniaFogModel_QueryInterface                                    # NarniaFogModel QueryInterface
+NarniaFogModel_QueryInterface_const                              # NarniaFogModel QueryInterface const
+NarniaFogParticle_QueryInterface                                 # NarniaFogParticle QueryInterface
+NarniaFogParticle_QueryInterface_const                           # NarniaFogParticle QueryInterface const
+MissionService_QueryInterface                                    # MissionService QueryInterface
+MissionService_QueryInterface_const                              # MissionService QueryInterface const
+ToneService_QueryInterface                                       # ToneService QueryInterface
+ToneService_QueryInterface_const                                 # ToneService QueryInterface const
+StringTuner_QueryInterface                                       # StringTuner QueryInterface
+StringTuner_QueryInterface_const                                 # StringTuner QueryInterface const
+TunerService_QueryInterface                                      # TunerService QueryInterface
+TunerService_QueryInterface_const                                # TunerService QueryInterface const
+InstrumentLoader_QueryInterface                                  # InstrumentLoader QueryInterface
+InstrumentLoader_QueryInterface_const                            # InstrumentLoader QueryInterface const
+GRCrowdPoint_QueryInterface                                      # GRCrowdPoint QueryInterface
+GRCrowdPoint_QueryInterface_const                                # GRCrowdPoint QueryInterface const
+GearManager_QueryInterface                                       # GearManager QueryInterface
+GearManager_QueryInterface_const                                 # GearManager QueryInterface const
+GearService_QueryInterface                                       # GearService QueryInterface
+GearService_QueryInterface_const                                 # GearService QueryInterface const
+FogService_QueryInterface                                        # FogService QueryInterface
+FogService_QueryInterface_const                                  # FogService QueryInterface const
+GlobalFogSettings_QueryInterface                                 # GlobalFogSettings QueryInterface
+GlobalFogSettings_QueryInterface_const                           # GlobalFogSettings QueryInterface const
+ManifestManager_QueryInterface                                   # ManifestManager QueryInterface
+ManifestManager_QueryInterface_const                             # ManifestManager QueryInterface const
+StatsService_QueryInterface                                      # StatsService QueryInterface
+StatsService_QueryInterface_const                                # StatsService QueryInterface const
+GRCameraLoft_QueryInterface                                      # GRCameraLoft QueryInterface
+GRCameraLoft_QueryInterface_const                                # GRCameraLoft QueryInterface const
+GEVideoScreenModel_QueryInterface                                # GEVideoScreenModel QueryInterface
+GEVideoScreenModel_QueryInterface_const                          # GEVideoScreenModel QueryInterface const
+TunerProgressBuiltin_QueryInterface                              # TunerProgressBuiltin QueryInterface
+TunerProgressBuiltin_QueryInterface_const                        # TunerProgressBuiltin QueryInterface const
+GameColorManager_QueryInterface                                  # GameColorManager QueryInterface
+GameColorManager_QueryInterface_const                            # GameColorManager QueryInterface const
+GRCameraSessionMode_QueryInterface                               # GRCameraSessionMode QueryInterface
+GRCameraSessionMode_QueryInterface_const                         # GRCameraSessionMode QueryInterface const
+GCAttachmentManager_QueryInterface                               # GCAttachmentManager QueryInterface
+GCAttachmentManager_QueryInterface_const                         # GCAttachmentManager QueryInterface const
+UIMenu_ShopSongs_QueryInterface                                  # UIMenu_ShopSongs QueryInterface
+UIMenu_ShopSongs_QueryInterface_const                            # UIMenu_ShopSongs QueryInterface const
+GRLoftAmbientLight_QueryInterface                                # GRLoftAmbientLight QueryInterface
+GRLoftAmbientLight_QueryInterface_const                          # GRLoftAmbientLight QueryInterface const
+GRLoftSpotLight_QueryInterface                                   # GRLoftSpotLight QueryInterface
+GRLoftSpotLight_QueryInterface_const                             # GRLoftSpotLight QueryInterface const
+GRLoftState_QueryInterface                                       # GRLoftState QueryInterface
+GRLoftState_QueryInterface_const                                 # GRLoftState QueryInterface const
+LoftPostEffectsManager_QueryInterface                            # LoftPostEffectsManager QueryInterface
+LoftPostEffectsManager_QueryInterface_const                      # LoftPostEffectsManager QueryInterface const
+RSVenueForkEmitterGear_QueryInterface                            # RSVenueForkEmitterGear QueryInterface
+RSVenueForkEmitterGear_QueryInterface_const                      # RSVenueForkEmitterGear QueryInterface const
+UIMenu_ShopGear_QueryInterface                                   # UIMenu_ShopGear QueryInterface
+UIMenu_ShopGear_QueryInterface_const                             # UIMenu_ShopGear QueryInterface const
+UIMenu_ShopPacks_QueryInterface                                  # UIMenu_ShopPacks QueryInterface
+UIMenu_ShopPacks_QueryInterface_const                            # UIMenu_ShopPacks QueryInterface const
+GearPlacementNode_QueryInterface                                 # GearPlacementNode QueryInterface
+GearPlacementNode_QueryInterface_const                           # GearPlacementNode QueryInterface const
+GearLava_QueryInterface                                          # GearLava QueryInterface
+GearLava_QueryInterface_const                                    # GearLava QueryInterface const
+GearNifCache_QueryInterface                                      # GearNifCache QueryInterface
+GearNifCache_QueryInterface_const                                # GearNifCache QueryInterface const
+GRVenueAmbientAnimations_QueryInterface                          # GRVenueAmbientAnimations QueryInterface
+GRVenueAmbientAnimations_QueryInterface_const                    # GRVenueAmbientAnimations QueryInterface const
+GRSoundIntensity_QueryInterface                                  # GRSoundIntensity QueryInterface
+GRSoundIntensity_QueryInterface_const                            # GRSoundIntensity QueryInterface const
+GRVenuePointLight_QueryInterface                                 # GRVenuePointLight QueryInterface
+GRVenuePointLight_QueryInterface_const                           # GRVenuePointLight QueryInterface const
+GRLoftCabinetScreen_QueryInterface                               # GRLoftCabinetScreen QueryInterface
+GRLoftCabinetScreen_QueryInterface_const                         # GRLoftCabinetScreen QueryInterface const
+GCLdbChlgService_QueryInterface                                  # GCLdbChlgService QueryInterface
+GCLdbChlgService_QueryInterface_const                            # GCLdbChlgService QueryInterface const
+GearChangeController_QueryInterface                              # GearChangeController QueryInterface
+GearChangeController_QueryInterface_const                        # GearChangeController QueryInterface const
+GCGFxMouseEventHandler_QueryInterface                            # GCGFxMouseEventHandler QueryInterface
+GCGFxMouseEventHandler_QueryInterface_const                      # GCGFxMouseEventHandler QueryInterface const
+AchievementService_QueryInterface                                # AchievementService QueryInterface
+AchievementService_QueryInterface_const                          # AchievementService QueryInterface const
+PrizeService_QueryInterface                                      # PrizeService QueryInterface
+PrizeService_QueryInterface_const                                # PrizeService QueryInterface const
+GCKinectEventHandler_QueryInterface                              # GCKinectEventHandler QueryInterface
+GCKinectEventHandler_QueryInterface_const                        # GCKinectEventHandler QueryInterface const
+FavoritesService_QueryInterface                                  # FavoritesService QueryInterface
+FavoritesService_QueryInterface_const                            # FavoritesService QueryInterface const
+RSConnectExtension_RDV_QueryInterface                            # RSConnectExtension_RDV QueryInterface
+RSConnectExtension_RDV_QueryInterface_const                      # RSConnectExtension_RDV QueryInterface const
+RSConnectService_Steam_QueryInterface                            # RSConnectService_Steam QueryInterface
+RSConnectService_Steam_QueryInterface_const                      # RSConnectService_Steam QueryInterface const
+RSSteamService_QueryInterface                                    # RSSteamService QueryInterface
+RSSteamService_QueryInterface_const                              # RSSteamService QueryInterface const
+RSDLCService_Steam_QueryInterface                                # RSDLCService_Steam QueryInterface
+RSDLCService_Steam_QueryInterface_const                          # RSDLCService_Steam QueryInterface const
+RSProfileService_MacOS_QueryInterface                            # RSProfileService_MacOS QueryInterface
+RSProfileService_MacOS_QueryInterface_const                      # RSProfileService_MacOS QueryInterface const
+RSSteamAchievement_QueryInterface                                # RSSteamAchievement QueryInterface
+RSSteamAchievement_QueryInterface_const                          # RSSteamAchievement QueryInterface const
+RSSteamActivityFeed_QueryInterface                               # RSSteamActivityFeed QueryInterface
+RSSteamActivityFeed_QueryInterface_const                         # RSSteamActivityFeed QueryInterface const
+RSSteamCloudFile_QueryInterface                                  # RSSteamCloudFile QueryInterface
+RSSteamCloudFile_QueryInterface_const                            # RSSteamCloudFile QueryInterface const
+RSSteamDownloadableContent_QueryInterface                        # RSSteamDownloadableContent QueryInterface
+RSSteamDownloadableContent_QueryInterface_const                  # RSSteamDownloadableContent QueryInterface const
+RSSteamLeaderboards_QueryInterface                               # RSSteamLeaderboards QueryInterface
+RSSteamLeaderboards_QueryInterface_const                         # RSSteamLeaderboards QueryInterface const
+RSSteamLeaderboardRequest_QueryInterface                         # RSSteamLeaderboardRequest QueryInterface
+RSSteamLeaderboardRequest_QueryInterface_const                   # RSSteamLeaderboardRequest QueryInterface const
+RSSteamLeaderboardRequestUpload_QueryInterface                   # RSSteamLeaderboardRequestUpload QueryInterface
+RSSteamLeaderboardRequestUpload_QueryInterface_const             # RSSteamLeaderboardRequestUpload QueryInterface const
+RSSteamLeaderboardRequestDownload_QueryInterface                 # RSSteamLeaderboardRequestDownload QueryInterface
+RSSteamLeaderboardRequestDownload_QueryInterface_const           # RSSteamLeaderboardRequestDownload QueryInterface const
+RSSteamWebApi_QueryInterface                                     # RSSteamWebApi QueryInterface
+RSSteamWebApi_QueryInterface_const                               # RSSteamWebApi QueryInterface const
+FrkService_QueryInterface                                        # FrkService QueryInterface
+FrkService_QueryInterface_const                                  # FrkService QueryInterface const
+GFxAssetTaskAssetFactory_QueryInterface                          # GFxAssetTaskAssetFactory QueryInterface
+GFxAssetTaskAssetFactory_QueryInterface_const                    # GFxAssetTaskAssetFactory QueryInterface const
+GFxInputRouterModel_QueryInterface                               # GFxInputRouterModel QueryInterface
+GFxInputRouterModel_QueryInterface_const                         # GFxInputRouterModel QueryInterface const
+GFxMovieModel_QueryInterface                                     # GFxMovieModel QueryInterface
+GFxMovieModel_QueryInterface_const                               # GFxMovieModel QueryInterface const
+GFxService_QueryInterface                                        # GFxService QueryInterface
+GFxService_QueryInterface_const                                  # GFxService QueryInterface const
+sub_LuaResumeCoroutineTask_QueryInterface                        # sub:LuaResumeCoroutineTask QueryInterface
+sub_LuaResumeCoroutineTask_QueryInterface_const                  # sub:LuaResumeCoroutineTask QueryInterface const
+LuaScriptFactory_QueryInterface                                  # LuaScriptFactory QueryInterface
+LuaScriptFactory_QueryInterface_const                            # LuaScriptFactory QueryInterface const
+SchedulerLua_QueryInterface                                      # SchedulerLua QueryInterface
+SchedulerLua_QueryInterface_const                                # SchedulerLua QueryInterface const
+AttachNifData_QueryInterface                                     # AttachNifData QueryInterface
+AttachNifData_QueryInterface_const                               # AttachNifData QueryInterface const
+CameraService_QueryInterface                                     # CameraService QueryInterface
+CameraService_QueryInterface_const                               # CameraService QueryInterface const
+LightService_QueryInterface                                      # LightService QueryInterface
+LightService_QueryInterface_const                                # LightService QueryInterface const
+NIFFactory_QueryInterface                                        # NIFFactory QueryInterface
+NIFFactory_QueryInterface_const                                  # NIFFactory QueryInterface const
+RenderService_QueryInterface                                     # RenderService QueryInterface
+RenderService_QueryInterface_const                               # RenderService QueryInterface const
+SceneGraphCache_QueryInterface                                   # SceneGraphCache QueryInterface
+SceneGraphCache_QueryInterface_const                             # SceneGraphCache QueryInterface const
+SceneGraphService_QueryInterface                                 # SceneGraphService QueryInterface
+SceneGraphService_QueryInterface_const                           # SceneGraphService QueryInterface const
+ShaderService_QueryInterface                                     # ShaderService QueryInterface
+ShaderService_QueryInterface_const                               # ShaderService QueryInterface const
+InputActionMessage_QueryInterface                                # InputActionMessage QueryInterface
+InputActionMessage_QueryInterface_const                          # InputActionMessage QueryInterface const
+InputHandler_QueryInterface                                      # InputHandler QueryInterface
+InputHandler_QueryInterface_const                                # InputHandler QueryInterface const
+InputService_QueryInterface                                      # InputService QueryInterface
+InputService_QueryInterface_const                                # InputService QueryInterface const
+InputStickMessage_QueryInterface                                 # InputStickMessage QueryInterface
+InputStickMessage_QueryInterface_const                           # InputStickMessage QueryInterface const
+KeyDownMessage_QueryInterface                                    # KeyDownMessage QueryInterface
+KeyDownMessage_QueryInterface_const                              # KeyDownMessage QueryInterface const
+KeyUpMessage_QueryInterface                                      # KeyUpMessage QueryInterface
+KeyUpMessage_QueryInterface_const                                # KeyUpMessage QueryInterface const
+MouseMoveMessage_QueryInterface                                  # MouseMoveMessage QueryInterface
+MouseMoveMessage_QueryInterface_const                            # MouseMoveMessage QueryInterface const
+MouseDownMessage_QueryInterface                                  # MouseDownMessage QueryInterface
+MouseDownMessage_QueryInterface_const                            # MouseDownMessage QueryInterface const
+MouseUpMessage_QueryInterface                                    # MouseUpMessage QueryInterface
+MouseUpMessage_QueryInterface_const                              # MouseUpMessage QueryInterface const
+Entity_QueryInterface                                            # Entity QueryInterface
+Entity_QueryInterface_const                                      # Entity QueryInterface const
+sub_EntityChangeMessage_QueryInterface                           # sub:EntityChangeMessage QueryInterface
+sub_EntityChangeMessage_QueryInterface_const                     # sub:EntityChangeMessage QueryInterface const
+EntityFactory_QueryInterface                                     # EntityFactory QueryInterface
+EntityFactory_QueryInterface_const                               # EntityFactory QueryInterface const
+EntityLoadRequest_QueryInterface                                 # EntityLoadRequest QueryInterface
+EntityLoadRequest_QueryInterface_const                           # EntityLoadRequest QueryInterface const
+EntityLoadResult_QueryInterface                                  # EntityLoadResult QueryInterface
+EntityLoadResult_QueryInterface_const                            # EntityLoadResult QueryInterface const
+EntityPreloadRequest_QueryInterface                              # EntityPreloadRequest QueryInterface
+EntityPreloadRequest_QueryInterface_const                        # EntityPreloadRequest QueryInterface const
+EntityPreloadResponse_QueryInterface                             # EntityPreloadResponse QueryInterface
+EntityPreloadResponse_QueryInterface_const                       # EntityPreloadResponse QueryInterface const
+EntityLoaderService_QueryInterface                               # EntityLoaderService QueryInterface
+EntityLoaderService_QueryInterface_const                         # EntityLoaderService QueryInterface const
+EntityManager_QueryInterface                                     # EntityManager QueryInterface
+EntityManager_QueryInterface_const                               # EntityManager QueryInterface const
+EntitySetLoadState_QueryInterface                                # EntitySetLoadState QueryInterface
+EntitySetLoadState_QueryInterface_const                          # EntitySetLoadState QueryInterface const
+sub_EventMessage_QueryInterface                                  # sub:EventMessage QueryInterface
+sub_EventMessage_QueryInterface_const                            # sub:EventMessage QueryInterface const
+FlatModelFactory_QueryInterface                                  # FlatModelFactory QueryInterface
+FlatModelFactory_QueryInterface_const                            # FlatModelFactory QueryInterface const
+FlatModelManager_QueryInterface                                  # FlatModelManager QueryInterface
+FlatModelManager_QueryInterface_const                            # FlatModelManager QueryInterface const
+PendingBehavior_QueryInterface                                   # PendingBehavior QueryInterface
+PendingBehavior_QueryInterface_const                             # PendingBehavior QueryInterface const
+Scheduler_QueryInterface                                         # Scheduler QueryInterface
+Scheduler_QueryInterface_const                                   # Scheduler QueryInterface const
+ScriptFactoryResponse_QueryInterface                             # ScriptFactoryResponse QueryInterface
+ScriptFactoryResponse_QueryInterface_const                       # ScriptFactoryResponse QueryInterface const
+WorldFactory_QueryInterface                                      # WorldFactory QueryInterface
+WorldFactory_QueryInterface_const                                # WorldFactory QueryInterface const
+AnimationService_QueryInterface                                  # AnimationService QueryInterface
+AnimationService_QueryInterface_const                            # AnimationService QueryInterface const
+KFMFactory_QueryInterface                                        # KFMFactory QueryInterface
+KFMFactory_QueryInterface_const                                  # KFMFactory QueryInterface const
+KFMFactory__ResponseData_QueryInterface                          # KFMFactory::ResponseData QueryInterface
+KFMFactory__ResponseData_QueryInterface_const                    # KFMFactory::ResponseData QueryInterface const
+AssetCacheResponse_QueryInterface                                # AssetCacheResponse QueryInterface
+AssetCacheResponse_QueryInterface_const                          # AssetCacheResponse QueryInterface const
+AssetConfigService_QueryInterface                                # AssetConfigService QueryInterface
+AssetConfigService_QueryInterface_const                          # AssetConfigService QueryInterface const
+AssetFactoryManager_QueryInterface                               # AssetFactoryManager QueryInterface
+AssetFactoryManager_QueryInterface_const                         # AssetFactoryManager QueryInterface const
+AssetLoadRequest_QueryInterface                                  # AssetLoadRequest QueryInterface
+AssetLoadRequest_QueryInterface_const                            # AssetLoadRequest QueryInterface const
+AssetLoadResponse_QueryInterface                                 # AssetLoadResponse QueryInterface
+AssetLoadResponse_QueryInterface_const                           # AssetLoadResponse QueryInterface const
+sub_AssetLocatorRequest_QueryInterface                           # sub:AssetLocatorRequest QueryInterface
+sub_AssetLocatorRequest_QueryInterface_const                     # sub:AssetLocatorRequest QueryInterface const
+sub_AssetConfigurationMessage_QueryInterface                     # sub:AssetConfigurationMessage QueryInterface
+sub_AssetConfigurationMessage_QueryInterface_const               # sub:AssetConfigurationMessage QueryInterface const
+sub_AssetLocatorResponse_QueryInterface                          # sub:AssetLocatorResponse QueryInterface
+sub_AssetLocatorResponse_QueryInterface_const                    # sub:AssetLocatorResponse QueryInterface const
+AssetTagsInfoResponse_QueryInterface                             # AssetTagsInfoResponse QueryInterface
+AssetTagsInfoResponse_QueryInterface_const                       # AssetTagsInfoResponse QueryInterface const
+AssetLocatorService_QueryInterface                               # AssetLocatorService QueryInterface
+AssetLocatorService_QueryInterface_const                         # AssetLocatorService QueryInterface const
+ConfigManager_QueryInterface                                     # ConfigManager QueryInterface
+ConfigManager_QueryInterface_const                               # ConfigManager QueryInterface const
+SectionEntry_QueryInterface                                      # SectionEntry QueryInterface
+SectionEntry_QueryInterface_const                                # SectionEntry QueryInterface const
+ConfigSource_QueryInterface                                      # ConfigSource QueryInterface
+ConfigSource_QueryInterface_const                                # ConfigSource QueryInterface const
+CommandLineSource_QueryInterface                                 # CommandLineSource QueryInterface
+CommandLineSource_QueryInterface_const                           # CommandLineSource QueryInterface const
+IniSource_QueryInterface                                         # IniSource QueryInterface
+IniSource_QueryInterface_const                                   # IniSource QueryInterface const
+EnvVarSource_QueryInterface                                      # EnvVarSource QueryInterface
+EnvVarSource_QueryInterface_const                                # EnvVarSource QueryInterface const
+DebugOutDestination_QueryInterface                               # DebugOutDestination QueryInterface
+DebugOutDestination_QueryInterface_const                         # DebugOutDestination QueryInterface const
+FileDestination_QueryInterface                                   # FileDestination QueryInterface
+FileDestination_QueryInterface_const                             # FileDestination QueryInterface const
+GenericAssetFactory_QueryInterface                               # GenericAssetFactory QueryInterface
+GenericAssetFactory_QueryInterface_const                         # GenericAssetFactory QueryInterface const
+GenericAssetLoadResponse_QueryInterface                          # GenericAssetLoadResponse QueryInterface
+GenericAssetLoadResponse_QueryInterface_const                    # GenericAssetLoadResponse QueryInterface const
+sub_IMessage_QueryInterface                                      # sub:IMessage QueryInterface
+sub_IMessage_QueryInterface_const                                # sub:IMessage QueryInterface const
+Logger_QueryInterface                                            # Logger QueryInterface
+Logger_QueryInterface_const                                      # Logger QueryInterface const
+MessageService_QueryInterface                                    # MessageService QueryInterface
+MessageService_QueryInterface_const                              # MessageService QueryInterface const
+NetMessage_QueryInterface                                        # NetMessage QueryInterface
+NetMessage_QueryInterface_const                                  # NetMessage QueryInterface const
+AssignNetIDMessage_QueryInterface                                # AssignNetIDMessage QueryInterface
+AssignNetIDMessage_QueryInterface_const                          # AssignNetIDMessage QueryInterface const
+PrintDestination_QueryInterface                                  # PrintDestination QueryInterface
+PrintDestination_QueryInterface_const                            # PrintDestination QueryInterface const
+ServiceManager_QueryInterface                                    # ServiceManager QueryInterface
+ServiceManager_QueryInterface_const                              # ServiceManager QueryInterface const
+sub_StreamMessage_QueryInterface                                 # sub:StreamMessage QueryInterface
+sub_StreamMessage_QueryInterface_const                           # sub:StreamMessage QueryInterface const
+MacOSPlatformService_QueryInterface                              # MacOSPlatformService QueryInterface
+MacOSPlatformService_QueryInterface_const                        # MacOSPlatformService QueryInterface const
+AudioBankAssetFactory_QueryInterface                             # AudioBankAssetFactory QueryInterface
+AudioBankAssetFactory_QueryInterface_const                       # AudioBankAssetFactory QueryInterface const
+AudioBankAssetLoadResponse_QueryInterface                        # AudioBankAssetLoadResponse QueryInterface
+AudioBankAssetLoadResponse_QueryInterface_const                  # AudioBankAssetLoadResponse QueryInterface const
+AudioMessage_QueryInterface                                      # AudioMessage QueryInterface
+AudioMessage_QueryInterface_const                                # AudioMessage QueryInterface const
+AudioService_QueryInterface                                      # AudioService QueryInterface
+AudioService_QueryInterface_const                                # AudioService QueryInterface const
+SceneGraphRemovedMessage_QueryInterface                          # SceneGraphRemovedMessage QueryInterface
+SceneGraphRemovedMessage_QueryInterface_const                    # SceneGraphRemovedMessage QueryInterface const
+SceneGraphAddedMessage_QueryInterface                            # SceneGraphAddedMessage QueryInterface
+SceneGraphAddedMessage_QueryInterface_const                      # SceneGraphAddedMessage QueryInterface const
+SceneGraphsUpdatedMessage_QueryInterface                         # SceneGraphsUpdatedMessage QueryInterface
+SceneGraphsUpdatedMessage_QueryInterface_const                   # SceneGraphsUpdatedMessage QueryInterface const
+SceneGraphMessage_QueryInterface                                 # SceneGraphMessage QueryInterface
+SceneGraphMessage_QueryInterface_const                           # SceneGraphMessage QueryInterface const
+JSONFactory__JSONFactoryData_QueryInterface                      # JSONFactory::JSONFactoryData QueryInterface
+JSONFactory__JSONFactoryData_QueryInterface_const                # JSONFactory::JSONFactoryData QueryInterface const
+ReturnToTitleScreen_QueryInterface                               # ReturnToTitleScreen QueryInterface
+ReturnToTitleScreen_QueryInterface_const                         # ReturnToTitleScreen QueryInterface const
+PreloadHelperComplete_QueryInterface                             # PreloadHelperComplete QueryInterface
+PreloadHelperComplete_QueryInterface_const                       # PreloadHelperComplete QueryInterface const
+SceneGraphCacheResponse_QueryInterface                           # SceneGraphCacheResponse QueryInterface
+SceneGraphCacheResponse_QueryInterface_const                     # SceneGraphCacheResponse QueryInterface const
+PreloadGroup_QueryInterface                                      # PreloadGroup QueryInterface
+PreloadGroup_QueryInterface_const                                # PreloadGroup QueryInterface const
+GCPauseMessage_QueryInterface                                    # GCPauseMessage QueryInterface
+GCPauseMessage_QueryInterface_const                              # GCPauseMessage QueryInterface const
+RSGraphAssetFactoryLoadResponse_QueryInterface                   # RSGraphAssetFactoryLoadResponse QueryInterface
+RSGraphAssetFactoryLoadResponse_QueryInterface_const             # RSGraphAssetFactoryLoadResponse QueryInterface const
+RSConnectGameInterface_Impl_QueryInterface                       # RSConnectGameInterface_Impl QueryInterface
+RSConnectGameInterface_Impl_QueryInterface_const                 # RSConnectGameInterface_Impl QueryInterface const
+ReactiveRingModel_QueryInterface                                 # ReactiveRingModel QueryInterface
+ReactiveRingModel_QueryInterface_const                           # ReactiveRingModel QueryInterface const
+RingParticleEmitter_QueryInterface                               # RingParticleEmitter QueryInterface
+RingParticleEmitter_QueryInterface_const                         # RingParticleEmitter QueryInterface const
+GCGFxMouseEventMessage_QueryInterface                            # GCGFxMouseEventMessage QueryInterface
+GCGFxMouseEventMessage_QueryInterface_const                      # GCGFxMouseEventMessage QueryInterface const
+GCKinectEventMessage_QueryInterface                              # GCKinectEventMessage QueryInterface
+GCKinectEventMessage_QueryInterface_const                        # GCKinectEventMessage QueryInterface const
+NiFrkParticleEffectModel_QueryInterface                          # NiFrkParticleEffectModel QueryInterface
+NiFrkParticleEffectModel_QueryInterface_const                    # NiFrkParticleEffectModel QueryInterface const
+GFxAssetTaskRequest_QueryInterface                               # GFxAssetTaskRequest QueryInterface
+GFxAssetTaskRequest_QueryInterface_const                         # GFxAssetTaskRequest QueryInterface const
+GFXModelResponse_QueryInterface                                  # GFXModelResponse QueryInterface
+GFXModelResponse_QueryInterface_const                            # GFXModelResponse QueryInterface const
+LuaScriptFactoryResponseData_QueryInterface                      # LuaScriptFactoryResponseData QueryInterface
+LuaScriptFactoryResponseData_QueryInterface_const                # LuaScriptFactoryResponseData QueryInterface const
+NIFFactoryResponse_QueryInterface                                # NIFFactoryResponse QueryInterface
+NIFFactoryResponse_QueryInterface_const                          # NIFFactoryResponse QueryInterface const
+AttachmentMadeMessage_QueryInterface                             # AttachmentMadeMessage QueryInterface
+AttachmentMadeMessage_QueryInterface_const                       # AttachmentMadeMessage QueryInterface const
+AttachmentMessage_QueryInterface                                 # AttachmentMessage QueryInterface
+AttachmentMessage_QueryInterface_const                           # AttachmentMessage QueryInterface const
+AttachmentBrokenMessage_QueryInterface                           # AttachmentBrokenMessage QueryInterface
+AttachmentBrokenMessage_QueryInterface_const                     # AttachmentBrokenMessage QueryInterface const
+InputActionMapsLoaded_QueryInterface                             # InputActionMapsLoaded QueryInterface
+InputActionMapsLoaded_QueryInterface_const                       # InputActionMapsLoaded QueryInterface const
+ScheduledTask_QueryInterface                                     # ScheduledTask QueryInterface
+ScheduledTask_QueryInterface_const                               # ScheduledTask QueryInterface const
+EntityFactory__EntityFactoryData_QueryInterface                  # EntityFactory::EntityFactoryData QueryInterface
+EntityFactory__EntityFactoryData_QueryInterface_const            # EntityFactory::EntityFactoryData QueryInterface const
+EntityFactoryRequest_QueryInterface                              # EntityFactoryRequest QueryInterface
+EntityFactoryRequest_QueryInterface_const                        # EntityFactoryRequest QueryInterface const
+EntityFactoryResponse_QueryInterface                             # EntityFactoryResponse QueryInterface
+EntityFactoryResponse_QueryInterface_const                       # EntityFactoryResponse QueryInterface const
+ResponseData_QueryInterface                                      # ResponseData QueryInterface
+ResponseData_QueryInterface_const                                # ResponseData QueryInterface const
+FlatModelFactoryRequest_QueryInterface                           # FlatModelFactoryRequest QueryInterface
+FlatModelFactoryRequest_QueryInterface_const                     # FlatModelFactoryRequest QueryInterface const
+FlatModelFactoryResponse_QueryInterface                          # FlatModelFactoryResponse QueryInterface
+FlatModelFactoryResponse_QueryInterface_const                    # FlatModelFactoryResponse QueryInterface const
+ScriptFactoryRequest_QueryInterface                              # ScriptFactoryRequest QueryInterface
+ScriptFactoryRequest_QueryInterface_const                        # ScriptFactoryRequest QueryInterface const
+WorldFactoryData_QueryInterface                                  # WorldFactoryData QueryInterface
+WorldFactoryData_QueryInterface_const                            # WorldFactoryData QueryInterface const
+WorldFactoryRequest_QueryInterface                               # WorldFactoryRequest QueryInterface
+WorldFactoryRequest_QueryInterface_const                         # WorldFactoryRequest QueryInterface const
+WorldFactoryResponse_QueryInterface                              # WorldFactoryResponse QueryInterface
+WorldFactoryResponse_QueryInterface_const                        # WorldFactoryResponse QueryInterface const
+ActorAddedMessage_QueryInterface                                 # ActorAddedMessage QueryInterface
+ActorAddedMessage_QueryInterface_const                           # ActorAddedMessage QueryInterface const
+ActorRemovedMessage_QueryInterface                               # ActorRemovedMessage QueryInterface
+ActorRemovedMessage_QueryInterface_const                         # ActorRemovedMessage QueryInterface const
+KFMFactoryRequest_QueryInterface                                 # KFMFactoryRequest QueryInterface
+KFMFactoryRequest_QueryInterface_const                           # KFMFactoryRequest QueryInterface const
+KFMFactoryResponse_QueryInterface                                # KFMFactoryResponse QueryInterface
+KFMFactoryResponse_QueryInterface_const                          # KFMFactoryResponse QueryInterface const
+AssetLocationMap_QueryInterface                                  # AssetLocationMap QueryInterface
+AssetLocationMap_QueryInterface_const                            # AssetLocationMap QueryInterface const
+ResponseData2_QueryInterface                                     # ResponseData QueryInterface
+ResponseData2_QueryInterface_const                               # ResponseData QueryInterface const
+AudioBankAssetLoadRequest_QueryInterface                         # AudioBankAssetLoadRequest QueryInterface
+AudioBankAssetLoadRequest_QueryInterface_const                   # AudioBankAssetLoadRequest QueryInterface const
+PostEventMessage_QueryInterface                                  # PostEventMessage QueryInterface
+PostEventMessage_QueryInterface_const                            # PostEventMessage QueryInterface const
+PostTriggerMessage_QueryInterface                                # PostTriggerMessage QueryInterface
+PostTriggerMessage_QueryInterface_const                          # PostTriggerMessage QueryInterface const
+SetParamMessage_QueryInterface                                   # SetParamMessage QueryInterface
+SetParamMessage_QueryInterface_const                             # SetParamMessage QueryInterface const
+SetStateMessage_QueryInterface                                   # SetStateMessage QueryInterface
+SetStateMessage_QueryInterface_const                             # SetStateMessage QueryInterface const
+SetSwitchMessage_QueryInterface                                  # SetSwitchMessage QueryInterface
+SetSwitchMessage_QueryInterface_const                            # SetSwitchMessage QueryInterface const
+DoPrepareEventCallbackBehaviorMessage_QueryInterface             # DoPrepareEventCallbackBehaviorMessage QueryInterface
+DoPrepareEventCallbackBehaviorMessage_QueryInterface_const       # DoPrepareEventCallbackBehaviorMessage QueryInterface const
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface           # DoUnprepareEventCallbackBehaviorMessage QueryInterface
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface_const     # DoUnprepareEventCallbackBehaviorMessage QueryInterface const
+DoLoadBankCallbackBehaviorMessage_QueryInterface                 # DoLoadBankCallbackBehaviorMessage QueryInterface
+DoLoadBankCallbackBehaviorMessage_QueryInterface_const           # DoLoadBankCallbackBehaviorMessage QueryInterface const
+DoUnloadBankCallbackBehaviorMessage_QueryInterface               # DoUnloadBankCallbackBehaviorMessage QueryInterface
+DoUnloadBankCallbackBehaviorMessage_QueryInterface_const         # DoUnloadBankCallbackBehaviorMessage QueryInterface const
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface        # DoPostEventExNotifyCallbackBehaviorMessage QueryInterface
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface_const  # DoPostEventExNotifyCallbackBehaviorMessage QueryInterface const

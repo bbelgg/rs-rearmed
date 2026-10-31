@@ -17,9 +17,8 @@
 #include "audio.h"
 #include "rc_hook.h"
 
-#define SI_OPEN 0x10133bee0ull  // SoundInput slot open (this, slot) -> bool
-#define SI_STATE 0x228          // u32: 2 = closed, to be opened
-#define SI_DEV 0x30             // u8 selected, u32 AudioObjectID at +4 (0x10133ab30)
+#define SI_STATE RC_OFF(si_state)  // u32: 2 = closed, to be opened
+#define SI_DEV RC_OFF(si_dev)      // u8 selected, u32 AudioObjectID at +4 (0x10133ab30)
 #define ENTRIES 64             // device list entries traced
 
 static _Thread_local struct {
@@ -134,7 +133,7 @@ static void after_open(rc_ctx *c, void *user) {
   device_name(dev, name, sizeof name);
   if (ok)
     rs_audio_log("input device %u \"%s\" (list entry %u) opened, %u channel(s)", dev, name, slot,
-                 *(uint32_t *)(self + 0x20));
+                 *(uint32_t *)(self + RC_OFF(si_channels)));
   else
     rs_audio_log("input device %u \"%s\" (list entry %u) not opened; its calls:%s", dev, name, slot,
                  t_open.steps);
@@ -142,7 +141,7 @@ static void after_open(rc_ctx *c, void *user) {
 
 __attribute__((constructor)) static void trace_init(void) {
   if (!rs_audio_log_on()) return;
-  if (rc_hook_add(SI_OPEN, before_open, after_open, NULL)) rs_audio_log("no SoundInput open hook point");
+  if (rc_hook_add(RC_ADDR(si_open), before_open, after_open, NULL)) rs_audio_log("no SoundInput open hook point");
 }
 
 int32_t rs_audio_get_property_data_size(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,

@@ -1,0 +1,10 @@
+# The macOS game: Rocksmith 2014 for Mac (Steam app 221680, depot 221682), the x86-64 Mach-O that runs under
+# Rosetta, as tools/steamless dumps it once it has decrypted itself (tools/targets/targets.py).
+id = "mac-x64"
+description = "Rocksmith 2014, macOS (x86-64 Mach-O, Steam)"
+front_end = "x86-64-macho"    # tools/ws7/recomp/xlat
+abi = "sysv64"                # runtime/rc_abi.h: RC_TARGET_ABI_SYSV64
+image_base = 0x100000000
+text = [0x100001b00, 0x1013e4300]   # __TEXT,__text
+# SHA-256 of the decrypted image the tables were made for (gen_image.py warns when RC_IMAGE differs)
+image_sha256 = "383a54ac9d01f5f754c1d771eee03ada0b9fd89d8698a3af5f1025685534253a"

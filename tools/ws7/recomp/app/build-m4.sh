@@ -9,6 +9,8 @@
 #    rsmacfixes and RSBypass patches) and `hooks` (hook
 #    points for mods loaded at run time, no code of its own), and un-drops, to
 #    a fixpoint, every dropped address that generated code still references;
+#    the lists are names (tools/targets/names), resolved through the target's
+#    tables into OUTDIR/target (tools/targets/targets.py gen);
 # 3. builds the image with that list (tools/ws7/recomp/build/build.sh), makes the Metal shader
 #    corpus from the game files (tools/metal/make-corpus.sh, OUTDIR/shaders) and links
 #    OUTDIR/app/Rocksmith2014.app (tools/ws7/recomp/app/build.sh), which bundles the corpus.
@@ -20,6 +22,7 @@
 #   RC_LTO=thin  ThinLTO, cache OUTDIR/lto-cache, RC_LTO_JOBS link threads (default 6)
 #   RC_PGO=gen   instrumented app, profiles in OUTDIR/pgo (RC_PGO_DIR);  RC_PGO=use:FILE.profdata
 #   RC_JOBS=N    compile jobs (default: all cores)
+# Target: RC_TARGET (default mac-x64) names the game the image is from (tools/targets/<id>).
 # Then: tools/play-native/install.sh OUTDIR/app/Rocksmith2014.app
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -33,7 +36,12 @@ esac
 mkdir -p "$out"
 ov=$root/tools/ws7/recomp/overrides
 export RC_LTO_CACHE=${RC_LTO_CACHE:-$out/lto-cache} RC_PGO_DIR=${RC_PGO_DIR:-$out/pgo}
-echo "build: ${RC_OPT:--O2}${RC_LTO:+ lto=$RC_LTO}${RC_PGO:+ pgo=$RC_PGO}${RC_O1:+ o1=$RC_O1}"
+export RC_TARGET=${RC_TARGET:-mac-x64}
+echo "build: ${RC_OPT:--O2}${RC_LTO:+ lto=$RC_LTO}${RC_PGO:+ pgo=$RC_PGO}${RC_O1:+ o1=$RC_O1} target=$RC_TARGET"
+# The target's names and tables: rc_target_names.h, rc_target.c and the skip lists (OUTDIR/target/skip)
+"${RC_PY:-$root/analysis/venv/bin/python}" -I "$root/tools/targets/targets.py" gen "$out/target" > "$out/target.log" 2>&1 ||
+  { cat "$out/target.log"; exit 1; }
+export RC_TARGET_DIR=$out/target
 
 # Progress for the installer: "progress F LABEL" lines on stdout, F the fraction of the whole build
 # (the compilers' own output goes to the logs in OUTDIR).
@@ -47,9 +55,7 @@ lib=$out/ov/lib
 # bisecting a regression to one module.
 modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp audio mods hooks}
 : > "$out/skip.txt"
-for m in $modules; do
-  if [ "$m" = mods ]; then cat "$out/ov/mods.skip"; else cat "$ov/$m.skip"; fi
-done | grep -v '^#' >> "$out/skip.txt"
+for m in $modules; do cat "$RC_TARGET_DIR/skip/$m.skip"; done | grep -v '^#' >> "$out/skip.txt"
 
 export RC_GEN_DIR=$out/gen RC_OBJ_DIR=$out/obj
 echo 100000000-110000000 > "$out/tso-all.txt"

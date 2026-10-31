@@ -9,12 +9,12 @@
 #include "jpeglib.h"
 #include "rc_ov.h"
 
-// The loader stores &jpeg_resync_to_restart (0x100b44270) as src->resync_to_restart: the guest address
+// The loader stores &jpeg_resync_to_restart as src->resync_to_restart: the guest address
 // maps to the native function itself (no trampoline round trip into the adapter).
 static inline void ov_jpeg_alias(void) {
   static int done;
   if (!done) {
-    ov_alias_add(0x100b44270, (void *)jpeg_resync_to_restart);
+    OV_ALIAS(jpeg_resync_to_restart, (void *)jpeg_resync_to_restart);
     done = 1;
   }
 }

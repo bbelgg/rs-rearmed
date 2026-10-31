@@ -50,9 +50,10 @@ uint64_t ov_vcall_n(uint64_t obj, int slot, const uint64_t *args, int nargs) {
                                                                                               a[4], a[5]);
 }
 
-// Code words of the image: __text (the vtable entries of a class are function starts in it).
-#define OV_TEXT_LO 0x100001b00ull
-#define OV_TEXT_HI 0x1013e4300ull
+// Code words of the image: __text (the vtable entries of a class are function starts in it), from the
+// target's target.toml.
+#define OV_TEXT_LO RC_TARGET_TEXT_LO
+#define OV_TEXT_HI RC_TARGET_TEXT_HI
 
 void ov_native_vtable(void *obj) {
   uint64_t *vt = *(uint64_t **)obj;

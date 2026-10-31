@@ -3,7 +3,7 @@
 //
 // The mods patch x86 bytes at fixed addresses of the Steam x86_64 build. In the recompiled app no x86
 // code executes, so each patch becomes a native function that replaces the translated function containing
-// it (mods.skip lists them). Everything works on guest memory directly (guest pointers are
+// it (tools/targets/names/overrides/mods.list names them). Everything works on guest memory directly (guest pointers are
 // host pointers) and calls translated code with OV_GUEST / OV_VCALL.
 //
 // Behaviour is the mod's, function for function; where the mod's patch sits in the middle of a function,
@@ -109,7 +109,6 @@ uint64_t rs_mods_raise_nofile(void) {
 // entry is set), and again should the table be rebuilt. Runs on a poller thread (as in the mod) because
 // nothing the translated code calls fills that table at a known point.
 // ------------------------------------------------------------------------------------------------
-#define KEYTAB 0x101909f20ull
 #define KEYTAB_END_INDEX 0x77
 #define KEYTAB_END_VALUE 0x23
 #define KEYTAB_CHECK_INDEX 0x73
@@ -117,7 +116,7 @@ uint64_t rs_mods_raise_nofile(void) {
 
 int rs_mods_keys_poll_once(void) {
   if (!g_cfg.fixes || !rc_img_lo) return 0;
-  volatile uint32_t *t = (volatile uint32_t *)(uintptr_t)RC_A(KEYTAB);
+  volatile uint32_t *t = (volatile uint32_t *)(uintptr_t)RC_GA(scaleform_keycode_table);
   if (t[KEYTAB_CHECK_INDEX] != KEYTAB_CHECK_VALUE || t[KEYTAB_END_INDEX] == KEYTAB_END_VALUE) return 0;
   if (t[KEYTAB_END_INDEX] != 0) return 0;  // something else is there: leave it
   t[KEYTAB_END_INDEX] = KEYTAB_END_VALUE;
@@ -152,8 +151,6 @@ __attribute__((constructor)) static void mods_init(void) {
 // F_100ba1190 at frame offset -0x28; the override is entered with the caller's frame pointer in c->r[5],
 // so it reads the same slot.
 // ------------------------------------------------------------------------------------------------
-#define CHAR_TO_KEY 0x101921c60ull
-#define KEY_STATE 0x101922060ull
 
 static const struct {
   uint32_t ch;  // full character as Cocoa reports it
@@ -178,8 +175,8 @@ static const struct {
 // The game's mapping: characters 1..255 through CHAR_TO_KEY, a character without a key sets entry 0 (KEY_NOKEY).
 static void set_key(rc_ctx *c, int ch, uint32_t down) {
   (void)c;
-  const int32_t *map = (const int32_t *)(uintptr_t)RC_A(CHAR_TO_KEY);
-  uint32_t *state = (uint32_t *)(uintptr_t)RC_A(KEY_STATE);
+  const int32_t *map = (const int32_t *)(uintptr_t)RC_GA(game_char_to_key);
+  uint32_t *state = (uint32_t *)(uintptr_t)RC_GA(game_key_state);
   if (ch < 1 || ch > 255) return;
   int64_t key = map[ch];
   if (key >= 0 && key <= 0xff) state[key] = down;
@@ -187,11 +184,11 @@ static void set_key(rc_ctx *c, int ch, uint32_t down) {
 // The mod also maps characters 0 and above 255 (arrows arrive as 0: Cocoa's 0xF700 truncated to a byte).
 static void set_key_fixed(rc_ctx *c, int ch, uint32_t down) {
   int64_t key = -1;
-  const int32_t *map = (const int32_t *)(uintptr_t)RC_A(CHAR_TO_KEY);
-  uint32_t *state = (uint32_t *)(uintptr_t)RC_A(KEY_STATE);
+  const int32_t *map = (const int32_t *)(uintptr_t)RC_GA(game_char_to_key);
+  uint32_t *state = (uint32_t *)(uintptr_t)RC_GA(game_key_state);
   if (ch >= 1 && ch <= 255) key = map[ch];
   if (key <= 0) {
-    uint32_t full = RC_LD(uint32_t, c->r[5] - 0x28);
+    uint32_t full = RC_LD(uint32_t, RC_FRAME_PTR(c) + RC_OFF(input_sink_full_char));
     for (size_t i = 0; i < NEXTRAKEYS; i++)
       if (EXTRA_KEYS[i].ch == full) key = EXTRA_KEYS[i].key;
   }
@@ -206,8 +203,8 @@ static void key_event(rc_ctx *c, uint32_t down) {
   else set_key(c, ch, down);
   ov_ret_void(c);
 }
-void F_101135520(rc_ctx *c) { key_event(c, 1); }
-void F_101135560(rc_ctx *c) { key_event(c, 0); }
+void RC_FN(key_down)(rc_ctx *c) { key_event(c, 1); }
+void RC_FN(key_up)(rc_ctx *c) { key_event(c, 0); }
 
 // ------------------------------------------------------------------------------------------------
 // Thread priority (rsmacfixes my_setschedparam): F_101313170 = the engine thread class's SetPriority(this,
@@ -216,20 +213,19 @@ void F_101135560(rc_ctx *c) { key_event(c, 0); }
 // scheduler, which hitches Floodgate job threads by 20-130 ms. Requests below the default (31) are
 // raised to it. Replaces the whole function (the mod interposes the call it makes).
 // ------------------------------------------------------------------------------------------------
-#define PRIO_TABLE 0x10142d3f0ull
 #define DEFAULT_PRIO 31
 
-void F_101313170(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(thread_set_priority)(rc_ctx *c) {
+  OV_ARGS_OF(thread_set_priority, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   int32_t idx = OV_I32(a);
   uint32_t ok = 1;
-  if (*(int32_t *)(self + 0x20) != idx) {
+  if (*(int32_t *)(self + RC_OFF(thread_priority_index)) != idx) {
     if ((uint32_t)idx > 6) {
       ok = 0;
     } else {
-      int32_t want = RC_LD(int32_t, RC_A(PRIO_TABLE) + 4ull * (uint32_t)idx);
-      pthread_t th = RC_LD(pthread_t, self + 0x30);
+      int32_t want = RC_LD(int32_t, RC_GA(thread_priority_table) + 4ull * (uint32_t)idx);
+      pthread_t th = RC_LD(pthread_t, self + RC_OFF(thread_pthread));
       int policy = 0;
       struct sched_param sp;
       memset(&sp, 0, sizeof sp);
@@ -237,7 +233,7 @@ void F_101313170(rc_ctx *c) {
       sp.sched_priority = want;
       if (g_cfg.fixes && want < DEFAULT_PRIO) sp.sched_priority = DEFAULT_PRIO;
       pthread_setschedparam(th, policy, &sp);
-      *(int32_t *)(self + 0x20) = idx;
+      *(int32_t *)(self + RC_OFF(thread_priority_index)) = idx;
     }
   }
   ov_ret_u32(c, ok);
@@ -251,11 +247,7 @@ void F_101313170(rc_ctx *c) {
 // under the game's recursive path-table lock. The game's lock protocol (checked in F_100158030/F_100158840):
 // pthread_mutex_lock; owner (pthread_self) at +0x40; depth ++ at +0x48 ... depth --; unlock.
 // ------------------------------------------------------------------------------------------------
-#define PATH_LOCK_PTR 0x1018e6c10ull   // pointer to the recursive mutex of the interned path table
-#define PATH_TABLE_PTR 0x1018e6c00ull  // the interned path table itself
-#define FN_INTERN 0x100158030ull       // void *(const char *s, int len /* -1 = strlen */)
-#define FN_RELEASE 0x100158840ull      // int (void *obj): drops a reference
-#define OBJ_REFS 0x28                  // int refcount in the interned object
+#define OBJ_REFS RC_OFF(path_obj_refs)  // int refcount in the interned object
 
 #define SLOTS 1024  // direct-mapped
 static struct {
@@ -266,11 +258,11 @@ static struct {
 static void *g_cache_table;  // the path table the cached objects belong to
 
 static pthread_mutex_t *path_lock(void) {
-  pthread_mutex_t *m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_A(PATH_LOCK_PTR));
+  pthread_mutex_t *m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_GA(path_table_lock));
   pthread_mutex_lock(m);
-  *(pthread_t *)((char *)m + 0x40) = pthread_self();
-  (*(int *)((char *)m + 0x48))++;
-  void *table = (void *)(uintptr_t)RC_LD(uint64_t, RC_A(PATH_TABLE_PTR));
+  *(pthread_t *)((char *)m + RC_OFF(rmutex_owner)) = pthread_self();
+  (*(int *)((char *)m + RC_OFF(rmutex_depth)))++;
+  void *table = (void *)(uintptr_t)RC_LD(uint64_t, RC_GA(path_table));
   if (table != g_cache_table) {  // a new path table: the old objects went with the old table
     for (unsigned i = 0; i < SLOTS; i++) {
       free(g_cache[i].s);
@@ -283,20 +275,20 @@ static pthread_mutex_t *path_lock(void) {
   return m;
 }
 static void path_unlock(pthread_mutex_t *m) {
-  (*(int *)((char *)m + 0x48))--;
+  (*(int *)((char *)m + RC_OFF(rmutex_depth)))--;
   pthread_mutex_unlock(m);
 }
 
 static void *intern_path(const char *s) {
-  return (void *)(uintptr_t)OV_GUEST(FN_INTERN, (uint64_t)(uintptr_t)s, 0xffffffffull);
+  return (void *)(uintptr_t)OV_GUEST(path_intern, (uint64_t)(uintptr_t)s, 0xffffffffull);
 }
 
-void F_100158b70(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(path_md5)(rc_ctx *c) {
+  OV_ARGS_OF(path_md5, a, c);
   void **out = OV_PTR(a, void *);
   const char *s = OV_PTR(a, const char);
   void *obj;
-  if (!g_cfg.fixes || !RC_LD(uint64_t, RC_A(PATH_LOCK_PTR))) {  // the game's path; the lock is created later than the hook
+  if (!g_cfg.fixes || !RC_LD(uint64_t, RC_GA(path_table_lock))) {  // the game's path; the lock is created later than the hook
     obj = intern_path(s);
     *out = obj;
     OV_RET_PTR(c, obj);
@@ -334,7 +326,7 @@ void F_100158b70(rc_ctx *c) {
   } else {
     free(copy);
   }
-  if (evicted) OV_GUEST(FN_RELEASE, (uint64_t)(uintptr_t)evicted);
+  if (evicted) OV_GUEST(path_release, (uint64_t)(uintptr_t)evicted);
   *out = obj;
   OV_RET_PTR(c, obj);
 }
@@ -345,42 +337,42 @@ void F_100158b70(rc_ctx *c) {
 // marks enumeration done when the list is empty) once per frame; the mod redirected that call to a loop
 // bounded by a frame budget. The step stays translated; the caller is replaced by this native version.
 // ------------------------------------------------------------------------------------------------
-#define INSTALLING_FLAG 0xa
+#define INSTALLING_FLAG RC_OFF(dlc_installing)
 
-void F_100a0d730(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(dlc_update)(rc_ctx *c) {
+  OV_ARGS_OF(dlc_update, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
-  OV_GUEST(0x100a0cc40, o);
+  OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
   if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-    OV_GUEST(0x100a0d7e0, o);
+    OV_GUEST(dlc_install_step, o);
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
     do {
-      OV_GUEST(0x100a0d7e0, o);
+      OV_GUEST(dlc_install_step, o);
       // the step that finds the list empty clears the flag and installs nothing
       if (*(volatile uint8_t *)(self + INSTALLING_FLAG)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < g_cfg.budget_s);
   }
-  if (!self[0x1a0]) self[0x1a0] = 1;
-  if (self[0x9] && self[0x8]) {
-    if ((uint8_t)OV_GUEST(0x100a0d9c0, o)) {
-      self[0x8] = 0;
-      self[0x1a1] = 0;
+  if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;
+  if (self[RC_OFF(dlc_check_on)] && self[RC_OFF(dlc_pending)]) {
+    if ((uint8_t)OV_GUEST(dlc_enum_check, o)) {
+      self[RC_OFF(dlc_pending)] = 0;
+      self[RC_OFF(dlc_tail_done)] = 0;
     }
   }
-  if (!self[0x1a1]) OV_GUEST(0x100a0dcd0, o);
-  if (self[0xc8]) {
-    if (!self[0xa] && *(uint64_t *)(self + 0x68)) {  // clear the std::map at +0x48
-      OV_GUEST(0x10008b010, o + 0x48, *(uint64_t *)(self + 0x50));
-      *(uint64_t *)(self + 0x58) = o + 0x48;
-      *(uint64_t *)(self + 0x50) = 0;
-      *(uint64_t *)(self + 0x60) = o + 0x48;
-      *(uint64_t *)(self + 0x68) = 0;
+  if (!self[RC_OFF(dlc_tail_done)]) OV_GUEST(dlc_update_tail, o);
+  if (self[RC_OFF(dlc_clear_map)]) {
+    if (!self[INSTALLING_FLAG] && *(uint64_t *)(self + RC_OFF(dlc_map_size))) {  // clear the std::map
+      OV_GUEST(std_tree_destroy, o + RC_OFF(dlc_map), *(uint64_t *)(self + RC_OFF(dlc_map_root)));
+      *(uint64_t *)(self + RC_OFF(dlc_map_begin)) = o + RC_OFF(dlc_map);
+      *(uint64_t *)(self + RC_OFF(dlc_map_root)) = 0;
+      *(uint64_t *)(self + RC_OFF(dlc_map_end)) = o + RC_OFF(dlc_map);
+      *(uint64_t *)(self + RC_OFF(dlc_map_size)) = 0;
     }
-    self[0xc8] = 0;
+    self[RC_OFF(dlc_clear_map)] = 0;
   }
   ov_ret_void(c);
 }
@@ -395,22 +387,16 @@ void F_100a0d730(rc_ctx *c) {
 // Table (*0x101949588): +0x08 buckets begin, +0x10 buckets end, +0x18 capacity end, +0x20 count; nodes
 // {next, double key, number object*}; its recursive mutex is *0x101949590.
 // ------------------------------------------------------------------------------------------------
-#define TABLE_PTR 0x101949588ull
-#define TABLE_LOCK_PTR 0x101949590ull
-#define NUM_VTABLE 0x1017f5c70ull
-#define HASH_CONST 0x1013eaa50ull  // 2^63 as a double
-#define PRIME_TABLE 0x1013eaa70ull // 28 sizes (uint64), lower_bound'ed by rehash
 #define NPRIMES 28
-#define FN_EFD_ALLOC 0x1012efc90ull
-#define FN_OBJ_CTOR 0x100105620ull
-#define FN_OBJ_DTOR_BASE 0x100105640ull
+#define ADDREF RC_SLOT(json_number_add_ref)
+#define RELEASE RC_SLOT(json_number_release)
 
-static inline uint64_t *table(void) { return (uint64_t *)(uintptr_t)RC_LD(uint64_t, RC_A(TABLE_PTR)); }
+static inline uint64_t *table(void) { return (uint64_t *)(uintptr_t)RC_LD(uint64_t, RC_GA(json_number_table)); }
 
 // The game's hash. `insert` selects the compare of F_1000f8f10 (v >= 2^63), the other two use
 // 2^63 <= v or unordered; the NaN case differs between them (never reached: JSON numbers).
 static uint64_t hash_orig(double v, int insert) {
-  double k = RC_LD(double, RC_A(HASH_CONST));
+  double k = RC_LD(double, RC_GA(const_two_pow_63));
   int big = insert ? (v >= k) : (k <= v || v != v);
   return big ? (uint64_t)rc_cvtt_f64_i64(v - k) ^ 0x8000000000000000ull : (uint64_t)rc_cvtt_f64_i64(v);
 }
@@ -427,7 +413,7 @@ static uint64_t hash_num(double v, int insert) {
 static void num_rehash(uint64_t *T, uint64_t want) {
   uint64_t nb = (T[2] - T[1]) / 8;
   if (nb >= want) return;
-  const uint64_t *P = (const uint64_t *)(uintptr_t)RC_A(PRIME_TABLE);
+  const uint64_t *P = (const uint64_t *)(uintptr_t)RC_GA(hashtable_prime_sizes);
   const uint64_t *p = P;
   uint64_t cnt = NPRIMES;
   while (cnt > 0) {  // std::lower_bound
@@ -461,8 +447,8 @@ static void num_rehash(uint64_t *T, uint64_t want) {
   if (old) rs_op_delete(old);
 }
 
-void F_1000f9920(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(num_rehash)(rc_ctx *c) {
+  OV_ARGS_OF(num_rehash, a, c);
   uint64_t *T = OV_PTR(a, uint64_t);
   uint64_t want = OV_U64(a);
   num_rehash(T, want);
@@ -472,14 +458,14 @@ void F_1000f9920(rc_ctx *c) {
 // F_1000f8f10(out, double v): *out = the number object for v, from the table or newly created and
 // inserted. The reference-count/virtual calls (slots 0 and 1 of the object: AddRef/Release inlined
 // smart-pointer traffic) are made in the same order as the game's.
-void F_1000f8f10(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(num_intern)(rc_ctx *c) {
+  OV_ARGS_OF(num_intern, a, c);
   uint64_t *out = OV_PTR(a, uint64_t);
   double v = OV_F64(a);
-  pthread_mutex_t *m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_A(TABLE_LOCK_PTR));
+  pthread_mutex_t *m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_GA(json_number_table_lock));
   pthread_mutex_lock(m);
-  *(pthread_t *)((char *)m + 0x40) = pthread_self();
-  (*(int *)((char *)m + 0x48))++;
+  *(pthread_t *)((char *)m + RC_OFF(rmutex_owner)) = pthread_self();
+  (*(int *)((char *)m + RC_OFF(rmutex_depth)))++;
   *out = 0;
   uint64_t *T = table();
   uint64_t nb = (T[2] - T[1]) / 8;
@@ -493,25 +479,25 @@ void F_1000f8f10(rc_ctx *c) {
   if (node) {  // found
     uint64_t obj = node[2];
     if (obj) {
-      OV_VCALL(obj, 0);
+      OV_VCALL(obj, ADDREF);
       *out = obj;
-      OV_VCALL(obj, 0);
-      OV_VCALL(obj, 1);
+      OV_VCALL(obj, ADDREF);
+      OV_VCALL(obj, RELEASE);
     }
   } else {
-    uint64_t obj = OV_GUEST(FN_EFD_ALLOC, 0x18, 0);
-    OV_GUEST(FN_OBJ_CTOR, obj);
+    uint64_t obj = OV_GUEST(efd_alloc, 0x18, 0);
+    OV_GUEST(json_number_base_ctor, obj);
     int flag = 0;
     if (obj) {
-      RC_ST(uint64_t, obj, RC_A(NUM_VTABLE));
-      RC_ST(double, obj + 0x10, v);
-      atomic_fetch_add_explicit((_Atomic int32_t *)(uintptr_t)(obj + 8), 1, memory_order_seq_cst);  // OSAtomicAdd32
+      RC_ST(uint64_t, obj, RC_GA(json_number_vtable));
+      RC_ST(double, obj + RC_OFF(json_number_value), v);
+      atomic_fetch_add_explicit((_Atomic int32_t *)(uintptr_t)(obj + RC_OFF(json_number_refs)), 1, memory_order_seq_cst);  // OSAtomicAdd32
       *out = obj;
-      OV_VCALL(obj, 0);
-      OV_VCALL(obj, 1);
+      OV_VCALL(obj, ADDREF);
+      OV_VCALL(obj, RELEASE);
       T = table();
-      OV_VCALL(obj, 0);
-      OV_VCALL(obj, 0);
+      OV_VCALL(obj, ADDREF);
+      OV_VCALL(obj, ADDREF);
     } else {
       T = table();
       flag = 1;
@@ -535,24 +521,24 @@ void F_1000f8f10(rc_ctx *c) {
       bk[idx] = (uint64_t)(uintptr_t)nn;
       T[4]++;
     }
-    if (obj) OV_VCALL(obj, 1);
-    if (!flag) OV_VCALL(obj, 1);
+    if (obj) OV_VCALL(obj, RELEASE);
+    if (!flag) OV_VCALL(obj, RELEASE);
   }
-  m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_A(TABLE_LOCK_PTR));
-  (*(int *)((char *)m + 0x48))--;
+  m = (pthread_mutex_t *)(uintptr_t)RC_LD(uint64_t, RC_GA(json_number_table_lock));
+  (*(int *)((char *)m + RC_OFF(rmutex_depth)))--;
   pthread_mutex_unlock(m);
   OV_RET_PTR(c, out);
 }
 
 // F_1000f8d20(this): the number object's destructor: set the vtable, remove its node(s) from the table, run
 // the base destructor (a tail call).
-void F_1000f8d20(rc_ctx *c) {
-  OV_ARGS(a, c);
+void RC_FN(num_dtor)(rc_ctx *c) {
+  OV_ARGS_OF(num_dtor, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
-  RC_ST(uint64_t, self, RC_A(NUM_VTABLE));
+  RC_ST(uint64_t, self, RC_GA(json_number_vtable));
   uint64_t *T = table();
   double v;
-  memcpy(&v, self + 0x10, 8);
+  memcpy(&v, self + RC_OFF(json_number_value), 8);
   uint64_t nb = T ? (T[2] - T[1]) / 8 : 0;
   if (nb) {
     uint64_t idx = hash_num(v, 0) % nb;
@@ -569,7 +555,7 @@ void F_1000f8d20(rc_ctx *c) {
           rs_op_delete(cur);
           T[4]--;
           cur = (uint64_t *)(uintptr_t)prev[0];
-          memcpy(&v, self + 0x10, 8);
+          memcpy(&v, self + RC_OFF(json_number_value), 8);
         } else {
           prev = cur;
           cur = (uint64_t *)(uintptr_t)cur[0];
@@ -584,7 +570,7 @@ void F_1000f8d20(rc_ctx *c) {
       }
     }
   }
-  uint64_t r = OV_GUEST(FN_OBJ_DTOR_BASE, (uint64_t)(uintptr_t)self);
+  uint64_t r = OV_GUEST(json_number_base_dtor, (uint64_t)(uintptr_t)self);
   ov_ret_u64(c, r);
 }
 
@@ -594,29 +580,28 @@ void F_1000f8d20(rc_ctx *c) {
 // `test r14b,r14b; je` (9 bytes at 0x1001eb784) so unsigned custom songs load. The verifier has other
 // callers (package config 0x1002a7550), so the bypass is made only for the SNG loader's call, found by the
 // return address the translated caller pushed. With RS_MODS_BYPASS=0 the real verifier runs. The verifier
-// itself is the crypto module's adapter, built under another name (build.sh: -DF_10137683d=...).
+// itself is the crypto module's adapter, built under another name (build.sh renames it to rs_crypto_dsa_verify).
 // ------------------------------------------------------------------------------------------------
-#define SNG_VERIFY_RET 0x1001eb768ull
-extern void rs_crypto_F_10137683d(rc_ctx *c);
+extern void rs_crypto_dsa_verify(rc_ctx *c);  // the crypto module's adapter (build.sh renames it)
 
-void F_10137683d(rc_ctx *c) {
-  if (g_cfg.bypass && RC_LD(uint64_t, c->r[4]) == RC_A(SNG_VERIFY_RET)) {
+void RC_FN(sng_verify)(rc_ctx *c) {
+  if (g_cfg.bypass && RC_RET_ADDR(c) == RC_GA(sng_load_verify_ret)) {
     COUNT(g_bypassed);
     ov_ret_u32(c, 1);
     return;
   }
-  rs_crypto_F_10137683d(c);
+  rs_crypto_dsa_verify(c);
 }
 
 const ov_entry ov_mods_entries[] = {
-    {0x1000f8d20ull, "num_dtor", F_1000f8d20},
-    {0x1000f8f10ull, "num_intern", F_1000f8f10},
-    {0x1000f9920ull, "num_rehash", F_1000f9920},
-    {0x100158b70ull, "path_md5", F_100158b70},
-    {0x100a0d730ull, "dlc_update", F_100a0d730},
-    {0x101135520ull, "key_down", F_101135520},
-    {0x101135560ull, "key_up", F_101135560},
-    {0x101313170ull, "thread_set_priority", F_101313170},
-    {0x10137683dull, "sng_verify", F_10137683d},
+    {RC_ADDR(num_dtor), "num_dtor", RC_FN(num_dtor)},
+    {RC_ADDR(num_intern), "num_intern", RC_FN(num_intern)},
+    {RC_ADDR(num_rehash), "num_rehash", RC_FN(num_rehash)},
+    {RC_ADDR(path_md5), "path_md5", RC_FN(path_md5)},
+    {RC_ADDR(dlc_update), "dlc_update", RC_FN(dlc_update)},
+    {RC_ADDR(key_down), "key_down", RC_FN(key_down)},
+    {RC_ADDR(key_up), "key_up", RC_FN(key_up)},
+    {RC_ADDR(thread_set_priority), "thread_set_priority", RC_FN(thread_set_priority)},
+    {RC_ADDR(sng_verify), "sng_verify", RC_FN(sng_verify)},
 };
 const int OV_MODS_COUNT = (int)(sizeof ov_mods_entries / sizeof ov_mods_entries[0]);

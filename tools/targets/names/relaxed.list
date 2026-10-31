@@ -1,0 +1,23 @@
+# Functions the translator emits without per-access TSO fences (tools/ws7/recomp/xlat/relaxed.py says why
+# and what each was checked for). Their addresses come from the target's symbols.map.
+# Wwise RoomVerb plug-in
+roomverb_fdn                # RoomVerb: 4-line feedback delay network, low-pass in the loop, Householder mix
+roomverb_fdn_lr             # RoomVerb: the same network with separate left/right outputs
+roomverb_early_reflections  # RoomVerb: early-reflection multi-tap delay (two tap sets, 4 frames per step)
+roomverb_allpass            # RoomVerb: Schroeder allpass diffusor on a delay line
+# Wwise Parametric EQ
+parametric_eq_biquad        # ParametricEQ: biquad (direct form I) over every channel
+# Wwise Peak Limiter
+peak_limiter_follower       # PeakLimiter: look-ahead peak follower and gain over every channel
+# Wwise Expander
+expander_gain               # Expander: envelope follower and gain computer (calls expf)
+# Wwise Meter and the AkAudioBuffer helper it calls
+meter_peak_rms              # Meter: peak/RMS of the buffer into the meter's own history (calls log10)
+ak_buffer_zero_pad          # AkAudioBuffer::ZeroPadToMaxFrames (bzero of each channel's tail)
+# Wwise Vorbis decoder: codebook decode over the packet being decoded
+vorbis_codebook_decode_vq   # Vorbis: decode one codebook entry and dequantise it into a vector
+vorbis_huffman_decode       # Vorbis: Huffman decode of one codebook entry
+vorbis_bits_look            # Vorbis: bit reader, look at the next n bits
+vorbis_bits_adv             # Vorbis: bit reader, advance by n bits
+# game: the note detector's analysis window
+dsp_analysis_window         # analysis window: buffer *= raised cosine, 4 samples per step (calls vcosf)

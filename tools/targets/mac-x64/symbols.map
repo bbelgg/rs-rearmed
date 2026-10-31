@@ -1,0 +1,1082 @@
+# Symbols of the mac-x64 image: NAME ADDRESS CONVENTION PROTOTYPE (tools/targets/targets.py).
+# ADDRESS: unslid image address (hex). CONVENTION: sysv (a function), data (a global), code (an address
+# inside a function, such as a return site). PROTOTYPE: C, as far as it is known (- = not recorded).
+# `NAME unsupported REASON` = no counterpart in this image. One name per line; two names may share an address.
+mach_header                                                      0x100000000  data  struct mach_header_64
+rsg_rijndael_key_setup_enc                                       0x100001b40  sysv  int(uint32_t *, const uint8_t *, int)
+rsg_rijndael_key_setup_dec                                       0x100001eb0  sysv  int(uint32_t *, const uint8_t *, int)
+rsg_rijndael_encrypt                                             0x100002080  sysv  void(const uint32_t *, int, const uint8_t *, uint8_t *)
+rsg_rijndael_decrypt                                             0x100002df0  sysv  void(const uint32_t *, int, const uint8_t *, uint8_t *)
+GRCamera_QueryInterface                                          0x10001cbd0  sysv  -
+GRCamera_QueryInterface_const                                    0x10001cc30  sysv  -
+GRCameraBackground_QueryInterface                                0x100024580  sysv  -
+GRCameraBackground_QueryInterface_const                          0x1000245e0  sysv  -
+GRCameraBGBehavior_Animated_QueryInterface                       0x10002b5a0  sysv  -
+GRCameraBGBehavior_Animated_QueryInterface_const                 0x10002b600  sysv  -
+GRCameraBGBehavior_BuildUp_QueryInterface                        0x100046e90  sysv  -
+GRCameraBGBehavior_BuildUp_QueryInterface_const                  0x100046ef0  sysv  -
+GRCameraBGBehavior_Customize_QueryInterface                      0x100052c70  sysv  -
+GRCameraBGBehavior_Customize_QueryInterface_const                0x100052cd0  sysv  -
+GRCameraBGBehavior_Debug_QueryInterface                          0x1000593b0  sysv  -
+GRCameraBGBehavior_Debug_QueryInterface_const                    0x100059410  sysv  -
+GRCameraBGBehavior_Panning_QueryInterface                        0x100060530  sysv  -
+GRCameraBGBehavior_Panning_QueryInterface_const                  0x100060590  sysv  -
+CameraSong_QueryInterface                                        0x1000706f0  sysv  -
+CameraSong_QueryInterface_const                                  0x100070750  sysv  -
+GRCameraDebug_QueryInterface                                     0x10007a980  sysv  -
+GRCameraDebug_QueryInterface_const                               0x10007a9e0  sysv  -
+GRCameraScripted_QueryInterface                                  0x10007f960  sysv  -
+GRCameraScripted_QueryInterface_const                            0x10007f9c0  sysv  -
+GRCameraService_QueryInterface                                   0x100085830  sysv  -
+GRCameraService_QueryInterface_const                             0x100085890  sysv  -
+IGRCameraImpl_QueryInterface                                     0x1000876b0  sysv  -
+IGRCameraImpl_QueryInterface_const                               0x100087710  sysv  -
+std_tree_destroy                                                 0x10008b010  sysv  void(void *tree, void *root)
+DatabaseCommandQueue_QueryInterface                              0x1000957a0  sysv  -
+DatabaseCommandQueue_QueryInterface_const                        0x100095800  sysv  -
+sub_EntityChangeMessage_QueryInterface                           0x100097be0  sysv  -
+sub_EntityChangeMessage_QueryInterface_const                     0x100097c30  sysv  -
+DatabaseMessageSystem_QueryInterface                             0x100098c40  sysv  -
+DatabaseMessageSystem_QueryInterface_const                       0x100098ca0  sysv  -
+DatabaseService_QueryInterface                                   0x1000a4ff0  sysv  -
+DatabaseService_QueryInterface_const                             0x1000a5050  sysv  -
+ReturnToTitleScreen_QueryInterface                               0x1000a55b0  sysv  -
+ReturnToTitleScreen_QueryInterface_const                         0x1000a5600  sysv  -
+GRCrowdBox_QueryInterface                                        0x1000b38f0  sysv  -
+GRCrowdBox_QueryInterface_const                                  0x1000b3950  sysv  -
+GRCrowdSystem_QueryInterface                                     0x1000c3110  sysv  -
+GRCrowdSystem_QueryInterface_const                               0x1000c3170  sysv  -
+GRLightService_QueryInterface                                    0x1000cfbc0  sysv  -
+GRLightService_QueryInterface_const                              0x1000cfc20  sysv  -
+SceneGraphRemovedMessage_QueryInterface                          0x1000cfe60  sysv  -
+SceneGraphRemovedMessage_QueryInterface_const                    0x1000cfeb0  sysv  -
+SceneGraphAddedMessage_QueryInterface                            0x1000d0170  sysv  -
+SceneGraphAddedMessage_QueryInterface_const                      0x1000d01c0  sysv  -
+SceneGraphsUpdatedMessage_QueryInterface                         0x1000d0bb0  sysv  -
+SceneGraphsUpdatedMessage_QueryInterface_const                   0x1000d0c00  sysv  -
+service_manager_holder                                           0x1000dc450  sysv  void *(void)
+set_app_focus                                                    0x1000e1e70  sysv  void(bool)
+GRMusicService_QueryInterface                                    0x1000e5290  sysv  -
+GRMusicService_QueryInterface_const                              0x1000e52f0  sysv  -
+sub_IMessage_QueryInterface                                      0x1000e5930  sysv  -
+sub_IMessage_QueryInterface_const                                0x1000e5980  sysv  -
+sub_AssetLocatorResponse_QueryInterface                          0x1000e5dd0  sysv  -
+sub_AssetLocatorResponse_QueryInterface_const                    0x1000e5e20  sysv  -
+SceneGraphMessage_QueryInterface                                 0x1000e85f0  sysv  -
+SceneGraphMessage_QueryInterface_const                           0x1000e8640  sysv  -
+JSONFactory_QueryInterface                                       0x1000f4590  sysv  -
+JSONFactory_QueryInterface_const                                 0x1000f45f0  sysv  -
+JSONFactory__Response_QueryInterface                             0x1000f46e0  sysv  -
+JSONFactory__Response_QueryInterface_const                       0x1000f4740  sysv  -
+JSONFactory__JSONFactoryData_QueryInterface                      0x1000f49a0  sysv  -
+JSONFactory__JSONFactoryData_QueryInterface_const                0x1000f4a00  sysv  -
+num_dtor                                                         0x1000f8d20  sysv  -
+num_intern                                                       0x1000f8f10  sysv  -
+num_rehash                                                       0x1000f9920  sysv  -
+property_object_ctor                                             0x1000f9ad0  sysv  void(void *obj)
+json_number_base_ctor                                            0x100105620  sysv  void(void *obj)
+json_number_base_dtor                                            0x100105640  sysv  void *(void *obj)
+dsp_analysis_window                                              0x10010da10  sysv  -
+PostEffectColorCorrect_QueryInterface                            0x100116be0  sysv  -
+PostEffectColorCorrect_QueryInterface_const                      0x100116c40  sysv  -
+PostEffectsService_QueryInterface                                0x100124160  sysv  -
+PostEffectsService_QueryInterface_const                          0x1001241c0  sysv  -
+GRClipFadeEffectComponent_QueryInterface                         0x100132340  sysv  -
+GRClipFadeEffectComponent_QueryInterface_const                   0x1001323a0  sysv  -
+GRDisplayRatioAdjuster_QueryInterface                            0x100138e80  sysv  -
+GRDisplayRatioAdjuster_QueryInterface_const                      0x100138ee0  sysv  -
+GRShowLightsSystem_QueryInterface                                0x10014b5f0  sysv  -
+GRShowLightsSystem_QueryInterface_const                          0x10014b650  sysv  -
+GRVenueMenuPresentation_Flow_QueryInterface                      0x100154a50  sysv  -
+GRVenueMenuPresentation_Flow_QueryInterface_const                0x100154ab0  sysv  -
+path_intern                                                      0x100158030  sysv  void *(const char *s, int len)
+path_release                                                     0x100158840  sysv  int(void *obj)
+path_md5                                                         0x100158b70  sysv  -
+MainService_MacOS_QueryInterface                                 0x100168600  sysv  -
+MainService_MacOS_QueryInterface_const                           0x100168660  sysv  -
+NSP_PlayListService_QueryInterface                               0x100178660  sysv  -
+NSP_PlayListService_QueryInterface_const                         0x1001786c0  sysv  -
+game_bootstrap                                                   0x100179dc0  sysv  void(const char *app_dir, const char *cwd)
+game_frame                                                       0x10017a020  sysv  bool(void)
+game_shutdown                                                    0x10017a0d0  sysv  void(void)
+RSLogger_QueryInterface                                          0x100187dc0  sysv  -
+RSLogger_QueryInterface_const                                    0x100187e20  sysv  -
+RSDejaOutDestination_QueryInterface                              0x100188940  sysv  -
+RSDejaOutDestination_QueryInterface_const                        0x1001889a0  sysv  -
+GuitarService_QueryInterface                                     0x1001aca40  sysv  -
+GuitarService_QueryInterface_const                               0x1001acaa0  sysv  -
+GRLocalization_QueryInterface                                    0x1001bd880  sysv  -
+GRLocalization_QueryInterface_const                              0x1001bd8e0  sysv  -
+rsg_bpe_expand                                                   0x1001eaa70  sysv  int(const uint8_t *, int, uint8_t *)
+sng_load_verify_ret                                              0x1001eb768  code  -
+GRSongDirectory_QueryInterface                                   0x100209530  sysv  -
+GRSongDirectory_QueryInterface_const                             0x100209590  sysv  -
+DetectionService_QueryInterface                                  0x10021af30  sysv  -
+DetectionService_QueryInterface_const                            0x10021af90  sysv  -
+VenueService_QueryInterface                                      0x10023b2e0  sysv  -
+VenueService_QueryInterface_const                                0x10023b340  sysv  -
+GameService_QueryInterface                                       0x1002732d0  sysv  -
+GameService_QueryInterface_const                                 0x100273330  sysv  -
+GRAlphaSortingComponent_QueryInterface                           0x100275de0  sysv  -
+GRAlphaSortingComponent_QueryInterface_const                     0x100275e40  sysv  -
+GRBackground_QueryInterface                                      0x100283910  sysv  -
+GRBackground_QueryInterface_const                                0x100283970  sysv  -
+GRBackgroundService_QueryInterface                               0x100284ca0  sysv  -
+GRBackgroundService_QueryInterface_const                         0x100284d00  sysv  -
+GRObjectEffectComponent_QueryInterface                           0x100285d70  sysv  -
+GRObjectEffectComponent_QueryInterface_const                     0x100285dd0  sysv  -
+GRWorldTextManager_QueryInterface                                0x100296810  sysv  -
+GRWorldTextManager_QueryInterface_const                          0x100296870  sysv  -
+GraphAssetFactory_QueryInterface                                 0x10029ab50  sysv  -
+GraphAssetFactory_QueryInterface_const                           0x10029abb0  sysv  -
+GraphAssetFactory__Response_QueryInterface                       0x10029aca0  sysv  -
+GraphAssetFactory__Response_QueryInterface_const                 0x10029ad00  sysv  -
+GRComponent_QueryInterface                                       0x10029bee0  sysv  -
+GRComponent_QueryInterface_const                                 0x10029bf40  sysv  -
+service_manager                                                  0x1002a74f0  sysv  void *(void)
+MainService_QueryInterface                                       0x1002a9f90  sysv  -
+MainService_QueryInterface_const                                 0x1002a9ff0  sysv  -
+PreloadHelper_QueryInterface                                     0x1002ab980  sysv  -
+PreloadHelper_QueryInterface_const                               0x1002ab9e0  sysv  -
+PreloadHelperComplete_QueryInterface                             0x1002abc80  sysv  -
+PreloadHelperComplete_QueryInterface_const                       0x1002abcd0  sysv  -
+SceneGraphCacheResponse_QueryInterface                           0x1002ac290  sysv  -
+SceneGraphCacheResponse_QueryInterface_const                     0x1002ac2e0  sysv  -
+PreloadHelperResponse_QueryInterface                             0x1002ad520  sysv  -
+PreloadHelperResponse_QueryInterface_const                       0x1002ad580  sysv  -
+PreloadItem_QueryInterface                                       0x1002ad720  sysv  -
+PreloadItem_QueryInterface_const                                 0x1002ad780  sysv  -
+PreloadGroup_QueryInterface                                      0x1002ad850  sysv  -
+PreloadGroup_QueryInterface_const                                0x1002ad8b0  sysv  -
+RSBootService_QueryInterface                                     0x1002b2380  sysv  -
+RSBootService_QueryInterface_const                               0x1002b23e0  sysv  -
+GFXModelResponse_QueryInterface                                  0x1002b26e0  sysv  -
+GFXModelResponse_QueryInterface_const                            0x1002b2730  sysv  -
+RSRenderService_QueryInterface                                   0x1002b3140  sysv  -
+RSRenderService_QueryInterface_const                             0x1002b31a0  sysv  -
+GCTickable_QueryInterface                                        0x1002d5280  sysv  -
+GCTickable_QueryInterface_const                                  0x1002d52e0  sysv  -
+GCPauseMessage_QueryInterface                                    0x1002d67f0  sysv  -
+GCPauseMessage_QueryInterface_const                              0x1002d6840  sysv  -
+rr_speed_ratio                                                   0x1002ddd70  sysv  float(float slider_percent)
+RSAudioService_QueryInterface                                    0x1002e03e0  sysv  -
+RSAudioService_QueryInterface_const                              0x1002e0440  sysv  -
+UIManagerI_QueryInterface                                        0x1003044c0  sysv  -
+UIManagerI_QueryInterface_const                                  0x100304510  sysv  -
+ui_event                                                         0x100314f70  sysv  void(void *menu, int event, int arg)
+ui_accepts                                                       0x1003151a0  sysv  bool(void *menu)
+too_many_inputs                                                  0x100315220  sysv  bool(void *input_manager)
+GCGFxMouseEventMessage_QueryInterface                            0x100326b90  sysv  -
+GCGFxMouseEventMessage_QueryInterface_const                      0x100326be0  sysv  -
+UIMenu_LAS_SongsList_QueryInterface                              0x100354b70  sysv  -
+UIMenu_LAS_SongsList_QueryInterface_const                        0x100354bd0  sysv  -
+ui_current                                                       0x100365e30  sysv  void *(void)
+ui_menu                                                          0x100365e50  sysv  void *(void *obj)
+UIService_QueryInterface                                         0x100367480  sysv  -
+UIService_QueryInterface_const                                   0x1003674e0  sysv  -
+game_interface_helper_new                                        0x1003720e0  sysv  void *(void)
+RSGraphAssetFactoryLoadResponse_QueryInterface                   0x100372190  sysv  -
+RSGraphAssetFactoryLoadResponse_QueryInterface_const             0x1003721f0  sysv  -
+RSConnectGameInterface_Impl_QueryInterface                       0x1003722e0  sysv  -
+RSConnectGameInterface_Impl_QueryInterface_const                 0x100372340  sysv  -
+efd_get_config_bool                                              0x100373cd0  sysv  -
+ResourceService_QueryInterface                                   0x100380a30  sysv  -
+ResourceService_QueryInterface_const                             0x100380a90  sysv  -
+GRMinigameCamera_QueryInterface                                  0x100385100  sysv  -
+GRMinigameCamera_QueryInterface_const                            0x100385160  sysv  -
+OscilleratorScopeModel_QueryInterface                            0x1003a6970  sysv  -
+OscilleratorScopeModel_QueryInterface_const                      0x1003a69d0  sysv  -
+ReactiveEffectsService_QueryInterface                            0x1003ac5d0  sysv  -
+ReactiveEffectsService_QueryInterface_const                      0x1003ac630  sysv  -
+ReactiveRingModel_QueryInterface                                 0x1003ac700  sysv  -
+ReactiveRingModel_QueryInterface_const                           0x1003ac750  sysv  -
+GCColorShift_QueryInterface                                      0x1003ae9f0  sysv  -
+GCColorShift_QueryInterface_const                                0x1003aea50  sysv  -
+GC2DAssetHelper_QueryInterface                                   0x1003b1d90  sysv  -
+GC2DAssetHelper_QueryInterface_const                             0x1003b1df0  sysv  -
+GCAccumulatedActor_QueryInterface                                0x1003c00d0  sysv  -
+GCAccumulatedActor_QueryInterface_const                          0x1003c0130  sysv  -
+GCPauseManager_QueryInterface                                    0x1003e09a0  sysv  -
+GCPauseManager_QueryInterface_const                              0x1003e0a00  sysv  -
+GRCameraNarniaVenue_QueryInterface                               0x1003f1160  sysv  -
+GRCameraNarniaVenue_QueryInterface_const                         0x1003f11c0  sysv  -
+FormLoader_QueryInterface                                        0x1003f93e0  sysv  -
+FormLoader_QueryInterface_const                                  0x1003f9440  sysv  -
+ClipFadeManager_QueryInterface                                   0x100416cc0  sysv  -
+ClipFadeManager_QueryInterface_const                             0x100416d20  sysv  -
+GEService_QueryInterface                                         0x100479120  sysv  -
+GEService_QueryInterface_const                                   0x100479180  sysv  -
+NarniaPortalModel_QueryInterface                                 0x10047bf10  sysv  -
+NarniaPortalModel_QueryInterface_const                           0x10047bf70  sysv  -
+SongListService_QueryInterface                                   0x10047db50  sysv  -
+SongListService_QueryInterface_const                             0x10047dbb0  sysv  -
+NarniaService_QueryInterface                                     0x100480710  sysv  -
+NarniaService_QueryInterface_const                               0x100480770  sysv  -
+GRSL2Spawner_QueryInterface                                      0x1004a2fa0  sysv  -
+GRSL2Spawner_QueryInterface_const                                0x1004a3000  sysv  -
+NarniaFogModel_QueryInterface                                    0x1004cb650  sysv  -
+NarniaFogModel_QueryInterface_const                              0x1004cb6b0  sysv  -
+NarniaFogParticle_QueryInterface                                 0x1004cc670  sysv  -
+NarniaFogParticle_QueryInterface_const                           0x1004cc6d0  sysv  -
+MissionService_QueryInterface                                    0x100501a10  sysv  -
+MissionService_QueryInterface_const                              0x100501a70  sysv  -
+ToneService_QueryInterface                                       0x1005209c0  sysv  -
+ToneService_QueryInterface_const                                 0x100520a20  sysv  -
+StringTuner_QueryInterface                                       0x10052fc60  sysv  -
+StringTuner_QueryInterface_const                                 0x10052fcc0  sysv  -
+TunerService_QueryInterface                                      0x1005319e0  sysv  -
+TunerService_QueryInterface_const                                0x100531a40  sysv  -
+InstrumentLoader_QueryInterface                                  0x1005339e0  sysv  -
+InstrumentLoader_QueryInterface_const                            0x100533a40  sysv  -
+GRCrowdPoint_QueryInterface                                      0x100534560  sysv  -
+GRCrowdPoint_QueryInterface_const                                0x1005345c0  sysv  -
+GearManager_QueryInterface                                       0x100538c30  sysv  -
+GearManager_QueryInterface_const                                 0x100538c90  sysv  -
+GearService_QueryInterface                                       0x100539f10  sysv  -
+GearService_QueryInterface_const                                 0x100539f70  sysv  -
+FogService_QueryInterface                                        0x100557690  sysv  -
+FogService_QueryInterface_const                                  0x1005576f0  sysv  -
+GlobalFogSettings_QueryInterface                                 0x1005580f0  sysv  -
+GlobalFogSettings_QueryInterface_const                           0x100558150  sysv  -
+ManifestManager_QueryInterface                                   0x100563810  sysv  -
+ManifestManager_QueryInterface_const                             0x100563870  sysv  -
+StatsService_QueryInterface                                      0x100581900  sysv  -
+StatsService_QueryInterface_const                                0x100581960  sysv  -
+GRCameraLoft_QueryInterface                                      0x1005c8be0  sysv  -
+GRCameraLoft_QueryInterface_const                                0x1005c8c40  sysv  -
+GEVideoScreenModel_QueryInterface                                0x100607490  sysv  -
+GEVideoScreenModel_QueryInterface_const                          0x1006074f0  sysv  -
+TunerProgressBuiltin_QueryInterface                              0x100653e00  sysv  -
+TunerProgressBuiltin_QueryInterface_const                        0x100653e60  sysv  -
+GameColorManager_QueryInterface                                  0x1006eb6d0  sysv  -
+GameColorManager_QueryInterface_const                            0x1006eb730  sysv  -
+GRCameraSessionMode_QueryInterface                               0x10071c300  sysv  -
+GRCameraSessionMode_QueryInterface_const                         0x10071c360  sysv  -
+GCAttachmentManager_QueryInterface                               0x10074a010  sysv  -
+GCAttachmentManager_QueryInterface_const                         0x10074a070  sysv  -
+UIMenu_ShopSongs_QueryInterface                                  0x10076ff60  sysv  -
+UIMenu_ShopSongs_QueryInterface_const                            0x10076ffd0  sysv  -
+GRLoftAmbientLight_QueryInterface                                0x100775ae0  sysv  -
+GRLoftAmbientLight_QueryInterface_const                          0x100775b40  sysv  -
+GRLoftSpotLight_QueryInterface                                   0x100776230  sysv  -
+GRLoftSpotLight_QueryInterface_const                             0x100776290  sysv  -
+GRLoftState_QueryInterface                                       0x100777450  sysv  -
+GRLoftState_QueryInterface_const                                 0x1007774b0  sysv  -
+LoftPostEffectsManager_QueryInterface                            0x100780ec0  sysv  -
+LoftPostEffectsManager_QueryInterface_const                      0x100780f20  sysv  -
+RSVenueForkEmitterGear_QueryInterface                            0x100781a10  sysv  -
+RSVenueForkEmitterGear_QueryInterface_const                      0x100781a70  sysv  -
+RingParticleEmitter_QueryInterface                               0x100782720  sysv  -
+RingParticleEmitter_QueryInterface_const                         0x100782780  sysv  -
+UIMenu_ShopGear_QueryInterface                                   0x1007899e0  sysv  -
+UIMenu_ShopGear_QueryInterface_const                             0x100789a50  sysv  -
+UIMenu_ShopPacks_QueryInterface                                  0x100798dc0  sysv  -
+UIMenu_ShopPacks_QueryInterface_const                            0x100798e20  sysv  -
+GearPlacementNode_QueryInterface                                 0x1007aa3c0  sysv  -
+GearPlacementNode_QueryInterface_const                           0x1007aa420  sysv  -
+GearLava_QueryInterface                                          0x1007ee220  sysv  -
+GearLava_QueryInterface_const                                    0x1007ee280  sysv  -
+GearNifCache_QueryInterface                                      0x1007f0f00  sysv  -
+GearNifCache_QueryInterface_const                                0x1007f0f60  sysv  -
+GRVenueAmbientAnimations_QueryInterface                          0x100811f30  sysv  -
+GRVenueAmbientAnimations_QueryInterface_const                    0x100811f90  sysv  -
+GRSoundIntensity_QueryInterface                                  0x10083c3c0  sysv  -
+GRSoundIntensity_QueryInterface_const                            0x10083c420  sysv  -
+GRVenuePointLight_QueryInterface                                 0x10083de80  sysv  -
+GRVenuePointLight_QueryInterface_const                           0x10083dee0  sysv  -
+GRLoftCabinetScreen_QueryInterface                               0x10084f5b0  sysv  -
+GRLoftCabinetScreen_QueryInterface_const                         0x10084f610  sysv  -
+GCLdbChlgService_QueryInterface                                  0x100863440  sysv  -
+GCLdbChlgService_QueryInterface_const                            0x1008634a0  sysv  -
+GearChangeController_QueryInterface                              0x100868190  sysv  -
+GearChangeController_QueryInterface_const                        0x1008681f0  sysv  -
+GCGFxMouseEventHandler_QueryInterface                            0x10086a4a0  sysv  -
+GCGFxMouseEventHandler_QueryInterface_const                      0x10086a500  sysv  -
+AchievementService_QueryInterface                                0x10087fde0  sysv  -
+AchievementService_QueryInterface_const                          0x10087fe40  sysv  -
+PrizeService_QueryInterface                                      0x1008a7570  sysv  -
+PrizeService_QueryInterface_const                                0x1008a75d0  sysv  -
+GCKinectEventHandler_QueryInterface                              0x1008a8530  sysv  -
+GCKinectEventHandler_QueryInterface_const                        0x1008a8590  sysv  -
+GCKinectEventMessage_QueryInterface                              0x1008a89a0  sysv  -
+GCKinectEventMessage_QueryInterface_const                        0x1008a8a00  sysv  -
+set_resolution                                                   0x1008bb1a0  sysv  void(int w, int h)
+set_fullscreen                                                   0x1008bb350  sysv  void(uint8_t)
+get_fullscreen                                                   0x1008bb390  sysv  int(void)
+set_visual_quality                                               0x1008bb670  sysv  void(int)
+get_resolution                                                   0x1008bb850  sysv  void(int *w, int *h)
+FavoritesService_QueryInterface                                  0x1008c4140  sysv  -
+FavoritesService_QueryInterface_const                            0x1008c41a0  sysv  -
+RSConnectExtension_RDV_QueryInterface                            0x100a048c0  sysv  -
+RSConnectExtension_RDV_QueryInterface_const                      0x100a04920  sysv  -
+rs_connect_service_steam_ctor                                    0x100a04e80  sysv  void(void *obj, void *steam)
+RSConnectService_Steam_QueryInterface                            0x100a05710  sysv  -
+RSConnectService_Steam_QueryInterface_const                      0x100a05770  sysv  -
+rs_steam_service_ctor                                            0x100a06650  sysv  void(void *obj)
+RSSteamService_QueryInterface                                    0x100a07ce0  sysv  -
+RSSteamService_QueryInterface_const                              0x100a07d40  sysv  -
+rsconnect_factory                                                0x100a0c360  sysv  -
+dlc_update_head                                                  0x100a0cc40  sysv  void(void *coord)
+rs_dlc_service_steam_ctor                                        0x100a0d560  sysv  void(void *obj)
+dlc_update                                                       0x100a0d730  sysv  -
+dlc_install_step                                                 0x100a0d7e0  sysv  void(void *coord)
+dlc_enum_check                                                   0x100a0d9c0  sysv  bool(void *coord)
+dlc_update_tail                                                  0x100a0dcd0  sysv  void(void *coord)
+RSDLCService_Steam_QueryInterface                                0x100a0ea40  sysv  -
+RSDLCService_Steam_QueryInterface_const                          0x100a0eaa0  sysv  -
+rs_profile_service_ctor                                          0x100a0f9d0  sysv  void(void *obj)
+RSProfileService_MacOS_QueryInterface                            0x100a108f0  sysv  -
+RSProfileService_MacOS_QueryInterface_const                      0x100a10950  sysv  -
+signin_start_no_uplay                                            0x100a13950  sysv  -
+dlc_worker_flush                                                 0x100a24d90  sysv  -
+dlc_job_preview                                                  0x100a24e70  sysv  -
+dlc_job_request                                                  0x100a25170  sysv  -
+open_uplay_url                                                   0x100a2a530  sysv  -
+dlc_connection_changed                                           0x100a2c720  sysv  -
+RSSteamAchievement_QueryInterface                                0x100a2f410  sysv  -
+RSSteamAchievement_QueryInterface_const                          0x100a2f470  sysv  -
+RSSteamActivityFeed_QueryInterface                               0x100a30da0  sysv  -
+RSSteamActivityFeed_QueryInterface_const                         0x100a30e00  sysv  -
+RSSteamCloudFile_QueryInterface                                  0x100a31460  sysv  -
+RSSteamCloudFile_QueryInterface_const                            0x100a314c0  sysv  -
+RSSteamDownloadableContent_QueryInterface                        0x100a33510  sysv  -
+RSSteamDownloadableContent_QueryInterface_const                  0x100a33570  sysv  -
+RSSteamLeaderboards_QueryInterface                               0x100a35e30  sysv  -
+RSSteamLeaderboards_QueryInterface_const                         0x100a35e90  sysv  -
+RSSteamLeaderboardRequest_QueryInterface                         0x100a35f60  sysv  -
+RSSteamLeaderboardRequest_QueryInterface_const                   0x100a35fc0  sysv  -
+RSSteamLeaderboardRequestUpload_QueryInterface                   0x100a36090  sysv  -
+RSSteamLeaderboardRequestUpload_QueryInterface_const             0x100a360f0  sysv  -
+RSSteamLeaderboardRequestDownload_QueryInterface                 0x100a361c0  sysv  -
+RSSteamLeaderboardRequestDownload_QueryInterface_const           0x100a36220  sysv  -
+RSSteamWebApi_QueryInterface                                     0x100a3bf90  sysv  -
+RSSteamWebApi_QueryInterface_const                               0x100a3bff0  sysv  -
+FrkService_QueryInterface                                        0x100a53270  sysv  -
+FrkService_QueryInterface_const                                  0x100a532d0  sysv  -
+NiFrkParticleEffectModel_QueryInterface                          0x100a53fb0  sysv  -
+NiFrkParticleEffectModel_QueryInterface_const                    0x100a54010  sysv  -
+expander_gain                                                    0x100a6a27c  sysv  -
+ak_buffer_zero_pad                                               0x100a6c5dc  sysv  -
+meter_peak_rms                                                   0x100a7f880  sysv  -
+parametric_eq_biquad                                             0x100a9a508  sysv  -
+peak_limiter_follower                                            0x100a9ae44  sysv  -
+roomverb_allpass                                                 0x100aa3914  sysv  -
+roomverb_early_reflections                                       0x100aa4208  sysv  -
+roomverb_fdn                                                     0x100aa4a60  sysv  -
+roomverb_fdn_lr                                                  0x100aa4e70  sysv  -
+ak_sink_ring_alloc                                               0x100aa75b0  sysv  void(void *sink, uint32_t frames)
+ak_sink_ring_init                                                0x100aa7be0  sysv  -
+rsg_ak_get_id_from_string                                        0x100ab08b0  sysv  uint32_t(const char *)
+ak_init                                                          0x100ab0a30  sysv  int(AkInitSettings *, AkPlatformInitSettings *)
+ak_set_rtpc_name                                                 0x100ab1b20  sysv  int(const char *, float, uint64_t, int, int)
+ak_post_event_name                                               0x100ab2c60  sysv  uint32_t(const char *event, uint64_t game_object, ...)
+ak_render_loop                                                   0x100ab7200  sysv  void(void *engine)
+ak_lengine_thread                                                0x100b049b0  sysv  -
+vorbis_huffman_decode                                            0x100b2e350  sysv  -
+vorbis_codebook_decode_vq                                        0x100b2e570  sysv  -
+vorbis_bits_look                                                 0x100b2f480  sysv  -
+vorbis_bits_adv                                                  0x100b2f510  sysv  -
+jpeg_CreateDecompress                                            0x100b40bf0  sysv  void(j_decompress_ptr, int, size_t)
+jpeg_finish_decompress                                           0x100b41030  sysv  boolean(j_decompress_ptr)
+jpeg_read_header                                                 0x100b41100  sysv  int(j_decompress_ptr, boolean)
+jpeg_abort_decompress                                            0x100b41180  sysv  void(j_decompress_ptr)
+jpeg_destroy_decompress                                          0x100b41190  sysv  void(j_decompress_ptr)
+jpeg_start_decompress                                            0x100b411a0  sysv  boolean(j_decompress_ptr)
+jpeg_read_scanlines                                              0x100b413b0  sysv  JDIMENSION(j_decompress_ptr, JSAMPARRAY, JDIMENSION)
+jpeg_read_coefficients                                           0x100b42800  sysv  jvirt_barray_ptr *(j_decompress_ptr)
+jpeg_resync_to_restart                                           0x100b44270  sysv  boolean(j_decompress_ptr, int)
+jpeg_std_error                                                   0x100b57920  sysv  struct jpeg_error_mgr *(struct jpeg_error_mgr *)
+png_set_sig_bytes                                                0x100b58c70  sysv  void(png_structp, int)
+png_get_io_ptr                                                   0x100b58ca0  sysv  png_voidp(png_structp)
+png_sig_cmp                                                      0x100b5aea0  sysv  int(png_const_bytep, png_size_t, png_size_t)
+png_create_info_struct                                           0x100b5b170  sysv  png_infop(png_structp)
+png_get_valid                                                    0x100b5c4a0  sysv  png_uint_32(png_const_structp, png_const_infop, png_uint_32)
+png_get_rowbytes                                                 0x100b5c4c0  sysv  png_size_t(png_const_structp, png_const_infop)
+png_get_gAMA                                                     0x100b5c4e0  sysv  png_uint_32(png_const_structp, png_const_infop, double *)
+png_get_IHDR                                                     0x100b5c510  sysv  png_uint_32(png_structp, png_infop, png_uint_32 *, png_uint_32 *, int *, int *, int *, int *, int *)
+png_create_read_struct                                           0x100b61590  sysv  png_structp(png_const_charp, png_voidp, png_error_ptr, png_error_ptr)
+png_destroy_read_struct                                          0x100b61780  sysv  void(png_structpp, png_infopp, png_infopp)
+png_read_end                                                     0x100b61880  sysv  void(png_structp, png_infop)
+png_read_row                                                     0x100b61c90  sysv  void(png_structp, png_bytep, png_bytep)
+png_read_image                                                   0x100b62170  sysv  void(png_structp, png_bytepp)
+png_read_update_info                                             0x100b62240  sysv  void(png_structp, png_infop)
+png_read_info                                                    0x100b62270  sysv  void(png_structp, png_infop)
+png_set_read_fn                                                  0x100b62970  sysv  void(png_structp, png_voidp, png_rw_ptr)
+png_set_strip_16                                                 0x100b62a30  sysv  void(png_structp)
+png_set_palette_to_rgb                                           0x100b62a50  sysv  void(png_structp)
+png_set_expand_gray_1_2_4_to_8                                   0x100b62a70  sysv  void(png_structp)
+png_set_tRNS_to_alpha                                            0x100b62a90  sysv  void(png_structp)
+png_set_gray_to_rgb                                              0x100b62ab0  sysv  void(png_structp)
+png_set_gamma                                                    0x100b66cb0  sysv  void(png_structp, double, double)
+png_error                                                        0x100b67080  sysv  void(png_structp, png_const_charp)
+png_set_longjmp_fn                                               0x100b67500  sysv  -
+png_get_error_ptr                                                0x100b67550  sysv  png_voidp(png_const_structp)
+png_longjmp                                                      0x100b67570  sysv  void(png_structp, int)
+GFxAssetTaskAssetFactory_QueryInterface                          0x100b67dd0  sysv  -
+GFxAssetTaskAssetFactory_QueryInterface_const                    0x100b67e30  sysv  -
+GFxAssetTaskRequest_QueryInterface                               0x100b67ea0  sysv  -
+GFxAssetTaskRequest_QueryInterface_const                         0x100b67f00  sysv  -
+GFxInputRouterModel_QueryInterface                               0x100b6cd90  sysv  -
+GFxInputRouterModel_QueryInterface_const                         0x100b6cdf0  sysv  -
+GFxMovieModel_QueryInterface                                     0x100b74ff0  sysv  -
+GFxMovieModel_QueryInterface_const                               0x100b75050  sysv  -
+GFxService_QueryInterface                                        0x100b7e8e0  sysv  -
+GFxService_QueryInterface_const                                  0x100b7e940  sysv  -
+input_sink                                                       0x100ba1190  sysv  void(int code, int a, int b)
+compress2                                                        0x100e07620  sysv  int(Bytef *, uLongf *, const Bytef *, uLong, int)
+compressBound                                                    0x100e076d0  sysv  uLong(uLong)
+crc32                                                            0x100e076f0  sysv  uLong(uLong, const Bytef *, uInt)
+inflateReset                                                     0x100e0b070  sysv  int(z_streamp)
+inflateInit_                                                     0x100e0b120  sysv  int(z_streamp, const char *, int)
+inflate                                                          0x100e0b260  sysv  int(z_streamp, int)
+inflateEnd                                                       0x100e0cf20  sysv  int(z_streamp)
+uncompress                                                       0x100e0fa10  sysv  int(Bytef *, uLongf *, const Bytef *, uLong)
+lua_checkstack                                                   0x100e0fb10  sysv  int(lua_State *, int)
+lua_xmove                                                        0x100e0fba0  sysv  void(lua_State *, lua_State *, int)
+lua_atpanic                                                      0x100e0fc90  sysv  lua_CFunction(lua_State *, lua_CFunction)
+lua_newthread                                                    0x100e0fca0  sysv  lua_State *(lua_State *)
+lua_gettop                                                       0x100e0fcf0  sysv  int(lua_State *)
+lua_settop                                                       0x100e0fd10  sysv  void(lua_State *, int)
+lua_remove                                                       0x100e0fdf0  sysv  void(lua_State *, int)
+lua_insert                                                       0x100e0ff00  sysv  void(lua_State *, int)
+lua_replace                                                      0x100e10000  sysv  void(lua_State *, int)
+lua_pushvalue                                                    0x100e10180  sysv  void(lua_State *, int)
+lua_type                                                         0x100e10260  sysv  int(lua_State *, int)
+lua_typename                                                     0x100e10340  sysv  const char *(lua_State *, int)
+lua_iscfunction                                                  0x100e10370  sysv  int(lua_State *, int)
+lua_isnumber                                                     0x100e10460  sysv  int(lua_State *, int)
+lua_isinteger                                                    0x100e10560  sysv  int(lua_State *, int)
+lua_isintvalue                                                   0x100e10680  sysv  -
+lua_isstring                                                     0x100e10790  sysv  int(lua_State *, int)
+lua_isuserdata                                                   0x100e10880  sysv  int(lua_State *, int)
+lua_rawequal                                                     0x100e10960  sysv  int(lua_State *, int, int)
+lua_lessthan                                                     0x100e10b00  sysv  int(lua_State *, int, int)
+lua_tonumber                                                     0x100e10ca0  sysv  lua_Number(lua_State *, int)
+lua_tointeger                                                    0x100e10db0  sysv  lua_Integer(lua_State *, int)
+lua_toboolean                                                    0x100e10ec0  sysv  int(lua_State *, int)
+lua_tolstring                                                    0x100e10fb0  sysv  const char *(lua_State *, int, size_t *)
+lua_objlen                                                       0x100e111c0  sysv  size_t(lua_State *, int)
+lua_tocfunction                                                  0x100e11300  sysv  lua_CFunction(lua_State *, int)
+lua_touserdata                                                   0x100e113f0  sysv  void *(lua_State *, int)
+lua_tothread                                                     0x100e114e0  sysv  lua_State *(lua_State *, int)
+lua_topointer                                                    0x100e115c0  sysv  const void *(lua_State *, int)
+lua_pushnil                                                      0x100e117b0  sysv  void(lua_State *)
+lua_pushnumber                                                   0x100e117d0  sysv  void(lua_State *, lua_Number)
+lua_pushinteger                                                  0x100e117f0  sysv  void(lua_State *, lua_Integer)
+lua_pushlstring                                                  0x100e11810  sysv  void(lua_State *, const char *, size_t)
+lua_pushstring                                                   0x100e11870  sysv  void(lua_State *, const char *)
+lua_pushfstring                                                  0x100e11940  sysv  -
+lua_pushcclosure                                                 0x100e11a10  sysv  void(lua_State *, lua_CFunction, int)
+lua_pushboolean                                                  0x100e11b20  sysv  void(lua_State *, int)
+lua_pushlightuserdata                                            0x100e11b50  sysv  void(lua_State *, void *)
+lua_pushthread                                                   0x100e11b70  sysv  int(lua_State *)
+lua_gettable                                                     0x100e11ba0  sysv  void(lua_State *, int)
+lua_getfield                                                     0x100e11c80  sysv  void(lua_State *, int, const char *)
+lua_rawget                                                       0x100e11da0  sysv  void(lua_State *, int)
+lua_rawgeti                                                      0x100e11ea0  sysv  void(lua_State *, int, int)
+lua_createtable                                                  0x100e11fa0  sysv  void(lua_State *, int, int)
+lua_getmetatable                                                 0x100e12000  sysv  int(lua_State *, int)
+lua_getfenv                                                      0x100e12120  sysv  void(lua_State *, int)
+lua_settable                                                     0x100e12250  sysv  void(lua_State *, int)
+lua_setfield                                                     0x100e12340  sysv  void(lua_State *, int, const char *)
+lua_rawset                                                       0x100e12460  sysv  void(lua_State *, int)
+lua_rawseti                                                      0x100e12590  sysv  void(lua_State *, int, int)
+lua_setmetatable                                                 0x100e126c0  sysv  int(lua_State *, int)
+lua_setfenv                                                      0x100e12820  sysv  int(lua_State *, int)
+lua_call                                                         0x100e12970  sysv  void(lua_State *, int, int)
+lua_pcall                                                        0x100e129c0  sysv  int(lua_State *, int, int, int)
+lua_load                                                         0x100e12b20  sysv  int(lua_State *, lua_Reader, void *, const char *)
+lua_dump                                                         0x100e12b70  sysv  int(lua_State *, lua_Writer, void *)
+lua_status                                                       0x100e12bb0  sysv  int(lua_State *)
+lua_gc                                                           0x100e12bc0  sysv  int(lua_State *, int, int)
+lua_error                                                        0x100e12cb0  sysv  int(lua_State *)
+lua_next                                                         0x100e12cc0  sysv  int(lua_State *, int)
+lua_concat                                                       0x100e12dc0  sysv  void(lua_State *, int)
+lua_newuserdata                                                  0x100e12e40  sysv  void *(lua_State *, size_t)
+lua_getupvalue                                                   0x100e12eb0  sysv  const char *(lua_State *, int, int)
+lua_setupvalue                                                   0x100e12ff0  sysv  const char *(lua_State *, int, int)
+lua_pushvalue_as_number                                          0x100e13170  sysv  int(lua_State *, int)
+luaL_argerror                                                    0x100e132d0  sysv  int(lua_State *, int, const char *)
+luaL_error                                                       0x100e133c0  sysv  -
+luaL_where                                                       0x100e13510  sysv  void(lua_State *, int)
+luaL_checkoption                                                 0x100e135b0  sysv  int(lua_State *, int, const char *, const char *const *)
+luaL_optlstring                                                  0x100e136b0  sysv  const char *(lua_State *, int, const char *, size_t *)
+luaL_checklstring                                                0x100e13770  sysv  const char *(lua_State *, int, size_t *)
+luaL_newmetatable                                                0x100e137f0  sysv  int(lua_State *, const char *)
+luaL_checkudata                                                  0x100e13860  sysv  void *(lua_State *, int, const char *)
+luaL_checkstack                                                  0x100e13910  sysv  void(lua_State *, int, const char *)
+luaL_checktype                                                   0x100e13950  sysv  void(lua_State *, int, int)
+luaL_checkany                                                    0x100e139e0  sysv  void(lua_State *, int)
+luaL_checknumber                                                 0x100e13a20  sysv  lua_Number(lua_State *, int)
+luaL_optnumber                                                   0x100e13ac0  sysv  lua_Number(lua_State *, int, lua_Number)
+luaL_checkinteger                                                0x100e13b10  sysv  lua_Integer(lua_State *, int)
+luaL_optinteger                                                  0x100e13b90  sysv  lua_Integer(lua_State *, int, lua_Integer)
+luaL_getmetafield                                                0x100e13c30  sysv  int(lua_State *, int, const char *)
+luaL_callmeta                                                    0x100e13cb0  sysv  int(lua_State *, int, const char *)
+luaL_register                                                    0x100e13d70  sysv  -
+luaL_findtable                                                   0x100e13f30  sysv  const char *(lua_State *, int, const char *, int)
+luaL_gsub                                                        0x100e14070  sysv  const char *(lua_State *, const char *, const char *, const char *)
+luaL_buffinit                                                    0x100e142b0  sysv  void(lua_State *, luaL_Buffer *)
+luaL_addstring                                                   0x100e142d0  sysv  void(luaL_Buffer *, const char *)
+luaL_pushresult                                                  0x100e14330  sysv  void(luaL_Buffer *)
+luaL_prepbuffer                                                  0x100e14390  sysv  char *(luaL_Buffer *)
+luaL_addvalue                                                    0x100e14460  sysv  void(luaL_Buffer *)
+luaL_ref                                                         0x100e14590  sysv  int(lua_State *, int)
+luaL_unref                                                       0x100e14650  sysv  void(lua_State *, int, int)
+luaL_loadbuffer                                                  0x100e14ab0  sysv  int(lua_State *, const char *, size_t, const char *)
+luaL_loadstring                                                  0x100e14b00  sysv  int(lua_State *, const char *)
+lua_sethook                                                      0x100e1a1a0  sysv  int(lua_State *, lua_Hook, int, int)
+lua_gethook                                                      0x100e1a1e0  sysv  lua_Hook(lua_State *)
+lua_gethookmask                                                  0x100e1a1f0  sysv  int(lua_State *)
+lua_gethookcount                                                 0x100e1a200  sysv  int(lua_State *)
+lua_getstack                                                     0x100e1a210  sysv  int(lua_State *, int, lua_Debug *)
+lua_getlocal                                                     0x100e1a270  sysv  const char *(lua_State *, const lua_Debug *, int)
+lua_setlocal                                                     0x100e1a360  sysv  const char *(lua_State *, const lua_Debug *, int)
+lua_getinfo                                                      0x100e1a450  sysv  int(lua_State *, const char *, lua_Debug *)
+lua_resume                                                       0x100e1c740  sysv  int(lua_State *, int)
+lua_yield                                                        0x100e1c980  sysv  int(lua_State *, int)
+lua_newstate                                                     0x100e29dd0  sysv  lua_State *(lua_Alloc, void *)
+lua_close                                                        0x100e2a1e0  sysv  void(lua_State *)
+camera_set_frustum                                               0x100e438c0  sysv  void(void *camera, const void *frustum)
+key_down                                                         0x101135520  sysv  -
+key_up                                                           0x101135560  sysv  -
+LuaScriptFactory_QueryInterface                                  0x10114ff10  sysv  -
+LuaScriptFactory_QueryInterface_const                            0x10114ff70  sysv  -
+LuaScriptFactoryResponseData_QueryInterface                      0x101150060  sysv  -
+LuaScriptFactoryResponseData_QueryInterface_const                0x1011500c0  sysv  -
+SchedulerLua_QueryInterface                                      0x1011598e0  sysv  -
+SchedulerLua_QueryInterface_const                                0x101159940  sysv  -
+sub_LuaResumeCoroutineTask_QueryInterface                        0x1011599b0  sysv  -
+sub_LuaResumeCoroutineTask_QueryInterface_const                  0x101159a00  sysv  -
+AttachNifData_QueryInterface                                     0x101164650  sysv  -
+AttachNifData_QueryInterface_const                               0x1011646b0  sysv  -
+CameraService_QueryInterface                                     0x101169190  sysv  -
+CameraService_QueryInterface_const                               0x1011691f0  sysv  -
+LightService_QueryInterface                                      0x101174280  sysv  -
+LightService_QueryInterface_const                                0x1011742e0  sysv  -
+NIFFactory_QueryInterface                                        0x101176890  sysv  -
+NIFFactory_QueryInterface_const                                  0x1011768f0  sysv  -
+RenderService_QueryInterface                                     0x101178f30  sysv  -
+RenderService_QueryInterface_const                               0x101178f90  sysv  -
+SceneGraphCache_QueryInterface                                   0x10117fc40  sysv  -
+SceneGraphCache_QueryInterface_const                             0x10117fca0  sysv  -
+NIFFactoryResponse_QueryInterface                                0x101180380  sysv  -
+NIFFactoryResponse_QueryInterface_const                          0x1011803d0  sysv  -
+SceneGraphService_QueryInterface                                 0x101199950  sysv  -
+SceneGraphService_QueryInterface_const                           0x1011999b0  sysv  -
+AttachmentMadeMessage_QueryInterface                             0x101199d00  sysv  -
+AttachmentMadeMessage_QueryInterface_const                       0x101199d50  sysv  -
+AttachmentMessage_QueryInterface                                 0x10119a270  sysv  -
+AttachmentMessage_QueryInterface_const                           0x10119a2c0  sysv  -
+AttachmentBrokenMessage_QueryInterface                           0x10119a3d0  sysv  -
+AttachmentBrokenMessage_QueryInterface_const                     0x10119a420  sysv  -
+ShaderService_QueryInterface                                     0x1011a2f00  sysv  -
+ShaderService_QueryInterface_const                               0x1011a2f60  sysv  -
+InputActionMapsLoaded_QueryInterface                             0x1011a65d0  sysv  -
+InputActionMapsLoaded_QueryInterface_const                       0x1011a6630  sysv  -
+InputActionMessage_QueryInterface                                0x1011a68a0  sysv  -
+InputActionMessage_QueryInterface_const                          0x1011a6900  sysv  -
+InputHandler_QueryInterface                                      0x1011a8290  sysv  -
+InputHandler_QueryInterface_const                                0x1011a82f0  sysv  -
+InputService_QueryInterface                                      0x1011aff90  sysv  -
+InputService_QueryInterface_const                                0x1011afff0  sysv  -
+InputStickMessage_QueryInterface                                 0x1011bdf20  sysv  -
+InputStickMessage_QueryInterface_const                           0x1011bdf80  sysv  -
+KeyDownMessage_QueryInterface                                    0x1011be610  sysv  -
+KeyDownMessage_QueryInterface_const                              0x1011be670  sysv  -
+KeyUpMessage_QueryInterface                                      0x1011be6e0  sysv  -
+KeyUpMessage_QueryInterface_const                                0x1011be740  sysv  -
+MouseMoveMessage_QueryInterface                                  0x1011bf390  sysv  -
+MouseMoveMessage_QueryInterface_const                            0x1011bf3f0  sysv  -
+MouseDownMessage_QueryInterface                                  0x1011bf460  sysv  -
+MouseDownMessage_QueryInterface_const                            0x1011bf4c0  sysv  -
+MouseUpMessage_QueryInterface                                    0x1011bf530  sysv  -
+MouseUpMessage_QueryInterface_const                              0x1011bf590  sysv  -
+ScheduledTask_QueryInterface                                     0x1011d2360  sysv  -
+ScheduledTask_QueryInterface_const                               0x1011d23b0  sysv  -
+Entity_QueryInterface                                            0x1011d2470  sysv  -
+Entity_QueryInterface_const                                      0x1011d24d0  sysv  -
+sub_EventMessage_QueryInterface                                  0x1011d2e70  sysv  -
+sub_EventMessage_QueryInterface_const                            0x1011d2ec0  sysv  -
+EntityFactory_QueryInterface                                     0x1011d6d00  sysv  -
+EntityFactory_QueryInterface_const                               0x1011d6d60  sysv  -
+EntityFactory__EntityFactoryData_QueryInterface                  0x1011d6e30  sysv  -
+EntityFactory__EntityFactoryData_QueryInterface_const            0x1011d6e90  sysv  -
+EntityFactoryRequest_QueryInterface                              0x1011d70d0  sysv  -
+EntityFactoryRequest_QueryInterface_const                        0x1011d7120  sysv  -
+EntityFactoryResponse_QueryInterface                             0x1011d7a40  sysv  -
+EntityFactoryResponse_QueryInterface_const                       0x1011d7aa0  sysv  -
+EntityLoadRequest_QueryInterface                                 0x1011d8e50  sysv  -
+EntityLoadRequest_QueryInterface_const                           0x1011d8eb0  sysv  -
+EntityLoadResult_QueryInterface                                  0x1011d8f20  sysv  -
+EntityLoadResult_QueryInterface_const                            0x1011d8f80  sysv  -
+EntityPreloadRequest_QueryInterface                              0x1011d8ff0  sysv  -
+EntityPreloadRequest_QueryInterface_const                        0x1011d9050  sysv  -
+EntityPreloadResponse_QueryInterface                             0x1011d90c0  sysv  -
+EntityPreloadResponse_QueryInterface_const                       0x1011d9120  sysv  -
+EntityLoaderService_QueryInterface                               0x1011df0a0  sysv  -
+EntityLoaderService_QueryInterface_const                         0x1011df100  sysv  -
+EntityManager_QueryInterface                                     0x1011e8ad0  sysv  -
+EntityManager_QueryInterface_const                               0x1011e8b30  sysv  -
+EntitySetLoadState_QueryInterface                                0x1011ebcf0  sysv  -
+EntitySetLoadState_QueryInterface_const                          0x1011ebd50  sysv  -
+FlatModelFactory_QueryInterface                                  0x1011fa930  sysv  -
+FlatModelFactory_QueryInterface_const                            0x1011fa990  sysv  -
+ResponseData_QueryInterface                                      0x1011fab00  sysv  -
+ResponseData_QueryInterface_const                                0x1011fab60  sysv  -
+FlatModelFactoryRequest_QueryInterface                           0x1011fccc0  sysv  -
+FlatModelFactoryRequest_QueryInterface_const                     0x1011fcd20  sysv  -
+FlatModelFactoryResponse_QueryInterface                          0x1011fd760  sysv  -
+FlatModelFactoryResponse_QueryInterface_const                    0x1011fd7c0  sysv  -
+FlatModelManager_QueryInterface                                  0x1012073b0  sysv  -
+FlatModelManager_QueryInterface_const                            0x101207410  sysv  -
+PendingBehavior_QueryInterface                                   0x10120f780  sysv  -
+PendingBehavior_QueryInterface_const                             0x10120f7e0  sysv  -
+Scheduler_QueryInterface                                         0x1012481f0  sysv  -
+Scheduler_QueryInterface_const                                   0x101248250  sysv  -
+ScriptFactoryRequest_QueryInterface                              0x10124bb00  sysv  -
+ScriptFactoryRequest_QueryInterface_const                        0x10124bb60  sysv  -
+ScriptFactoryResponse_QueryInterface                             0x10124c970  sysv  -
+ScriptFactoryResponse_QueryInterface_const                       0x10124c9d0  sysv  -
+WorldFactory_QueryInterface                                      0x10125dca0  sysv  -
+WorldFactory_QueryInterface_const                                0x10125dd00  sysv  -
+WorldFactoryData_QueryInterface                                  0x10125ddf0  sysv  -
+WorldFactoryData_QueryInterface_const                            0x10125de50  sysv  -
+WorldFactoryRequest_QueryInterface                               0x10125f0b0  sysv  -
+WorldFactoryRequest_QueryInterface_const                         0x10125f110  sysv  -
+WorldFactoryResponse_QueryInterface                              0x10125f620  sysv  -
+WorldFactoryResponse_QueryInterface_const                        0x10125f680  sysv  -
+AnimationService_QueryInterface                                  0x10126ddb0  sysv  -
+AnimationService_QueryInterface_const                            0x10126de10  sysv  -
+ActorAddedMessage_QueryInterface                                 0x10126e2c0  sysv  -
+ActorAddedMessage_QueryInterface_const                           0x10126e310  sysv  -
+ActorRemovedMessage_QueryInterface                               0x10126e3c0  sysv  -
+ActorRemovedMessage_QueryInterface_const                         0x10126e410  sysv  -
+KFMFactory_QueryInterface                                        0x101278a70  sysv  -
+KFMFactory_QueryInterface_const                                  0x101278ad0  sysv  -
+KFMFactory__ResponseData_QueryInterface                          0x101278bc0  sysv  -
+KFMFactory__ResponseData_QueryInterface_const                    0x101278c20  sysv  -
+KFMFactoryRequest_QueryInterface                                 0x101279510  sysv  -
+KFMFactoryRequest_QueryInterface_const                           0x101279570  sysv  -
+KFMFactoryResponse_QueryInterface                                0x101279ca0  sysv  -
+KFMFactoryResponse_QueryInterface_const                          0x101279d00  sysv  -
+AssetCacheResponse_QueryInterface                                0x10127a6b0  sysv  -
+AssetCacheResponse_QueryInterface_const                          0x10127a710  sysv  -
+AssetConfigService_QueryInterface                                0x10127c7d0  sysv  -
+AssetConfigService_QueryInterface_const                          0x10127c830  sysv  -
+AssetFactoryManager_QueryInterface                               0x101283ce0  sysv  -
+AssetFactoryManager_QueryInterface_const                         0x101283d40  sysv  -
+AssetLoadRequest_QueryInterface                                  0x101285f50  sysv  -
+AssetLoadRequest_QueryInterface_const                            0x101285fb0  sysv  -
+AssetLoadResponse_QueryInterface                                 0x1012862e0  sysv  -
+AssetLoadResponse_QueryInterface_const                           0x101286340  sysv  -
+AssetTagsInfoResponse_QueryInterface                             0x101289620  sysv  -
+AssetTagsInfoResponse_QueryInterface_const                       0x101289680  sysv  -
+AssetLocatorService_QueryInterface                               0x101292140  sysv  -
+AssetLocatorService_QueryInterface_const                         0x1012921a0  sysv  -
+AssetLocationMap_QueryInterface                                  0x101292280  sysv  -
+AssetLocationMap_QueryInterface_const                            0x1012922e0  sysv  -
+sub_StreamMessage_QueryInterface                                 0x101292a70  sysv  -
+sub_StreamMessage_QueryInterface_const                           0x101292ac0  sysv  -
+sub_AssetConfigurationMessage_QueryInterface                     0x101293360  sysv  -
+sub_AssetConfigurationMessage_QueryInterface_const               0x1012933b0  sysv  -
+sub_AssetLocatorRequest_QueryInterface                           0x101294970  sysv  -
+sub_AssetLocatorRequest_QueryInterface_const                     0x1012949c0  sysv  -
+ConfigManager_QueryInterface                                     0x1012b5b30  sysv  -
+ConfigManager_QueryInterface_const                               0x1012b5b90  sysv  -
+SectionEntry_QueryInterface                                      0x1012bb8f0  sysv  -
+SectionEntry_QueryInterface_const                                0x1012bb950  sysv  -
+ConfigSource_QueryInterface                                      0x1012c1a90  sysv  -
+ConfigSource_QueryInterface_const                                0x1012c1af0  sysv  -
+CommandLineSource_QueryInterface                                 0x1012c1b60  sysv  -
+CommandLineSource_QueryInterface_const                           0x1012c1bc0  sysv  -
+IniSource_QueryInterface                                         0x1012c1c30  sysv  -
+IniSource_QueryInterface_const                                   0x1012c1c90  sysv  -
+EnvVarSource_QueryInterface                                      0x1012c1d00  sysv  -
+EnvVarSource_QueryInterface_const                                0x1012c1d60  sysv  -
+rsg_efd_datastream_init                                          0x1012c1fe0  sysv  void(void *, uint32_t)
+rsg_efd_datastream_init_copy                                     0x1012c2080  sysv  void(void *, const void *, _Bool)
+rsg_efd_datastream_destroy                                       0x1012c2130  sysv  void(void *)
+rsg_efd_datastream_read                                          0x1012c2200  sysv  void(void *, void *, size_t)
+rsg_efd_datastream_write                                         0x1012c2300  sysv  void(void *, const void *, size_t)
+rsg_efd_datastream_seek                                          0x1012c2460  sysv  _Bool(void *, size_t)
+rsg_efd_datastream_write_stream                                  0x1012c2550  sysv  void(void *, void *)
+rsg_efd_datastream_read_stream                                   0x1012c26b0  sysv  void(void *, void *)
+DebugOutDestination_QueryInterface                               0x1012ddbe0  sysv  -
+DebugOutDestination_QueryInterface_const                         0x1012ddc40  sysv  -
+FileDestination_QueryInterface                                   0x1012e1550  sysv  -
+FileDestination_QueryInterface_const                             0x1012e15b0  sysv  -
+GenericAssetFactory_QueryInterface                               0x1012e3200  sysv  -
+GenericAssetFactory_QueryInterface_const                         0x1012e3260  sysv  -
+ResponseData2_QueryInterface                                     0x1012e3360  sysv  -
+ResponseData2_QueryInterface_const                               0x1012e33c0  sysv  -
+GenericAssetLoadResponse_QueryInterface                          0x1012e3a90  sysv  -
+GenericAssetLoadResponse_QueryInterface_const                    0x1012e3af0  sysv  -
+rsg_efd_msghelper_on_init                                        0x1012e5ba0  sysv  int(void *)
+rsg_efd_msghelper_on_tick                                        0x1012e5bb0  sysv  int(void *)
+rsg_efd_msghelper_display_name                                   0x1012e5bd0  sysv  const char *(void *)
+Logger_QueryInterface                                            0x1012ebd10  sysv  -
+Logger_QueryInterface_const                                      0x1012ebd70  sysv  -
+efd_alloc                                                        0x1012efc90  sysv  void *(size_t size, int hint)
+efd_malloc                                                       0x1012eff00  sysv  void *(size_t size, int hint)
+rsg_efd_category_init_u0                                         0x1012f44b0  sysv  uint64_t *(uint64_t *, uint32_t, uint32_t)
+rsg_efd_category_init_u2                                         0x1012f45a0  sysv  uint64_t *(uint64_t *, uint32_t, uint32_t)
+MessageService_QueryInterface                                    0x1012f4cb0  sysv  -
+MessageService_QueryInterface_const                              0x1012f4d10  sysv  -
+NetMessage_QueryInterface                                        0x1012f6820  sysv  -
+NetMessage_QueryInterface_const                                  0x1012f6880  sysv  -
+AssignNetIDMessage_QueryInterface                                0x1012f68f0  sysv  -
+AssignNetIDMessage_QueryInterface_const                          0x1012f6950  sysv  -
+efd_set_path_hooks                                               0x1012f6ce0  sysv  void(void *, void *, void *copy_root, void *root, void *copy_root2, void *root2)
+rsg_efd_path_standardize                                         0x1012f6d60  sysv  _Bool(char *)
+efd_sqrt_table_new                                               0x1012f8d60  sysv  -
+PrintDestination_QueryInterface                                  0x1012f92c0  sysv  -
+PrintDestination_QueryInterface_const                            0x1012f9320  sysv  -
+ServiceManager_QueryInterface                                    0x1012ffd30  sysv  -
+ServiceManager_QueryInterface_const                              0x1012ffd90  sysv  -
+rsg_efd_id_set_type                                              0x101303210  sysv  _Bool(uint64_t *, int)
+rsg_efd_id_set_usage                                             0x101303330  sysv  _Bool(uint64_t *, int)
+rsg_efd_id_set_shard                                             0x101303450  sysv  _Bool(uint64_t *, uint32_t)
+rsg_efd_id_set_net_id                                            0x1013035a0  sysv  _Bool(uint64_t *, uint32_t)
+rsg_efd_id_set_base_id                                           0x101303610  sysv  _Bool(uint64_t *, uint64_t)
+rsg_efd_datastream_write_id                                      0x1013036c0  sysv  void *(void *, const uint64_t *)
+rsg_efd_datastream_read_id                                       0x101303770  sysv  void *(void *, uint64_t *)
+rsg_efd_utf8_units_at                                            0x101303810  sysv  int(const char *)
+rsg_efd_utf8_units                                               0x101303830  sysv  int(uint64_t)
+rsg_efd_utf8_tail_missing                                        0x101303850  sysv  int(const char *, uint32_t)
+rsg_efd_utf8string_length                                        0x1013050e0  sysv  size_t(const rsg_efd_utf8string *)
+rsg_efd_utf8string_to_upper                                      0x101306460  sysv  rsg_efd_utf8string *(rsg_efd_utf8string *)
+rsg_efd_utf8string_to_lower                                      0x1013064d0  sysv  rsg_efd_utf8string *(rsg_efd_utf8string *)
+efd_snprintf                                                     0x10130b200  sysv  -
+thread_set_priority                                              0x101313170  sysv  -
+MacOSPlatformService_QueryInterface                              0x101313680  sysv  -
+MacOSPlatformService_QueryInterface_const                        0x1013136e0  sysv  -
+autologin                                                        0x101315d70  sysv  -
+AudioBankAssetFactory_QueryInterface                             0x10131d790  sysv  -
+AudioBankAssetFactory_QueryInterface_const                       0x10131d7f0  sysv  -
+AudioBankAssetLoadRequest_QueryInterface                         0x10131dc30  sysv  -
+AudioBankAssetLoadRequest_QueryInterface_const                   0x10131dc90  sysv  -
+AudioBankAssetLoadResponse_QueryInterface                        0x10131e5b0  sysv  -
+AudioBankAssetLoadResponse_QueryInterface_const                  0x10131e610  sysv  -
+AudioMessage_QueryInterface                                      0x1013223c0  sysv  -
+AudioMessage_QueryInterface_const                                0x101322420  sysv  -
+PostEventMessage_QueryInterface                                  0x1013224f0  sysv  -
+PostEventMessage_QueryInterface_const                            0x101322550  sysv  -
+PostTriggerMessage_QueryInterface                                0x1013226a0  sysv  -
+PostTriggerMessage_QueryInterface_const                          0x101322700  sysv  -
+SetParamMessage_QueryInterface                                   0x101322850  sysv  -
+SetParamMessage_QueryInterface_const                             0x1013228b0  sysv  -
+SetStateMessage_QueryInterface                                   0x101322a00  sysv  -
+SetStateMessage_QueryInterface_const                             0x101322a60  sysv  -
+SetSwitchMessage_QueryInterface                                  0x101322c00  sysv  -
+SetSwitchMessage_QueryInterface_const                            0x101322c60  sysv  -
+DoPrepareEventCallbackBehaviorMessage_QueryInterface             0x101322e00  sysv  -
+DoPrepareEventCallbackBehaviorMessage_QueryInterface_const       0x101322e60  sysv  -
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface           0x101322fb0  sysv  -
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface_const     0x101323010  sysv  -
+DoLoadBankCallbackBehaviorMessage_QueryInterface                 0x101323160  sysv  -
+DoLoadBankCallbackBehaviorMessage_QueryInterface_const           0x1013231c0  sysv  -
+DoUnloadBankCallbackBehaviorMessage_QueryInterface               0x101323330  sysv  -
+DoUnloadBankCallbackBehaviorMessage_QueryInterface_const         0x101323390  sysv  -
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface        0x101323500  sysv  -
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface_const  0x101323560  sysv  -
+AudioService_QueryInterface                                      0x101337230  sysv  -
+AudioService_QueryInterface_const                                0x101337290  sysv  -
+input_queue_read                                                 0x10133b310  sysv  -
+si_open                                                          0x10133bee0  sysv  bool(void *self, int slot)
+rsg_cryptopp_aes_ctr_decrypt                                     0x101376328  sysv  _Bool(const uint8_t *, uint64_t, const char *, uint32_t, uint8_t *, uint32_t)
+rsg_cryptopp_dsa_sha1_verify                                     0x10137683d  sysv  _Bool(const uint8_t *, uint32_t, const char *)
+sng_verify                                                       0x10137683d  sysv  _Bool(const uint8_t *, uint32_t, const char *)
+rsg_cryptopp_aes_cfb_decrypt                                     0x101376f8f  sysv  -
+dsp_two                                                          0x1013ea36c  data  float
+const_two_pow_63                                                 0x1013eaa50  data  double
+hashtable_prime_sizes                                            0x1013eaa70  data  uint64_t[28]
+dsp_two_pi                                                       0x1013ead64  data  float
+dsp_ramp0                                                        0x1013ead90  data  float[4]
+dsp_half4                                                        0x1013eada0  data  float[4]
+dsp_four4                                                        0x1013eadb0  data  float[4]
+dsp_k046                                                         0x1013eadc0  data  float[4]
+dsp_k054                                                         0x1013eadd0  data  float[4]
+dsp_one4                                                         0x1013eade0  data  float[4]
+thread_priority_table                                            0x10142d3f0  data  int32_t[7]
+psarc_key_iv                                                     0x10142e3d0  data  uint8_t[16]
+la_vcosf                                                         0x1017e8b68  data  void *
+json_number_vtable                                               0x1017f5c70  data  void *[]
+objc_classref_MessageBox                                         0x10186da28  data  Class
+game_config                                                      0x101873e08  data  rsp_config
+GRCamera_class_info                                              0x1018ddbb0  data  efd::ClassInfo
+GRCameraBackground_class_info                                    0x1018de018  data  efd::ClassInfo
+GRCameraBGBehavior_Animated_class_info                           0x1018de480  data  efd::ClassInfo
+GRCameraBGBehavior_BuildUp_class_info                            0x1018de8e8  data  efd::ClassInfo
+GRCameraBGBehavior_Customize_class_info                          0x1018ded50  data  efd::ClassInfo
+GRCameraBGBehavior_Debug_class_info                              0x1018df1b8  data  efd::ClassInfo
+GRCameraBGBehavior_Panning_class_info                            0x1018df620  data  efd::ClassInfo
+CameraSong_class_info                                            0x1018dfa98  data  efd::ClassInfo
+GRCameraDebug_class_info                                         0x1018dff00  data  efd::ClassInfo
+GRCameraScripted_class_info                                      0x1018e0368  data  efd::ClassInfo
+GRCameraService_class_info                                       0x1018e07a0  data  efd::ClassInfo
+IGRCameraImpl_class_info                                         0x1018e0ba8  data  efd::ClassInfo
+DatabaseCommandQueue_class_info                                  0x1018e0fe8  data  efd::ClassInfo
+DatabaseMessageSystem_class_info                                 0x1018e1c00  data  efd::ClassInfo
+DatabaseService_class_info                                       0x1018e2008  data  efd::ClassInfo
+GRCrowdBox_class_info                                            0x1018e2418  data  efd::ClassInfo
+GRCrowdSystem_class_info                                         0x1018e28a0  data  efd::ClassInfo
+GRLightService_class_info                                        0x1018e2cb8  data  efd::ClassInfo
+GRMusicService_class_info                                        0x1018e3130  data  efd::ClassInfo
+JSONFactory_class_info                                           0x1018e3620  data  efd::ClassInfo
+JSONFactory__Response_class_info                                 0x1018e3a28  data  efd::ClassInfo
+JSONFactory__JSONFactoryData_class_info                          0x1018e3e30  data  efd::ClassInfo
+PostEffectColorCorrect_class_info                                0x1018e4e78  data  efd::ClassInfo
+PostEffectsService_class_info                                    0x1018e52b8  data  efd::ClassInfo
+GRClipFadeEffectComponent_class_info                             0x1018e56e8  data  efd::ClassInfo
+GRDisplayRatioAdjuster_class_info                                0x1018e5b20  data  efd::ClassInfo
+GRShowLightsSystem_class_info                                    0x1018e6370  data  efd::ClassInfo
+GRVenueMenuPresentation_Flow_class_info                          0x1018e67c8  data  efd::ClassInfo
+path_table                                                       0x1018e6c00  data  void *
+path_table_lock                                                  0x1018e6c10  data  pthread_mutex_t *
+MainService_MacOS_class_info                                     0x1018e6c58  data  efd::ClassInfo
+NSP_PlayListService_class_info                                   0x1018e7060  data  efd::ClassInfo
+main_service                                                     0x1018e7470  data  void *
+lua_owner                                                        0x1018e7478  data  void *
+gl_context                                                       0x1018e7488  data  void *
+RSLogger_class_info                                              0x1018e7498  data  efd::ClassInfo
+RSDejaOutDestination_class_info                                  0x1018e78a0  data  efd::ClassInfo
+GuitarService_class_info                                         0x1018e7cc8  data  efd::ClassInfo
+GRLocalization_class_info                                        0x1018e80e8  data  efd::ClassInfo
+GRSongDirectory_class_info                                       0x1018e8588  data  efd::ClassInfo
+DetectionService_class_info                                      0x1018e8998  data  efd::ClassInfo
+VenueService_class_info                                          0x1018e9578  data  efd::ClassInfo
+GameService_class_info                                           0x1018e9b40  data  efd::ClassInfo
+GRAlphaSortingComponent_class_info                               0x1018e9f50  data  efd::ClassInfo
+GRBackground_class_info                                          0x1018ea3a0  data  efd::ClassInfo
+GRBackgroundService_class_info                                   0x1018ea7b0  data  efd::ClassInfo
+GRObjectEffectComponent_class_info                               0x1018eabb8  data  efd::ClassInfo
+GRWorldTextManager_class_info                                    0x1018eb058  data  efd::ClassInfo
+GraphAssetFactory_class_info                                     0x1018eb460  data  efd::ClassInfo
+GraphAssetFactory__Response_class_info                           0x1018eb868  data  efd::ClassInfo
+GRComponent_class_info                                           0x1018ebc80  data  efd::ClassInfo
+MainService_class_info                                           0x1018ec4c8  data  efd::ClassInfo
+PreloadHelper_class_info                                         0x1018ec8d0  data  efd::ClassInfo
+PreloadHelperResponse_class_info                                 0x1018ecce0  data  efd::ClassInfo
+PreloadHelperComplete_class_info                                 0x1018ed0e8  data  efd::ClassInfo
+PreloadItem_class_info                                           0x1018ed4f0  data  efd::ClassInfo
+PreloadGroup_class_info                                          0x1018ed8f8  data  efd::ClassInfo
+RSBootService_class_info                                         0x1018edd00  data  efd::ClassInfo
+RSRenderService_class_info                                       0x1018ee108  data  efd::ClassInfo
+GCTickable_class_info                                            0x1018ee558  data  efd::ClassInfo
+RSAudioService_class_info                                        0x1018eea08  data  efd::ClassInfo
+UIMenu_LAS_SongsList_class_info                                  0x1018eef98  data  efd::ClassInfo
+UIService_class_info                                             0x1018ef3c0  data  efd::ClassInfo
+RSGraphAssetFactoryLoadResponse_class_info                       0x1018ef7d0  data  efd::ClassInfo
+RSConnectGameInterface_Impl_class_info                           0x1018efbd8  data  efd::ClassInfo
+ResourceService_class_info                                       0x1018effe0  data  efd::ClassInfo
+GRMinigameCamera_class_info                                      0x1018f0420  data  efd::ClassInfo
+OscilleratorScopeModel_class_info                                0x1018f0868  data  efd::ClassInfo
+ReactiveEffectsService_class_info                                0x1018f0cb8  data  efd::ClassInfo
+GCColorShift_class_info                                          0x1018f10f0  data  efd::ClassInfo
+GC2DAssetHelper_class_info                                       0x1018f1848  data  efd::ClassInfo
+GCAccumulatedActor_class_info                                    0x1018f1ce0  data  efd::ClassInfo
+GCPauseMessage_class_info                                        0x1018f21a8  data  efd::ClassInfo
+GCPauseManager_class_info                                        0x1018f25e0  data  efd::ClassInfo
+GRCameraNarniaVenue_class_info                                   0x1018f2a60  data  efd::ClassInfo
+FormLoader_class_info                                            0x1018f2ec8  data  efd::ClassInfo
+ClipFadeManager_class_info                                       0x1018f3340  data  efd::ClassInfo
+GEService_class_info                                             0x1018f3878  data  efd::ClassInfo
+NarniaPortalModel_class_info                                     0x1018f3ca8  data  efd::ClassInfo
+SongListService_class_info                                       0x1018f40f0  data  efd::ClassInfo
+NarniaService_class_info                                         0x1018f4500  data  efd::ClassInfo
+GRSL2Spawner_class_info                                          0x1018f49b8  data  efd::ClassInfo
+NarniaFogModel_class_info                                        0x1018f4df0  data  efd::ClassInfo
+NarniaFogParticle_class_info                                     0x1018f5228  data  efd::ClassInfo
+MissionService_class_info                                        0x1018f5660  data  efd::ClassInfo
+ToneService_class_info                                           0x1018f5aa8  data  efd::ClassInfo
+StringTuner_class_info                                           0x1018f5f08  data  efd::ClassInfo
+TunerService_class_info                                          0x1018f6340  data  efd::ClassInfo
+InstrumentLoader_class_info                                      0x1018f6750  data  efd::ClassInfo
+GRCrowdPoint_class_info                                          0x1018f6b58  data  efd::ClassInfo
+GearManager_class_info                                           0x1018f6fd0  data  efd::ClassInfo
+GearService_class_info                                           0x1018f73e0  data  efd::ClassInfo
+FogService_class_info                                            0x1018f7840  data  efd::ClassInfo
+GlobalFogSettings_class_info                                     0x1018f7c48  data  efd::ClassInfo
+ManifestManager_class_info                                       0x1018f80b0  data  efd::ClassInfo
+StatsService_class_info                                          0x1018f8500  data  efd::ClassInfo
+UIManagerI_class_info                                            0x1018f8bb0  data  efd::ClassInfo
+GRCameraLoft_class_info                                          0x1018f8fc8  data  efd::ClassInfo
+GEVideoScreenModel_class_info                                    0x1018f9490  data  efd::ClassInfo
+ReturnToTitleScreen_class_info                                   0x1018f9908  data  efd::ClassInfo
+TunerProgressBuiltin_class_info                                  0x1018f9df8  data  efd::ClassInfo
+GameColorManager_class_info                                      0x1018fa430  data  efd::ClassInfo
+GRCameraSessionMode_class_info                                   0x1018fa8e0  data  efd::ClassInfo
+GCAttachmentManager_class_info                                   0x1018fae88  data  efd::ClassInfo
+UIMenu_ShopSongs_class_info                                      0x1018fb330  data  efd::ClassInfo
+GRLoftAmbientLight_class_info                                    0x1018fb748  data  efd::ClassInfo
+GRLoftSpotLight_class_info                                       0x1018fbb80  data  efd::ClassInfo
+GRLoftState_class_info                                           0x1018fc828  data  efd::ClassInfo
+LoftPostEffectsManager_class_info                                0x1018fcc60  data  efd::ClassInfo
+RSVenueForkEmitterGear_class_info                                0x1018fd068  data  efd::ClassInfo
+RingParticleEmitter_class_info                                   0x1018fd4a0  data  efd::ClassInfo
+UIMenu_ShopGear_class_info                                       0x1018fd8a8  data  efd::ClassInfo
+UIMenu_ShopPacks_class_info                                      0x1018fdcb0  data  efd::ClassInfo
+GearPlacementNode_class_info                                     0x1018fe0f8  data  efd::ClassInfo
+GearLava_class_info                                              0x1018fe5e0  data  efd::ClassInfo
+GearNifCache_class_info                                          0x1018fea18  data  efd::ClassInfo
+GRVenueAmbientAnimations_class_info                              0x1018fee70  data  efd::ClassInfo
+GRSoundIntensity_class_info                                      0x1018ff2c8  data  efd::ClassInfo
+GRVenuePointLight_class_info                                     0x1018ff700  data  efd::ClassInfo
+GRLoftCabinetScreen_class_info                                   0x1018ffb48  data  efd::ClassInfo
+GCLdbChlgService_class_info                                      0x1018fffa0  data  efd::ClassInfo
+GearChangeController_class_info                                  0x1019003c8  data  efd::ClassInfo
+GCGFxMouseEventMessage_class_info                                0x1019007d0  data  efd::ClassInfo
+GCGFxMouseEventHandler_class_info                                0x101900bd8  data  efd::ClassInfo
+AchievementService_class_info                                    0x101901068  data  efd::ClassInfo
+ReactiveRingModel_class_info                                     0x1019015d8  data  efd::ClassInfo
+PrizeService_class_info                                          0x1019019e0  data  efd::ClassInfo
+GCKinectEventMessage_class_info                                  0x101901e00  data  efd::ClassInfo
+GCKinectEventHandler_class_info                                  0x101902208  data  efd::ClassInfo
+FavoritesService_class_info                                      0x1019026b0  data  efd::ClassInfo
+RSConnectExtension_RDV_class_info                                0x101902b88  data  efd::ClassInfo
+RSConnectService_Steam_class_info                                0x101902f90  data  efd::ClassInfo
+rs_connect_service                                               0x101903398  data  void *
+rs_connect_game_interface                                        0x1019033a0  data  void *
+RSSteamService_class_info                                        0x1019033f8  data  efd::ClassInfo
+RSDLCService_Steam_class_info                                    0x101903808  data  efd::ClassInfo
+RSProfileService_MacOS_class_info                                0x101903c10  data  efd::ClassInfo
+RSSteamAchievement_class_info                                    0x1019042c0  data  efd::ClassInfo
+RSSteamActivityFeed_class_info                                   0x1019046c8  data  efd::ClassInfo
+RSSteamCloudFile_class_info                                      0x101904ad0  data  efd::ClassInfo
+RSSteamDownloadableContent_class_info                            0x101904ed8  data  efd::ClassInfo
+RSSteamLeaderboards_class_info                                   0x1019052e0  data  efd::ClassInfo
+RSSteamLeaderboardRequest_class_info                             0x1019056e8  data  efd::ClassInfo
+RSSteamLeaderboardRequestUpload_class_info                       0x101905af0  data  efd::ClassInfo
+RSSteamLeaderboardRequestDownload_class_info                     0x101905ef8  data  efd::ClassInfo
+RSSteamWebApi_class_info                                         0x101906708  data  efd::ClassInfo
+FrkService_class_info                                            0x101906b98  data  efd::ClassInfo
+NiFrkParticleEffectModel_class_info                              0x1019070c8  data  efd::ClassInfo
+ak_render_engine                                                 0x101907bb0  data  void *
+ak_lengine_start_time                                            0x101907c10  data  uint32_t
+ak_platform_settings                                             0x101907da0  data  AkPlatformInitSettings
+ak_lengine_thread_id                                             0x101908418  data  pthread_t
+GFxAssetTaskRequest_class_info                                   0x101908a20  data  efd::ClassInfo
+GFxAssetTaskAssetFactory_class_info                              0x101908e30  data  efd::ClassInfo
+GFxInputRouterModel_class_info                                   0x101909238  data  efd::ClassInfo
+GFxMovieModel_class_info                                         0x101909670  data  efd::ClassInfo
+GFxService_class_info                                            0x101909aa8  data  efd::ClassInfo
+scaleform_keycode_table                                          0x101909f20  data  uint32_t[]
+GFXModelResponse_class_info                                      0x10190a320  data  efd::ClassInfo
+game_char_to_key                                                 0x101921c60  data  int32_t[256]
+game_key_state                                                   0x101922060  data  uint32_t[256]
+sub_LuaResumeCoroutineTask_class_info                            0x1019224c0  data  efd::ClassInfo
+LuaScriptFactory_class_info                                      0x1019228c8  data  efd::ClassInfo
+LuaScriptFactoryResponseData_class_info                          0x101922cd0  data  efd::ClassInfo
+SchedulerLua_class_info                                          0x1019230e0  data  efd::ClassInfo
+AttachNifData_class_info                                         0x101923508  data  efd::ClassInfo
+CameraService_class_info                                         0x101923910  data  efd::ClassInfo
+SceneGraphMessage_class_info                                     0x101923d18  data  efd::ClassInfo
+SceneGraphAddedMessage_class_info                                0x101924120  data  efd::ClassInfo
+SceneGraphRemovedMessage_class_info                              0x101924528  data  efd::ClassInfo
+SceneGraphsUpdatedMessage_class_info                             0x101924930  data  efd::ClassInfo
+AttachmentMessage_class_info                                     0x101924d38  data  efd::ClassInfo
+AttachmentMadeMessage_class_info                                 0x101925140  data  efd::ClassInfo
+AttachmentBrokenMessage_class_info                               0x101925548  data  efd::ClassInfo
+LightService_class_info                                          0x101925950  data  efd::ClassInfo
+NIFFactory_class_info                                            0x101925d58  data  efd::ClassInfo
+NIFFactoryResponse_class_info                                    0x101926160  data  efd::ClassInfo
+RenderService_class_info                                         0x101926568  data  efd::ClassInfo
+SceneGraphCache_class_info                                       0x101926980  data  efd::ClassInfo
+SceneGraphCacheResponse_class_info                               0x101926d90  data  efd::ClassInfo
+SceneGraphService_class_info                                     0x101927198  data  efd::ClassInfo
+ShaderService_class_info                                         0x1019275a0  data  efd::ClassInfo
+InputActionMapsLoaded_class_info                                 0x1019279a8  data  efd::ClassInfo
+InputActionMessage_class_info                                    0x101927db0  data  efd::ClassInfo
+InputHandler_class_info                                          0x1019281b8  data  efd::ClassInfo
+InputService_class_info                                          0x1019285f0  data  efd::ClassInfo
+InputStickMessage_class_info                                     0x101928b50  data  efd::ClassInfo
+KeyDownMessage_class_info                                        0x101928f58  data  efd::ClassInfo
+KeyUpMessage_class_info                                          0x101929360  data  efd::ClassInfo
+MouseMoveMessage_class_info                                      0x101929b70  data  efd::ClassInfo
+MouseDownMessage_class_info                                      0x101929f78  data  efd::ClassInfo
+MouseUpMessage_class_info                                        0x10192a380  data  efd::ClassInfo
+Entity_class_info                                                0x10192abd0  data  efd::ClassInfo
+sub_EntityChangeMessage_class_info                               0x10192afd8  data  efd::ClassInfo
+EntityFactory_class_info                                         0x10192b3e0  data  efd::ClassInfo
+EntityFactory__EntityFactoryData_class_info                      0x10192b7e8  data  efd::ClassInfo
+EntityFactoryRequest_class_info                                  0x10192bbf0  data  efd::ClassInfo
+EntityFactoryResponse_class_info                                 0x10192bff8  data  efd::ClassInfo
+EntityLoadRequest_class_info                                     0x10192c410  data  efd::ClassInfo
+EntityLoadResult_class_info                                      0x10192c818  data  efd::ClassInfo
+EntityPreloadRequest_class_info                                  0x10192cc20  data  efd::ClassInfo
+EntityPreloadResponse_class_info                                 0x10192d028  data  efd::ClassInfo
+EntityLoaderService_class_info                                   0x10192d430  data  efd::ClassInfo
+EntityManager_class_info                                         0x10192d838  data  efd::ClassInfo
+EntitySetLoadState_class_info                                    0x10192dc40  data  efd::ClassInfo
+sub_EventMessage_class_info                                      0x10192e058  data  efd::ClassInfo
+FlatModelFactory_class_info                                      0x10192e460  data  efd::ClassInfo
+ResponseData_class_info                                          0x10192e868  data  efd::ClassInfo
+FlatModelFactoryRequest_class_info                               0x10192ec70  data  efd::ClassInfo
+FlatModelFactoryResponse_class_info                              0x10192f078  data  efd::ClassInfo
+FlatModelManager_class_info                                      0x10192f480  data  efd::ClassInfo
+PendingBehavior_class_info                                       0x10192fca8  data  efd::ClassInfo
+ScheduledTask_class_info                                         0x1019300f0  data  efd::ClassInfo
+Scheduler_class_info                                             0x1019304f8  data  efd::ClassInfo
+ScriptFactoryRequest_class_info                                  0x101930918  data  efd::ClassInfo
+ScriptFactoryResponse_class_info                                 0x101930d20  data  efd::ClassInfo
+WorldFactory_class_info                                          0x101931128  data  efd::ClassInfo
+WorldFactoryData_class_info                                      0x101931530  data  efd::ClassInfo
+WorldFactoryRequest_class_info                                   0x101931938  data  efd::ClassInfo
+WorldFactoryResponse_class_info                                  0x101931d40  data  efd::ClassInfo
+ActorAddedMessage_class_info                                     0x101932148  data  efd::ClassInfo
+ActorRemovedMessage_class_info                                   0x101932550  data  efd::ClassInfo
+AnimationService_class_info                                      0x101932958  data  efd::ClassInfo
+KFMFactory_class_info                                            0x101932d80  data  efd::ClassInfo
+KFMFactory__ResponseData_class_info                              0x101933188  data  efd::ClassInfo
+KFMFactoryRequest_class_info                                     0x101933590  data  efd::ClassInfo
+KFMFactoryResponse_class_info                                    0x101933998  data  efd::ClassInfo
+AssetCacheResponse_class_info                                    0x101933da0  data  efd::ClassInfo
+AssetConfigService_class_info                                    0x1019341a8  data  efd::ClassInfo
+AssetFactoryManager_class_info                                   0x101934678  data  efd::ClassInfo
+AssetLoadRequest_class_info                                      0x101934ab0  data  efd::ClassInfo
+AssetLoadResponse_class_info                                     0x101934eb8  data  efd::ClassInfo
+sub_AssetLocatorRequest_class_info                               0x1019352c0  data  efd::ClassInfo
+sub_AssetConfigurationMessage_class_info                         0x1019356c8  data  efd::ClassInfo
+sub_AssetLocatorResponse_class_info                              0x101935ad0  data  efd::ClassInfo
+AssetTagsInfoResponse_class_info                                 0x101935ed8  data  efd::ClassInfo
+AssetLocatorService_class_info                                   0x1019362e0  data  efd::ClassInfo
+AssetLocationMap_class_info                                      0x1019366e8  data  efd::ClassInfo
+ConfigManager_class_info                                         0x101936bf8  data  efd::ClassInfo
+SectionEntry_class_info                                          0x101937000  data  efd::ClassInfo
+ConfigSource_class_info                                          0x101937410  data  efd::ClassInfo
+CommandLineSource_class_info                                     0x101937818  data  efd::ClassInfo
+IniSource_class_info                                             0x101937c20  data  efd::ClassInfo
+EnvVarSource_class_info                                          0x101938030  data  efd::ClassInfo
+DebugOutDestination_class_info                                   0x101938438  data  efd::ClassInfo
+FileDestination_class_info                                       0x101938c48  data  efd::ClassInfo
+GenericAssetFactory_class_info                                   0x101939058  data  efd::ClassInfo
+ResponseData2_class_info                                         0x101939460  data  efd::ClassInfo
+GenericAssetLoadResponse_class_info                              0x101939868  data  efd::ClassInfo
+sub_IMessage_class_info                                          0x101939c98  data  efd::ClassInfo
+Logger_class_info                                                0x10193a4a8  data  efd::ClassInfo
+MessageService_class_info                                        0x10193b100  data  efd::ClassInfo
+NetMessage_class_info                                            0x10193b918  data  efd::ClassInfo
+AssignNetIDMessage_class_info                                    0x10193bd20  data  efd::ClassInfo
+PrintDestination_class_info                                      0x10193c9c0  data  efd::ClassInfo
+ServiceManager_class_info                                        0x10193d218  data  efd::ClassInfo
+sub_StreamMessage_class_info                                     0x10193de70  data  efd::ClassInfo
+MacOSPlatformService_class_info                                  0x10193e718  data  efd::ClassInfo
+AudioBankAssetFactory_class_info                                 0x10193ed08  data  efd::ClassInfo
+AudioBankAssetLoadRequest_class_info                             0x10193f110  data  efd::ClassInfo
+AudioBankAssetLoadResponse_class_info                            0x10193f518  data  efd::ClassInfo
+AudioMessage_class_info                                          0x10193f920  data  efd::ClassInfo
+PostEventMessage_class_info                                      0x10193fd28  data  efd::ClassInfo
+PostTriggerMessage_class_info                                    0x101940130  data  efd::ClassInfo
+SetParamMessage_class_info                                       0x101940538  data  efd::ClassInfo
+SetStateMessage_class_info                                       0x101940940  data  efd::ClassInfo
+SetSwitchMessage_class_info                                      0x101940d48  data  efd::ClassInfo
+DoPrepareEventCallbackBehaviorMessage_class_info                 0x101941150  data  efd::ClassInfo
+DoUnprepareEventCallbackBehaviorMessage_class_info               0x101941558  data  efd::ClassInfo
+DoLoadBankCallbackBehaviorMessage_class_info                     0x101941960  data  efd::ClassInfo
+DoUnloadBankCallbackBehaviorMessage_class_info                   0x101941d68  data  efd::ClassInfo
+DoPostEventExNotifyCallbackBehaviorMessage_class_info            0x101942170  data  efd::ClassInfo
+AudioService_class_info                                          0x101942578  data  efd::ClassInfo
+json_number_table                                                0x101949588  data  void *
+json_number_table_lock                                           0x101949590  data  pthread_mutex_t *
+app_focus                                                        0x10194b391  data  uint8_t

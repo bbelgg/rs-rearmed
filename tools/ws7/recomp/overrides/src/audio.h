@@ -27,7 +27,7 @@
 
 // Wwise's AkPlatformInitSettings copy (0x101907da0): +0x54 uNumRefillsInVoice (u16), the ring is
 // refills x 256 frames per channel (sink Init 0x100aa7be0).
-#define AK_PD_REFILLS 0x101907df4ull
+#define AK_PD_REFILLS (RC_ADDR(ak_platform_settings) + RC_OFF(ak_ps_refills))
 #define AK_REFILL_FRAMES 256u
 
 // The output device's I/O buffer size in frames as last applied or read back (0: not known yet). Written by

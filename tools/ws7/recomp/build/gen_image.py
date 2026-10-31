@@ -23,6 +23,8 @@ Usage: venv/bin/python -I gen_image.py IMAGE OUTDIR [options]
                     native object so the link-time optimiser does not take it to -O2)
   --prof "..."      PGO flags for every TU (-fprofile-instr-generate / -fprofile-instr-use=F)
   --prof-dep FILE   the .profdata of --prof: TUs are rebuilt when it changes
+  --target ID       the game the image is from (tools/targets/<id>; default $RC_TARGET, else
+                    mac-x64): picks the front end and checks the image against target.toml
 
 Output in OUTDIR: decls.h, part_<firstaddr>.c, table.c, manifest.json, build.ninja.
 TU files are rewritten only when their content changes.
@@ -187,6 +189,29 @@ def write_ninja(args, outdir, chunks):
     write_if_changed(os.path.join(outdir, "build.ninja"), "\n".join(L) + "\n")
 
 
+def check_target(tid, image):
+    """The target's front end must be this translator's; warn when the image is not the one its tables are for."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "targets"))
+    import hashlib
+    import targets
+    try:
+        t = targets.Target(tid)
+    except targets.TargetError as e:
+        sys.exit("gen_image.py: %s" % e)
+    fe = t.info.get("front_end")
+    if fe != "x86-64-macho":
+        sys.exit("gen_image.py: target %s needs the %s front end, which is not implemented" % (tid, fe))
+    want = t.info.get("image_sha256")
+    if want:
+        h = hashlib.sha256()
+        with open(image, "rb") as f:
+            for blk in iter(lambda: f.read(1 << 20), b""):
+                h.update(blk)
+        if h.hexdigest() != want:
+            print("gen_image.py: warning: %s is not the image target %s was made for (SHA-256 %s, expected %s)"
+                  % (image, tid, h.hexdigest(), want), file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
@@ -204,7 +229,10 @@ def main():
     ap.add_argument("--prof", default="")
     ap.add_argument("--prof-dep")
     ap.add_argument("--batch", type=int, default=48)
+    ap.add_argument("--target", default=os.environ.get("RC_TARGET") or "mac-x64")
     args = ap.parse_args()
+    check_target(args.target, args.image)
+    os.environ["RC_TARGET"] = args.target  # the translator's own tables (xlat/relaxed.py), in the workers too
     os.makedirs(args.outdir, exist_ok=True)
     t0 = time.time()
     from xlat.core import Translator

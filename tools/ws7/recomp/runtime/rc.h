@@ -21,6 +21,17 @@
 // structs holding one keep their layout.
 typedef uint64_t rc_v128 __attribute__((vector_size(16), aligned(8)));
 
+#ifdef RC_GUEST32
+// 32-bit guests (xlat/x86_32.py, runtime/rc32_x87.h): the x87 stack as doubles, its control and
+// status words, the MMX registers (kept apart from the x87 ones, see rc32_x87.h).
+typedef struct {
+  double st[8];     // physical registers; ST(i) is st[(top + i) & 7]
+  uint64_t mm[8];
+  uint16_t cw, sw;  // sw: C0..C3 and the exception bits; TOP is kept in top
+  uint8_t top, tag; // tag: bit k set = physical register k empty
+} rc_fpu;
+#endif
+
 typedef struct rc_ctx {
   uint64_t r[16];  // rax rcx rdx rbx rsp rbp rsi rdi r8..r15 (x86 encoding order)
   rc_v128 x[16];
@@ -29,6 +40,11 @@ typedef struct rc_ctx {
   // call, ~0 if none. A thunk whose frame is at or below it can skip rc_unwind_sync (rc_call.h,
   // rc_unwind_guard); kept by runtime/rc_thread.c and rc_setjmp.c.
   uint64_t cg_fp;
+#ifdef RC_GUEST32
+  rc_fpu fpu;
+  uint32_t fs;     // guest address of the thread's TEB (the FS segment base)
+  uint32_t ret_to; // the return address the last guest `ret` popped (rc32_gen.h)
+#endif
 } rc_ctx;
 
 typedef void (*rc_fn)(rc_ctx *);

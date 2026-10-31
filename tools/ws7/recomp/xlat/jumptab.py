@@ -57,6 +57,8 @@ class _Fn:
 
 
 class JumpTableMixin:
+    M32 = False    # xlat/x86_32.py: also the 32-bit forms
+    LOOPS = ()
     # --- public entry -------------------------------------------------------
     def jump_table(self, path, jmp, entry):
         """Targets of the switch-style indirect `jmp` at jmp.address, or None."""
@@ -102,9 +104,9 @@ class JumpTableMixin:
                 fn.insns[a] = i
                 m = i.mnemonic
                 nxt = a + i.size
-                if m in ("ret", "ud2", "hlt"):
+                if m in self.STOP:
                     break
-                if x86.X86_GRP_JUMP in i.groups:
+                if x86.X86_GRP_JUMP in i.groups or m in self.LOOPS:
                     op = i.operands[0]
                     if op.type != x86.X86_OP_IMM:
                         if m == "jmp":
@@ -414,6 +416,11 @@ class JumpTableMixin:
                 if mb:
                     new.add((self._jt_canon(i, ops[1].mem.index), 0, None))
                     lvl = (mb[1], ops[1].size)
+            elif self.M32 and m == "movzx" and ops[1].type == x86.X86_OP_MEM and ops[1].mem.base and \
+                    not ops[1].mem.index and not ops[1].mem.segment and off == 0 and lvl is None and \
+                    ops[1].size in (1, 2):    # movzx I2, byte [I + T1]: the absolute byte table of MSVC
+                new.add((self._jt_canon(i, ops[1].mem.base), 0, None))
+                lvl = (ops[1].mem.disp & 0xffffffff, ops[1].size)
         if not new:
             return None
         fd = [(f[0], f[1], f[2]) for f in facts]

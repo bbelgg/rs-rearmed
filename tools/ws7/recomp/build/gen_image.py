@@ -50,10 +50,11 @@ SYM_RE = re.compile(r"\b([FI]_[0-9a-f]+)\(c\)")
 _tr = None
 
 
-def _init(img):
+def _init(img, noret):
     global _tr
     from xlat.core import Translator
     _tr = Translator(img)
+    _tr.set_noreturn_table(noret)
 
 
 def _work(batch):
@@ -239,6 +240,11 @@ def main():
     tr = Translator(args.image)
     lo_t, hi_t = tr.text_lo, tr.text_hi
     starts = sorted(f for f in tr.img.fstarts if lo_t <= f < hi_t)
+    # Which calls never return, decided once here: answered by each worker as it goes, the answers on
+    # recursion cycles would depend on the order the batches reach the workers (nondeterministic output).
+    noret = tr.noreturn_table()
+    print("  no-return analysis: %d of %d functions, %.0fs" % (sum(noret.values()), len(noret), time.time() - t0),
+          file=sys.stderr)
     if args.only:
         lo, hi = (int(x, 16) for x in args.only.split("-"))
         starts = [f for f in starts if lo <= f < hi]
@@ -270,7 +276,7 @@ def main():
         status[a] = [st, reason, n, None]
         callees.update(cs)
 
-    with mp.Pool(args.jobs, _init, (args.image,)) as pool:
+    with mp.Pool(args.jobs, _init, (args.image, noret)) as pool:
         done = 0
         for res in pool.imap(_work, batches):
             for a, st, reason, n, text, cs in res:

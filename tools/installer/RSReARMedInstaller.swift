@@ -426,8 +426,13 @@ enum Steps {
         }
         r.appendLog("  ✓ Apple Silicon")
 
-        try await require("xcode-select", name: "Xcode CLI tools", hint: "run: xcode-select --install")
-        try await r.shell("xcode-select -p")
+        // /usr/bin/xcode-select is on every Mac; -p fails (status 2) until the tools are installed.
+        do {
+            try await r.shell("xcode-select -p")
+            r.appendLog("  ✓ Xcode CLI tools")
+        } catch {
+            throw InstallerError.missingPrerequisite("Xcode CLI tools — run: xcode-select --install")
+        }
 
         try await require("cmake", name: "CMake", hint: "run: brew install cmake")
         try await require("ninja", name: "Ninja", hint: "run: brew install ninja")

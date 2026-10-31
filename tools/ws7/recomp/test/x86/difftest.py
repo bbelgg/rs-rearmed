@@ -35,6 +35,7 @@ sys.path.insert(0, RECOMP)
 
 from capstone import x86  # noqa: E402
 
+POINTER_REGS = ()      # register indices a caller wants pointed at scratch (test.x86.handcases)
 STACK_LO, STACK_HI = 0x00100000, 0x00120000
 SCRATCH_LO, SCRATCH_HI = 0x00200000, 0x00210000
 TEB = 0x00300000
@@ -45,7 +46,8 @@ FS_SEL = 0x08
 WIRE_FPU = struct.Struct("<8d8QHHBB2x")
 RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_teb.c", "rc32_seh.c"]
 TRANSCENDENTAL = {(0xd9, 0xf0), (0xd9, 0xf1), (0xd9, 0xf2), (0xd9, 0xf3), (0xd9, 0xf9), (0xd9, 0xfb),
-                  (0xd9, 0xfe), (0xd9, 0xff), (0xd9, 0xfd), (0xd9, 0xf5), (0xd9, 0xf8)}
+                  (0xd9, 0xfe), (0xd9, 0xff), (0xd9, 0xfd), (0xd9, 0xf5), (0xd9, 0xf8),
+                  (0xd9, 0xf4), (0xd8, 0xf8), (0xdc, 0xf8), (0xde, 0xf8)}  # fxtract, fprem(1)/fdiv NaN payloads
 
 
 # --- x87 values: double <-> 80-bit (mantissa, exponent) as Unicorn wants them ----------------
@@ -176,6 +178,8 @@ class Unicorn:
                 u.hook_add(UC_HOOK_CODE, self._pushf_post, begin=nxt, end=nxt)
             elif kind == "ref_x87":    # an operand QEMU 5 handles unlike hardware
                 u.hook_add(UC_HOOK_CODE, self._ref_x87, begin=a, end=a)
+            elif kind == "fprem":      # a partial reduction (C2=1): the step size is QEMU's own
+                u.hook_add(UC_HOOK_CODE, self._fprem_post, begin=nxt, end=nxt)
             elif kind == "rdtsc":
                 u.hook_add(UC_HOOK_CODE, self._rdtsc_post, begin=nxt, end=nxt)
         self._leaf = {}
@@ -236,6 +240,10 @@ class Unicorn:
         v = from80(uc.reg_read(X.UC_X86_REG_FP0 + top))
         op = bytes(uc.mem_read(addr, 2))
         if (op == b"\xd9\xf1" and not v > 0) or (op == b"\xd9\xf9" and not v + 1.0 > 0) or (op == b"\xd9\xfa" and v < 0):
+            self.ref_limit = True
+
+    def _fprem_post(self, uc, addr, size, ud):
+        if uc.reg_read(self.X.UC_X86_REG_FPSW) & 0x400:   # C2: reduction incomplete
             self.ref_limit = True
 
     def _mxcsr(self, uc, addr, size, ud):
@@ -395,6 +403,8 @@ def make_case(func, seed, ld, mmx):
     regs = [word() for _ in range(8)]
     regs[4] = esp
     regs[5] = R.choice([esp + 0x40, word()])
+    for ix in POINTER_REGS:        # hand snippets take scratch pointers here (ecx/edx = 1/2)
+        regs[ix] = SCRATCH_LO + 0x40 + (R.randrange(0, 0x400) & ~7)
     top = R.randrange(8)
     nvalid = R.randrange(0, 5)
     tag = 0xff
@@ -464,15 +474,42 @@ def compare(case, c, u, tol):
             for k in range(8):
                 if not (cf["tag"] >> k & 1) and not feq(cf["st"][k], uf["st"][k], tol):
                     d.append("st phys%d %r/%r" % (k, cf["st"][k], uf["st"][k]))
-    if (cf["sw"] ^ uf["sw"]) & 0x4500:
+    # C0 C2 C3 are defined only by a compare (fcom/fucom/ftst/fxam/ficom); x87 arithmetic and
+    # fprem/trig leave them undefined or implementation-specific, so compare only for a compare
+    if case.get("cc") and (cf["sw"] ^ uf["sw"]) & 0x4500:
         d.append("fpu C3C2C0 %04x/%04x" % (cf["sw"] & 0x4500, uf["sw"] & 0x4500))
     if cf["cw"] != uf["cw"]:
         d.append("fpu cw %04x/%04x" % (cf["cw"], uf["cw"]))
     skip = (u["regs"][4], u["regs"][4] + 4) if adj else (0, 0)
+    # Below the final esp is unallocated stack: x86 EFLAGS is live across a call, but the
+    # translator models the arithmetic flags as function-local (as the 64-bit build does, which
+    # is exact for compiler-generated code), so a `pushfd` inside a callee spills a different
+    # flags image to this scratch. Nothing reads it; a live stack slot is at or above esp.
+    dead_below = min(c["regs"][4], u["regs"][4])
     for (a, n), cb, ub in zip(case["dump"], c["dump"], u["dump"]):
         if cb == ub:
             continue
-        diffs = [a + k for k in range(n) if cb[k] != ub[k] and not skip[0] <= a + k < skip[1]]
+        on_stack = STACK_LO <= a < STACK_HI
+        diffs = [a + k for k in range(n) if cb[k] != ub[k] and not skip[0] <= a + k < skip[1]
+                 and not (on_stack and a + k < dead_below)]
+        if diffs and (tol or case.get("x87")):
+            # a float-result function: a differing 8-byte-aligned slot that both sides read as
+            # NaN, or (same sign) as inf vs finite, is an x87 NaN-payload / exponent-range
+            # difference; with tol, a near-equal pair is a rounding difference
+            def fuzzy(off):
+                o = off & ~7
+                if o + 8 > n:
+                    return False
+                x = struct.unpack_from("<d", cb, o)[0]
+                y = struct.unpack_from("<d", ub, o)[0]
+                if x != x and y != y:
+                    return True
+                # one side inf, the other finite same-sign: the x87 80-bit exponent range the
+                # model computes as a 64-bit double does not have (runtime/rc32_x87.h)
+                if math.isinf(x) != math.isinf(y) and (x >= 0) == (y >= 0):
+                    return True
+                return feq(x, y, tol)
+            diffs = [p for p in diffs if not fuzzy(p - a)]
         if diffs:
             d.append("mem %d bytes from %08x (%02x/%02x)" % (len(diffs), diffs[0], cb[diffs[0] - a], ub[diffs[0] - a]))
     return d
@@ -500,7 +537,7 @@ def hook_points(tr, funcs):
     """Addresses where Unicorn's state is aligned with the runtime's model before or after the
     instruction: status-word stores (exception bits), stmxcsr, cpuid, rdtsc. Also which
     functions use MMX and which use transcendental x87 instructions."""
-    pts, mmx, trans = set(), set(), set()
+    pts, mmx, trans, ccset, x87set = set(), set(), set(), set(), set()
     for f in funcs:
         try:
             tr.entry = f
@@ -522,6 +559,8 @@ def hook_points(tr, funcs):
                     trans.add(f)
                 if oc in ((0xd9, 0xf1), (0xd9, 0xf9), (0xd9, 0xfa)):
                     pts.add((a, "ref_x87", nxt))
+                if oc in ((0xd9, 0xf8), (0xd9, 0xf5)):    # fprem, fprem1
+                    pts.add((a, "fprem", nxt))
             if m in ("mov", "push") and any(o.type == x86.X86_OP_REG and i.reg_name(o.reg) in
                                             ("cs", "ds", "es", "ss", "fs", "gs") for o in i.operands[-1:]):
                 pts.add((a, "sreg", nxt))
@@ -535,7 +574,11 @@ def hook_points(tr, funcs):
                 pts.add((a, "rdtsc", nxt))
             if any(o.type == x86.X86_OP_REG and i.reg_name(o.reg).startswith("mm") for o in i.operands):
                 mmx.add(f)
-    return sorted(pts), mmx, trans
+            if m.startswith(("fcom", "fucom", "ftst", "fxam", "ficom")):
+                ccset.add(f)
+            if oc:
+                x87set.add(f)
+    return sorted(pts), mmx, trans, ccset, x87set
 
 
 def debug_case(image, args):
@@ -551,7 +594,7 @@ def debug_case(image, args):
     f, k = int(f, 16), int(k)
     tr = Translator32(image)
     ok = sorted(int(a, 16) for a, v in man["per_function"].items() if v[0] == "ok")
-    pts, mmx, trans = hook_points(tr, ok)
+    pts, mmx, trans, ccset, x87set = hook_points(tr, ok)
     os.environ["RC32_RUNNER_VERBOSE"] = "1"
     errpath = os.path.join(out, "debug.stderr")
     with open(errpath, "w") as err:
@@ -567,6 +610,8 @@ def debug_case(image, args):
         uc.u.hook_add(UC_HOOK_CODE, lambda u_, a, s_, d: utrace.append(a) if a in fset else None)
         case = make_case(f, (f << 8) | k, ld, f in mmx)
         case["mmx_used"] = f in mmx
+        case["cc"] = f in ccset
+        case["x87"] = f in x87set
         case["stubs"] = {int(a, 16) for a, v in man["per_function"].items() if v[0] == "stub"}
         c = runner.run(case)
         u = uc.run(case, args.limit)
@@ -599,7 +644,7 @@ def run_image(image, args):
         funcs = [int(a, 16) for a in args.only.split(",")]
     elif args.sample and args.sample < len(ok):
         funcs = sorted(random.Random(1).sample(ok, args.sample))
-    pts, mmx, trans = hook_points(tr, ok)
+    pts, mmx, trans, ccset, x87set = hook_points(tr, ok)
     stubs = {int(a, 16) for a, v in man["per_function"].items() if v[0] == "stub"}
     runner = Runner(exe, image)
     ld = Loaded(tr.img, runner.imp_area)
@@ -612,6 +657,8 @@ def run_image(image, args):
         for k in range(args.cases):
             case = make_case(f, (f << 8) | k, ld, f in mmx)
             case["mmx_used"] = f in mmx
+            case["cc"] = f in ccset
+            case["x87"] = f in x87set
             c = runner.run(case)
             u = uc.run(case, args.limit)
             case["stubs"] = stubs

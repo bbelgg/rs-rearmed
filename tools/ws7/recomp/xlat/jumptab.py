@@ -341,8 +341,9 @@ class JumpTableMixin:
         if dslot:
             wr = wr | {dslot}                       # store to a stack slot
         if cond is not None and sets_flags:
-            if m == "cmp" and ops[0].type == x86.X86_OP_REG:
-                r = self._jt_canon(i, ops[0].reg)
+            cmp_slot = self._jt_slot(i, ops[0]) if m == "cmp" else None
+            if m == "cmp" and (ops[0].type == x86.X86_OP_REG or cmp_slot):
+                r = cmp_slot or self._jt_canon(i, ops[0].reg)
                 lim = None
                 if ops[1].type == x86.X86_OP_IMM:
                     lim = ops[1].imm & ((1 << (8 * ops[0].size)) - 1)

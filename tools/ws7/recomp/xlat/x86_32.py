@@ -351,13 +351,15 @@ class Translator32(X87Mixin, core.Translator):
                        % tuple(ld(k) for k in (0, 1, 2, 4, 5, 6, 7)))
             return True
         if m in ("pushfd", "pushf"):
-            out.append("{ uint32_t f = (uint32_t)rc_flags_pack(cf, pf, zf, sf, of) | ((uint32_t)df << 10); %s }"
+            # the modelled flags, plus every other EFLAGS bit the code last wrote with popfd
+            # (eflags_other): notably the ID flag (bit 21), toggled to test for cpuid.
+            out.append("{ uint32_t f = (uint32_t)rc_flags_pack(cf, pf, zf, sf, of) | ((uint32_t)df << 10) | eflags_other; %s }"
                        % self.push4("f"))
             return True
         if m in ("popfd", "popf"):
             out.append("{ uint32_t f = RC_LDS(uint32_t, RC_M(rsp)); rsp = (uint32_t)(rsp + 4); "
                        "cf = f & 1; pf = (f >> 2) & 1; zf = (f >> 6) & 1; sf = (f >> 7) & 1; df = (f >> 10) & 1; "
-                       "of = (f >> 11) & 1; }")
+                       "of = (f >> 11) & 1; eflags_other = f & 0x3ff138u; }")   # 0x3ff138: EFLAGS less modelled/pack bits
             return True
         if m == "std":
             out.append("df = 1;")
@@ -510,7 +512,8 @@ class Translator32(X87Mixin, core.Translator):
         self.entry = entry
         lines = core.Translator.function(self, entry, name)
         k = next(n for n, s in enumerate(lines) if s.startswith("  (void)zf;"))
-        extra = ["  uint8_t df = 0; (void)df;"]
+        extra = ["  uint8_t df = 0; (void)df;",
+                 "  uint32_t eflags_other = 0; (void)eflags_other;  // EFLAGS bits outside cf/pf/zf/sf/of/df"]
         if self.has_resume:
             ips = self.resume_ips
             extra += ["  static const uint32_t resume_ips[] = {%s};" % ", ".join("0x%xu" % a for a in ips),

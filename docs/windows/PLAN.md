@@ -72,6 +72,8 @@ tells the game (2026-11-04).
 Rocksmith 1 DLC songs: `RS_STEAM_OWNED` reaches the face as on the Mac and `test_steam32` covers it, but no game run
 yet: the test account owns none of those DLC. Open: one run with an account that does, or with the variable set.
 
+Auto Save warning: not skipped here yet, as on the Mac (`RS_MODS_AUTOSAVE`); the notice still shows after
+profile select. Open: match the Windows UI event handler and its dialog timer, then the same pre hook runs here.
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
 Mods and hook points (2026-11-05): the 14 hook points of 1.5.1 (the 15th since, `si_io`, is the Mac game's CoreAudio input and has no counterpart), the overlay API, the `mods/` folder and one mod ABI
@@ -229,6 +231,8 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-160):
 
 - The 30 symbols not proved (the Wwise plug-in DSP, small efd helpers): they have candidates in the map, and a wrong address would be
   worse than the gap.
+- The Auto Save warning skip: the Mac pre hook needs the Windows UI event handler matched first; with the shared RSMods
+  library the same hook would then run on both.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** multiplayer with any input, as in the [Mac plan](../mac/PLAN.md#next-work).

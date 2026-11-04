@@ -132,6 +132,11 @@ user's, with a test profile.
   `RS_MODS_LOG=1` logs `intro: skipped`. Checked 2026-11-03 with the test harness's title reference: 4
   boots with the original cache (one scripted on to the main menu and 60 s of a song) and 3 with a
   fast-load one reached the title, and 6 more with a test build of the same logic.
+- **Auto Save warning** (`RS_MODS_AUTOSAVE`): with a profile in the test install, Return on the title once
+  it takes keys, Return on the profile list. With the skip the main menu comes up with no warning dialog;
+  `RS_MODS_LOG=1` logs `auto save warning skipped`. With `RS_MODS_AUTOSAVE=0` the RS2AutosaveWarning dialog
+  appears after profile select instead. Checked 2026-11-05: profile select reaches the main menu with no
+  dialog, and the dialog returns with the switch off.
 - **Direct Connect overlay**: with the original `cache.psarc` (not one that has the entries already, or the
   overlay changes nothing) and `game/Update/patcharchives.psarc` made by `cache_overlay.py`, the INPUT
   setting (in My Path, `ui_menu_pillar_mission`) offers DIRECT CONNECT as a fourth value, and choosing it

@@ -18,3 +18,4 @@ si_io               # SoundInput I/O (this, uint32 device, const AudioBufferList
 boot_intro_update   # RSBootService intro tick (this) -> bool still loading: the start-up intro movie; mods.c skips it
 steam_dlc_owned     # (Steam wrapper, int app id) -> bool: the game's DLC list has the AppID, installed; mods.c (songs added while the game runs)
 frontend_open_file  # FrontEnd_OpenFile(DataStream **out, const char *path): opens a game file through the VFS; mods.c (cache overlay)
+autosave_warning    # UI event handler (menu, category, event): shows the Auto Save warning dialog; mods.c skips it

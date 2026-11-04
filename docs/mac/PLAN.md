@@ -43,6 +43,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   game's bars are its own code, which the Mac game does not have.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen
   ([METAL.md](METAL.md#status) lists what the 1.3.0 release check covered).
+- **Auto Save warning skipped** (Mac only so far): after profile select the game goes straight on without the
+  autosave warning dialog (`RS_MODS_AUTOSAVE`). Learn & Play still shows it ([Windows plan](../windows/PLAN.md#next-work)).
 
 ## Open issues
 

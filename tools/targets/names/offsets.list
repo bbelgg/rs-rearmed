@@ -34,6 +34,9 @@ json_number_refs          # number object: int32 refcount
 json_number_value         # number object: double value
 json_number_add_ref_slot  # number object vtable: AddRef
 json_number_release_slot  # number object vtable: Release
+autosave_menu             # UI event handler: created-dialog slot (+0x418)
+autosave_timer            # UI event handler: state-machine timer double (+0x428)
+autosave_query_slot       # sign-in query object vtable: the dialog predicate
 
 # audio (overrides/src/audio_*.c)
 ak_ps_refills    # AkPlatformInitSettings: u16 uNumRefillsInVoice

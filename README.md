@@ -67,6 +67,7 @@ port.
 | "Re-ARMed" title logo | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, Uplay screens skipped | ✅ | ✅ |
 | No intro screens (`RS_MODS_INTRO=0` plays them) | ✅ | ✅ |
+| Skip the Auto Save warning dialog after profile select (`RS_MODS_AUTOSAVE=0` shows it) | ✅ | ❌ |
 | Your Steam profiles copied in once | ✅ | ✅ |
 | Audio output, backing track in time | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
@@ -130,6 +131,7 @@ These are compiled into the Mac app. Learn & Play has those marked "Both edition
 | **Direct Connect choice**: DIRECT CONNECT (any audio interface) in the INPUT setting (My Path) and on the cable screen. The game supports it but its menus leave it out; the installer adds it in a small overlay made from your own `cache.psarc`, which stays as it is, so a modded cache still works. Both editions | on | `RS_MODS_OVERLAY=0` reads `cache.psarc` alone |
 | **Enumerate**: the main menu's SHOP, which can't work offline, is ENUMERATE: add a song to Steam's `dlc` folder (or the copy's), press it, and the song is in the list, with no restart. Changed and removed songs still need **Refresh Game Files**. Does what [RSMods](https://github.com/Lovrom8/RSMods)' menu entry does. Both editions | on | `RS_MODS_OVERLAY=0`: SHOP, as in the game, and no scan |
 | **Uplay sign-in prompt skipped**: Enter on the title screen goes straight to the profile list, without the "Uplay account" dialogs | on | none |
+| **Auto Save warning skipped**: the autosave warning dialog after profile select never appears, and the state machine continues at once instead of waiting | on | `RS_MODS_AUTOSAVE=0` shows the warning again |
 | **Offline Steam layer**: a replacement `libsteam_api` that works without the Steam client, with its cloud saves in a local folder | on | none |
 | **Song ownership**: the game lists a song only when Steam reports its AppID as owned. The offline Steam layer reports the base game, your DLC and the AppID of every archive in the copy's `dlc/`, so custom songs show up whatever AppID they carry. The Rocksmith 1 songs you bought show up too: a copy or refresh asks Steam which you own, with your account logged in. Both editions | on | `RS_STEAM_DLC=all` reports every AppID as owned; a list of AppIDs reports only those |
 | **"Re-ARMed" title logo**: a tag over the title-screen logo, built automatically from your own `static.psarc` by `tools/loadscreen`. Both editions | on | `RS_REARMED=0` shows the original logo; or delete `static.psarc.rearmed` |

@@ -103,3 +103,6 @@ ni_camera_frustum                 0x114   # NiCamera::SetViewFrustum 0x1557f20
 ni_camera_far                     0x128   # 0x1557f9e
 song_search_key                   0x38    # left Shift: the list's own label, SEARCH [SHIFT]
 song_search_key2                  0x3c    # right Shift: the same virtual key to the game (win32_input.c)
+autosave_menu                           unsupported  not yet matched
+autosave_timer                          unsupported  not yet matched
+autosave_query_slot                     unsupported  not yet matched

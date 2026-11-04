@@ -337,6 +337,7 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
+| `RS_MODS_AUTOSAVE=0` | — | no effect in this edition: Learn & Play still shows the Auto Save warning after profile select; the Mac build skips it |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
 | `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, and SHOP instead of ENUMERATE ([Game files](#game-files)) |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |

@@ -24,6 +24,8 @@ efd_alloc                # efd allocator
 json_number_base_ctor    # number object base constructor
 json_number_base_dtor    # number object base destructor
 sng_load_verify_ret      # SNG loader: return address of its DSA verify call
+autosave_signin_query    # object answering the sign-in predicate gating the Auto Save dialog
+autosave_query_arg       # int argument (1) of that predicate
 
 # audio (overrides/src/audio_*.c)
 ak_platform_settings   # Wwise's AkPlatformInitSettings copy

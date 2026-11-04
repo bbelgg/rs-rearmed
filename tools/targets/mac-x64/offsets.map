@@ -29,6 +29,9 @@ json_number_refs                  0x8     # number object: int32 refcount
 json_number_value                 0x10    # number object: double value
 json_number_add_ref_slot          0x0     # number object vtable: AddRef
 json_number_release_slot          0x1     # number object vtable: Release
+autosave_menu                     0x418   # UI event handler: created-dialog slot
+autosave_timer                    0x428   # UI event handler: state-machine timer double
+autosave_query_slot               0x1f    # sign-in query object vtable: the dialog predicate
 ak_ps_refills                     0x54    # AkPlatformInitSettings: u16 uNumRefillsInVoice
 ak_sink_refills                   0x94    # CoreAudio sink: u32 ring refill count
 ak_sink_ring                      0x28    # CoreAudio sink: ring buffer pointer

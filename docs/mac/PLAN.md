@@ -59,6 +59,16 @@ how each works is in [DESIGN.md](DESIGN.md#built-in-fixes-and-mods):
   counterpart here.
 - **Title logo, open-file limit, song path cache and number-table hash**: unchanged here, and now in Learn & Play too.
 
+## Fixed in 1.4.1
+
+A patch release of what was found after 1.4.0, the same in the [Windows plan](../windows/PLAN.md#fixed-in-141):
+
+- **Rocksmith 1 DLC songs** show for the account that owns them (`RS_STEAM_OWNED`, from a copy or refresh with that
+  account logged in to Steam).
+- **Guitar on an interface also used for output**: a device with inputs keeps a 128-frame buffer, so a sink rebuilt
+  after the input opens can't leave the guitar with half of each buffer.
+- **Installer**: closing its window quits without a crash.
+
 ## Next work
 
 Being looked into, with no promise of if or when:

@@ -162,6 +162,17 @@ together in one build ([TESTING.md](TESTING.md#unattended-runs)); how each works
 - **No intro screens**: skipped in code, with no game asset changed; `RS_MODS_INTRO=0` plays them. Once in eight runs
   a notice "The Ubisoft servers are not available" came up over the main menu; Return closes it.
 
+## Fixed in 1.4.1
+
+A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac/PLAN.md#fixed-in-141) where it applies:
+
+- **Rocksmith 1 DLC songs** show for the account that owns them (`RS_STEAM_OWNED`). Covered by `test_steam32`; no game
+  run, as the test account owns none of them.
+- **Screen saver and display sleep** stay off while the game is open, as on the Mac.
+- **Audio buffer**: a device with inputs keeps a 128-frame buffer. Capture here takes any size, so this only stops the
+  render buffer depending on the opening order.
+- **Installer**: closing its window quits without a crash.
+
 ## Next work
 
 **Parity (P4):**

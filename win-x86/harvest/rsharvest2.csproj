@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- 32-bit console harvester for Rocksmith2014.exe (a 32-bit process). Targets .NET Framework
+       4.8 (inbox on Windows 10/11, so the built exe needs no runtime install) and builds
+       cross-platform via the reference-assemblies package (e.g. `dotnet publish` on macOS). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <PlatformTarget>x86</PlatformTarget>
+    <AssemblyName>rsharvest2</AssemblyName>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <LangVersion>latest</LangVersion>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <!-- Reproducible: no PDB and no debug directory, so the exe holds no build path and is the same
+         byte for byte wherever it is built (build.sh prints its SHA-256; README.md has the expected one). -->
+    <Deterministic>true</Deterministic>
+    <DebugType>none</DebugType>
+    <DebugSymbols>false</DebugSymbols>
+    <PathMap>$(MSBuildProjectDirectory)=/src</PathMap>
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+    <!-- No git commit hash in the version, so a build does not depend on the checkout. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <EnableSourceLink>false</EnableSourceLink>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+  </ItemGroup>
+</Project>

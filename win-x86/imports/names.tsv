@@ -1,0 +1,36 @@
+# Curated import names for the Learn & Play IAT (lp_iat.py reads this).
+# KEY (slot or wrapper site, hex)	NAME (dll!name for wrappers)	CONFIDENCE	EVIDENCE
+0x010b7068	InterlockedIncrement	high	push &refcount, result unused; padlen 20
+0x010b706c	InterlockedDecrement	high	push &refcount; test eax; destroy on zero; padlen 20
+0x010b7074	DeleteCriticalSection	high	destructor, after CloseHandle; entry fits 24 bytes (21)
+0x010b7078	GetCurrentThreadId	high	no args, stored as lock owner after EnterCriticalSection; padlen 18
+0x010b707c	EnterCriticalSection	high	push &cs, paired with 0x10b7080; padlen 20
+0x010b7080	LeaveCriticalSection	high	push &cs, after the guarded block; padlen 20
+0x010b7084	Sleep	high	push seconds*1000; CRT startup lock spin uses Sleep(1000)
+0x010b708c	CloseHandle	high	push handle in destructors
+0x010b7090	ReleaseSemaphore	high	(h, 1, NULL); padlen 16
+0x010b7094	WaitForSingleObject	high	(h, INFINITE); test eax
+0x010b70a0	InterlockedExchangeAdd	high	(p, -1); dec eax on result; padlen 22
+0x010b7124	GetProcAddress	high	(module, "IsWow64Process"); padlen 14
+0x010b7154	QueryPerformanceCounter	high	push &li; fild qword [li]
+0x010b717c	SetLastError	medium	push 0; padlen 12
+0x010b71b4	WaitForMultipleObjects	high	(2, handles, FALSE, 5000); cmp 0x102; padlen 22
+0x010b71ec	GetTickCount	high	cookie init mix; elapsed ms vs 1000; padlen 12
+0x010b72dc	??0exception@std@@QAE@ABV01@@Z	high	copy ctor then vtable store; padlen 30
+0x010b72e0	malloc	high	push size, pointer result; padlen 6
+0x010b72e4	free	high	push ptr; add esp,4; padlen 4
+0x010b72f4	rand	high	no args, int result to fild; padlen 4
+0x010b72fc	fprintf	high	(__iob_func()+0x40, fmt, ...)
+0x010b7300	__iob_func	high	result+0x40 = stderr, +0x20 = stdout; padlen 10
+0x010b7308	??_U@YAPAXI@Z	medium	push size, odd name length (13) under padlen 40
+0x010b730c	??_V@YAXPAX@Z	medium	push ptr; add esp,4; odd length (13) under padlen 24
+0x010b7320	strchr	high	(str, ':' or ';'); padlen 6
+0x010b7344	tolower	medium	path char after '\\'->'/'; odd length under padlen 26
+0x010b736c	sscanf	high	(s, "%d.%d.%d.%d", ...); cmp eax,4
+0x010b7460	strncmp	medium	3 args, test eax; odd length under padlen 8
+0x010b749c	fputs	high	(str, stdout)
+0x010b755c	_snprintf	medium	(buf, size, "%s%s%s", ...)
+0x010b75ec	??3@YAXPAX@Z	high	353 calls, push ptr; padlen 12
+0x010b7644	??2@YAPAXI@Z	medium	320 calls, push size; pairs with operator delete (padlen 4 conflicts)
+0x010b775c	DefWindowProcW	medium	(hwnd, msg, wp, lp), msg 0x281; padlen 14 (A or W)
+0x010b7784	timeGetTime	medium	no args, ms counter (winmm group)

@@ -1,0 +1,45 @@
+# Guest functions (image VAs = RVA + 0xf80000, the game's base; the generated F_<addr> and rc32_table
+# are named by image VA, e.g. the entry F_1adb8f4) that an override module defines F_<addr> for, so
+# gen_image_pe.py drops them from translation and the hand-written native function takes their place
+# (win-x86/shims/win32_overrides.c). The Windows counterpart of the Mac built-in mods
+# (tools/targets/names/overrides/mods.list).
+#
+# CDLC (RSBypass): the SNG loader's signature check (0x10d96a0; RVA 0x1596a0), which calls the DSA
+# verifier 0x19bfeb0 on a song file. Skipped as on the Mac (sng_verify): unsigned song files load;
+# the verifier's other caller keeps the real check. RS_MODS_BYPASS=0 checks again.
+10d96a0
+# CDLC: the song-key list (0x10f41c0; RVA 0x1741c0). The Learn a Song list keeps a song only when
+# the CRC-32 of its SongKey is in a table of known keys in the image; custom songs' keys are not, so
+# F_10f41c0 answers true (the Windows image only; the Mac has no such table). `wrap`: W_10f41c0
+# stays translated for RS_MODS_BYPASS=0.
+10f41c0 wrap
+# Batched DLC mounting (rsmacfixes): the DLC coordinator's per-frame update (0x1449310; RVA
+# 0x4c9310), which mounts one dlc/ archive per frame; the native one mounts several within a frame
+# budget, as the Mac dlc_update. RS_MODS_BUDGET_MS / RS_MODS_FIXES.
+1449310
+# Songs added while the game runs: the Steam wrapper's DLC ownership check (0x1448b10, the Mac steam_dlc_owned).
+# `wrap`: W_1448b10 stays translated for every caller but the install step, and for RS_MODS_BYPASS=0.
+1448b10 wrap
+# No intro screens: the RSBootService intro tick (0x1126950, the Mac boot_intro_update), stdcall
+# bool update(boot). `wrap`: still translated, as W_1126950; win32_overrides.c's F_1126950 skips the
+# intro (as the Mac mods.c does, off with RS_MODS_INTRO=0) and calls W_1126950 for the rest.
+1126950 wrap
+# Direct Connect: FrontEnd_OpenFile (0x101ba80; the Mac's 0x1003c7810), replaced by a native one that
+# opens a cacheN.7z from the installer's overlay (Update/patcharchives.psarc, which the engine mounts at
+# PatchUpdate/) before cache.psarc: the counterpart of the Mac pre hook in overrides/mods/mods.c.
+101ba80
+# Path MD5 cache (rsmacfixes): the path intern (0x141c130, the Mac path_intern; RVA 0x49c130), with the
+# Mac's wrapper path_md5 inlined into its callers. `wrap`: W_141c130 stays translated for a path not
+# cached and for RS_MODS_FIXES=0.
+141c130 wrap
+# Number-table hash (rsmacfixes): the hash of the game's table of number objects (0x1400650; RVA
+# 0x480650), its integer part, so every value in [0, 1) lands in one bucket. A function of its own
+# here (the Mac has it inlined in num_dtor, num_intern and num_rehash). `wrap`: W_1400650 stays
+# translated for RS_MODS_FIXES=0.
+1400650 wrap
+# The DLC preview's download jobs: RSRDVDownloadManager's queue functions (0x144bc80, 0x144bdb0; the Mac
+# dlc_job_preview and dlc_job_request). Offline each job fails at once, as on the Mac. Its flush
+# (0x144bbd0, dlc_worker_flush) does nothing, as on the Mac.
+144bc80
+144bdb0
+144bbd0

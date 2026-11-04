@@ -1,0 +1,4 @@
+# build output (produced by build.sh / dotnet publish)
+dist/
+bin/
+obj/

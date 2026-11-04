@@ -1,0 +1,6 @@
+# Python packages for Learn & Play's build, into the build's venv (no user action): the translator's Capstone, and
+# for the offline unpacker (win-x86/unpack/lp_unpack.py) Unicorn and pefile. Unicorn is pinned: the seed's output
+# is checked by SHA-256, and this is the version it was checked with. All have arm64 wheels for Python 3.9 and up.
+capstone>=5,<6
+unicorn==2.1.4
+pefile==2024.8.26

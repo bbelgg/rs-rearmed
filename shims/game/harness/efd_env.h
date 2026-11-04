@@ -22,13 +22,13 @@
 #ifndef EFD_ENV_H
 #define EFD_ENV_H
 
-#define RS_ORIG_EFD_INIT 0x1012e2790
-#define RS_ORIG_EFD_SHUTDOWN 0x1012e27f0
-#define RS_ORIG_EFD_LOGGER_SINGLETON 0x10193a8b0 /* -> {?, ILogger *} */
-#define RS_ORIG_EFD_STRING_TABLE 0x101939c70     /* GlobalStringTable * */
-#define RS_ORIG_EFD_STRING_COUNT 0x101939c78
-#define RS_ORIG_EFD_STRING_COLLISIONS 0x101939c80
-#define RS_ORIG_EFD_SQRT_TABLE 0x10193e6f8 /* uint32_t * */
+#define RS_ORIG_EFD_INIT RC_ADDR(efd_init)
+#define RS_ORIG_EFD_SHUTDOWN RC_ADDR(efd_shutdown)
+#define RS_ORIG_EFD_LOGGER_SINGLETON RC_ADDR(efd_logger_singleton) /* -> {?, ILogger *} */
+#define RS_ORIG_EFD_STRING_TABLE RC_ADDR(efd_string_table) /* GlobalStringTable * */
+#define RS_ORIG_EFD_STRING_COUNT RC_ADDR(efd_string_table_count)
+#define RS_ORIG_EFD_STRING_COLLISIONS RC_ADDR(efd_string_table_collisions)
+#define RS_ORIG_EFD_SQRT_TABLE RC_ADDR(efd_sqrt_table) /* uint32_t * */
 
 // Runs efd's static initializers and efd::Init. Returns the number of
 // initializers run, or -1 if one trapped.

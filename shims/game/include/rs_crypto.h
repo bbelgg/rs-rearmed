@@ -24,34 +24,31 @@ extern "C" {
 #endif
 
 // --- where the originals and their keys are (unslid image addresses) ---------
-#define RS_ORIG_RIJNDAEL_KEY_SETUP_ENC 0x100001b40
-#define RS_ORIG_RIJNDAEL_KEY_SETUP_DEC 0x100001eb0
-#define RS_ORIG_RIJNDAEL_ENCRYPT 0x100002080
-#define RS_ORIG_RIJNDAEL_DECRYPT 0x100002df0
-#define RS_ORIG_BPE_EXPAND 0x1001eaa70
-#define RS_ORIG_CRYPTOPP_AES_CTR 0x101376328
-#define RS_ORIG_CRYPTOPP_DSA_VERIFY 0x10137683d
-#define RS_ORIG_CRYPTOPP_AES_CFB 0x101376f8f
-#define RS_ORIG_PROFILE_ENCRYPT 0x100168c90 /* save: (buf, int *len) */
-#define RS_ORIG_PROFILE_LOAD 0x100168df0    /* load: (?, path, ctx, callback) */
-#define RS_ORIG_PKGCONFIG_DECRYPT 0x1002a7550
-#define RS_ORIG_SNG_LOAD 0x1001eb6a0
-#define RS_ORIG_PSARC_OPEN 0x100161780
-#define RS_ORIG_PREVIEW_DECRYPT 0x100a2aeb0
-#define RS_RANGE_LIB_CRYPTOPP 0x101343dd0ULL, 0x101383700ULL /* its 2 static initializers */
+#define RS_ORIG_RIJNDAEL_KEY_SETUP_ENC RC_ADDR(rsg_rijndael_key_setup_enc)
+#define RS_ORIG_RIJNDAEL_KEY_SETUP_DEC RC_ADDR(rsg_rijndael_key_setup_dec)
+#define RS_ORIG_RIJNDAEL_ENCRYPT RC_ADDR(rsg_rijndael_encrypt)
+#define RS_ORIG_RIJNDAEL_DECRYPT RC_ADDR(rsg_rijndael_decrypt)
+#define RS_ORIG_BPE_EXPAND RC_ADDR(rsg_bpe_expand)
+#define RS_ORIG_CRYPTOPP_AES_CTR RC_ADDR(rsg_cryptopp_aes_ctr_decrypt)
+#define RS_ORIG_CRYPTOPP_DSA_VERIFY RC_ADDR(rsg_cryptopp_dsa_sha1_verify)
+#define RS_ORIG_CRYPTOPP_AES_CFB RC_ADDR(rsg_cryptopp_aes_cfb_decrypt)
+#define RS_ORIG_PROFILE_ENCRYPT RC_ADDR(rsg_profile_encrypt) /* save: (buf, int *len) */
+#define RS_ORIG_PROFILE_LOAD RC_ADDR(profile_load) /* load: (?, path, ctx, callback) */
+#define RS_ORIG_PKGCONFIG_DECRYPT RC_ADDR(rsg_pkgconfig_decrypt)
+#define RS_RANGE_LIB_CRYPTOPP RC_ADDR(lib_cryptopp_begin), RC_ADDR(lib_cryptopp_end) /* its 2 static initializers */
 
 // Key material in the image (never copied into source, logs or golden files).
-#define RS_KEY_SNG_DSA_BLOB_LEN 0x101878508 /* u32 */
-#define RS_KEY_SNG_DSA_BLOB 0x101878510     /* BPE -> 1,680 hex chars, buffer 0x691 */
-#define RS_KEY_SNG_AES_BLOB_LEN 0x1018784b0
-#define RS_KEY_SNG_AES_BLOB 0x1018784c0 /* BPE -> 64 hex chars, buffer 0x41 */
-#define RS_KEY_PKG_DSA_BLOB_LEN 0x10187aa70
-#define RS_KEY_PKG_DSA_BLOB 0x10187aa80 /* BPE -> 1,678 hex chars, buffer 0x68f */
-#define RS_KEY_PKG_AES 0x1013ecc60      /* 32 bytes */
-#define RS_KEY_PSARC_HEX 0x1013eba80    /* 64 hex chars + NUL (the caller passes 0x41) */
-#define RS_KEY_PSARC_IV 0x10142e3d0     /* 16 bytes */
-#define RS_KEY_PROFILE 0x101877060      /* 32 bytes */
-#define RS_KEY_PREVIEW 0x1013f9a90      /* 32 bytes */
+#define RS_KEY_SNG_DSA_BLOB_LEN RC_ADDR(key_sng_dsa_blob_len) /* u32 */
+#define RS_KEY_SNG_DSA_BLOB RC_ADDR(key_sng_dsa_blob) /* BPE -> 1,680 hex chars, buffer 0x691 */
+#define RS_KEY_SNG_AES_BLOB_LEN RC_ADDR(key_sng_aes_blob_len)
+#define RS_KEY_SNG_AES_BLOB RC_ADDR(key_sng_aes_blob) /* BPE -> 64 hex chars, buffer 0x41 */
+#define RS_KEY_PKG_DSA_BLOB_LEN RC_ADDR(key_pkg_dsa_blob_len)
+#define RS_KEY_PKG_DSA_BLOB RC_ADDR(key_pkg_dsa_blob) /* BPE -> 1,678 hex chars, buffer 0x68f */
+#define RS_KEY_PKG_AES RC_ADDR(key_pkg_aes) /* 32 bytes */
+#define RS_KEY_PSARC_HEX RC_ADDR(key_psarc_hex) /* 64 hex chars + NUL (the caller passes 0x41) */
+#define RS_KEY_PSARC_IV RC_ADDR(psarc_key_iv) /* 16 bytes */
+#define RS_KEY_PROFILE RC_ADDR(key_profile) /* 32 bytes */
+#define RS_KEY_PREVIEW RC_ADDR(key_preview) /* 32 bytes */
 
 // --- rijndael-alg-fst.c v3.0 (the game's copy, 0x100001b40...) ---------------
 // Same contract: rk holds 4*(Nr+1) words (60 for 256-bit keys); the setup

@@ -13,6 +13,10 @@
 #include <mach/mach_time.h>
 #include <stdlib.h>
 
+#ifndef RSP_VERSION
+#define RSP_VERSION ""  // set by CMake from the repo's VERSION file
+#endif
+
 NSOpenGLContext *rsp_g_gl_context;
 MainController *rsp_g_main_controller;
 
@@ -195,6 +199,20 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   return kCVReturnSuccess;
 }
 
+// A display mode for updateScreenSize on the frame thread, which takes it at the start of a frame: the
+// flag goes last, so that thread cannot apply the old values and clear the request. (The original set
+// it first, and x86's store order alone did not save it.)
+static void rsp_mode_request(MainController *c, BOOL full, int w, int h) {
+  c->CurrentSetting_FullScreen = full;
+  c->CurrentSetting_Width = w;
+  c->CurrentSetting_Height = h;
+  __atomic_store_n(&c->CurrentSetting_NeedsUpdate, YES, __ATOMIC_RELEASE);
+}
+
+static BOOL rsp_mode_pending(MainController *c) {
+  return __atomic_load_n(&c->CurrentSetting_NeedsUpdate, __ATOMIC_ACQUIRE);
+}
+
 @implementation OpenGLView
 
 - (NSOpenGLContext *)openGLContext {  // 0x1001841f0
@@ -369,7 +387,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   // A mode change already waiting for the frame thread (goFullScreen / goWindow / an adopted window
   // size, all in points) is converted at the new scale when it is applied: keep it. The engine's
   // current resolution would be the stale one (the screen change comes with a new window size).
-  BOOL pending = controller && controller->CurrentSetting_NeedsUpdate;
+  BOOL pending = controller && rsp_mode_pending(controller);
   int w = rsp_screen_width(), h = rsp_screen_height();  // points, at the old scale
   rsp_set_render_scale(s);
   if (pending) {
@@ -379,10 +397,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   fprintf(stderr, "[rsp] render scale %.1f: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
           (int)lround(h * s), w, h);
   if (controller && !pending && w > 0 && h > 0) {
-    controller->CurrentSetting_Width = w;
-    controller->CurrentSetting_Height = h;
-    controller->CurrentSetting_FullScreen = rsp_is_fullscreen();
-    controller->CurrentSetting_NeedsUpdate = YES;  // applied by updateScreenSize on the frame thread
+    rsp_mode_request(controller, rsp_is_fullscreen(), w, h);
   }
 }
 
@@ -507,7 +522,9 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   if (!controller) return;
   lastInputTime = [controller renderTime];
   [controller keyDown:e];
-  unichar ch = [[e characters] characterAtIndex:0];
+  // (a dead key has no characters; the original's unchecked read ends the game with an exception)
+  NSString *chars = [e characters];
+  unichar ch = [chars length] ? [chars characterAtIndex:0] : 0;
   NSUInteger flags = [e modifierFlags];
   rsp_post_input(RSP_EV_KEYDOWN, [e keyCode], (int)rsp_pack_keydown_char(ch, flags));
 }
@@ -516,7 +533,8 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   if (!controller) return;
   lastInputTime = [controller renderTime];
   [controller keyUp:e];
-  unichar ch = [[e characters] characterAtIndex:0];
+  NSString *chars = [e characters];
+  unichar ch = [chars length] ? [chars characterAtIndex:0] : 0;
   rsp_post_input(RSP_EV_KEYUP, [e keyCode], ch);
 }
 
@@ -639,10 +657,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [openGLView setNeedsDisplay:YES];
   [w makeKeyAndOrderFront:openGLView];
   [w makeFirstResponder:openGLView];
-  CurrentSetting_NeedsUpdate = YES;
-  CurrentSetting_FullScreen = YES;
-  CurrentSetting_Width = (int)screen.width;
-  CurrentSetting_Height = (int)screen.height;
+  rsp_mode_request(self, YES, (int)screen.width, (int)screen.height);
 }
 
 - (void)goWindow {  // 0x1001855a0
@@ -656,10 +671,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
   [openGLView setFrame:NSMakeRect(0, 0, 1280.0, 720.0)];
   [w setContentAspectRatio:NSMakeSize(1280.0, 720.0)];
   NSRect b = openGLView ? [openGLView bounds] : NSZeroRect;
-  CurrentSetting_NeedsUpdate = YES;
-  CurrentSetting_FullScreen = NO;
-  CurrentSetting_Width = (int)b.size.width;
-  CurrentSetting_Height = (int)b.size.height;
+  rsp_mode_request(self, NO, (int)b.size.width, (int)b.size.height);
 }
 
 - (void)awakeFromNib {  // 0x100185760
@@ -739,7 +751,8 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 }
 
 - (void)keyDown:(NSEvent *)e {  // 0x100185a80
-  unichar ch = [[e charactersIgnoringModifiers] characterAtIndex:0];
+  NSString *chars = [e charactersIgnoringModifiers];
+  unichar ch = [chars length] ? [chars characterAtIndex:0] : 0;
   if (rsp_is_fullscreen_toggle(ch, [e modifierFlags])) {
     BOOL was = CurrentSetting_FullScreen;
     CurrentSetting_FullScreen = !was;
@@ -783,10 +796,7 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
       [openGLView setNeedsDisplay:YES];
       [w makeFirstResponder:openGLView];
       [w makeKeyAndOrderFront:openGLView];
-      CurrentSetting_NeedsUpdate = YES;
-      CurrentSetting_FullScreen = NO;
-      CurrentSetting_Width = (int)c.size.width;
-      CurrentSetting_Height = (int)c.size.height;
+      rsp_mode_request(self, NO, (int)c.size.width, (int)c.size.height);
     }
   }
   // 4. swap interval
@@ -801,9 +811,9 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 
 // Display-link thread, from drawView, under the CGL lock.
 - (void)updateScreenSize {  // 0x100185fc0
-  if (CurrentSetting_NeedsUpdate) {
+  if (rsp_mode_pending(self)) {
     rsp_set_display_mode(CurrentSetting_FullScreen, CurrentSetting_Width, CurrentSetting_Height);
-    CurrentSetting_NeedsUpdate = NO;
+    __atomic_store_n(&CurrentSetting_NeedsUpdate, NO, __ATOMIC_RELAXED);
   }
 }
 
@@ -870,7 +880,7 @@ void rsp_shell_load(rsp_shell *out) {
                           NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
                   backing:NSBackingStoreBuffered
                     defer:NO];
-  [w setTitle:@"Rocksmith 2014"];
+  [w setTitle:@"Rocksmith 2014 Re-ARMed " RSP_VERSION];
   [w setMinSize:NSMakeSize(800, 622)];
   [w setContentMinSize:NSMakeSize(800, 600)];
   [w setReleasedWhenClosed:NO];

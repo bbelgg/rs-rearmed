@@ -22,6 +22,8 @@
 #include <setjmp.h>
 #include <stdint.h>
 
+#include "../include/rs_names.h"
+
 typedef struct {
   uint64_t text_lo, text_hi;
   int resolved, unresolved;  // bound import slots
@@ -53,12 +55,13 @@ int rsimage_run_inits(uint64_t lo, uint64_t hi);
 int rsimage_run_init_list(const uint64_t *addrs, int n);
 
 // Component ranges (analysis/ws7/components.md) for rsimage_run_inits.
-#define RS_RANGE_ENGINE_EFD 0x10127a980ULL, 0x101319bd0ULL
-#define RS_RANGE_ENGINE_EGF 0x1011c1c10ULL, 0x101260190ULL
-#define RS_RANGE_ENGINE_NIMAIN 0x100e34310ULL, 0x101146090ULL
+#define RS_RANGE_ENGINE_EFD RC_ADDR(engine_efd_begin), RC_ADDR(engine_efd_end)
+#define RS_RANGE_ENGINE_EGF RC_ADDR(engine_egf_begin), RC_ADDR(engine_egf_end)
+#define RS_RANGE_ENGINE_NIMAIN RC_ADDR(engine_nimain_begin), RC_ADDR(engine_nimain_end)
 #define RS_RANGE_ALL 0ULL, ~0ULL
 
-// Original function by its unslid address, e.g. RS_FN(uint32_t (*)(const char *), 0x100ab08b0).
+// Original function by its unslid address, e.g.
+// RS_FN(uint32_t (*)(const char *), RC_ADDR(rsg_ak_get_id_from_string)).
 #define RS_FN(type, addr) ((type)(uintptr_t)((uint64_t)(addr) + rsimage_slide))
 
 #endif

@@ -2,6 +2,7 @@
 #include "rsp_renderer.h"
 
 #include <ctype.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
@@ -182,6 +183,12 @@ int rsp_metal_session_begin(const char *home, int abnormal) {
     }
   }
   return 0;
+}
+
+void rsp_metal_cache_flush(void) {
+  int (*flush)(double);
+  *(void **)&flush = dlsym(RTLD_DEFAULT, "rs_gfx_flush_cache");
+  if (flush) flush(2.0);
 }
 
 void rsp_metal_session_forget(const char *home) {

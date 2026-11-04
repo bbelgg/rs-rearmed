@@ -55,15 +55,19 @@ target_include_directories(rs_jpeg8 PUBLIC third_party/jpeg-8d)
 target_compile_options(rs_jpeg8 PRIVATE -O2 -ffp-contract=off -w)
 set_target_properties(rs_jpeg8 PROPERTIES OSX_ARCHITECTURES "arm64;x86_64")
 
+# The tests name the originals (RS_ORIG_*, RS_KEY_*: include/rs_names.h); the harness maps the Mac image.
+rs_target_names(mac-x64 rsg_target_dir)
+
 # Differential test: original x86_64 functions vs rewrites, writes the golden file.
 add_executable(rs_game_difftest harness/difftest.c harness/rsimage.c harness/efd_env.c)
+target_include_directories(rs_game_difftest PRIVATE "${rsg_target_dir}")
 target_link_libraries(rs_game_difftest PRIVATE rs_game rs_online rs_lua51 rs_png15 rs_jpeg8 z)
 target_compile_options(rs_game_difftest PRIVATE -Wno-deprecated-declarations)
 set_target_properties(rs_game_difftest PROPERTIES OSX_ARCHITECTURES "x86_64")
 
 # Native test: arm64 rewrites vs the golden file.
 add_executable(rs_game_native_test test/native_test.c)
-target_include_directories(rs_game_native_test PRIVATE test)
+target_include_directories(rs_game_native_test PRIVATE test "${rsg_target_dir}")
 target_link_libraries(rs_game_native_test PRIVATE rs_game rs_online rs_lua51 rs_png15 rs_jpeg8 z)
 target_compile_options(rs_game_native_test PRIVATE -Wno-deprecated-declarations)
 set_target_properties(rs_game_native_test PROPERTIES OSX_ARCHITECTURES "arm64")

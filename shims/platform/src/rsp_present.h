@@ -1,4 +1,4 @@
-// Metal presentation for the shell (docs/METAL-PLAN.md step 6), rsp_present_metal.m. Not in the
+// Metal presentation for the shell (docs/mac/METAL.md "Context and presentation API"), rsp_present_metal.m. Not in the
 // original. With libRSOpenGL loaded with its Metal backend (rs_gfx_backend() == RS_GFX_METAL: the
 // default, or RS_GL_BACKEND=metal; main() chooses, rsp_renderer.h),
 // OpenGLView draws into a CAMetalLayer through an rs_gfx layer context instead of an NSOpenGLContext;

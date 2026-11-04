@@ -42,6 +42,7 @@
 #include "../src/crypto_internal.h"
 #include "efd_fakes.h"
 #include "rs_crypto.h"
+#include "rs_names.h"
 
 typedef struct {
   int (*ks_enc)(uint32_t *, const uint8_t *, int);

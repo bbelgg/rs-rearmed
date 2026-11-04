@@ -1,4 +1,4 @@
-// The Metal core's side of rs_gfx.h (docs/METAL-DESIGN.md). With
+// The Metal core's side of rs_gfx.h (docs/mac/METAL.md). With
 // RS_GL_BACKEND=metal every rs_gfx_* call goes to the rsmtl_gfx_* of the same
 // signature. rs_gfx.c has weak defaults (NULL / no-op); src/metal/ defines the
 // real ones. Internal to libRSOpenGL (hidden).
@@ -21,6 +21,7 @@ void rsmtl_gfx_unlock(rs_gfx_context *ctx);
 CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx);
 int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
 int rsmtl_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total);
+int rsmtl_gfx_flush_cache(double max_seconds);
 
 // rsgl.c: the generated weak rsmtl_<name> stubs report through this.
 void rsmtl_unimplemented(int idx, const char *name);

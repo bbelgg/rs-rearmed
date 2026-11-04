@@ -1,5 +1,5 @@
 // GLSL 1.20 (Scaleform GFx and the Cg shim's glsl backend) -> Metal Shading
-// Language, for the Metal core (docs/METAL-DESIGN.md "Shader translation").
+// Language, for the Metal core (docs/mac/METAL.md "Shader translation").
 //
 // Binding conventions of the generated MSL:
 //   entry points        rs_vs (vertex), rs_fs (fragment), one library per program
@@ -24,7 +24,8 @@ enum rsmsl_type {  // GL type enums, kept numeric so the core can compare with g
     RSMSL_FLOAT = 0x1406, RSMSL_VEC2 = 0x8B50, RSMSL_VEC3 = 0x8B51, RSMSL_VEC4 = 0x8B52,
     RSMSL_INT = 0x1404, RSMSL_IVEC2 = 0x8B53, RSMSL_IVEC3 = 0x8B54, RSMSL_IVEC4 = 0x8B55,
     RSMSL_BOOL = 0x8B56, RSMSL_MAT2 = 0x8B5A, RSMSL_MAT3 = 0x8B5B, RSMSL_MAT4 = 0x8B5C,
-    RSMSL_SAMPLER_2D = 0x8B5E, RSMSL_SAMPLER_CUBE = 0x8B60,
+    RSMSL_SAMPLER_1D = 0x8B5D, RSMSL_SAMPLER_2D = 0x8B5E, RSMSL_SAMPLER_3D = 0x8B5F, RSMSL_SAMPLER_CUBE = 0x8B60,
+    RSMSL_SAMPLER_2D_RECT = 0x8B63,
 };
 
 enum { RSMSL_STAGE_VS = 1, RSMSL_STAGE_FS = 2 };

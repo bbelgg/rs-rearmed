@@ -6,6 +6,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+
+#include <atomic>
+#include <thread>
 
 typedef int32_t HSteamUser;
 typedef uint64_t SteamAPICall_t;
@@ -80,6 +84,17 @@ public:
     virtual int GetCallbackSizeBytes() = 0;
     uint8_t m_nCallbackFlags = 0;
     int m_iCallback = 0;
+};
+
+struct DlcListener : CCallbackBase {
+    int hits = 0;
+    uint32_t app = 0;
+    void Run(void *p) override {
+        hits++;
+        memcpy(&app, p, sizeof app);
+    }
+    void Run(void *p, bool, SteamAPICall_t) override { Run(p); }
+    int GetCallbackSizeBytes() override { return 4; }
 };
 
 struct StatsListener : CCallbackBase {
@@ -157,6 +172,17 @@ int main() {
     EXPECT(vcall<uint64_t>(apps, 20) == sid);                      // GetAppOwner
     EXPECT(vcall<uint32_t>(http, 0, 1, "http://x") == 0);          // CreateHTTPRequest -> invalid
 
+    // The ENUMERATE press: no overlay, and DlcInstalled_t for the free DLC (the game's rescan)
+    DlcListener dlc_listener;
+    SteamAPI_RegisterCallback(&dlc_listener, 1005);
+    EXPECT(!vcall<bool>(utils, 17));                               // IsOverlayEnabled
+    for (int i = 0; i < 500 && !dlc_listener.hits; i++) {
+        SteamAPI_RunCallbacks();
+        usleep(10000);
+    }
+    EXPECT(dlc_listener.hits == 1 && dlc_listener.app == 248750);
+    SteamAPI_UnregisterCallback(&dlc_listener);
+
     // ISteamUserStats: RequestCurrentStats -> UserStatsReceived_t via RunCallbacks
     StatsListener listener;
     SteamAPI_RegisterCallback(&listener, 1101);
@@ -202,6 +228,23 @@ int main() {
     }
     EXPECT(listed);
     EXPECT(vcall<bool>(remote, 6, "shim_test.bin"));              // FileDelete
+
+    // Two threads saving one file: every save works and the file is one of them, whole.
+    static char save_a[4096], save_b[4096], save_got[4096];
+    memset(save_a, 'a', sizeof save_a);
+    memset(save_b, 'b', sizeof save_b);
+    std::atomic<int> save_failed{0};
+    auto saver = [&](const char *data) {
+        for (int i = 0; i < 100; i++)
+            if (!vcall<bool>(remote, 0, "shim_race.bin", (const void *)data, (int32_t)sizeof save_a)) save_failed++;
+    };
+    std::thread saver_a(saver, save_a), saver_b(saver, save_b);
+    saver_a.join();
+    saver_b.join();
+    EXPECT(save_failed == 0);
+    EXPECT(vcall<int32_t>(remote, 1, "shim_race.bin", (void *)save_got, (int32_t)sizeof save_got) == (int32_t)sizeof save_got);
+    EXPECT(!memcmp(save_got, save_a, sizeof save_a) || !memcmp(save_got, save_b, sizeof save_b));
+    EXPECT(vcall<bool>(remote, 6, "shim_race.bin"));
 
     SteamAPI_Shutdown();
     printf("%s: %s\n",

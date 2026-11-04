@@ -1,4 +1,4 @@
-# GLSL -> MSL translator (src/msl/, docs/METAL-DESIGN.md): library linked into the opengl target, tests.
+# GLSL -> MSL translator (src/msl/, docs/mac/METAL.md): library linked into the opengl target, tests.
 #
 #   rsmsl            static library (C++), linked into libRSOpenGL
 #   msl_unit         translator / corpus unit tests                       ctest msl.unit

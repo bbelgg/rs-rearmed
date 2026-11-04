@@ -273,9 +273,14 @@ static int rsm_uniform_components(int type) {
     return 1;
 }
 
+static bool rsm_uniform_is_sampler(int type) {
+    return type == RSMSL_SAMPLER_1D || type == RSMSL_SAMPLER_2D || type == RSMSL_SAMPLER_3D ||
+           type == RSMSL_SAMPLER_CUBE || type == RSMSL_SAMPLER_2D_RECT;
+}
+
 static bool rsm_uniform_is_int(int type) {
     return type == RSMSL_INT || type == RSMSL_IVEC2 || type == RSMSL_IVEC3 || type == RSMSL_IVEC4 ||
-           type == RSMSL_BOOL || type == RSMSL_SAMPLER_2D || type == RSMSL_SAMPLER_CUBE;
+           type == RSMSL_BOOL || rsm_uniform_is_sampler(type);
 }
 
 // "name", "name[0]" -> base location; "name[i]" -> base + i. -1 if none.
@@ -584,7 +589,7 @@ static void rsm_set_uniform(GLint loc, GLsizei count, int kind, int comps, const
     rsm_uniform *u = &p->uniforms[p->loc_uniform[loc]];
     int type = u->u.type;
     bool is_int = rsm_uniform_is_int(type);
-    bool is_sampler = type == RSMSL_SAMPLER_2D || type == RSMSL_SAMPLER_CUBE;
+    bool is_sampler = rsm_uniform_is_sampler(type);
     bool is_mat = type == RSMSL_MAT2 || type == RSMSL_MAT3 || type == RSMSL_MAT4;
     int want = rsm_uniform_components(type);
     // GL: the call's type must match (bool accepts both).
@@ -686,7 +691,7 @@ void rsmtl_glGetUniformfv(GLuint program, GLint location, GLfloat *params) {
     rsm_uniform *u = &p->uniforms[p->loc_uniform[location]];
     int elem = location - u->loc, type = u->u.type;
     int comps = rsm_uniform_components(type);
-    if (type == RSMSL_SAMPLER_2D || type == RSMSL_SAMPLER_CUBE) {
+    if (rsm_uniform_is_sampler(type)) {
         params[0] = (GLfloat)p->int_values[location];
         return;
     }

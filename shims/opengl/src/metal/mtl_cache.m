@@ -1,4 +1,4 @@
-// Metal core: shader library and pipeline cache (docs/METAL-PLAN.md step 7).
+// Metal core: shader library and pipeline cache (docs/mac/METAL.md "Metal core").
 //
 // In memory, per device (shared by its contexts): MSL text -> library + rs_vs + rs_fs variants,
 // and per library rsm_pkey -> MTLRenderPipelineState. Each item is built once; a thread that
@@ -35,8 +35,9 @@
 // Archive access: adds and serialisation run on one serial queue (concurrent add + serialise
 // crashes in Metal); lookups from pipeline creation run on any thread (concurrent with both, as
 // checked under stress). The fresh archive is written every RSM_SERIALIZE_EVERY new pipelines, a
-// few seconds after the last new one, when the last context goes and at exit; to a temporary file
-// renamed into place, so a crash leaves the previous files.
+// few seconds after the last new one, when the last context goes and at exit (atexit; the shell's
+// quit ends in _exit and calls rs_gfx_flush_cache first); to a temporary file renamed into place, so
+// a crash leaves the previous files.
 //
 // Corrupt or foreign files are discarded (bad manifest records: the file is cut at the first one;
 // an archive Metal rejects: deleted). Disk use: the directories of other formats, conventions, OS
@@ -49,7 +50,8 @@
 //                             even outside an app bundle
 //   RS_METAL_CACHE_DIR=<dir>  cache directory (default ~/Library/Caches/rs-rearmed/metal when the
 //                             process runs from an .app bundle; off otherwise, so tools and tests
-//                             never write there unless asked)
+//                             never write there unless asked). Learn & Play's app sets its own
+//                             (lp_main.c), so the editions do not warm or age out each other's shaders
 //   RS_METAL_CACHE_STATS=1    print counters (hits, misses, compile times) when the last context
 //                             goes and at exit; 2: also log every archive hit and miss
 //   RS_METAL_CACHE_WARM_SYNC=1  wait for warming before the first context returns (tests)
@@ -65,6 +67,8 @@
 //   RS_METAL_CORPUS_WARM=0|1  safe load's corpus warm: never / always (default: by the rule in
 //                             "Corpus warm")
 //   RS_MTL_TEST_FAIL=<text>   tests only: MSL containing <text> gets an #error (compile failure path)
+//   RS_MTL_TEST_FAIL_WARM=pipeline|fragment  tests only: those builds fail while warming, as with a busy
+//                             compiler service; the game's own use builds them again
 //   RS_METAL_CACHE_KEEP_RUNS=<n>  tests only: RSM_KEEP_RUNS
 //   RS_METAL_CORPUS_MIN_MANIFEST=<n>  tests only: RSM_CORPUS_MIN_MANIFEST
 #include "mtl_internal.h"
@@ -767,7 +771,7 @@ static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *w
             st.wait_ns += rsm_now_ns() - t0;
         }
     }
-    // NEW again after the wait: a warming compile failed and left it to be retried (rsm_publish_lib).
+    // NEW again after the wait: a warming build failed and left it to be retried (rsm_publish_built).
     if (*state == RSM_NEW || *state == RSM_QUEUED) {
         *state = RSM_BUILDING;
         return true;
@@ -782,12 +786,15 @@ static void rsm_publish_state(RSMShaderCache *c, int *state, int to) {
     pthread_mutex_unlock(&c->m);
 }
 
-static void rsm_publish(RSMShaderCache *c, int *state) { rsm_publish_state(c, state, RSM_DONE); }
+// What failed while warming stays NEW, so the game's own use builds it again: a failure there may be the
+// compiler service's (busy with the warm-up's parallel compiles), not the MSL's. Libraries, fragment
+// variants and pipelines alike.
+static void rsm_publish_built(RSMShaderCache *c, int *state, bool ok, bool render) {
+    rsm_publish_state(c, state, ok || render ? RSM_DONE : RSM_NEW);
+}
 
-// A library that failed to compile while warming stays NEW, so the game's own use compiles it again: a
-// failure there may be the compiler service's (busy with the warm-up's parallel compiles), not the MSL's.
 static void rsm_publish_lib(RSMShaderCache *c, RSMLibEntry *e, bool render) {
-    rsm_publish_state(c, &e->state, e->lib || render ? RSM_DONE : RSM_NEW);
+    rsm_publish_built(c, &e->state, e->lib != nil, render);
 }
 
 static RSMShaderCache *rsm_cache_for(id<MTLDevice> dev);
@@ -1222,7 +1229,12 @@ bool rsm_cache_library_wait(RSMContext *ctx, RSMLibEntry *e) {
     return e->lib != nil;
 }
 
-static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha) {
+static bool rsm_test_warm_fails(bool render, const char *what) {
+    const char *t = render ? NULL : getenv("RS_MTL_TEST_FAIL_WARM");
+    return t && !strcmp(t, what);
+}
+
+static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha, bool render) {
     if (alpha < 0 || alpha > 8 || !e->lib)
         return nil;
     pthread_mutex_lock(&c->m);
@@ -1239,14 +1251,17 @@ static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha
             if (!f)
                 rsm_log("fragment function: %s", err.localizedDescription.UTF8String);
         }
+        if (rsm_test_warm_fails(render, "fragment"))
+            f = nil;
         e->fs[alpha] = f;
-        rsm_publish(c, &e->fs_state[alpha]);
+        rsm_publish_built(c, &e->fs_state[alpha], f != nil, render);
+        return f;  // after a failure the slot is the next builder's
     }
     return e->fs[alpha];
 }
 
 static id<MTLRenderPipelineState> rsm_build_pipeline(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey *k, bool render) {
-    id<MTLFunction> fs = rsm_fragment(c, e, k->alpha_func);
+    id<MTLFunction> fs = rsm_fragment(c, e, k->alpha_func, render);
     if (!e->vs || !fs)
         return nil;
     uint64_t t0 = rsm_now_ns();
@@ -1274,6 +1289,8 @@ static id<MTLRenderPipelineState> rsm_build_pipeline(RSMShaderCache *c, RSMLibEn
         err = nil;
         ps = [c->dev newRenderPipelineStateWithDescriptor:d error:&err];
     }
+    if (rsm_test_warm_fails(render, "pipeline"))
+        ps = nil;
     uint64_t dt = rsm_now_ns() - t0;
     if (render) {
         st.pipe_built++;
@@ -1315,11 +1332,13 @@ static id<MTLRenderPipelineState> rsm_pipeline_for(RSMShaderCache *c, RSMLibEntr
     bool mine = rsm_claim(c, &s->state, render, &st.pipe_waited);
     pthread_mutex_unlock(&c->m);
     if (mine) {
-        s->ps = rsm_build_pipeline(c, e, k, render);
-        rsm_publish(c, &s->state);
-    } else if (render) {
-        st.pipe_reused++;
+        id<MTLRenderPipelineState> ps = rsm_build_pipeline(c, e, k, render);
+        s->ps = ps;
+        rsm_publish_built(c, &s->state, ps != nil, render);
+        return ps;  // after a failure the slot is the next builder's
     }
+    if (render)
+        st.pipe_reused++;
     return s->ps;
 }
 
@@ -1621,6 +1640,9 @@ static void rsm_flush(RSMShaderCache *c) {
 }
 
 static void rsm_cache_atexit(void) {
+    static _Atomic int ran;  // rs_gfx_flush_cache and then exit()
+    if (ran++)
+        return;
     pthread_mutex_lock(&g_caches_lock);
     NSArray *caches = [g_caches copy];
     pthread_mutex_unlock(&g_caches_lock);
@@ -1630,6 +1652,21 @@ static void rsm_cache_atexit(void) {
     for (RSMShaderCache *c in caches)
         rsm_flush(c);
     rsm_print_stats("exit");
+}
+
+// On another thread, so a write that hangs (the compiler service, a full disk) cannot hold up the quit.
+int rsm_cache_flush(double max_s) {
+    pthread_mutex_lock(&g_caches_lock);
+    bool any = g_caches.count > 0;
+    pthread_mutex_unlock(&g_caches_lock);
+    if (!any)
+        return 0;
+    dispatch_semaphore_t done = dispatch_semaphore_create(0);
+    dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
+        rsm_cache_atexit();
+        dispatch_semaphore_signal(done);
+    });
+    return dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(max_s * NSEC_PER_SEC))) ? 1 : 0;
 }
 
 static void rsm_open_disk(RSMShaderCache *c, warm_list *wl) {

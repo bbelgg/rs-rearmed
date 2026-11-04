@@ -43,6 +43,7 @@ RSMTL_WEAK void rsmtl_gfx_lock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK void rsmtl_gfx_unlock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx) { (void)ctx; return NULL; }
 RSMTL_WEAK int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds) { (void)ctx, (void)max_seconds; return 0; }
+RSMTL_WEAK int rsmtl_gfx_flush_cache(double max_seconds) { (void)max_seconds; return 0; }
 RSMTL_WEAK int rsmtl_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total) {
     (void)ctx;
     if (done) *done = 0;
@@ -318,6 +319,8 @@ RS_EXPORT int rs_gfx_prepare_progress(rs_gfx_context *c, int *done, int *total) 
     if (total) *total = 0;
     return 0;
 }
+
+RS_EXPORT int rs_gfx_flush_cache(double max_seconds) { return METAL ? rsmtl_gfx_flush_cache(max_seconds) : 0; }
 
 RS_EXPORT CGLContextObj rs_gfx_cgl(rs_gfx_context *c) {
     if (METAL)

@@ -54,7 +54,15 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
     `static.psarc` link, in whichever Steam library that is (e.g. one on an
     external drive). `RS_STEAM_DLC` / `dlc`: `installed` (default), `all`
     (opt-in: every app id is owned, so every archive shows up whatever its
-    AppID), `none`, or a comma-separated list of app ids (only those).
+    AppID), `none`, or a comma-separated list of app ids (only those). The
+    install passes such a list (`game/.rearmed/steam.env`, written by
+    `tools/play-native/gamefiles.py`): the installed DLC, 248750 and every
+    AppID the copy's `dlc/` archives carry, so custom songs show up whatever
+    AppID they carry.
+
+The stub also answers the Enumerate entry of the main menu (`src/enumerate.h`, shared with Learn & Play): the game's
+`IsOverlayEnabled` question counts as the press, new archives are copied into the install's `dlc/`, and a
+`DlcInstalled_t` for 248750 makes the game scan them ([DESIGN.md](../../docs/mac/DESIGN.md#built-in-fixes-and-mods)).
 
 `auto` (the default) uses real when Valve's library loads and
 `SteamAPI_Init` succeeds through it, and stub otherwise. Settings go in
@@ -63,3 +71,5 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
 
 The native app bundles the arm64 slice (`tools/ws7/recomp/app/build.sh`); the launcher
 (`tools/play-native`) runs it in stub mode.
+
+The 32-bit counterpart for the Windows port, built on the same code: [win-x86/shims/steam](../../win-x86/shims/steam/README.md).

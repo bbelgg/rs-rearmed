@@ -40,6 +40,11 @@ add_library(rsp_shell STATIC src/rsp_shell.m src/rsp_overlay.c src/rsp_present_m
 target_link_libraries(rsp_shell PUBLIC rsp_core "-framework AppKit" ${rsp_gl}
   "-framework CoreVideo" "-framework IOKit" "-framework Metal" "-framework QuartzCore")
 target_compile_options(rsp_shell PRIVATE $<$<COMPILE_LANGUAGE:OBJC>:-fno-objc-arc> -Wno-deprecated-declarations)
+# The window title carries the release; a standalone build reads it from the repo's VERSION file.
+if(NOT RS_VERSION)
+  file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/../../VERSION" RS_VERSION LIMIT_COUNT 1)
+endif()
+target_compile_definitions(rsp_shell PRIVATE RSP_VERSION="${RS_VERSION}")
 set_target_properties(rsp_shell PROPERTIES OSX_ARCHITECTURES "${rsp_gl_archs}")
 
 # Unit tests of the portable half.
@@ -70,9 +75,11 @@ set(rsp_shell_exe "${rsp_root}/RSPShellTest.app/Contents/MacOS/RSPShellTest")
 # The diff test against the original x86_64 functions, run under Rosetta. It
 # compiles the shims/game harness sources read-only.
 set(rsp_harness "${rsp_repo}/shims/game/harness")
+include("${rsp_repo}/cmake/RSTargetNames.cmake")
+rs_target_names(mac-x64 rsp_target_dir)
 add_executable(rsp_platform_difftest test/rsp_platform_difftest.c
   "${rsp_harness}/rsimage.c" "${rsp_harness}/efd_env.c")
-target_include_directories(rsp_platform_difftest PRIVATE "${rsp_harness}")
+target_include_directories(rsp_platform_difftest PRIVATE "${rsp_harness}" "${rsp_target_dir}")
 target_link_libraries(rsp_platform_difftest PRIVATE rsp_core)
 target_compile_options(rsp_platform_difftest PRIVATE -Wno-sign-compare -Wno-missing-field-initializers)
 set_target_properties(rsp_platform_difftest PROPERTIES OSX_ARCHITECTURES "x86_64")
@@ -92,7 +99,7 @@ foreach(arch arm64 x86_64)
 endforeach()
 # The overlay through libRSOpenGL (whose install name is @executable_path/, next to the app's
 # executable: DYLD_LIBRARY_PATH finds it in its build directory). The Metal variant waits for the
-# Metal core (docs/METAL-PLAN.md step 5).
+# Metal core (docs/mac/METAL.md "Metal core").
 if(TARGET opengl)
   set(rsp_dyld -e "DYLD_LIBRARY_PATH=$<TARGET_FILE_DIR:opengl>")
 endif()

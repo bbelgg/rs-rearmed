@@ -25,12 +25,11 @@
 extern "C" {
 #endif
 
-#define RS_ORIG_RDV_EXT_VTABLE 0x101822c98
-#define RS_ORIG_RDV_EXT_CTOR 0x100a04590 /* (this): sizeof 0x18, manager (0x80) at +0x10 */
-#define RS_ORIG_RDV_EXT_CLASS_DESC 0x101902b88
-#define RS_ORIG_RDV_MGR_TICK 0x100a1b350
-#define RS_ORIG_CONNECT_GAME_INTERFACE 0x1019033a0 /* RSConnectGameInterface * */
-#define RS_ORIG_CONNECT_SERVICE 0x101903398        /* RSConnectService * */
+#define RS_ORIG_RDV_EXT_VTABLE RC_ADDR(RSConnectExtension_RDV_vtable)
+#define RS_ORIG_RDV_EXT_CTOR RC_ADDR(RSConnectExtension_RDV_ctor) /* (this): sizeof 0x18, manager (0x80) at +0x10 */
+#define RS_ORIG_RDV_EXT_CLASS_DESC RC_ADDR(RSConnectExtension_RDV_class_info)
+#define RS_ORIG_CONNECT_GAME_INTERFACE RC_ADDR(rs_connect_game_interface) /* RSConnectGameInterface * */
+#define RS_ORIG_CONNECT_SERVICE RC_ADDR(rs_connect_service) /* RSConnectService * */
 #define RS_RDV_EXT_CLASS_ID 0x1000719u
 #define RS_GAME_INTERFACE_SLOT_EVENT 58 /* (this, const efd string &name, &param, Ptr &extra) */
 

@@ -19,7 +19,7 @@ patch="$here/third_party/ffmpeg-bink2.patch"
 mkdir -p "$prefix/src"
 tarball="$prefix/src/ffmpeg-$version.tar.xz"
 if [ ! -f "$tarball" ]; then
-  curl -fL --retry 3 -o "$tarball.part" "https://ffmpeg.org/releases/ffmpeg-$version.tar.xz"
+  curl -fL --retry 3 --retry-all-errors -o "$tarball.part" "https://ffmpeg.org/releases/ffmpeg-$version.tar.xz"
   mv "$tarball.part" "$tarball"
 fi
 echo "$sha256  $tarball" | shasum -a 256 -c -

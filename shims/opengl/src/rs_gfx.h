@@ -1,5 +1,5 @@
 // Backend-neutral context and presentation API, exported by libRSOpenGL
-// (docs/METAL-DESIGN.md). The shell creates its context through this on Metal;
+// (docs/mac/METAL.md). The shell creates its context through this on Metal;
 // tests use the offscreen contexts to run the same GL calls on both backends.
 #pragma once
 #include <OpenGL/CGLTypes.h>
@@ -46,6 +46,12 @@ int rs_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
 // grow once, when the corpus warm is decided; both only grow; done <= total). Returns 1 while
 // rs_gfx_prepare runs, 0 otherwise (before, after, GL), -1 for no context.
 int rs_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total);
+// The process is about to end without running atexit handlers (the shell's rsp_exit ends in
+// _exit): writes what the Metal disk cache still holds, as exit() would. From any thread, with
+// contexts still in use; drops the compiles still queued, so call it last. Waits at most
+// max_seconds (a write cut off by the end of the process leaves the previous files). Returns 0
+// when done or there is nothing to write, 1 on timeout. GL: no-op, 0.
+int rs_gfx_flush_cache(double max_seconds);
 // The CGLContextObj the game and CGL calls see: the real one on GL, a token on Metal.
 CGLContextObj rs_gfx_cgl(rs_gfx_context *ctx);
 

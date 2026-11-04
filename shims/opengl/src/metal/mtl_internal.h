@@ -1,4 +1,4 @@
-// Metal core of libRSOpenGL (docs/METAL-DESIGN.md "Metal core"): shared types.
+// Metal core of libRSOpenGL (docs/mac/METAL.md "Metal core"): shared types.
 //
 // One RSMContext per rs_gfx context, current per thread. GL objects are ObjC
 // objects held in per-type name tables; GL state is plain C in the context.
@@ -486,6 +486,8 @@ void rsm_cache_context_destroyed(RSMContext *ctx);  // last one: write the archi
 int rsm_cache_prepare(RSMContext *ctx, double max_s);
 // rs_gfx_prepare_progress: libraries compiled / to compile so far; 1 while rs_gfx_prepare runs.
 int rsm_cache_progress(RSMContext *ctx, int *done, int *total);
+// rs_gfx_flush_cache: what exit() does for the cache, at most max_s. 0 done, 1 timed out.
+int rsm_cache_flush(double max_s);
 // The descriptor for a program pipeline (mtl_draw.m).
 MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunction> fs, const rsm_pkey *k);
 

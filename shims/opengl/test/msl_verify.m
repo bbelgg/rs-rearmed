@@ -15,7 +15,7 @@
 //                         (status VDIFF: pixels match but a vertex output differs)
 //   --tol <n>             allowed colour error per channel, in 1/255 steps (default 2)
 //   --fast-math           compile the MSL with fast math (default: safe math, which is what the
-//                         Metal core must use; see docs/METAL-DESIGN.md)
+//                         Metal core must use; see docs/mac/METAL.md)
 //   --dump <dir>          for failures: the MSL and GL / Metal / diff PNGs
 //   --limit <n>           first n pairs only
 //   --outliers <n>        status NEAR instead of DIFF when at most n pixels (over all variants) exceed
@@ -58,7 +58,7 @@
 #define GRID 8
 #define NVERT (GRID * GRID * 6)
 #define TEX 32
-// Vertex buffer of attribute i. docs/METAL-DESIGN.md says 16 + i, but Metal's last vertex buffer
+// Vertex buffer of attribute i. docs/mac/METAL.md says 16 + i, but Metal's last vertex buffer
 // index is 30 and the Cg shim uses location 15, so the base must be <= 15 (here 14).
 #define VB_BASE 14
 
@@ -274,7 +274,7 @@ static int gl_init(void) {
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) return 0;
     glGenTextures(16, g_gltex);
     // Metal always filters cube maps across faces; compare like with like (the translation, not
-    // the seam behaviour; see docs/METAL-DESIGN.md).
+    // the seam behaviour; see docs/mac/METAL.md).
     glEnable(0x884F /* GL_TEXTURE_CUBE_MAP_SEAMLESS */);
     if (glGetError() != GL_NO_ERROR) fprintf(stderr, "note: GL_TEXTURE_CUBE_MAP_SEAMLESS unavailable, cube seams will differ\n");
     return 1;

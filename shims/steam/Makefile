@@ -10,7 +10,7 @@ CXXFLAGS := -std=c++17 -O2 -Wall -Wextra -Wno-unused-parameter -fvisibility=hidd
 GAME_BIN ?= $(HOME)/Library/Application Support/Steam/steamapps/common/Rocksmith2014/Rocksmith2014.app/Contents/MacOS/Rocksmith2014
 
 SRCS := src/shim.cpp src/interfaces.cpp
-HDRS := src/shim.h
+HDRS := src/shim.h src/enumerate.h
 LIB  := build/libsteam_api.dylib
 
 all: libsteam_api.dylib
@@ -41,10 +41,14 @@ unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSO
 TEST_ENV := RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata
 NO_STEAM := HOME=$(CURDIR)/build/emptyhome
 
-test: build/test_shim build/test_vtables
+build/test_enumerate: tests/test_enumerate.cpp $(HDRS)
+	$(CXX) $(ARCHS) $(CXXFLAGS) tests/test_enumerate.cpp -o $@
+
+test: build/test_shim build/test_vtables build/test_enumerate
 	@if [ -e build/steam_shim.ini ]; then echo "build/steam_shim.ini would change the tests' settings: move it away" >&2; exit 1; fi
 	arch -arm64 build/test_vtables
 	arch -x86_64 build/test_vtables
+	arch -arm64 build/test_enumerate
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -arm64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -x86_64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=all arch -arm64 build/test_shim

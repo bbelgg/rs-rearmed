@@ -9,6 +9,7 @@
 // floating-point register.
 
 #include "shim.h"
+#include "enumerate.h"
 
 #include <copyfile.h>
 #include <dirent.h>
@@ -105,7 +106,9 @@ static bool remote_path(const char *name, std::string *out) {
     return true;
 }
 
+// Under g_mutex: every save of a file uses the one temporary name.
 static bool write_atomic(const std::string &path, const void *data, size_t size) {
+    std::lock_guard<std::recursive_mutex> lock(g_mutex);
     size_t slash = path.find_last_of('/');
     if (slash != std::string::npos) mkdirs(path.substr(0, slash));
     std::string tmp = path + ".shimtmp";
@@ -379,6 +382,11 @@ public:
 // ---------------------------------------------------------------------------
 // ISteamUtils
 
+static void enumerate_done() {
+    uint32_t app = kEnumerateAppId;
+    shim_post_callback(kDlcInstalledCallback, &app, sizeof app);
+}
+
 class Utils {
 public:
     virtual uint32_t GetSecondsSinceAppActive() { return (uint32_t)(time(nullptr) - g_start_time); }
@@ -404,7 +412,12 @@ public:
         return shim_call_result(h, out, cub, expected, failed);
     }
     Z(RunFrame)  // deprecated slot, absent from the flat API
-    Z(GetIPCCallCount) Z(SetWarningMessageHook) Z(IsOverlayEnabled) Z(BOverlayNeedsPresent)
+    Z(GetIPCCallCount) Z(SetWarningMessageHook)
+    virtual bool IsOverlayEnabled() {  // no overlay; the game asks before it opens the Shop (enumerate.h)
+        enumerate_press(shim_config().game_dir, enumerate_done);
+        return false;
+    }
+    Z(BOverlayNeedsPresent)
     Z(CheckFileSignature) Z(ShowGamepadTextInput) Z(GetEnteredGamepadTextLength)
     Z(GetEnteredGamepadTextInput)
     virtual const char *GetSteamUILanguage() { return shim_config().language.c_str(); }

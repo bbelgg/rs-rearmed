@@ -1,5 +1,5 @@
 // Renderer choice of a game start: Metal (the default) or OpenGL, and the fallback to OpenGL when
-// Metal cannot start or keeps ending abnormally (docs/METAL-DESIGN.md "Defaults and fallback").
+// Metal cannot start or keeps ending abnormally (docs/mac/METAL.md "Defaults and fallback").
 //
 // libRSOpenGL picks its backend once, when it loads, from RS_GL_BACKEND (unset: Metal). main()
 // decides as early as it can (before the image, the engine and the window) and, when the decision
@@ -77,6 +77,9 @@ int rsp_metal_abnormal_count(const char *home);
 int rsp_metal_session_begin(const char *home, int abnormal);
 // A clean exit: removes this process's marker (once; async-signal-safe).
 void rsp_metal_session_end(void);
+// A clean exit that runs no atexit handlers: libRSOpenGL's disk cache writes what it still holds
+// (rs_gfx_flush_cache, looked up at run time; nothing without it or on GL). At most 2 seconds.
+void rsp_metal_cache_flush(void);
 // Removes <home>'s marker whoever wrote it (the count starts again).
 void rsp_metal_session_forget(const char *home);
 

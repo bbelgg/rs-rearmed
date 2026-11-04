@@ -1,4 +1,4 @@
-// GLSL 1.20 -> Metal Shading Language (msl_xlat.h, docs/METAL-DESIGN.md "Shader translation").
+// GLSL 1.20 -> Metal Shading Language (msl_xlat.h, docs/mac/METAL.md "Shader translation").
 //
 // A direct, typed source-to-source translator for the GLSL the game feeds GL: Scaleform GFx's
 // shaders (built from fragments at run time) and the Cg shim's ARB -> GLSL output. Both are small,

@@ -1108,6 +1108,39 @@ static void case_luminance(void) {
     glok("luminance");
 }
 
+// A sampler1D on a unit of its own, beside a 2D texture on unit 0 (the game's glass effect: a rainbow
+// ramp on unit 2): glUniform1i takes it as it takes any sampler.
+static void case_texture_1d(void) {
+    static const char fs[] =
+        "#version 120\n"
+        "uniform sampler1D ramp;\n"
+        "uniform sampler2D tex;\n"
+        "varying vec2 v_tc;\n"
+        "void main() { gl_FragColor = texture1D(ramp, v_tc.x) + texture2D(tex, v_tc) * 0.5; }\n";
+    glClearColor(0, 0, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint p = program(kVStex, fs, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(p, "ramp"), 2);
+    glUniform1i(glGetUniformLocation(p, "tex"), 0);
+    static const unsigned char base[] = {0, 0, 0, 255}, ramp[] = {255, 0, 0, 255, 0, 255, 0, 255};
+    GLuint t[2];
+    glGenTextures(2, t);
+    glBindTexture(GL_TEXTURE_2D, t[0]);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 1, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, base);
+    glActiveTexture(GL_TEXTURE2);
+    glBindTexture(GL_TEXTURE_1D, t[1]);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_RGBA, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, ramp);
+    glActiveTexture(GL_TEXTURE0);
+    draw_tex_rect(0, 0, 32, 16);
+    snap();
+    check_px(8, 8, 255, 0, 0, 255, "sampler1D first texel");
+    check_px(24, 8, 0, 255, 0, 255, "sampler1D second texel");
+    glok("texture_1d");
+}
+
 static void case_mipmaps(void) {
     glClearColor(0, 0, 0, 1);
     glClear(GL_COLOR_BUFFER_BIT);
@@ -2120,6 +2153,7 @@ static const test_case kCases[] = {
     {"dxt", case_dxt, 1},
     {"bgra", case_bgra, 0},
     {"luminance", case_luminance, 0},
+    {"texture_1d", case_texture_1d, 0},
     {"mipmaps", case_mipmaps, 2},
     {"alpha_test", case_alpha_test, 2},
     {"polygon_mode", case_polygon_mode, 0},

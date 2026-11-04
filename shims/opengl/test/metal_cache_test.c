@@ -15,11 +15,13 @@
 //   cold        empty cache: every pipeline is an archive miss
 //   warm        RS_METAL_CACHE_WARM_SYNC=1: warming built every library and pipeline from the
 //               manifest, all archive hits, nothing compiled on the drawing thread
+//   warm-fail   a pipeline or fragment variant fails while warming: the draws build it again
 //   warm-async  as the game sees it: warming races the first draws; no misses
 //   no-cache    RS_METAL_CACHE=0, same MSL: what the system Metal cache alone gives
 //   prepare     RSM_TEST_PREPARE (rs_gfx_prepare before the links, the shell's safe load): warm,
 //               with a cold system Metal cache (RS_MTL_SALT_COMPILE), and timing out; then the
 //               throttled pool on a cold first run (2 workers, utility QoS; RS_MTL_COMPILE_THREADS)
+//   quit        rs_gfx_flush_cache and _exit, as the shell ends: the next run misses nothing
 //   corrupt     garbage archive and a torn manifest; then a garbage manifest: discarded, no crash
 //   stale       directories of other formats/OS/GPUs are removed, foreign files left alone
 //   async       --async children with the compile pool and with RS_MTL_COMPILE_THREADS=0
@@ -257,6 +259,18 @@ static int child(int nonce) {
     GLenum err = glGetError();
     printf("CHILD link_ms=%.1f draw1_ms=%.1f draw2_ms=%.1f bad=%d glerror=0x%x\n", link_ms, pass_ms[0], pass_ms[1],
            bad, err);
+    // The shell's quit: no context destroyed, no atexit. One pipeline more, short of the next archive
+    // write, which only the flush can save.
+    const char *quit = getenv("RSM_TEST_QUIT");
+    if (quit) {
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDrawArrays(GL_TRIANGLES, 0, 6);
+        glFinish();
+        int rc = rs_gfx_flush_cache(atof(quit));
+        fflush(stdout);
+        _exit(bad || err || rc ? 1 : 0);
+    }
     rs_gfx_make_current(NULL);
     rs_gfx_destroy(c);
     return bad || err ? 1 : 0;
@@ -886,6 +900,19 @@ int main(int argc, char **argv) {
     check(warm.link_ms + warm.draw1_ms < cold.link_ms + cold.draw1_ms, "warm link + first draws %.1f ms < cold %.1f ms",
           warm.link_ms + warm.draw1_ms, cold.link_ms + cold.draw1_ms);
 
+    // A build that fails while warming (the compiler service busy) is not final: the game's own draw
+    // builds it again, so nothing goes missing.
+    const char *wf_pipe[] = {"RS_METAL_CACHE_WARM_SYNC=1", "RS_MTL_TEST_FAIL_WARM=pipeline", NULL};
+    const char *wf_frag[] = {"RS_METAL_CACHE_WARM_SYNC=1", "RS_MTL_TEST_FAIL_WARM=fragment", NULL};
+    run_result wfp = run("warm-fail-pipeline", wf_pipe);
+    check(wfp.rc == 0 && wfp.bad == 0 && wfp.pipe_built == P,
+          "pipelines that failed while warming are built by the draws (rc %d, bad %d, built %d)", wfp.rc, wfp.bad,
+          wfp.pipe_built);
+    run_result wff = run("warm-fail-fragment", wf_frag);
+    check(wff.rc == 0 && wff.bad == 0 && wff.pipe_built == P,
+          "fragment variants that failed while warming are built by the draws (rc %d, bad %d, built %d)", wff.rc,
+          wff.bad, wff.pipe_built);
+
     run_result async = run("warm-async", NULL);
     check(async.rc == 0 && async.bad == 0, "warm-async run draws correctly (rc %d)", async.rc);
     check(async.misses == 0 && async.hits >= P, "warm-async: %d hits, %d misses", async.hits, async.misses);
@@ -957,6 +984,19 @@ int main(int argc, char **argv) {
     printf("pipeline compile on the drawing thread: cold %.1f ms, no-cache (system Metal cache only) %.1f ms, "
            "warm 0 builds (archive lookups in warming: %.1f ms for %d libraries + %d pipelines)\n",
            cold.pipe_ms, off.pipe_ms, warm.warm_ms, warm.lib_warmed, warm.pipe_warmed);
+
+    // The shell's quit (rs_gfx_flush_cache, then _exit): what was built last is in the archive. A new salt
+    // only makes other libraries of the same code, so only the child's extra pipeline is new.
+    char qsalt[96];
+    snprintf(qsalt, sizeof qsalt, "RS_MTL_SALT=q%d-%d", g_nonce, (int)getpid());
+    const char *quit_env[] = {"RSM_TEST_QUIT=30", qsalt, NULL};
+    run_result quit = run("quit", quit_env);
+    check(quit.rc == 0 && quit.misses == 1 && quit.writes == 1, "quit: flushed and ended (rc %d, %d misses, %d writes)",
+          quit.rc, quit.misses, quit.writes);
+    const char *after_quit_env[] = {"RS_METAL_CACHE_WARM_SYNC=1", qsalt, NULL};
+    run_result aq = run("after-quit", after_quit_env);
+    check(aq.rc == 0 && aq.misses == 0 && aq.hits > P, "after a quit every pipeline is in the archive (%d hits, %d misses)",
+          aq.hits, aq.misses);
 
     // Corrupt: garbage archive, torn manifest (cut inside a record).
     // Compaction: more than 8 archive files (copies of the one there) become one after warming.

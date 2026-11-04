@@ -297,10 +297,6 @@ static void efd_difftest(FILE *golden) {
 }
 
 // --- crypto: the originals behind crypto_api -----------------------------------
-#define RS_ORIG_EFD_ALLOC 0x1012efc90 /* (size, flags) */
-#define RS_ORIG_EFD_FREE_SIZED 0x1012f00f0
-#define RS_ORIG_JSON_VALUE_CTOR 0x1000f9ad0
-
 static const uint8_t *img_at(uint64_t vm) { return (const uint8_t *)(uintptr_t)(vm + rsimage_slide); }
 
 // A fake RSConnectService for the code that asks it (0x100a05a50 asserts a
@@ -338,7 +334,7 @@ static void pl_callback(int fail, int code, int err, void *ctx, uint8_t *buf, ui
     pl_res.buf = malloc(len ? len : 1);
     memcpy(pl_res.buf, buf, len);
     pl_res.len = len;
-    RS_FN(void (*)(void *, size_t), RS_ORIG_EFD_FREE_SIZED)(buf, (size_t)-1);
+    RS_FN(void (*)(void *, size_t), RS_ORIG_EFD_FREE)(buf, (size_t)-1);
   }
 }
 static void orig_profile_load(const uint8_t *file, uint32_t n, int *fail, int *code, uint8_t **out, uint32_t *len) {
@@ -382,7 +378,7 @@ static uint32_t orig_pkgconfig(const uint8_t *file, uint32_t n, uint8_t **out) {
   uint32_t t = *(uint32_t *)(stream + 0x2c);
   *out = malloc(t ? t : 1);
   memcpy(*out, buf, t);
-  RS_FN(void (*)(void *, size_t), RS_ORIG_EFD_FREE_SIZED)(buf, (size_t)-1);
+  RS_FN(void (*)(void *, size_t), RS_ORIG_EFD_FREE)(buf, (size_t)-1);
   return t;  // the 0x38-byte stream object is left (efd heap, test process)
 }
 
@@ -480,7 +476,7 @@ static void crypto_difftest(FILE *golden, const char *game_dir, int unwind) {
 static void *x86_new_empty_object(void *ctx) {  // what 0x100a20570 makes
   (void)ctx;
   void *o = RS_FN(void *(*)(size_t, int), RS_ORIG_EFD_ALLOC)(0x78, 0);
-  RS_FN(void (*)(void *), RS_ORIG_JSON_VALUE_CTOR)(o);
+  RS_FN(void (*)(void *), RC_ADDR(property_object_ctor))(o);
   EXT_FN(o, 0, void (*)(void *))(o);
   return o;
 }
@@ -532,15 +528,18 @@ static void online_thunks(void *ext) {
   static const struct {
     uint64_t addr;
     int slot;
-  } t[] = {{0x100a05e10, 21}, {0x100a05e40, 22}, {0x100a05f10, 23}, {0x100a05f30, 25}, {0x100a05f50, 36}};
+  } t[] = {{RC_ADDR(rs_connect_ext_call_slot21), 21}, {RC_ADDR(rs_connect_ext_call_slot22), 22},
+           {RC_ADDR(rs_connect_ext_call_slot23), 23}, {RC_ADDR(rs_connect_ext_call_slot25), 25},
+           {RC_ADDR(rs_connect_ext_call_slot36), 36}};
   for (size_t i = 0; i < sizeof t / sizeof *t; i++) {  // all void
     RS_FN(void (*)(void *, const void *), t[i].addr)(&fake_cs, v);
     efd_txf("thunk %llx (slot %d): done\n", (unsigned long long)t[i].addr, t[i].slot);
   }
-  online_sret a = RS_FN(online_sret(*)(void *), 0x100a05ea0)(&fake_cs);
-  online_sret b = RS_FN(online_sret(*)(void *, bool), 0x100a05ed0)(&fake_cs, true);
-  efd_txf("thunk 100a05ea0 (slot 28): %s; thunk 100a05ed0 (slot 29): %s\n", a.p ? "object" : "null",
-          b.p ? "object" : "null");
+  online_sret a = RS_FN(online_sret(*)(void *), RC_ADDR(rs_connect_ext_call_slot28))(&fake_cs);
+  online_sret b = RS_FN(online_sret(*)(void *, bool), RC_ADDR(rs_connect_ext_call_slot29))(&fake_cs, true);
+  efd_txf("thunk %llx (slot 28): %s; thunk %llx (slot 29): %s\n",
+          (unsigned long long)RC_ADDR(rs_connect_ext_call_slot28), a.p ? "object" : "null",
+          (unsigned long long)RC_ADDR(rs_connect_ext_call_slot29), b.p ? "object" : "null");
   if (a.p) obj_release(a.p);
   fake_cs.ext = NULL;
 }

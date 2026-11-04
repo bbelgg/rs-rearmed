@@ -435,7 +435,7 @@ void rsmtl_glVertexAttrib2f(GLuint index, GLfloat x, GLfloat y) { rsmtl_glVertex
 void rsmtl_glVertexAttrib3f(GLuint index, GLfloat x, GLfloat y, GLfloat z) { rsmtl_glVertexAttrib4f(index, x, y, z, 1); }
 
 // Conventional arrays, with NVIDIA's aliasing onto generic attributes
-// (docs/METAL-DESIGN.md "Built-in attributes"): what the Cg shim uses.
+// (docs/mac/METAL.md "Built-in attributes"): what the Cg shim uses.
 void rsmtl_glVertexPointer(GLint size, GLenum type, GLsizei stride, const GLvoid *pointer) {
     RSM_CTX()
     rsm_attrib_pointer(ctx, 0, size, type, false, stride, pointer);

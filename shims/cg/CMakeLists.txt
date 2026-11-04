@@ -53,6 +53,10 @@ if(EXISTS "${RS_CG_CORPUS}/corpus")
     add_test(NAME cg.corpus.load.${backend} COMMAND cg_corpus_load ${cg_corpus})
     set_tests_properties(cg.corpus.load.${backend} PROPERTIES ENVIRONMENT "RS_CG_BACKEND=${backend}")
   endforeach()
+  if(TARGET rsmsl)
+    add_test(NAME cg.corpus.load.metal COMMAND cg_corpus_load ${cg_corpus})
+    set_tests_properties(cg.corpus.load.metal PROPERTIES ENVIRONMENT "RS_CG_BACKEND=glsl;RS_GL_BACKEND=metal")
+  endif()
   if(EXISTS "${RS_CG_CORPUS}/reference.jsonl")
     add_test(NAME cg.corpus.params
       COMMAND sh -c "\"$1\" \"$2\" \"$4\"/*.?po && python3 -I \"$3\" \"$5\" \"$2\""

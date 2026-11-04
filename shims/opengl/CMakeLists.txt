@@ -5,7 +5,7 @@
 #                      imports and the extra functions the Cg shim, the shell and
 #                      the tests call (extra-gl-imports.txt), forwarding to the
 #                      backend (RS_GL_BACKEND=gl: the system framework;
-#                      metal, the default: rsmtl_<name>, docs/METAL-DESIGN.md), plus
+#                      metal, the default: rsmtl_<name>, docs/mac/METAL.md), plus
 #                      re-export of the rest of the framework and rs_gfx.h.
 #                      The app, the shell and Cg link it (@executable_path).
 #   libglspy.dylib     the game-import wrappers as a DYLD_INSERT_LIBRARIES
@@ -138,6 +138,6 @@ if(EXISTS "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014")
             "${RS_GAME_APP}/Contents/MacOS/Rocksmith2014" "${ogl_imports}")
 endif()
 
-# Metal backend (docs/METAL-DESIGN.md): the shader translator, then the Metal core.
+# Metal backend (docs/mac/METAL.md): the shader translator, then the Metal core.
 include(msl.cmake)
 include(metal.cmake)

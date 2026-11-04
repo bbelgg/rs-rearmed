@@ -278,9 +278,11 @@ int rsp_screen_height(void) {  // 0x10017a330
 static void default_exit(int status) { _exit(status); }
 static void (*g_exit)(int) = default_exit;
 void rsp_set_exit(void (*fn)(int)) { g_exit = fn ? fn : default_exit; }
-// Both are clean ends of a session: a Metal session's crash marker goes (rsp_renderer.h).
+// Both are clean ends of a session: a Metal session's crash marker goes (rsp_renderer.h), and
+// _exit runs no atexit handlers, so the Metal disk cache is written here.
 void rsp_exit(int status) {
   rsp_metal_session_end();
+  rsp_metal_cache_flush();
   g_exit(status);
 }
 

@@ -1,5 +1,5 @@
 // Metal core: context, command buffers, transient memory, rs_gfx, CGL, strings
-// and errors (docs/METAL-DESIGN.md "Metal core").
+// and errors (docs/mac/METAL.md "Metal core").
 #include "mtl_internal.h"
 
 #include <ImageIO/ImageIO.h>
@@ -485,6 +485,12 @@ int rsmtl_gfx_prepare_progress(rs_gfx_context *c, int *done, int *total) {
         return -1;
     }
     return rsm_cache_progress((__bridge RSMContext *)c, done, total);
+}
+
+int rsmtl_gfx_flush_cache(double max_seconds) {
+    @autoreleasepool {
+        return rsm_cache_flush(max_seconds);
+    }
 }
 
 void rsmtl_gfx_make_current(rs_gfx_context *c) { rsm_tls = (__bridge RSMContext *)c; }

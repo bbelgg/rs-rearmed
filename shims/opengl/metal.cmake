@@ -1,4 +1,4 @@
-# Metal core (src/metal/, docs/METAL-DESIGN.md): sources added to the opengl target and its tests.
+# Metal core (src/metal/, docs/mac/METAL.md): sources added to the opengl target and its tests.
 set(ogl_mtl_sources
   src/metal/mtl_context.m
   src/metal/mtl_state.m
@@ -41,7 +41,7 @@ endif()
 
 set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
-  fbo render_to_texture depth_texture cube_map dxt bgra luminance mipmaps alpha_test polygon_mode subdata_in_flight
+  fbo render_to_texture depth_texture cube_map dxt bgra luminance texture_1d mipmaps alpha_test polygon_mode subdata_in_flight
   map_buffer readback_orientation tex_subimage unpack_alignment uniforms rebind_attrib queries errors object_lifetime
   mip_redefine fbo_mipmap orphans restart_index stream_subdata stencil_clear_ref pbo_bounds api)
 # Programs need the translator (msl.cmake's rsmsl).

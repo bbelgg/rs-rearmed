@@ -1,0 +1,220 @@
+# Testing the Mac port
+
+What this repository can test, how to run it, and what needs tooling that is not in it. The Windows port's
+tests: [Windows testing](../windows/TESTING.md).
+
+## Tests in the repository
+
+Most tests are CTest tests of the root CMake build (step 4 of the [manual build](INSTALL.md#build-by-hand),
+with the venv's `cmake`, `ninja` and `ctest` first on `PATH` as in its step 2):
+
+```bash
+cmake -S . -B build -G Ninja && cmake --build build
+ctest --test-dir build --output-on-failure            # or -R <name> for some of them
+```
+
+Tests that need a game file skip or are left out when it is not there: the decrypted image
+(`RS_GAME_PLAIN`, default `analysis/cg/Rocksmith2014_x64_plain`), the installed game (`RS_GAME_APP`,
+`RS_GAME_DIR`), or extracted videos and shader dumps under `analysis/`. Nothing derived from the game is
+in the repository.
+
+| Area | Tests | What they check |
+|---|---|---|
+| Decryption | `steamless.decrypt` (`tools/steamless/test_decrypt.py`) | the key found in a made-up Mach-O, what is refused, in plain words; the real pin with `RS_DEPOT_GAME` |
+| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) with made-up game folders: what each edition copies, clones and real copies, the space check, resuming a stopped copy, refreshes (only the copied set is removed, the game's own writes stay), the earlier mirror's links removed without following them, the completeness check |
+| Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (the cable screen's DIRECT CONNECT button, the INPUT slider's fourth value, the main menu's ENUMERATE, the notice) and that a file which has them is left alone; the psarc and 7z readers and writers with made-up archives (a rewritten 7z keeps every other file's stored bytes, order, times and attributes); the overlay made, and left out for a cache that has the entries; `gamefiles.py` making it after a copy. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
+| Per-game tables | `targets.check` (`tools/targets/test_targets.py`, also `python3 tools/targets/check.py`) | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
+| Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
+| Renderer | `opengl.*` (`shims/opengl/test`) | the GL entry-point table and its clients (`opengl.table.clients`), offscreen contexts on both backends, 40 GL sequences run on GL and Metal with their pixels compared (`opengl.metal.*`), every game import with `RS_GL_CHECK=1` (`opengl.metal.coverage`), the Metal disk cache (`opengl.metal.cache`) |
+| Shader translator | `msl.unit`, `msl.verify.builtin`, `msl.verify.corpus` | GLSL to MSL; `msl_verify` runs programs on offscreen GL and Metal with the same inputs and compares pixels, depth and vertex outputs (the corpus test needs shader dumps) |
+| Cg | `cg.*` (`shims/cg/tests`) | exports, ARB and GLSL rendering, the shader corpus (load, parameters, GLSL dump, render diff against the ARB path), a stress test in the game's call order |
+| Bink | `bink.exports`, `bink.decode.*`, `bink.realtime` (`shims/bink/test`) | the exports against the game's imports; decoding and real-time playback of game videos (need extracted videos) |
+| Game libraries | `game.offline.no_network`, `game.difftest.x86_64`, `game.native.arm64` (`shims/game/test`) | the online stub and crypto import nothing that talks to a network; the rewritten crypto, efd, hash and Lua functions against the original x86-64 code (run under Rosetta, which writes a golden file), then the arm64 build against that file |
+| libstdc++ | `libstdcxx.*` | the system library provides the GNU ABI the game needs |
+| Shims | `shim.<name>.macho` | each built shim has the expected architectures and install name (`tools/check-shim.sh`) |
+
+Outside CTest:
+
+- **Steam layer**: `make -C shims/steam check` (exports against the game's imports, both slices) and
+  `make -C shims/steam test` (vtable slots and ABI tests, arm64 and x86_64; the x86_64 run needs Rosetta).
+- **Network guard**: `tools/ws8/netguard/build.sh --test` builds `netguard_test` and runs it on both
+  architectures.
+- **App build**: `build-m4.sh` starts the new app once with `--init-only` (maps the image, binds the shims,
+  then exits) and fails if that does not print its `init-only:` line. `tools/ws7/recomp/build/build.sh`
+  links a smoke test of the translated image and checks zlib's `adler32`/`crc32` against the system's.
+- **Seam unit test**: `tools/ws7/recomp/app/test/build.sh OUTDIR` (or `RC_UNIT_TEST=1` for `app/build.sh`): the
+  engine seam without the game, 166 checks.
+- **Translation**: the generated C of the whole image is the same across runs and scheduling
+  (`--jobs`, `--batch`); compare two `gen/` directories with `diff -r`.
+
+## Installer tests
+
+The installer app has no automated test. It is checked by hand, end to end, with a test home:
+
+```bash
+HOME=/path/to/test-home "tools/installer/RS Re-ARMed Installer.app/Contents/MacOS/RS Re-ARMed Installer"
+```
+
+Its build folder, logs, the launcher and `~/Library/Application Support/RS Re-ARMed` then go under the test
+home. Its preferences do not: the installer keeps its choices (game, build folder, renderer) in the real
+user's defaults (`UserDefaults`), so a test run changes what the next real run starts with. The cases
+checked for 1.3.0: a fresh build and install, Skip during Preparing shaders, an update after a simulated
+renderer fallback (the popup shows OpenGL), quitting mid-build, and the download of a release's source. How the
+screens were driven for 1.4.0, the launch options, and the stand-ins for Steam and Apple's tools that show every
+message of the box above the log: [Windows testing](../windows/TESTING.md#the-installer-app) (one app, one set of
+messages). `tools/steamless/test_decrypt.py` (ctest `steamless.decrypt`) tries the decryption on a made-up Mach-O;
+with `RS_DEPOT_GAME` set to the clean Mac depot folder it also checks the real output against the pin.
+
+A whole first install through the app, for a home of its own: link `<home>/Library/Application Support/Steam/
+steamapps/common/Rocksmith2014` to the clean depot, start the app as in that section with `-Game mac`, from outside the
+repository (it takes the current folder's repository if there is one), and click Build & Install: that is the only
+click until the last window, about 20 minutes, with `Rocksmith2014_x64_decrypted` matching the pin.
+
+A test home on another disk needs two things a real home doesn't: its `logs` folder has to be a link to the startup disk
+(the launcher's `open --stdout` there fails with -10810, launchd's spawn refused with EPERM), and each new build asks
+for the removable volume once per app, the launcher and the game. Someone has to click Allow; until then the process
+stands still in `open`, with no window and 0.01 s of CPU.
+
+`tools/play-native/install.sh` takes `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` for a test install that
+leaves the real one alone; the launcher's `RS_NATIVE_SEED=0` skips copying the Steam saves (for a prepared
+`steam/` folder). The test install gets its own copy of the game files from `RS_GAME_DIR` (clones when the
+test folder is on the game's volume; a real copy of the whole game and its DLC otherwise, so check the free
+space first). To prove a run reads no Steam folder, start the game with `HOME` set to a folder without
+one: the copy, `.rearmed/steam.env` and the `steam/` saves are all it needs.
+
+## Game runs
+
+The game is tested in a **separate test install** (`RS_NATIVE_HOME`, `RS_NATIVE_LAUNCHER`), never the
+user's, with a test profile.
+
+- **Unattended runs** used an input injector (key presses and waits for log lines or screens) and a
+  virtual audio cable that plays a recording into the Real Tone input, with the scripts that run them and
+  their reference screenshots. These come from the private project RS Re-ARMed was split from and are
+  **not in this repository**. What the repository has for such runs:
+  - `RS_GL_SNAPSHOT_DIR=DIR` (with `RS_GL_SNAPSHOT_SECS=N`): a PNG of the frame every N seconds, on both
+    renderers. Each snapshot is a synchronous readback (about 70 ms), so judge smoothness without them.
+  - `RS_GL_FRAMETIMES=FILE`: one line per frame, for frame-time statistics (median, p99, frames over
+    20/33/50 ms). Keep the game's window in front for anything measured: see [Windows testing](../windows/TESTING.md#unattended-runs).
+  - `logs/last-run.log` with `RS_MODS_LOG=1`, `RS_AUDIO_LOG=1`, `RS_STEAM_LOG=1`, `RS_GL_LOG=1`.
+  - `tools/ws8/keyfifo`: keys for a running game from a FIFO, in either edition, a key at a time with the
+    snapshots in between. Build it with `tools/ws8/keyfifo/build.sh OUTDIR`, start the game's executable with
+    `RS_KEY_FIFO=FILE DYLD_INSERT_LIBRARIES=OUTDIR/libkeyfifo.dylib`, then `echo "key return" > FILE`, `text danc`
+    or `click X Y`. Keys go into the game's own event queue, so nothing else on the Mac gets them. (The launcher's
+    netguard stays in the list: `DYLD_INSERT_LIBRARIES=<home>/libnetguard.dylib:OUTDIR/libkeyfifo.dylib`.)
+- **By hand**: menus, a song, Session Mode, lessons, Guitarcade, full screen and back, quitting; on both
+  renderers (`RS_GL_BACKEND=gl` for OpenGL).
+- **First play of a song stutters** with Metal after an install: Metal builds pipelines the first time they
+  are used, so the first half-minute of a song, venue or mode has a few 0.3-0.8 s stalls. Measure frame
+  times on a second play.
+- **Fallback**: two forced kills (`kill -9`) of Metal starts in a row; the next start must use OpenGL, write
+  `opengl` into `renderer` and `renderer-fallback.txt`; a clean quit removes `metal-session`.
+- **No intro screens** (`RS_MODS_INTRO`): boot to the title several times with the original `cache.psarc`
+  (a fast-load `cache.psarc` has a short intro of its own and hides problems) and with a fast-load one;
+  with the skip, snapshots show white, about three seconds of black, then the title (about 8 s from
+  launch, against about 31 s with `RS_MODS_INTRO=0`, which must still show the Ubisoft logo and the legal
+  screens). The failure to look for is the title never coming: the loft fades in with no title on it.
+  `RS_MODS_LOG=1` logs `intro: skipped`. Checked 2026-11-03 with the test harness's title reference: 4
+  boots with the original cache (one scripted on to the main menu and 60 s of a song) and 3 with a
+  fast-load one reached the title, and 6 more with a test build of the same logic.
+- **Direct Connect overlay**: with the original `cache.psarc` (not one that has the entries already, or the
+  overlay changes nothing) and `game/Update/patcharchives.psarc` made by `cache_overlay.py`, the INPUT
+  setting (in My Path, `ui_menu_pillar_mission`) offers DIRECT CONNECT as a fourth value, and choosing it
+  works with an audio interface. `RS_MODS_LOG=1` logs
+  `cache overlay: cache7.7z from Update/patcharchives.psarc`. Checked by the user on 2026-11-03. Without
+  screen control, a marker label is the quickest check that the overlay is read: change the title screen's
+  `pressstart` label in the overlay's copy of `ui_menu_pillar_startup` and look at a snapshot
+  (`RS_GL_SNAPSHOT_DIR`).
+- **Enumerate** (`shims/steam/tests/test_enumerate.cpp` covers the copying): take a custom song out of the test
+  install's copy, point `source` and `dlc_from` in its `.rearmed/source.json` at folders of your own, start the game,
+  and when the main menu is up put the song in one of them. By keyfifo, counted from the start: Return at 42 s
+  (title) and 50 s (profile), song in at 80 s, Down at 84 s to ENUMERATE, Return at 88 s: the notice "Looking for new
+  songs…"; Return at 96 s closes it, Up, Return at 105 s for LEARN A SONG, `/` at 117 s, `amor` at 120 s, Down and
+  Return on the match, Return on Play Song at 145 s, `fwddelete` at 172 s on the tuner (Skip Tuner), Return at 178 s
+  on "Yes, continue without tuning". A Return on the tuner instead starts Calibration, which waits for a guitar. With
+  `RS_STEAM_LOG=1` the log has `enumerate: pressed` once, `1 new archive(s) in the copy` and `dispatch callback 1005`.
+  Use a song with an AppID the game's list lacks, re-packed as under Song ownership. Checked on 2026-11-04 with The
+  Bee as 999999: "amor" gives 2 Matches (Paramore too), the song plays to the note highway with no restart;
+  with `RS_MODS_BYPASS=0` 1 Match, without the song.
+- **Song ownership** (songs listed whatever AppID they carry): re-pack an official archive with another
+  `appid.appid` (with `tools/play-native/cache_overlay.py`'s `Psarc` and `write_psarc`), put it in the
+  `dlc/` of the test install's game source and refresh the copy (`gamefiles.py`): `steam.env`'s
+  `RS_STEAM_DLC` gains the AppID and a search finds the song; with the copy's `steam.env` holding the list
+  without it, the search does not. Checked on 2026-11-03 with Dancing Queen as 999999 ("danc": 9 matches
+  against 8), played to the note highway. The way through the screens from a test key mod (key events
+  through the engine's input sink 0x100ba1190): Return on the title about 35 s after the first frame (this
+  test build plays the intro), Return on the profile list, Return on the main menu once it is up (the DLC
+  enumeration there took about 30 s in a first run); in the song list `/` opens the search (the Mac
+  binding; Shift is the Windows one), and letters only register when the key stays down for a few frames
+  (a down and up in the same frame is lost for text, though it works for Return); Tab opens SORT BY. Down
+  then Return opens a match, Return plays it, Return on "TUNE UP!" (the test profile has no tuner skip
+  set), and the song starts. Use the original `cache.psarc` in the test copy: with a modded one a start
+  stayed on the loading screen for minutes (the known fast-load stall, [PLAN.md](PLAN.md#open-issues)).
+- **The screens by key** (`tools/ws8/keyfifo`, 2026-11-04, a test install with a profile; snapshots every 2 s): the
+  title takes Return about 40 s after the start. Return on the profile, then wait about 26 s for the main menu.
+  Ctrl opens Path/Input: Down to INPUT, Right and Left step through REAL TONE CABLE, MICROPHONE, DISCONNECTED and
+  DIRECT CONNECT, Esc goes back (the change reaches the profile only when the game saves it, so a kill loses it).
+  Return on LEARN A SONG; `/` opens the search, letters 1.5 s apart, and the list shows the matches; Down and Return
+  on a song, Return on Play Song, Return on "TUNE UP!". In a song Esc pauses; Down moves through RESUME, RESTART,
+  CHORDS and EXIT, with a key now and then lost, so look before Return. The main menu's list is LEARN A SONG,
+  ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, UPLAY.
+  LESSONS: Down to a lesson, Return, Return to start it; Esc gives RESUME, EXIT LESSON. SESSION MODE: Space on the
+  band screen starts it, after the tuner. Esc from the main menu leads to "Are you sure you want to quit?", Return
+  on it to the title, Esc there to EXIT GAME?, and Return on that is a normal quit, gone in 0.2 s. keyfifo's `quit` (the app
+  menu's Quit item) also ends the game, from inside a song too, in 0.3-0.5 s.
+- **The installed app by `open`** (2026-11-04, the launcher in a test home): the launcher hands the game only what it
+  lists, so a test copy of its `Contents/Resources/launch.sh` adds keyfifo, `HOME`, `CFFIXED_USER_HOME` and the lines of a
+  file to `open`'s `--env`s; without `HOME` the game writes to the real `~/Library/Caches`. A home with no Steam account
+  takes the account whose saves were copied in. The same route as above, with the title taking Return from about 11 s.
+  Search `cherub`, Return, Return on Play Song, 26 s later `fwddelete` on the tuner, 6 s later Return: the highway about
+  20 s after that, with no snapshot needed. NONSTOP PLAY: Return on START NONSTOP PLAY, the tuner, Delete, Return; Esc in
+  a song puts the cursor on the entry last used, so look before pressing Down to EXIT.
+- **Guitarcade**: Down five times to GUITARCADE, Return, Return on TECHNIQUE GAMES, a game, Return, Return. A game has a tuner
+  with no Skip Tuner: Return starts Calibration (Esc cancels) and only a tuned instrument gets past it. So the menus and
+  the list of games are what keys reach. A virtual cable next to a Loopback device of the same name gives "Two
+  Rocksmith Real Tone Cables have been detected"; with the input on the microphone the wave doesn't reach it at all.
+- **Without a guitar**: DISCONNECTED plays songs ("TUNE UP!" then the note highway) but greys out Session Mode,
+  Lessons, Guitarcade, Multiplayer and the Tone Designer. Exactly one device named "Rocksmith USB Guitar Adapter"
+  (a Loopback device of that name works) gives REAL TONE CABLE with `CURRENT INPUT: Real Tone Cable`; two give "Two
+  Rocksmith Real Tone Cables have been detected" at the tuner. The tuner stands before every session: Delete,
+  then Return on "Yes, continue without tuning". With another app in front the engine takes no keys: send keyfifo's
+  `front` before them.
+- **The output device** (2026-11-04, a test library logging the buffer sets, UR22 as output and input): the
+  sink sets 256 frames at about 1 s, the input scan sets 128 on the same device at 3-4 s and stays. Changing the
+  default output during a run only adds a mute listener; the sink stays on its device. Unplugging the device moves
+  the output to another by the HAL; replugging reopens the input only.
+- Before reporting a game bug, check whether it also happens in the original game under Rosetta.
+
+### The capture VM
+
+Not applicable: the Mac edition's game is not packed. See [the Windows port's notes](../windows/TESTING.md).
+
+## Diagnostics
+
+Logs are in `<home>/logs/`: `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log`. Set switches for
+the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switches)).
+
+| Switch | What |
+|---|---|
+| `RS_MODS_LOG=1` | what the built-in fixes apply |
+| `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input |
+| `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
+| `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_TRACE_DIR` | GL calls, errors after each call, counts, traces |
+| `RS_MSL_LOG=1`, `RS_MTL_DUMP_MSL` | shaders translated at run time, the MSL of slow compiles |
+| `RS_GL_DUMP_SHADERS` | the GLSL the game compiles |
+| `RS_GL_SNAPSHOT_DIR`, `RS_GL_SNAPSHOT_SECS` | frame snapshots |
+| `RS_GL_FRAMETIMES` | frame times |
+| `--renderer-check` | the renderer a start would use, without starting the game |
+| `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
+| `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |
+
+## Offline checks
+
+The game must never call home.
+
+- `game.offline.no_network` (CTest): the online stub and the crypto import no network function.
+- `tools/ws8/netguard/build.sh --test`: the guard refuses non-local connections, host-name lookups and URL
+  opens.
+- In a game run, `logs/netguard.log` lists every refused attempt; a run from the title to a song should add
+  nothing unexpected. The launcher refuses to start without `libnetguard.dylib`.
+- The Steam layer runs in stub mode (`RS_STEAM_MODE=stub` in the launcher): it never loads Valve's library.
+  `crd` is never copied into `steam/` and is deleted from a copy before each launch.

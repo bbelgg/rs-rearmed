@@ -61,7 +61,9 @@ display link and render thread, input, file paths and `Rocksmith.ini` (`rsp_shel
 `rsp_config.c`). The engine sits behind function-pointer hooks; `tools/ws7/recomp/app/seam_platform.c`
 connects them to the translated `GameBootstrap` and `GameFrame`. The shell adds the keyboard keys the
 original lacked and follows the display's refresh rate (`RS_FPS` fixes a rate). `RS_METAL_RETINA=1`
-renders at backing-pixel size on a Retina screen.
+renders at backing-pixel size on a Retina screen. The screen saver and display sleep stay off while the game
+is open, in a window or full screen: the view holds a display-sleep assertion for its whole life, as the
+original's does.
 
 The install is self-contained: `install.sh` puts RS Re-ARMed's own copy of the game files next to the
 installed app (`tools/play-native/gamefiles.py`: APFS clones, which share the data with Steam's files until

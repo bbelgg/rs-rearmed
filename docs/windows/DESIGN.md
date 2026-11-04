@@ -144,6 +144,10 @@ macOS full screen need nothing from the game; the pointer goes back through the 
 screen, the original too ([Mac plan](../mac/PLAN.md#status)). The rules are
 plain C in `win-x86/app/lp_screen.c`.
 
+The screen saver and display sleep stay off while the game is open, in a window or full screen: `lp_window.m`
+takes a display-sleep assertion when it makes the window and holds it until the process ends, as the Mac game's
+view does. An offscreen run (`LP_OFFSCREEN=1`) makes no window and takes none.
+
 ## Renderer
 
 ### Direct3D 9

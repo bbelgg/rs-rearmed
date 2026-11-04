@@ -204,6 +204,11 @@ the wall time, to match them with snapshots. `LP_WINDOW_SCRIPT=20:900x700,30:tog
 toggles full screen at those seconds; `quit`, `unfocus` and `focus` are the same steps as Command-Q and as the
 window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window.
 
+Display sleep: during a run with a window, `pmset -g assertions` lists `rs2014_lp` with `NoDisplaySleepAssertion`
+named "Rocksmith 2014 is preventing your Mac from sleeping.", counted under `PreventUserIdleDisplaySleep`. It is
+gone after the quit, and an `LP_OFFSCREEN=1` run has only the `game` activity's `PreventUserIdleSystemSleep`.
+Checked on 2026-11-04 with `RS_FULLSCREEN=0 LP_WINDOW_SCRIPT=30:quit`. Waiting out a real screen saver timeout was not.
+
 Screenshots: `RS_GL_SNAPSHOT_DIR=DIR RS_GL_SNAPSHOT_SECS=3` (libRSOpenGL's, as on the Mac). Frame times:
 `RS_GL_FRAMETIMES=FILE` (the Mac port's format). For anything measured keep the game's window in front (keyfifo's `front`,
 and nothing else activated during the run): the full-screen window hides when another app is active, and frame rate

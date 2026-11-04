@@ -37,6 +37,7 @@
 //      RS_FULLSCREEN=1|0  always full screen / always a window, whatever the game's setting
 //      LP_WINDOW_SCRIPT   window resizes and full-screen toggles for unattended checks
 #import <Cocoa/Cocoa.h>
+#import <IOKit/pwr_mgt/IOPMLib.h>
 #import <QuartzCore/CAMetalLayer.h>
 
 #include <stdint.h>
@@ -392,6 +393,11 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
       g_win.contentMinSize = NSMakeSize(320, 180);
       g_win.delegate = g_ctl;
       g_win.title = @"Rocksmith 2014 Learn & Play Re-ARMed " LP_VERSION;
+      // No screen saver or display sleep while the game is open, in a window or full screen, as the Mac
+      // game's view does (rsp_shell.m). Held until the process ends.
+      IOPMAssertionID awake;
+      IOPMAssertionCreateWithName(kIOPMAssertionTypeNoDisplaySleep, kIOPMAssertionLevelOn,
+                                  CFSTR("Rocksmith 2014 is preventing your Mac from sleeping."), &awake);
       input_monitor();
       window_script();
     }

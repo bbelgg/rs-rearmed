@@ -71,7 +71,7 @@ clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$ob
   "$b/modules/d3dx9_42/obj/libgame_rc.a" $dcomp $bink \
   "$obj/win32_shims.a" "$obj/steam/libsteam32.a" \
   -L"$gl" -lRSOpenGL -lc++ -lz -framework Metal -framework QuartzCore -framework Cocoa \
-  -framework AudioToolbox -framework CoreAudio -framework CoreFoundation \
+  -framework AudioToolbox -framework CoreAudio -framework CoreFoundation -framework IOKit \
   -Wl,-rpath,@executable_path -o "$out/rs2014_lp"
 
 # libRSOpenGL's install name is @executable_path/libRSOpenGL.dylib

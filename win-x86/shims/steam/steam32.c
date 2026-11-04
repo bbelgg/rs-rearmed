@@ -249,7 +249,7 @@ M(t_IsOverlayEnabled) {  // no overlay; the game asks before it opens the Shop (
 
 // ISteamApps
 M(p_GetLanguage) { UNUSED; return w32_gstr(steam32h_language()); }
-M(p_BIsSubscribedApp) { UNUSED; return steam32h_owned(a[0]); }
+M(p_BIsSubscribedApp) { UNUSED; return steam32h_subscribed(a[0]); }
 M(p_BIsDlcInstalled) { UNUSED; return a[0] != steam32h_app_id() && steam32h_owned(a[0]); }
 M(p_GetDLCCount) { UNUSED; return (uint32_t)steam32h_dlc_count(); }
 M(p_BGetDLCDataByIndex) {  // (i, AppId_t *, bool *available, char *name, int cub)

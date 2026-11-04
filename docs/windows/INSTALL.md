@@ -364,5 +364,6 @@ log, start with `open -n --env LP_LOG=1 …` ([TESTING.md](TESTING.md#diagnostic
 | a path with spaces refused | Use a build folder and a clone whose paths have no spaces. |
 | The game starts in the wrong mode or size | `RS_FULLSCREEN=0`, or fix `[Renderer.Win32]` in `userdata/game/Rocksmith.ini`. |
 | No guitar sound | Check the INPUT setting in the game (Real Tone cable, microphone, DIRECT CONNECT) and that macOS allowed microphone access. A device must be named "Rocksmith USB Guitar Adapter" to count as the cable. |
+| Rocksmith 1 DLC songs you own are missing, or the refresh says "Rocksmith 1 DLC: not checked" | Only Steam knows which of them you own, and a refresh can ask it only while the account RS Re-ARMed plays as is logged in: log in to that account in Steam, then **Refresh Game Files** (or `learn-play.sh --refresh`). The answer is kept, so Steam can be closed afterwards. |
 | Songs or profiles missing after switching Steam accounts | **Refresh Game Files** (or `learn-play.sh --refresh`): it records the account whose license has Learn & Play in `game/.rearmed/steam.env`, and the app uses it whoever is logged in to Steam. Set `RS_STEAM_ID` to choose another (see [Game files](#game-files)). |
 | The game crashes | Open an issue with `last-run.log` and `previous-run.log`. |

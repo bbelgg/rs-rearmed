@@ -59,6 +59,7 @@ struct ShimConfig {
     std::string steam_root;    // ~/Library/Application Support/Steam
     std::set<AppId_t> dlc;     // stub mode: DLC reported as owned (installed DLC by default)
     bool dlc_all = false;      // stub mode: every app id is owned (RS_STEAM_DLC=all)
+    std::set<AppId_t> owned;   // stub mode: apps the account owns besides that, not this game's DLC (RS_STEAM_OWNED)
     bool log = false;
 };
 

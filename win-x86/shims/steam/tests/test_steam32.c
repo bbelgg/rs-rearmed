@@ -142,6 +142,8 @@ int main(void) {
   CHECK(vcall(apps, 6, 1, (uint32_t[]){221680}) == 1);
   CHECK(vcall(apps, 6, 1, (uint32_t[]){258341}) == 1);
   CHECK(vcall(apps, 6, 1, (uint32_t[]){12345}) == 0);
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){206166}) == 1);  // RS_STEAM_OWNED: owned, but no DLC of this game
+  CHECK(vcall(apps, 7, 1, (uint32_t[]){206166}) == 0);
   CHECK(vcall(apps, 7, 1, (uint32_t[]){221680}) == 0);  // BIsDlcInstalled: not the base app
   CHECK(vcall(apps, 10, 0, 0) == 2);
   uint32_t out = w32_galloc(16);

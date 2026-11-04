@@ -435,13 +435,16 @@ static bool owned(AppId_t app) {
     return app == c.app_id || c.dlc_all || c.dlc.count(app);
 }
 
+// What the account owns, this game's or not: the DLC above and RS_STEAM_OWNED.
+static bool subscribed(AppId_t app) { return owned(app) || shim_config().owned.count(app); }
+
 class Apps {
 public:
     virtual bool BIsSubscribed() { return true; }
     Z(BIsLowViolence) Z(BIsCybercafe) Z(BIsVACBanned)
     virtual const char *GetCurrentGameLanguage() { return shim_config().language.c_str(); }
     virtual const char *GetAvailableGameLanguages() { return shim_config().language.c_str(); }
-    virtual bool BIsSubscribedApp(AppId_t app) { return owned(app); }
+    virtual bool BIsSubscribedApp(AppId_t app) { return subscribed(app); }
     virtual bool BIsDlcInstalled(AppId_t app) { return app != shim_config().app_id && owned(app); }
     Z(GetEarliestPurchaseUnixTime) Z(BIsSubscribedFromFreeWeekend)
     virtual int GetDLCCount() { return (int)shim_config().dlc.size(); }

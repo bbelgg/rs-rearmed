@@ -23,6 +23,7 @@ void steam32h_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 
 // apps: the base app and the configured DLC (all of them with RS_STEAM_DLC=all)
 int steam32h_owned(uint32_t app);
+int steam32h_subscribed(uint32_t app);  // those and RS_STEAM_OWNED, the apps that are no DLC of this game
 int steam32h_dlc_count(void);
 uint32_t steam32h_dlc_at(int i);  // 0 when out of range
 

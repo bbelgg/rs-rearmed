@@ -22,6 +22,11 @@ mode = auto
 # comma-separated list of app ids.                              [RS_STEAM_DLC]
 #dlc = installed
 
+# Apps the account owns besides that, as a comma-separated list: asked about, but no
+# DLC of this game (the first Rocksmith's DLC, for the RS1 compatibility pack's
+# songs).                                                       [RS_STEAM_OWNED]
+#owned = 206166
+
 # Stub-mode Steam Cloud / stats root: <data_dir>/<account id>/<app id>/{remote,local,stats.txt}
 # Default: ~/Library/Application Support/RocksmithSteamShim/userdata  [RS_STEAM_DATA_DIR]
 #data_dir = /path/to/userdata

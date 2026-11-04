@@ -73,6 +73,9 @@ it, the title shows the tag, and with `RS_REARMED=0` the link goes back and the 
 Custom songs: listed and played (the signature skip, the AppID ownership and the song-key table skip;
 [Built in for 1.4.0](#built-in-for-140)).
 
+Rocksmith 1 DLC songs: `RS_STEAM_OWNED` reaches the face as on the Mac and `test_steam32` covers it, but no game run
+yet: the test account owns none of those DLC. Open: one run with an account that does, or with the variable set.
+
 All of these together, in one build with an install copy made by `gamefiles.py`, were checked in the game on
 2026-11-03 ([Built in for 1.4.0](#built-in-for-140)): every pre-release item is done.
 

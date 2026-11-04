@@ -159,6 +159,87 @@ class Plan(Base):
         self.assertEqual(gamefiles.steam_env(None, archive_apps={999999}), ["RS_STEAM_DLC=248750,999999"])
 
 
+class Rs1Owned(Base):
+    """The songs of the RS1 compatibility pack need the first Rocksmith's DLC: the Steam client is asked for it when
+    the edition's account is logged in, and the answer is kept for a refresh without it."""
+
+    ACCOUNT = 12345
+
+    def setUp(self):
+        super().setUp()
+        self.dest = os.path.join(self.tmp, "copy")
+        os.makedirs(os.path.join(self.dest, gamefiles.META))
+        index = {"Entries": {"a": {"Attributes": {"DLCRS1Key": [{"360": "x", "WIN32": 206166}]}},
+                             "b": {"Attributes": {"DLCRS1Key": [{"WIN32": "222041"}]}},
+                             "c": {"Attributes": {"DLCRS1Key": None}}, "d": {"Attributes": {}}}}
+        write(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"), gamefiles.cache_overlay.write_psarc(
+            [("appid.appid", b"221680"), ("manifests/songs_rs1dlc/songs_rs1dlc.hsan", json.dumps(index).encode())]))
+        self.asked = []
+        self.answer = {"account": self.ACCOUNT, "apps": [206166]}
+        self.state = gamefiles.SteamState(True, True, True, self.ACCOUNT)
+        patches = [mock.patch.object(gamefiles, "steam_state", lambda steam: self.state),
+                   mock.patch.object(gamefiles, "ask_steam", lambda steam, apps: self.asked.append(apps) or self.answer)]
+        for p in patches:
+            p.start()
+            self.addCleanup(p.stop)
+        self.said = []
+
+    def owned(self, account=ACCOUNT):
+        return gamefiles.rs1_owned(self.steam, self.dest, account, self.said.append)
+
+    def test_the_pack_names_the_dlc(self):
+        self.assertEqual(gamefiles.rs1_dlc_apps(self.dest), {206166, 222041})
+
+    def test_steam_says_what_the_account_owns(self):
+        self.assertEqual(self.owned(), [206166])
+        self.assertEqual(self.asked, [{206166, 222041}])
+        self.assertIn("owns 1 of the 2", self.said[0])
+
+    def test_steam_env_keeps_them_apart_from_the_dlc(self):
+        env = gamefiles.steam_env(None, archive_apps={999999}, owned=[222041, 206166])
+        self.assertEqual(env, ["RS_STEAM_DLC=248750,999999", "RS_STEAM_OWNED=206166,222041"])
+
+    def test_another_account_is_not_asked_and_the_answer_is_kept(self):
+        self.owned()
+        self.state = gamefiles.SteamState(True, True, True, 777)
+        self.assertEqual(self.owned(), [206166])
+        self.assertEqual(len(self.asked), 1)
+
+    def test_steam_closed_keeps_the_answer(self):
+        self.owned()
+        self.state = gamefiles.SteamState(True, False, False)
+        self.assertEqual(self.owned(), [206166])
+
+    def test_an_answer_for_another_account_is_not_used(self):
+        self.answer = {"account": 777, "apps": [206166, 222041]}
+        self.assertEqual(self.owned(), [])
+        self.assertIn("not checked", self.said[0])
+
+    def test_steam_with_no_answer_keeps_what_was_known(self):
+        self.owned()
+        self.answer = None
+        self.assertEqual(self.owned(), [206166])
+
+    def test_what_one_account_owns_is_not_the_others(self):
+        self.owned()
+        self.state = gamefiles.SteamState(True, False, False)
+        self.assertEqual(self.owned(account=777), [])
+
+    def test_nothing_is_asked_without_the_pack(self):
+        os.unlink(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"))
+        self.assertEqual(self.owned(), [])
+        self.assertEqual(self.asked, [])
+
+    def test_the_owned_apps_reach_steam_env(self):
+        self.mac_game()
+        with mock.patch.object(gamefiles, "steam_account", lambda *a: (self.ACCOUNT, gamefiles.HOW_LICENSE)):
+            write(os.path.join(self.src, "dlc", "rs1compatibilitydlc_m.psarc"),
+                  open(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"), "rb").read())
+            copy = os.path.join(self.tmp, "fresh")
+            Copier("mac", self.src, copy, (), self.steam, quiet(), is_running=lambda e: False).run()
+        self.assertIn(b"RS_STEAM_OWNED=206166\n", open(os.path.join(copy, ".rearmed", "steam.env"), "rb").read())
+
+
 def song(appid=None, name="songs/bin/generic/x_lead.sng"):
     """A small song archive (a real psarc) carrying APPID in appid.appid (none: no such entry)."""
     files = [(name, b"song data")]

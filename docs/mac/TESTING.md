@@ -149,6 +149,15 @@ user's, with a test profile.
   then Return opens a match, Return plays it, Return on "TUNE UP!" (the test profile has no tuner skip
   set), and the song starts. Use the original `cache.psarc` in the test copy: with a modded one a start
   stayed on the loading screen for minutes (the known fast-load stall, [PLAN.md](PLAN.md#open-issues)).
+- **Rocksmith 1 songs** (`RS_STEAM_OWNED`): an APFS clone of the copy (`cp -cR`), the Steam folder copied without
+  `crd`, the game started by keyfifo with `RS_STEAM_OWNED` set to the AppIDs of `gamefiles.rs1_dlc_apps`. "countd"
+  gives 2 Matches (Megadeth and The Final Countdown), which plays to the note highway (`Play_FinalCountdown` in the
+  log, audio from `songs.psarc`); unset, 1 Match. "rebel" finds Rebel Rebel either way: the disc pack has no such
+  check. Netguard logged nothing refused. Checked on 2026-11-04. `gamefiles.ask_steam` was checked against a running
+  Steam for an account that owns none of them (0 of 141, and the account id right); not yet for one that does.
+- **Keys and the focus**: without `RS_KEY_DIRECT=1` a key goes to the window only while the game has the focus, and
+  any other app coming forward loses it quietly (`[rsmods] key down` is missing from the log). With it, keys arrive
+  in front or not. Search text then still needs 1.5 s between letters.
 - **The screens by key** (`tools/ws8/keyfifo`, 2026-11-04, a test install with a profile; snapshots every 2 s): the
   title takes Return about 40 s after the start. Return on the profile, then wait about 26 s for the main menu.
   Ctrl opens Path/Input: Down to INPUT, Right and Left step through REAL TONE CABLE, MICROPHONE, DISCONNECTED and

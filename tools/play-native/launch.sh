@@ -15,7 +15,8 @@
 #     credentials) is never copied;
 #   - the DLC the account owns (the ones Steam installed, recorded in the copy's .rearmed/steam.env with
 #     the language), the free 248750 that custom songs carry and every AppID the copy's dlc/ archives
-#     carry (recorded there too: custom songs show whatever AppID they carry) count as owned; set
+#     carry (recorded there too: custom songs show whatever AppID they carry) count as owned, and so does
+#     the first Rocksmith's DLC the account owns (RS_STEAM_OWNED, recorded there at a refresh); set
 #     RS_STEAM_DLC=all with launchctl setenv to own every AppID. The Steam account (its saves and profiles) is the one the copy
 #     recorded there too (RS_STEAM_ID: the account whose license has the Mac game), so logging in to Steam
 #     with another account (e.g. one for Learn & Play) changes nothing here; RS_STEAM_ID with launchctl

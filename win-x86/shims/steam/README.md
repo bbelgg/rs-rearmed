@@ -30,7 +30,8 @@ make slots STEAM_API_DLL=<game>/steam_api.dll PY=<python with capstone>
   its `interfaces.cpp`): the identity from Steam's `loginusers.vdf`, the language and installed
   DLC from the appmanifest (plus the free 248750), `RS_STEAM_DLC` / `steam_shim.ini` (the app
   passes the install's list: the installed DLC, 248750 and every AppID the copy's `dlc/` archives
-  carry, from `game/.rearmed/steam.env`), Steam
+  carry, from `game/.rearmed/steam.env`), `RS_STEAM_OWNED` (the first Rocksmith's DLC the account
+  owns, for the RS1 compatibility pack's songs; `BIsSubscribedApp` only), Steam
   Cloud in `<data_dir>/<account>/221680/remote` seeded from Steam's copy without `crd`, local
   stats and achievements. Implemented: ISteamClient, ISteamUser, ISteamFriends, ISteamUtils,
   ISteamApps, ISteamUserStats, ISteamRemoteStorage; ISteamHTTP, ISteamMatchmaking and the rest

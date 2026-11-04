@@ -40,6 +40,7 @@ void steam32h_enumerate(void (*post)(int id, const void *data, uint32_t size)) {
 }
 
 int steam32h_owned(uint32_t app) { return owned(app); }
+int steam32h_subscribed(uint32_t app) { return subscribed(app); }
 int steam32h_dlc_count(void) { return g_apps.GetDLCCount(); }
 uint32_t steam32h_dlc_at(int i) {
     AppId_t app = 0;

@@ -6,6 +6,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 - **Released**: `VERSION` says which release this is. 1.4.0 is the first with the experimental Windows (Learn & Play)
   port.
+- **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with
+  the owning account logged in to Steam, since only the Steam client knows which of them it owns.
 - **What works**: the whole game as a native arm64 app, offline: songs, DLC and custom songs, Session
   Mode, lessons with their videos, Guitarcade; the Real Tone cable and other audio interfaces (Direct
   Connect) with lower latency than under Rosetta; Metal by default with OpenGL as choice and fallback;

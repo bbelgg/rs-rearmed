@@ -124,6 +124,17 @@ static std::string appmanifest_language(const std::vector<std::string> &t) {
     return std::string();
 }
 
+// A comma-separated list of app ids.
+static void app_id_list(const std::string &v, std::set<AppId_t> *out) {
+    for (const char *p = v.c_str(); *p;) {
+        char *end;
+        unsigned long id = strtoul(p, &end, 10);
+        if (end == p) { p++; continue; }
+        if (id) out->insert((AppId_t)id);
+        p = end;
+    }
+}
+
 // Installed DLC: each InstalledDepots entry of a DLC names its "dlcappid". Steam installs only the DLC the
 // account owns, so these are what the real backend reports as owned. The game hides every song whose
 // archive's AppID is not owned, and custom songs mostly carry 248750 (a free DLC; the toolkit's default).
@@ -201,14 +212,12 @@ static void load_config() {
         c.dlc.insert(kFreeCdlcAppId);
         c.dlc_all = v == "all";
     } else if (v != "none") {
-        for (const char *p = v.c_str(); *p;) {
-            char *end;
-            unsigned long id = strtoul(p, &end, 10);
-            if (end == p) { p++; continue; }
-            if (id) c.dlc.insert((AppId_t)id);
-            p = end;
-        }
+        app_id_list(v, &c.dlc);
     }
+    // The apps the install found the account owns outside this game's DLC: the first Rocksmith's DLC, which
+    // the game asks about for each song of the RS1 compatibility pack (BIsSubscribedApp only: Steam lists
+    // them as no DLC of this game and installs nothing for them).
+    app_id_list(opt("RS_STEAM_OWNED", "owned"), &c.owned);
 
     c.data_dir = opt("RS_STEAM_DATA_DIR", "data_dir");
     if (c.data_dir.empty())

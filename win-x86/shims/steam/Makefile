@@ -39,11 +39,11 @@ $(OUT)/test_steam32: tests/test_steam32.c $(OUT)/libsteam32.a $(OUT)/win32_guest
 	    $(RT:%=$(OUT)/rt_%.o) -o $@
 
 # The tests run with a HOME of their own (no Steam there) and a data directory under $(OUT).
-unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSONA RS_STEAM_LOG \
+unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_OWNED RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSONA RS_STEAM_LOG \
     RS_STEAM_DATA_DIR RS_STEAM_REAL_LIB SteamAppId
 test: $(OUT)/test_steam32
 	rm -rf $(OUT)/testdata $(OUT)/emptyhome && mkdir -p $(OUT)/emptyhome
-	HOME=$(abspath $(OUT))/emptyhome RS_STEAM_DATA_DIR=$(abspath $(OUT))/testdata RS_STEAM_DLC=248750,258341 \
+	HOME=$(abspath $(OUT))/emptyhome RS_STEAM_DATA_DIR=$(abspath $(OUT))/testdata RS_STEAM_DLC=248750,258341 RS_STEAM_OWNED=206166 \
 	    $(OUT)/test_steam32
 
 slots:

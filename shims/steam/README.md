@@ -59,6 +59,11 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
     `tools/play-native/gamefiles.py`): the installed DLC, 248750 and every
     AppID the copy's `dlc/` archives carry, so custom songs show up whatever
     AppID they carry.
+    `RS_STEAM_OWNED` / `owned`: a comma-separated list of apps the account
+    owns outside this game's DLC, reported by `BIsSubscribedApp` only (not
+    `BIsDlcInstalled`, not `GetDLCCount`). The install fills it with the first
+    Rocksmith's DLC the account owns, which the game asks about for each song
+    of the RS1 compatibility pack ([DESIGN.md](../../docs/mac/DESIGN.md#steam)).
 
 The stub also answers the Enumerate entry of the main menu (`src/enumerate.h`, shared with Learn & Play): the game's
 `IsOverlayEnabled` question counts as the press, new archives are copied into the install's `dlc/`, and a

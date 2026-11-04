@@ -263,6 +263,11 @@ disappears from the list. As on the Mac ([DESIGN.md](../mac/DESIGN.md#steam)), t
 `game/.rearmed/steam.env` at each copy and refresh, so songs show whatever AppID they carry and official
 DLC is reported as before. No game code is changed for it.
 
+The songs of `rs1compatibilitydlc` need the first Rocksmith's DLC as well, the same way as on the Mac
+([DESIGN.md](../mac/DESIGN.md#steam)): `dlc_update_tail` (`0x1449660`) asks `BIsSubscribedApp` for the AppIDs in the
+game folder's `metadata` file. The same `rs1_owned` asks the Steam client at a copy or refresh when the edition's
+account is logged in, and the face answers `RS_STEAM_OWNED` from `steam.env` through `BIsSubscribedApp` only.
+
 ## Online services
 
 `win-x86/online` gives the Windows build the Mac port's offline behaviour: no login is started, Enter on

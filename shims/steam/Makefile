@@ -36,7 +36,7 @@ build/test_vtables: tests/test_vtables.cpp $(SRCS) $(HDRS)
 
 # The tests run with a HOME of their own (no Steam there, unless a run makes one) and without the
 # settings the developer's environment may have for the game (README: launchctl setenv).
-unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSONA RS_STEAM_LOG \
+unexport RS_STEAM_MODE RS_STEAM_DLC RS_STEAM_OWNED RS_STEAM_LANGUAGE RS_STEAM_ID RS_STEAM_PERSONA RS_STEAM_LOG \
     RS_STEAM_DATA_DIR RS_STEAM_REAL_LIB SteamAppId
 TEST_ENV := RS_STEAM_MODE=stub RS_STEAM_DATA_DIR=$(CURDIR)/build/testdata
 NO_STEAM := HOME=$(CURDIR)/build/emptyhome
@@ -49,7 +49,7 @@ test: build/test_shim build/test_vtables build/test_enumerate
 	arch -arm64 build/test_vtables
 	arch -x86_64 build/test_vtables
 	arch -arm64 build/test_enumerate
-	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -arm64 build/test_shim
+	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 RS_STEAM_OWNED=206166,222041 arch -arm64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -x86_64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=all arch -arm64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) arch -arm64 build/test_shim

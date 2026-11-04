@@ -245,6 +245,11 @@ song finds it; with `RS_STEAM_DLC` set to the list without that AppID (as before
 nothing ("0 Matches"). Checked on 2026-11-03 with Dancing Queen as 999999. To test a changed archive, run with a game folder of its own (`cp -Rc` of the game
 folder clones it; set `LP_GAME_DIR`) rather than changing the installed copy.
 
+Rocksmith 1 songs (`RS_STEAM_OWNED`): not run on Learn & Play yet, the test account owns none of them. The route is
+the Mac one ([TESTING.md](../mac/TESTING.md#game-runs)): set `RS_STEAM_OWNED` to the AppIDs of
+`gamefiles.rs1_dlc_apps`, and a search for "countd" finds The Final Countdown; unset, it does not. The face's answer
+is covered by `test_steam32`.
+
 Custom songs (the song-key table skip): with CDLC in the copy's `dlc/` (here Amorphis' The Bee), search
 for the artist and play it, from the title to the note highway:
 

@@ -152,6 +152,11 @@ int main() {
     EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == dlc_all);
     EXPECT(!vcall<bool>(apps, 7, (uint32_t)221680));               // the base game is no DLC
     if (dlc_list) EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));  // BIsSubscribedApp
+    if (getenv("RS_STEAM_OWNED")) {                                // owned, but no DLC of this game
+        EXPECT(vcall<bool>(apps, 6, (uint32_t)206166));
+        EXPECT(!vcall<bool>(apps, 7, (uint32_t)206166));
+        EXPECT(!vcall<bool>(apps, 6, (uint32_t)206167) || dlc_all);
+    }
     if (dlc_list) {
         EXPECT(vcall<int>(apps, 10) == 2);                             // GetDLCCount
         uint32_t dlc_id = 0;

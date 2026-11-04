@@ -125,6 +125,18 @@ list gains only the custom songs' AppIDs, and official DLC is reported as before
 in the Steam layer: no psarc reading in the game process, and one implementation for both editions
 (Windows: [DESIGN.md](../windows/DESIGN.md#steam)).
 
+The songs of `rs1compatibilitydlc` need more. The archive comes with the game and carries the base AppID, and its
+audio is in `songs.psarc`, but each song names the DLC of the first Rocksmith it came from (`DLCRS1Key`'s `WIN32`,
+141 AppIDs for 143 songs). `dlc_update_tail` walks the entries of the game folder's encrypted `metadata` file
+(`STEAM<AppID>`), asks `BIsSubscribedApp` for each AppID up to 222140 and keeps those owned; the list filter
+(`0x100a02e60`) hides an RS1 song whose AppID is not kept. Steam installs nothing for these and keeps no ticket for an
+app that never ran, so nothing on disk says who owns them: a copy or refresh asks the Steam client, when the
+edition's account is the one logged in (`rs1_owned` in `gamefiles.py`, a process of its own through Valve's library,
+gone before the game starts). The answer goes into `RS_STEAM_OWNED` in `steam.env`, which the Steam layer reports
+through `BIsSubscribedApp` only: as with real Steam, these are no DLC of this game. `.rearmed/rs1-owned.json` keeps
+it for a refresh with Steam closed or on another account. The 52 songs of `rs1compatibilitydisc` have no such check:
+AppID 258341 and audio of their own are all they need.
+
 ## Online services
 
 The game's Rendez-Vous/Uplay layer is replaced by an offline one (the `online` override module:

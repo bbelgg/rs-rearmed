@@ -1,7 +1,12 @@
 # Everyday play: the native arm64 build
 
+The install scripts. The user documentation is [docs/mac/INSTALL.md](../../docs/mac/INSTALL.md) for the Mac game
+and [docs/windows/INSTALL.md](../../docs/windows/INSTALL.md) for Learn & Play.
+
 ```bash
-tools/play-native/install.sh [APP]  # after a build (tools/ws7/recomp/app/build-m4.sh); re-run to update
+tools/play-native/install.sh [APP]       # after a build (tools/ws7/recomp/app/build-m4.sh); re-run to update
+tools/play-native/install.sh --refresh-game   # sync the install's copy of the game files (new DLC, CDLC)
+python3 tools/play-native/test_gamefiles.py   # the copy's tests
 ```
 
 `APP` defaults to the build-m4.sh output under `$RS_BUILD_DIR` (default `build/` in the repo). Then start
@@ -10,8 +15,9 @@ copied from the user's install at install time (`RS2014.icns`); so does the runn
 
 | Where | What |
 |---|---|
-| `~/Applications/RS Re-ARMed.app` | the launcher (`launch.sh`) |
-| `~/Library/Application Support/RS Re-ARMed/game/` | the game folder mirrored with symlinks, plus this build's `Rocksmith2014.app` (a copy, so the build directory is not needed to play) and an offline `Rocksmith.ini` |
+| `~/Applications/RS Re-ARMed.app` | the launcher (`launch.sh`, run by the small program `launch-stub.c`, so macOS's privacy answers go to the app) |
+| `~/Library/Application Support/RS Re-ARMed/game/` | the install's own copy of the game files (`gamefiles.py`: APFS clones when the game is on the same volume, else a real copy), plus this build's `Rocksmith2014.app` (a copy, so the build directory is not needed to play) and an offline `Rocksmith.ini` |
+| `…/game-source`, `…/gamefiles.py` | where the copy comes from, and the tool for `install.sh --refresh-game` |
 | `…/steam/<account>/221680/remote/` | **your profiles and progress for the native build**: on the first launch a copy of the real `Steam/userdata/<account>/221680/remote` (`*_PRFLDB`, `LocalProfiles.json`), without `crd` |
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
 
@@ -32,7 +38,34 @@ How it runs, every launch:
 - **Your mods and assets.** The install's `cache.psarc` (e.g. a fast-load mod: title in ~11 s) and the
   RS Re-ARMed title logo (`static.psarc.rearmed`, `tools/loadscreen`; `RS_REARMED=0` for the
   original) are used; the real Real Tone cable as usual.
-- New DLC folders in the install are linked on the next launch. The install itself is never changed,
-  so the Rosetta game keeps working as before.
+- **The game's own files.** The game reads only the copy in `game/`, so a Steam update, uninstall or
+  library move does not change it. New DLC and custom songs reach it with `install.sh --refresh-game` (or
+  the installer's Refresh Game Files): only new and changed files are copied, and files the game folder
+  lost are removed from the copy. The Steam install itself is never changed, so the Rosetta game keeps
+  working as before.
 - The game is started with `open -n -a … --env …`: exec'ing it from the launcher leaves it without a
   window when the launcher was opened from the Finder.
+
+## Learn & Play (the Windows game, experimental)
+
+```bash
+tools/play-native/learn-play.sh [HARVEST]   # or install.sh --learn-play; re-run to update
+tools/play-native/learn-play.sh --refresh   # sync the app's copy of the game files (new DLC)
+```
+
+One run: the game (Steam downloads it, nothing to paste), the Microsoft DLLs, the code image, the build (about 26 minutes
+the first time on an M2, about 2 GB free; resumable) and the install. Then start **RS Re-ARMed Learn &
+Play** from `~/Applications`.
+
+| Where | What |
+|---|---|
+| `~/Applications/RS Re-ARMed Learn & Play.app` | the game: `rs2014_lp`, libRSOpenGL, the game image and the DLL images; ad-hoc signed |
+| `~/Library/Application Support/RS Re-ARMed/learn-play/game/` | the app's own copy of the game files: the Windows game folder and the PC DLC (`*_p.psarc`) |
+| `…/learn-play/game-dir` | the game folder the app reads (one line): `game/` |
+| `…/learn-play/userdata/` | the game's writes: `game/Rocksmith.ini` (your audio and display settings) |
+| `…/learn-play/steam/` | **your profiles and progress** (the offline Steam layer's saves) |
+| `…/learn-play/logs/` | `last-run.log`, `previous-run.log` |
+| `$RS_BUILD_DIR/win-x86/lp/` | the build; afterwards only the translated libraries, a cache for the next run (`LP_KEEP_BUILD=1` keeps everything, `0` nothing) |
+
+Uninstall: delete the app and `~/Library/Application Support/RS Re-ARMed/learn-play` (back up `steam/`
+first to keep your progress); that removes the copy of the game files too.

@@ -3,9 +3,10 @@
 #
 #   tools/loadscreen/build.sh <out.psarc> [variant]
 #
-# Reads the install's static.psarc (or static.psarc.orig if present), rewrites
-# gfxassets/views/logo_elk_final.dds and logo_graded_elk_final.dds (both are
-# used by titlescreen.gfx), and writes the result to <out.psarc>. The install
+# Reads $RS_GAME_DIR's static.psarc (or static.psarc.orig, or a game copy's
+# static.psarc.original, if present; either edition's: they have the same logo),
+# rewrites gfxassets/views/logo_elk_final.dds and logo_graded_elk_final.dds (both
+# are used by titlescreen.gfx), and writes the result to <out.psarc>. The install
 # is not touched. Needs a python with Pillow, numpy and etcpak (DXT5 encoder;
 # Pillow's own smears the tag's outline): set RS_PY, or a venv is made in $TMPDIR.
 set -euo pipefail
@@ -17,16 +18,17 @@ variant=${2:-A}
 
 src="$RS_GAME_DIR/static.psarc"
 [[ -f "$RS_GAME_DIR/static.psarc.orig" ]] && src="$RS_GAME_DIR/static.psarc.orig"
+[[ -f "$RS_GAME_DIR/static.psarc.original" ]] && src="$RS_GAME_DIR/static.psarc.original"
 
 if [[ -z "${RS_PY:-}" ]]; then
     venv="${TMPDIR:-/tmp}/rs-loadscreen-venv"
     [[ -x "$venv/bin/python" ]] || python3 -m venv "$venv"
-    "$venv/bin/python" -c "import PIL, numpy, etcpak" 2>/dev/null || "$venv/bin/pip" -q install pillow numpy etcpak
+    "$venv/bin/python" -c "import PIL, numpy, etcpak" 2>/dev/null || "$venv/bin/pip" -q install 'pillow<13' 'numpy<3' 'etcpak<1'
     RS_PY="$venv/bin/python"
 fi
 
 work=$(mktemp -d "${TMPDIR:-/tmp}/rs-loadscreen.XXXXXX")
-trap 'rm -rf "$work"' EXIT
+trap 'rm -rf "$work" "$out.part"' EXIT
 python3 "$tools/psarc_extract.py" "$src" "$work/x" --match _elk_final.dds >/dev/null
 
 args=()
@@ -52,5 +54,6 @@ EOF
     args+=("gfxassets/views/$l.dds=$work/$l.game.dds")
 done
 
-python3 "$tools/psarc_pack.py" "$src" "$out" "${args[@]}"
+python3 "$tools/psarc_pack.py" "$src" "$out.part" "${args[@]}"
+mv "$out.part" "$out"  # complete or not there: the launchers use it whenever it is there
 echo "wrote $out"

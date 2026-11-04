@@ -45,6 +45,12 @@ set(RS_GAME_APP
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 include(RSShim)
+include(RSTargetNames)
+
+# The python3 on PATH (the build's venv, or the command line tools' one) before any framework Python
+# CMake finds by itself, e.g. Homebrew's: the build uses nothing from Homebrew.
+set(Python3_FIND_FRAMEWORK LAST)
+find_package(Python3 COMPONENTS Interpreter)
 
 enable_testing()
 
@@ -54,7 +60,14 @@ foreach(shim libstdcxx bink opengl cg game platform)
 endforeach()
 
 # The per-game name tables (tools/targets): every name resolves in every target.
-find_package(Python3 COMPONENTS Interpreter)
 if(Python3_FOUND)
   add_test(NAME targets.check COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/targets/test_targets.py)
+  # The Learn & Play install steps (win-x86/install): fixture cabinets, no Steam, no network.
+  add_test(NAME win-x86.install COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/win-x86/install/test_lp_install.py)
+  # The installs' own copy of the game files (tools/play-native/gamefiles.py): made-up game folders.
+  add_test(NAME play-native.gamefiles COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_gamefiles.py)
+  add_test(NAME steamless.decrypt COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/steamless/test_decrypt.py)
+  # The Direct Connect overlay (tools/play-native/cache_overlay.py): made-up archives; the real cache.psarc
+  # when there is one.
+  add_test(NAME play-native.cache_overlay COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_cache_overlay.py)
 endif()

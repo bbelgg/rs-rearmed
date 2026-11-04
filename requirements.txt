@@ -1,7 +1,16 @@
 # Python packages for the build (tools/ws7/recomp: the recompiler and the import-thunk generator).
-capstone
+capstone>=5,<6
+
+# The Mac build's CMake and Ninja (arm64 binaries from PyPI, in the venv's bin; no Homebrew). The root
+# CMakeLists.txt needs CMake 3.20 or later; generated build.ninja files need Ninja 1.8 or later.
+cmake>=3.24,<5
+ninja>=1.11,<2
 
 # The "Re-ARMed" title logo (tools/loadscreen).
-pillow
-numpy
-etcpak
+pillow<13
+numpy<3
+etcpak<1
+
+# Not for the Mac build: unicorn + pefile, for Learn & Play's offline unpacker, are in
+# win-x86/install/requirements.txt, which its build installs by itself. The same two serve maintainers: the
+# 32-bit front end's differential test (tools/ws7/recomp/test/x86) and win-x86/imports/lp_wrappers_run.py.

@@ -1,7 +1,7 @@
 #!/bin/bash
 # Usage: tools/play-native/warm-shaders.sh [APP]
 #
-# The install's shader warm-up (docs/METAL-DESIGN.md "Safe load"): compiles the Metal shader libraries
+# The install's shader warm-up (docs/mac/METAL.md "Safe load"): compiles the Metal shader libraries
 # the game will need (the disk cache's manifest and the app's bundled shader corpus) once, now, so
 # the first Metal start does not spend minutes on "Preparing shaders" (or, with a fast-load
 # cache.psarc and no warm-up at all, stall on the loading screen). Runs APP's own executable with

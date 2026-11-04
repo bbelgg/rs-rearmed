@@ -1,7 +1,11 @@
 #!/bin/bash
 # Build the RS Re-ARMed Installer app bundle.
 #   tools/installer/build.sh
+#   RS_LP_SEED=/path/to/seed.bin tools/installer/build.sh    (a release: see win-x86/unpack/README.md)
 # Output: tools/installer/RS Re-ARMed Installer.app
+# The seed of the offline unpacker goes into the bundle's Resources: with it Learn & Play needs no Windows PC.
+# It is never in git; without RS_LP_SEED, win-x86/unpack/seed.bin is used when it is there, else the app is built
+# without one and Learn & Play falls back to a capture.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 repo=$(cd "$here/../.." && pwd)
@@ -20,6 +24,18 @@ swiftc -O -o "$out/Contents/MacOS/RS Re-ARMed Installer" \
     -target arm64-apple-macosx12.0
 
 rm "$src"
+
+seed=${RS_LP_SEED:-$repo/win-x86/unpack/seed.bin}
+if [[ -f $seed ]]; then
+    [[ "$(gzip -dc "$seed" 2>/dev/null | head -c 8)" == LPSEED01 ]] || { echo "error: $seed is not a seed" >&2; exit 1; }
+    cp "$seed" "$out/Contents/Resources/seed.bin"
+    echo "with the seed: $seed"
+elif [[ -n ${RS_LP_SEED:-} ]]; then
+    echo "error: no seed at $RS_LP_SEED" >&2
+    exit 1
+else
+    echo "without a seed: Learn & Play will need a capture from a Windows PC"
+fi
 
 # App icon, drawn by make-icon.swift.
 iconset=$(mktemp -d "${TMPDIR:-/tmp}/rs-installer-icon.XXXXXX")/AppIcon.iconset

@@ -42,52 +42,26 @@ Rocksmith 2014's macOS binary uses **Valve SteamStub DRM** (macOS variant):
 | DRM bundle | `__text + 0x3120` (~1.4 MB) |
 | Fat binary x86_64 offset | 26,312,704 |
 
-## Tools
+On disk `__text` is the code XORed with a repeating 8-byte key, the same key from the first byte to the last; the
+rest of the file is as it is. So the file can be decrypted without running anything.
 
-### 1. `dump-decrypted.sh`
-
-Dumps the decrypted `__text` from the running game. The DRM blocks lldb, so
-the script adds an `LC_LOAD_WEAK_DYLIB` for `dump_decrypted.dylib` to the
-Steam game binary and copies the dylib next to it. When the game starts, the
-dylib waits until `__text` is decrypted and writes it next to itself; the
-script moves it to `build/steamless/text_decrypted.bin` and puts the original
-game binary back (kept meanwhile as `Rocksmith2014.pre-dump`), however the
-wait ends: success, timeout, Ctrl-C.
+## `decrypt.py`
 
 ```bash
-# Quit the game first: it has to start after the setup.
-./tools/steamless/dump-decrypted.sh [output_dir]   # then start the game through Steam
+python3 tools/steamless/decrypt.py [--game DIR] [--output FILE]
 ```
 
-The steps also run one at a time (the installer does this): `setup` (refuses
-while the game runs), `wait` (restores afterwards) and `restore`.
-`RS_GAME_DIR` sets the game folder, `RS_DUMP_TIMEOUT` the wait in seconds
-(default 900).
+Writes `build/steamless/Rocksmith2014_x64_decrypted`: the x86-64 slice with `__text` in the clear. No game
+launch, no Rosetta, no Steam account: your Steam copy is only read.
 
-### 2. `patch-binary.py`
+It finds the key in your own binary, nothing ships: the key that turns the top of `__text` into the C runtime's
+start must also turn its most common aligned block into the compilers' 8-byte NOP. It never prints the key. The
+result is checked against the pins in `tools/targets/mac-x64/target.toml`: a binary that isn't the game, or another
+build of it, is refused in plain words and nothing is written. A Steam copy with a mod's extra load commands
+has the pinned `__text` and another header: it is used, and says so. The output for the clean depot binary
+matches `image_sha256` byte for byte. `test_decrypt.py` tests it on a made-up Mach-O.
 
-Reconstructs a DRM-free x86_64 Mach-O from the dump.
+The binary at `build/steamless/Rocksmith2014_x64_decrypted` is gitignored.
 
-```bash
-python3 tools/steamless/patch-binary.py [--dump PATH] [--output PATH]
-```
-
-Steps:
-1. Extracts the x86_64 thin slice from the fat binary
-2. Replaces `__text` with the decrypted dump
-3. Fixes `LC_UNIXTHREAD` entry point if needed
-4. Verifies the result disassembles correctly
-
-It leaves the result unsigned and prints the `RC_IMAGE` line for the build
-(docs/BUILDING.md, Manual build, step 3).
-
-## Workflow
-
-```
-1. Quit Rocksmith, then ./tools/steamless/dump-decrypted.sh
-2. Launch Rocksmith through Steam → the script finishes and restores the game
-3. python3 tools/steamless/patch-binary.py
-```
-
-The decrypted binary at `build/steamless/Rocksmith2014_x64_decrypted`
-is gitignored.
+Earlier versions dumped `__text` from a game started through Steam, with a dylib added to the Steam copy for the
+moment; that needed Rosetta and the owning account. The XOR of the file reproduces that dump with 0 differing bytes.

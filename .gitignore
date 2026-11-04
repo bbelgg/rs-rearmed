@@ -23,6 +23,10 @@ __pycache__/
 
 # Recompiler build scripts (source, not output)
 !tools/ws7/recomp/build/
+!win-x86/build/
 
 # Built installer app (tools/installer/build.sh)
 tools/installer/RS Re-ARMed Installer.app/
+
+# VMProtect unpack seed (shipped with release, not in source; keyed to one game build)
+win-x86/unpack/seed.bin

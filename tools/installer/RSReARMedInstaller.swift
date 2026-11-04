@@ -1910,6 +1910,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         }
         NSApp.mainMenu = makeMainMenu()
         window = InstallerWindow()
+        // Ours to keep: by default a closed window releases itself, and the quit that follows reads this
+        // property for the runner (applicationShouldTerminate) and crashes on the freed window.
+        window.isReleasedWhenClosed = false
         window.delegate = self
         window.makeKeyAndOrderFront(nil)
 

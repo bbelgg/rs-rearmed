@@ -76,6 +76,11 @@ uint32_t rs_audio_frames_wanted(uint32_t dflt) {
 
 uint32_t rs_audio_set_device_buffer(AudioObjectID dev, uint32_t cap, const char *who) {
   if (dev == kAudioObjectUnknown) return 0;
+  // The size is the device's, not a direction's, so an interface used for guitar and output has one,
+  // and the last to set it wins. The Mac game's input sizes its queue slots at open from the 128 it
+  // sets, and its IOProc queues one slot per I/O buffer: of a larger buffer the rest is lost, and the
+  // guitar breaks up. The sink can come after the input (it is rebuilt on a device change).
+  if (cap > RS_AUDIO_INPUT_FRAMES && rs_audio_has_input(dev)) cap = RS_AUDIO_INPUT_FRAMES;
   uint32_t want = rs_audio_frames_wanted(RS_AUDIO_DEFAULT_FRAMES < cap ? RS_AUDIO_DEFAULT_FRAMES : cap), n = want;
   char name[128];
   rs_audio_dev_name(dev, name, sizeof name);

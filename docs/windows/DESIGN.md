@@ -215,7 +215,7 @@ inputs first, with stable ids. In exclusive event mode the ring holds two period
 thread signals the guest's event.
 
 **Latency, as the Mac port does it** (shared code in `shims/coreaudio/rs_audio_host.c`): the device's I/O
-buffer is `RS_AUDIO_FRAMES` (default 256), the input device's at most 128; `GetDevicePeriod` reports 256
+buffer is `RS_AUDIO_FRAMES` (default 256), at most 128 on a device with inputs; `GetDevicePeriod` reports 256
 frames as the default and 128 as the minimum; the feeding guest thread joins the device's audio workgroup
 as a real-time thread (`RS_AUDIO_RT`); stale input is trimmed (`RS_AUDIO_INPUT_TRIM`); devices are set to
 48 kHz when they can be (`RS_AUDIO_SET_RATE`). Exclusive output at a 256-frame period is about the Mac

@@ -367,7 +367,7 @@ again, or choose Metal in the installer.
 
 The setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer in steps of 256 frames
 (5.3 ms). The launcher keeps it across launches. The output device's buffer is `RS_AUDIO_FRAMES`
-(default 256, 128 at `LatencyBuffer=1`).
+(default 256; 128 at `LatencyBuffer=1` and on an interface that also has inputs).
 
 ## Settings and switches
 

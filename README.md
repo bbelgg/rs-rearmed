@@ -332,7 +332,8 @@ yourself from your own copy, with the installer or by hand.
 The audio engine setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer, in steps of 256
 frames (5.3 ms). The launcher keeps what you choose in the game; `launchctl setenv RS_LATENCY_BUFFER 1`
 overrides it. The output device's buffer is `RS_AUDIO_FRAMES` (default 256, and 128 at `LatencyBuffer` 1,
-which is why 1 does not crackle here as it does under Rosetta). At 1 only the game's output buffer is that
+which is why 1 does not crackle here as it does under Rosetta, and on an interface that also has inputs,
+where the guitar shares it). At 1 only the game's output buffer is that
 small; the rest of its audio engine runs as at 2, double-buffered, which adds no delay
 (`RS_AUDIO_RING_SPLIT=0` turns that off). Both are read when the game starts.
 

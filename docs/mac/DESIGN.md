@@ -93,7 +93,8 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 (`tools/ws7/recomp/overrides/src/audio_*.c`) replaces their CoreAudio side:
 
 - the output device runs with a 256-frame buffer (`RS_AUDIO_FRAMES`; at most half the game's own buffer,
-  so 128 at `LatencyBuffer=1`), and the game's ring is split so `LatencyBuffer=1` does not crackle
+  so 128 at `LatencyBuffer=1`, and 128 on an interface that also has inputs, whose buffer the guitar input
+  shares and needs at 128), and the game's ring is split so `LatencyBuffer=1` does not crackle
   (`RS_AUDIO_RING_SPLIT`);
 - the Wwise thread is a real-time thread in the output device's audio workgroup (`RS_AUDIO_RT`);
 - stale guitar audio queued from the cable is dropped instead of played late (`RS_AUDIO_INPUT_TRIM`);

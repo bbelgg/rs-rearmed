@@ -23,6 +23,7 @@
 
 #define RS_AUDIO_DEFAULT_FRAMES 256u
 #define RS_AUDIO_MIN_FRAMES 32u
+#define RS_AUDIO_INPUT_FRAMES 128u  // what the game gives the guitar input
 
 // An environment switch: unset or empty = dflt; "0", "n...", "f..." = 0; anything else = 1.
 int rs_audio_env_on(const char *name, int dflt);
@@ -43,8 +44,9 @@ uint32_t rs_audio_frames_wanted(uint32_t dflt);
 // Sets the device's I/O buffer (kAudioDevicePropertyBufferFrameSize, a per-process setting) to
 // RS_AUDIO_FRAMES (default min(256, cap)), kept within cap, the device's range and 32 frames, and
 // returns the size the device then reports (0: unknown). cap is the most the caller's buffer
-// behind the device can take per callback (the Mac build: half the Wwise ring). who names the
-// caller in the log.
+// behind the device can take per callback (the Mac build: half the Wwise ring), and at most 128 on
+// a device that also has inputs: one size serves both directions, and the Mac game's guitar input
+// keeps only 128 frames of each I/O buffer. who names the caller in the log.
 uint32_t rs_audio_set_device_buffer(AudioObjectID dev, uint32_t cap, const char *who);
 
 // Makes the calling thread a time-constraint thread for one period of frames at rate (up to 30%

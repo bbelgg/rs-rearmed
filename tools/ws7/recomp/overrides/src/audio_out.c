@@ -9,8 +9,9 @@
 // is kept within the device's range and at most half the sink's ring (LatencyBuffer x 256 frames): the
 // HAL callback can take no more than the ring holds, and with no block to spare (a 256-frame ring and a
 // 256-frame buffer) the game lists no audio interface under Direct Connect. So LatencyBuffer=1 gets a
-// 128-frame buffer (the ring's count, audio_ring.c: at 1 the engine itself runs with 2). The sink is rebuilt
-// on a device change, which calls this again.
+// 128-frame buffer (the ring's count, audio_ring.c: at 1 the engine itself runs with 2). So does an
+// interface that also has inputs: the guitar input needs 128 there (rs_audio_set_device_buffer). The sink is
+// rebuilt on a device change, which calls this again.
 //
 // F_100b049b0, the LEngine thread entry (the thread Wwise renders on, 256 frames per block, woken by the
 // HAL callback through a mach semaphore): the original is

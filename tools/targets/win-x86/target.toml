@@ -1,0 +1,10 @@
+# The Windows game: Rocksmith 2014 Learn & Play (Steam app 221680, Windows depot 221683), the 32-bit PE
+# unpacked from its VMProtect layer (win-x86/image/lp_image.py), mapped at the base its code is linked for.
+# The installer's view of the same game (depot, exe hash, DLLs) is win-x86/target.toml.
+id = "win-x86"
+description = "Rocksmith 2014 Learn & Play, Windows (x86-32 PE, Steam)"
+front_end = "x86-32-pe"       # tools/ws7/recomp/xlat/x86_32.py, build/gen_image_pe.py
+abi = "win32"                 # runtime/rc_abi.h: RC_TARGET_ABI_WIN32 (not built yet)
+image_base = 0xf80000         # runtime addresses (win-x86/online/names.tsv); link addresses + 0xb80000
+# TODO text = [LO, HI]: .text of the unpacked image
+# TODO image_sha256: of the unpacked image the tables are made for

@@ -36,6 +36,13 @@ int _setjmp(void *) __attribute__((returns_twice));
 #define RC_LDR(T, a) RC_LD(T, a)
 #endif
 
+// The fences of a whole `rep movs` / `rep stos`, whose bulk copy is not fenced store by store: stores
+// inside one string instruction may reorder on x86 too, before and after it they may not.
+#ifndef RC_MO_TSO
+#define RC_FENCE_LD() ((void)0)
+#define RC_FENCE_ST() ((void)0)
+#endif
+
 // host address of guest address g
 #define RC_M(g) (M_ + (uint64_t)(uint32_t)(g))
 
@@ -66,6 +73,11 @@ int _setjmp(void *) __attribute__((returns_twice));
 // rc_ctx already), and so on up, until the frame whose call site the guest returned to: what the
 // guest does. A native -> guest call (rc32_call) fails when its sentinel does not come back.
 #define RC32_RET_SAVE() (c->ret_to = RC_LDS(uint32_t, RC_M(rsp)))
+// Flags across a call whose caller reads them after it (Translator32.flag_callees): out before the
+// call and at the callee's `ret`, in at the callee's entry and after the call.
+#define RC32_FLAGS_OUT() (c->ret_flags = (uint32_t)rc_flags_pack(cf, pf, zf, sf, of))
+#define RC32_FLAGS_IN() do { uint32_t f_ = c->ret_flags; cf = f_ & 1; pf = (f_ >> 2) & 1; zf = (f_ >> 6) & 1; \
+  sf = (f_ >> 7) & 1; of = (f_ >> 11) & 1; } while (0)
 #define RC32_RET_OTHER(a) __builtin_expect(c->ret_to != (a), 0)
 
 #endif

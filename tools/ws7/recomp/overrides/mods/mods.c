@@ -17,12 +17,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/resource.h>
-#include <sys/sysctl.h>
+#include <strings.h>
 #include <time.h>
 #include <unistd.h>
 
 #include "mods.h"
+#include "rc_hook.h"
+#include "rc_nofile.h"
 
 // libc++'s operator new / delete, as the translated code calls them (nodes and bucket arrays are freed by
 // translated code with operator delete)
@@ -32,9 +33,9 @@ extern void rs_op_delete(void *) __asm__("__ZdlPv");
 // ------------------------------------------------------------------------------------------------
 // Configuration
 // ------------------------------------------------------------------------------------------------
-static rs_mods_config g_cfg = {1, 1, 0.050};
+static rs_mods_config g_cfg = {1, 1, 0.050, 1};
 static int g_log;
-static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed;
+static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed, g_overlaid;
 #define COUNT(x) atomic_fetch_add_explicit(&(x), 1, memory_order_relaxed)
 
 static void logf_(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -58,6 +59,8 @@ void rs_mods_reload_config(void) {
   g_log = env_on("RS_MODS_LOG", 0);
   g_cfg.bypass = env_on("RS_MODS_BYPASS", 1);
   g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
+  g_cfg.intro = env_on("RS_MODS_INTRO", 1);
+  g_cfg.overlay = env_on("RS_MODS_OVERLAY", 1);
   g_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -85,22 +88,13 @@ static double elapsed_s(void) {
 // OS-level fix: open-file limit (rsmacfixes fix 4). The arm64 runtime does it itself, once, at startup.
 // ------------------------------------------------------------------------------------------------
 uint64_t rs_mods_raise_nofile(void) {
-  struct rlimit rl;
-  if (getrlimit(RLIMIT_NOFILE, &rl) != 0) return 0;
-  rlim_t old = rl.rlim_cur, want = 10240;
-  if (rl.rlim_max != RLIM_INFINITY && rl.rlim_max < want) want = rl.rlim_max;
-  int maxproc = 0;
-  size_t n = sizeof maxproc;
-  if (sysctlbyname("kern.maxfilesperproc", &maxproc, &n, NULL, 0) == 0 && maxproc > 0 && (rlim_t)maxproc < want)
-    want = (rlim_t)maxproc;
-  if (want > old) {
-    rl.rlim_cur = want;
-    int r = setrlimit(RLIMIT_NOFILE, &rl);
-    getrlimit(RLIMIT_NOFILE, &rl);
-    logf_("open-file limit %llu -> %llu%s", (unsigned long long)old, (unsigned long long)rl.rlim_cur,
-          r ? " (setrlimit failed)" : "");
-  }
-  return rl.rlim_cur;
+  uint64_t old;
+  int failed;
+  uint64_t now = rc_raise_nofile(&old, &failed);
+  if (now != old || failed)
+    logf_("open-file limit %llu -> %llu%s", (unsigned long long)old, (unsigned long long)now,
+          failed ? " (setrlimit failed)" : "");
+  return now;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -133,14 +127,20 @@ static void *keys_thread(void *arg) {
   return NULL;
 }
 
+static int before_open_file(rc_ctx *c, void *user);
+static int before_dlc_owned(rc_ctx *c, void *user);
+
 __attribute__((constructor)) static void mods_init(void) {
   rs_mods_reload_config();
+  if (rc_hook_add_name("frontend_open_file", before_open_file, NULL, NULL)) logf_("no FrontEnd_OpenFile hook point");
+  if (rc_hook_add_name("steam_dlc_owned", before_dlc_owned, NULL, NULL)) logf_("no DLC ownership hook point");
   if (g_cfg.fixes) rs_mods_raise_nofile();
   if (g_cfg.fixes && !env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
   }
-  logf_("fixes %s, bypass %s, budget %.0f ms", g_cfg.fixes ? "on" : "off", g_cfg.bypass ? "on" : "off",
+  logf_("fixes %s, bypass %s, overlay %s, intro skip %s, budget %.0f ms", g_cfg.fixes ? "on" : "off",
+        g_cfg.bypass ? "on" : "off", g_cfg.overlay ? "on" : "off", g_cfg.intro ? "on" : "off",
         g_cfg.budget_s * 1000);
 }
 
@@ -339,12 +339,25 @@ void RC_FN(path_md5)(rc_ctx *c) {
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
 
+// Mounting an archive asks whether its AppID is in the DLC list the game made once at start, so no answer of the
+// Steam layer can cover a song added while the game runs (shims/steam/src/enumerate.h). During the install step
+// an archive in dlc/ counts as owned, whatever AppID it carries; RS_MODS_BYPASS=0 asks the list.
+static int g_mounting;  // the game thread's
+
+static int before_dlc_owned(rc_ctx *c, void *user) {
+  (void)user;
+  if (!g_mounting || !g_cfg.bypass) return 0;
+  ov_ret_u32(c, 1);
+  return 1;
+}
+
 void RC_FN(dlc_update)(rc_ctx *c) {
   OV_ARGS_OF(dlc_update, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
+  g_mounting = 1;
   if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
     OV_GUEST(dlc_install_step, o);
   } else {
@@ -356,6 +369,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
       if (*(volatile uint8_t *)(self + INSTALLING_FLAG)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < g_cfg.budget_s);
   }
+  g_mounting = 0;
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;
   if (self[RC_OFF(dlc_check_on)] && self[RC_OFF(dlc_pending)]) {
     if ((uint8_t)OV_GUEST(dlc_enum_check, o)) {
@@ -593,6 +607,49 @@ void RC_FN(sng_verify)(rc_ctx *c) {
   rs_crypto_dsa_verify(c);
 }
 
+// ------------------------------------------------------------------------------------------------
+// No intro screens. RSBootService (RSBootService.cpp) boots in phases (u32 at boot_phase): 0 and 1 start the
+// services and the preload groups; 2 ("OnInit_Intro") waits for the shader, database, GE, UI, reactive-effects
+// and fork services; 3 runs boot_phase3_steps steps (u32 counter at boot_step: the patch and other archives
+// mounted, the venues) and then loads the start-up sound bank and, once the intro is over, pushes the title
+// screen. Phases 2 and 3 first tick the intro (boot_intro_update: the Scaleform intro movie with the logos,
+// legal screens and intro video) and wait while it returns true. Its state (u32 at boot_intro_state): 0 load
+// the movie's model, 1 wait for it, 2 wait for the movie to start (busy), 3 play (not busy: the boot goes on
+// meanwhile), 4 end (release the model, state 5, start the boot service's 3-second tail timer), 5 done.
+//
+// The game's own skip (in phase 2, just before the tick: a key press once the movie is on its last screen) sets
+// state 4 and clears the playing flag (boot_intro_playing). The skip here takes the same transition, without
+// the movie ever playing: the model is loaded as usual (states 0 and 1); then, instead of starting the movie,
+// the tick reports "not busy" (as it does while the movie plays) until phase 3 has done its steps, and then
+// ends the intro. Both conditions are needed, measured on the Mac build: without the model loaded, or with
+// the intro ended before phase 3's steps, the title screen never gets its menu movie and the game sits on an
+// empty screen (the stall that RSMods' short "fast load" intros also run into, see its QualityOfLife.cpp).
+// The screen is white, then black for a few seconds while the title loads. Only during boot (phases 2 and 3).
+// With RS_MODS_INTRO=0 the intro plays.
+// ------------------------------------------------------------------------------------------------
+static int before_intro_update(rc_ctx *c, void *user) {
+  (void)user;
+  if (!g_cfg.intro) return 0;
+  OV_ARGS(a, c);
+  uint8_t *boot = OV_PTR(a, uint8_t);
+  uint32_t phase = *(uint32_t *)(boot + RC_OFF(boot_phase));
+  uint32_t *state = (uint32_t *)(boot + RC_OFF(boot_intro_state));
+  if ((phase != 2 && phase != 3) || *state < 2 || *state >= 4) return 0;  // loading the model: the original
+  if (phase == 2 || *(uint32_t *)(boot + RC_OFF(boot_step)) < RC_OFF(boot_phase3_steps)) {
+    ov_ret_u32(c, 0);  // not busy, the movie not started
+    return 1;
+  }
+  logf_("intro: skipped");
+  *state = 4;  // the game's skip: the original ends the intro (state 5) and starts the tail timer
+  boot[RC_OFF(boot_intro_playing)] = 0;
+  return 0;
+}
+
+__attribute__((constructor)) static void intro_init(void) {
+  if (rc_hook_add(RC_ADDR(boot_intro_update), before_intro_update, NULL, NULL))
+    fputs("[rs-mods] intro: no boot_intro_update hook point\n", stderr);
+}
+
 const ov_entry ov_mods_entries[] = {
     {RC_ADDR(num_dtor), "num_dtor", RC_FN(num_dtor)},
     {RC_ADDR(num_intern), "num_intern", RC_FN(num_intern)},
@@ -605,3 +662,40 @@ const ov_entry ov_mods_entries[] = {
     {RC_ADDR(sng_verify), "sng_verify", RC_FN(sng_verify)},
 };
 const int OV_MODS_COUNT = (int)(sizeof ov_mods_entries / sizeof ov_mods_entries[0]);
+
+// ------------------------------------------------------------------------------------------------
+// Cache overlay (the Direct Connect choice). The game opens the archives inside cache.psarc (cache0.7z ...
+// cache8.7z; the menu data is in one of them) by name through FrontEnd_OpenFile (0x1003c7810), which finds
+// them in cache.psarc, mounted at the root of the VFS (0x1003c9682). The installer's overlay
+// (tools/play-native/cache_overlay.py) is <game>/Update/patcharchives.psarc, the patch container the engine
+// mounts at PatchUpdate/ itself when the file is there (0x1003c8cd1, "%spatcharchives.psarc"). It holds new
+// copies of the cacheN.7z archives whose menu files it changes, made from the user's own cache.psarc. The
+// engine's patch layer takes only its own .new/.delta archives from there, so for a cacheN.7z this opens
+// PatchUpdate/<name> first, and the name itself when the overlay has no such archive (or there is no
+// overlay). cache.psarc is never changed. The pre hook calls the hook point again, which passes the patch
+// path through unchanged.
+// ------------------------------------------------------------------------------------------------
+
+static int is_cache_7z(const char *p) {
+  if (strncasecmp(p, "cache", 5) != 0) return 0;
+  p += 5;
+  if (*p < '0' || *p > '9') return 0;
+  while (*p >= '0' && *p <= '9') p++;
+  return strcasecmp(p, ".7z") == 0;
+}
+
+static int before_open_file(rc_ctx *c, void *user) {
+  (void)user;
+  OV_ARGS(a, c);
+  uint64_t out = OV_U64(a);
+  const char *path = OV_PTR(a, const char);
+  if (!g_cfg.overlay || !out || !path || !is_cache_7z(path)) return 0;
+  char alt[64];
+  if (snprintf(alt, sizeof alt, "patchupdate/%s", path) >= (int)sizeof alt) return 0;
+  OV_GUEST(frontend_open_file, out, (uint64_t)(uintptr_t)alt);
+  if (!*(uint64_t *)(uintptr_t)out) return 0;  // not in the overlay: the original opens it from cache.psarc
+  COUNT(g_overlaid);
+  logf_("cache overlay: %s from Update/patcharchives.psarc", path);
+  ov_ret_u64(c, out);
+  return 1;
+}

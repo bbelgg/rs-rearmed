@@ -1,8 +1,9 @@
 // 32-bit guests: the 4 GB guest window (rc32.h).
 //
-// The whole window is reserved PROT_NONE at start and committed in pieces: the image at its
+// The whole window is reserved PROT_NONE at start and committed in pieces: each image at its
 // preferred base, and an arena for everything else the guest may point to (stacks, TEBs, heap
-// blocks, the import area). The first 64 KB stay unmapped, so a null pointer still faults.
+// blocks, the import areas). The first 64 KB stay unmapped, so a null pointer still faults. The
+// arena steps over the images inside its range (Microsoft's DLLs prefer 0x78000000 and up).
 #include <errno.h>
 #include <pthread.h>
 #include <stdio.h>
@@ -20,6 +21,10 @@
 uint8_t *rc_mem;
 static uint32_t arena_next = ARENA_LO, arena_committed = ARENA_LO;
 static pthread_mutex_t arena_mu = PTHREAD_MUTEX_INITIALIZER;
+// the images' ranges [lo, hi)
+#define MAX_RESERVED 16
+static struct { uint64_t lo, hi; } reserved[MAX_RESERVED];
+static int nreserved;
 
 int rc32_mem_init(void) {
   if (rc_mem) return 0;
@@ -40,20 +45,49 @@ int rc32_mem_commit(uint32_t g, uint32_t size) {
   return mprotect(rc_mem + lo, hi - lo, PROT_READ | PROT_WRITE);
 }
 
+void rc32_mem_guard(uint32_t g, uint32_t size) { mprotect(rc_mem + g, size, PROT_NONE); }
+
+int rc32_mem_reserve(uint32_t g, uint32_t size) {
+  uint64_t lo = g, hi = (uint64_t)g + size;
+  int rc = -1;
+  pthread_mutex_lock(&arena_mu);
+  if (nreserved < MAX_RESERVED && !(lo < arena_next && hi > ARENA_LO)) {
+    rc = 0;
+    for (int k = 0; k < nreserved; k++)
+      if (lo < reserved[k].hi && hi > reserved[k].lo) rc = -1;
+    if (!rc) {
+      reserved[nreserved].lo = lo;
+      reserved[nreserved].hi = hi;
+      nreserved++;
+    }
+  }
+  pthread_mutex_unlock(&arena_mu);
+  return rc;
+}
+
+uint32_t rc32_arena_used(void) { return arena_next - ARENA_LO; }
+
 uint32_t rc32_alloc(uint32_t size) {
   if (rc32_mem_init()) return 0;
   pthread_mutex_lock(&arena_mu);
-  uint32_t a = (arena_next + 15) & ~15u, r = 0;
-  if ((uint64_t)a + size <= ARENA_HI) {
-    arena_next = a + size;
+  uint64_t a = (arena_next + 15) & ~15u;
+  uint32_t r = 0;
+  for (int k = 0; k < nreserved; k++)  // step over the images (restart after each step)
+    if (a < reserved[k].hi && a + size > reserved[k].lo) {
+      a = (reserved[k].hi + 15) & ~15ull;
+      k = -1;
+    }
+  if (a > arena_committed) arena_committed = (uint32_t)(a & ~0xfffull);  // a page boundary
+  if (a + size <= ARENA_HI) {
+    arena_next = (uint32_t)(a + size);
     if (arena_next > arena_committed) {
       uint32_t want = (arena_next - arena_committed + 0xfffff) & ~0xfffffu;  // 1 MB steps
       if (rc32_mem_commit(arena_committed, want) == 0) {
         arena_committed += want;
-        r = a;
+        r = (uint32_t)a;
       }
     } else {
-      r = a;
+      r = (uint32_t)a;
     }
   }
   if (r) memset(rc_mem + r, 0, size);

@@ -209,7 +209,8 @@ def check_target(tid, image):
             for blk in iter(lambda: f.read(1 << 20), b""):
                 h.update(blk)
         if h.hexdigest() != want:
-            print("gen_image.py: warning: %s is not the image target %s was made for (SHA-256 %s, expected %s)"
+            print("gen_image.py: warning: %s is not the image target %s was made for (SHA-256 %s, expected %s). "
+                  "A game copy with a mod added differs this way and builds the same: decrypt.py has checked its code."
                   % (image, tid, h.hexdigest(), want), file=sys.stderr)
 
 

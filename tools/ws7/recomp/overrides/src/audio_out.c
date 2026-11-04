@@ -22,22 +22,13 @@
 // a block must be ready within one HAL period of the wake-up.
 // RS_AUDIO_RT=0 runs the thread as the original does.
 #include <CoreAudio/CoreAudio.h>
-#include <mach/mach.h>
-#include <mach/mach_time.h>
 #include <mach/semaphore.h>
-#include <mach/thread_policy.h>
-#include <os/workgroup.h>
 #include <pthread.h>
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
 #include <time.h>
 
 #include "audio.h"
 
 #define SAMPLE_RATE 48000u             // the sink forces 48 kHz ('nsrt', 0x100aa6a10)
-#define DEFAULT_FRAMES 256u
-#define MIN_FRAMES 32u
 
 _Atomic uint32_t rs_audio_out_frames;
 
@@ -45,91 +36,19 @@ _Atomic uint32_t rs_audio_out_frames;
 static _Atomic uint32_t g_out_dev;
 static _Atomic uint32_t g_out_gen;
 
-static int g_log = -1;
-
-int rs_audio_env_on(const char *name, int dflt) {
-  const char *v = getenv(name);
-  if (!v || !*v) return dflt;
-  return !(v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F');
-}
-
-int rs_audio_log_on(void) {
-  if (g_log < 0) g_log = rs_audio_env_on("RS_AUDIO_LOG", 0);
-  return g_log;
-}
-
-void rs_audio_log(const char *fmt, ...) {
-  if (!rs_audio_log_on()) return;
-  va_list ap;
-  va_start(ap, fmt);
-  fputs("[rs-audio] ", stderr);
-  vfprintf(stderr, fmt, ap);
-  fputc('\n', stderr);
-  va_end(ap);
-}
-
 // ------------------------------------------------------------------------------------------------
 // Output device buffer
 // ------------------------------------------------------------------------------------------------
-static int dev_get(AudioObjectID dev, AudioObjectPropertySelector sel, void *out, UInt32 size) {
-  AudioObjectPropertyAddress a = {sel, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
-  UInt32 sz = size;
-  return AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, out) == noErr && sz == size;
-}
-
-static void dev_name(AudioObjectID dev, char *buf, size_t n) {
-  CFStringRef s = NULL;
-  snprintf(buf, n, "?");
-  if (dev_get(dev, kAudioObjectPropertyName, &s, sizeof s) && s) {
-    CFStringGetCString(s, buf, (CFIndex)n, kCFStringEncodingUTF8);
-    CFRelease(s);
-  }
-}
-
-// RS_AUDIO_FRAMES: unset or empty = dflt, 0 = leave the device alone
-static uint32_t frames_wanted(uint32_t dflt) {
-  const char *v = getenv("RS_AUDIO_FRAMES");
-  if (!v || !*v) return dflt;
-  char *end;
-  unsigned long n = strtoul(v, &end, 10);
-  if (end == v || n > 8192) return dflt;
-  return (uint32_t)n;
-}
-
 void rs_audio_output_device(uint32_t dev) {
   if (dev == kAudioObjectUnknown) return;
   uint32_t refills = rs_audio_ring_refills();
-  uint32_t ring = refills * AK_REFILL_FRAMES, cap = ring / 2;
-  uint32_t want = frames_wanted(DEFAULT_FRAMES < cap ? DEFAULT_FRAMES : cap), n = want;
-  char name[128];
-  dev_name(dev, name, sizeof name);
-  AudioValueRange r = {0, 0};
-  int have_range = dev_get(dev, kAudioDevicePropertyBufferFrameSizeRange, &r, sizeof r);
-  if (want) {
-    if (n > cap) {
-      rs_audio_log("warning: RS_AUDIO_FRAMES %u is more than half the ring (%u x %u = %u frames); using %u",
-                   want, refills, AK_REFILL_FRAMES, ring, cap);
-      n = cap;
-    }
-    if (have_range) {
-      if (n < (uint32_t)r.mMinimum) n = (uint32_t)r.mMinimum;
-      if (n > (uint32_t)r.mMaximum) n = (uint32_t)r.mMaximum;
-    }
-    if (n < MIN_FRAMES) n = MIN_FRAMES;
-    AudioObjectPropertyAddress a = {kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal,
-                                    kAudioObjectPropertyElementMain};
-    UInt32 v = n;
-    OSStatus st = AudioObjectSetPropertyData(dev, &a, 0, NULL, sizeof v, &v);
-    if (st != noErr) rs_audio_log("output device %u: setting the buffer to %u frames failed (%d)", dev, n, (int)st);
-  }
-  UInt32 applied = 0;
-  dev_get(dev, kAudioDevicePropertyBufferFrameSize, &applied, sizeof applied);
+  uint32_t ring = refills * AK_REFILL_FRAMES;
+  uint32_t applied = rs_audio_set_device_buffer(dev, ring / 2, "output device");
   atomic_store(&rs_audio_out_frames, applied);
-  rs_audio_log("output device %u \"%s\": buffer %u frames (requested %u%s, range %.0f-%.0f), LatencyBuffer %u = ring %u frames",
-               dev, name, (unsigned)applied, want, want ? "" : " = keep", r.mMinimum, r.mMaximum, refills, ring);
+  rs_audio_log("output device %u: LatencyBuffer %u = ring %u frames", dev, refills, ring);
   if (applied > ring)
     rs_audio_log("warning: the device buffer (%u) is larger than the ring (%u): expect dropouts; raise LatencyBuffer",
-                 (unsigned)applied, ring);
+                 applied, ring);
   atomic_store(&g_out_dev, dev);
   atomic_fetch_add(&g_out_gen, 1);
 }
@@ -137,57 +56,12 @@ void rs_audio_output_device(uint32_t dev) {
 // ------------------------------------------------------------------------------------------------
 // LEngine thread
 // ------------------------------------------------------------------------------------------------
-static uint64_t ns_to_abs(uint64_t ns) {
-  static mach_timebase_info_data_t tb;
-  if (!tb.denom) mach_timebase_info(&tb);
-  return ns * tb.denom / tb.numer;
-}
-
 // Time-constraint policy: one block period (256 frames, or the device buffer if larger: a callback then
 // asks for several blocks at once), up to 30% of it computing, done within the period.
 static void make_realtime(void) {
   uint32_t frames = atomic_load(&rs_audio_out_frames);
   if (frames < AK_REFILL_FRAMES) frames = AK_REFILL_FRAMES;
-  uint64_t period_ns = (uint64_t)frames * 1000000000ull / SAMPLE_RATE;
-  thread_time_constraint_policy_data_t p;
-  p.period = (uint32_t)ns_to_abs(period_ns);
-  p.computation = (uint32_t)ns_to_abs(period_ns * 3 / 10);
-  p.constraint = (uint32_t)ns_to_abs(period_ns);
-  p.preemptible = 1;
-  kern_return_t kr = thread_policy_set(pthread_mach_thread_np(pthread_self()), THREAD_TIME_CONSTRAINT_POLICY,
-                                       (thread_policy_t)&p, THREAD_TIME_CONSTRAINT_POLICY_COUNT);
-  if (kr == KERN_SUCCESS)
-    rs_audio_log("Wwise thread: real-time, period %.2f ms, computation %.2f ms", period_ns / 1e6, period_ns * 0.3 / 1e6);
-  else
-    rs_audio_log("Wwise thread: time-constraint policy failed (%d)", kr);
-}
-
-typedef struct {
-  os_workgroup_t wg;
-  os_workgroup_join_token_s token;
-  int joined;
-} workgroup_state;
-
-static void wg_leave(workgroup_state *s) {
-  if (s->joined) os_workgroup_leave(s->wg, &s->token);
-  if (s->wg) os_release(s->wg);
-  s->wg = NULL;
-  s->joined = 0;
-}
-
-static void wg_join(workgroup_state *s, uint32_t dev) {
-  wg_leave(s);
-  if (dev == kAudioObjectUnknown) return;
-  os_workgroup_t wg = NULL;
-  if (!dev_get(dev, kAudioDevicePropertyIOThreadOSWorkgroup, &wg, sizeof wg) || !wg) {
-    rs_audio_log("Wwise thread: output device %u has no I/O workgroup", dev);
-    return;
-  }
-  s->wg = wg;
-  int err = os_workgroup_join(wg, &s->token);
-  s->joined = err == 0;
-  if (err) rs_audio_log("Wwise thread: joining output device %u's workgroup failed (%d)", dev, err);
-  else rs_audio_log("Wwise thread: joined output device %u's workgroup", dev);
+  rs_audio_make_realtime(frames, SAMPLE_RATE, "Wwise thread");
 }
 
 void RC_FN(ak_lengine_thread)(rc_ctx *c) {
@@ -197,7 +71,7 @@ void RC_FN(ak_lengine_thread)(rc_ctx *c) {
   RC_ST(uint32_t, RC_GA(ak_lengine_start_time), (uint32_t)time(NULL));
   int rt = rs_audio_env_on("RS_AUDIO_RT", 1);
   if (rt) make_realtime();
-  workgroup_state wg = {0};
+  rs_audio_workgroup wg = {0};
   uint32_t gen = 0;
   do {
     if (rt) {
@@ -205,12 +79,12 @@ void RC_FN(ak_lengine_thread)(rc_ctx *c) {
       if (g != gen) {
         gen = g;
         make_realtime();  // the period and budget follow the new device's buffer
-        wg_join(&wg, atomic_load(&g_out_dev));
+        rs_audio_wg_join(&wg, atomic_load(&g_out_dev), "Wwise thread");
       }
     }
     OV_GUEST(ak_render_loop, RC_LD(uint64_t, RC_GA(ak_render_engine)));
     semaphore_wait(RC_LD(uint32_t, self));
   } while (!RC_LD(uint8_t, self + RC_OFF(ak_lengine_stop)));
-  wg_leave(&wg);
+  rs_audio_wg_leave(&wg);
   ov_ret_u32(c, 0);
 }

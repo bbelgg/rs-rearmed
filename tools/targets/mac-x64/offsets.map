@@ -71,3 +71,8 @@ profile_block_c                   0x80    # RSProfileService: byte, StartSignIn 
 profile_set_pad_slot              0x11    # RSProfileService vtable: SetPad(this, player, pad)
 dlc_job_delete_slot               0x1     # DLC-preview job functor vtable: delete
 dlc_job_fail_slot                 0x4     # DLC-preview job functor vtable: completion (job, bool failed)
+boot_phase                        0x58    # RSBootService: u32 boot phase (switch at 0x1002ae483)
+boot_intro_state                  0x78    # RSBootService: u32 intro state (switch at 0x1002b10dc)
+boot_intro_playing                0x39    # RSBootService: u8 intro playing (set 0x1002b128d, cleared by the skip 0x1002aedda)
+boot_step                         0x34    # RSBootService: u32 phase 3 step counter (switch at 0x1002af72a)
+boot_phase3_steps                 0xa     # RSBootService: phase 3's step count (11-case switch on counter + 1)

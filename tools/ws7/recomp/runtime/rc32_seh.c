@@ -17,8 +17,10 @@
 // the target esp, and longjmps there: the generated code reloads every register from rc_ctx and
 // jumps to the label. The host frames in between (the CRT handlers, the dispatcher, the
 // function that raised) are dropped, as their guest frames are.
+#include <dlfcn.h>
 #include <setjmp.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "rc32.h"
 
@@ -27,6 +29,7 @@
 #define EXCEPTION_EXIT_UNWIND 4
 #define STATUS_UNWIND 0xc0000027u
 #define END_OF_CHAIN 0xffffffffu
+#define DISPATCH_FRAME 0xfffffff8u  // the handler of call_handler's frame: never called
 #define CONTEXT_SIZE 0x2cc
 #define CONTEXT_FULL 0x1003fu  // CONTEXT_i386 | CONTROL | INTEGER | SEGMENTS | FLOATING_POINT | DEBUG
 
@@ -50,7 +53,63 @@ static void ctx_load(rc_ctx *c, uint32_t cx) {
   for (int k = 0; k < 8; k++) c->r[k] = ld32(cx + off[k]);
 }
 
+// One handler call, as ntdll's ExecuteHandler makes it: with a frame of the dispatcher's on top of the
+// chain while the handler runs. The CRT counts on it: _UnwindNestedFrames saves the chain's head, unwinds
+// and sets saved->next to what is left, which without this frame would be the target frame itself,
+// linked to itself for good.
+static uint32_t call_handler(rc_ctx *c, uint32_t handler, uint32_t rec, uint32_t node, uint32_t cx) {
+  uint32_t reg = (cx - 32) & ~15u;
+  st32(reg, ld32(c->fs + RC32_TEB_SEH));
+  st32(reg + 4, DISPATCH_FRAME);
+  st32(c->fs + RC32_TEB_SEH, reg);
+  c->r[4] = (cx - 64) & ~15u;
+  uint32_t a[4] = {rec, node, cx, 0};
+  uint32_t r = rc32_call(c, handler, a, 4, (uint32_t)c->r[1], (uint32_t)c->r[2], 0);
+  st32(c->fs + RC32_TEB_SEH, ld32(reg));
+  return r;
+}
+
+// RC32_LOG_RAISE=N: log the first N exceptions raised (code, a C++ exception's type, the raiser)
+// and the first N resumes (a longjmp, or the jump to an __except block or catch continuation)
+static int log_max(void) {
+  static int max = -1;
+  if (max < 0) {
+    const char *e = getenv("RC32_LOG_RAISE");
+    max = e ? atoi(e) : 0;
+  }
+  return max;
+}
+static int log_resume(void) {
+  static int n;
+  return __atomic_fetch_add(&n, 1, __ATOMIC_RELAXED) < log_max();
+}
+static void log_raise(rc_ctx *c, uint32_t code, uint32_t nargs, const uint32_t *args) {
+  static int n;
+  if (__atomic_fetch_add(&n, 1, __ATOMIC_RELAXED) >= log_max()) return;
+  char type[96] = "";
+  if (code == 0xe06d7363u && nargs >= 3 && args[2]) {  // MSVC C++: ThrowInfo -> first catchable type
+    uint32_t cta = ld32(args[2] + 12), ct = cta ? ld32(cta + 4) : 0, td = ct ? ld32(ct + 4) : 0;
+    if (td) snprintf(type, sizeof type, " %.80s", (const char *)(rc_mem + td + 8));
+  }
+  fprintf(stderr, "rc32: raise 0x%08x%s tid %x esp 0x%x, guest stack:", code, type, ld32(c->fs + 0x24),
+          (uint32_t)c->r[4]);
+  for (int k = 0; k < 12; k++) fprintf(stderr, " %x", ld32((uint32_t)c->r[4] + 4 * k));
+  fprintf(stderr, "\n  host:");
+  void **fp = __builtin_frame_address(0);
+  for (int k = 0; k < 14 && fp; k++) {
+    fprintf(stderr, " %p", fp[1]);
+    void **up = fp[0];
+    if (up <= fp) break;
+    fp = up;
+  }
+  Dl_info di;
+  if (dladdr((void *)log_raise, &di)) fprintf(stderr, " (image at %p)", di.dli_fbase);
+  fprintf(stderr, "\n");
+}
+
 void rc32_raise(rc_ctx *c, uint32_t code, uint32_t flags, uint32_t nargs, const uint32_t *args) {
+  log_raise(c, code, nargs, args);
+  if (rc32_note) rc32_note(RC32_NOTE_RAISE, 0);
   uint32_t esp_after = (uint32_t)c->r[4];
   // the records live below the raiser's stack; the handlers run below them
   uint32_t rec = (esp_after - 0x100) & ~15u, cx = (rec - CONTEXT_SIZE - 16) & ~15u;
@@ -64,9 +123,7 @@ void rc32_raise(rc_ctx *c, uint32_t code, uint32_t flags, uint32_t nargs, const 
   uint32_t node = ld32(c->fs + RC32_TEB_SEH);
   while (node != END_OF_CHAIN && node) {
     uint32_t handler = ld32(node + 4);
-    c->r[4] = (cx - 64) & ~15u;
-    uint32_t a[4] = {rec, node, cx, 0};
-    uint32_t r = rc32_call(c, handler, a, 4, (uint32_t)c->r[1], (uint32_t)c->r[2], 0);
+    uint32_t r = handler == DISPATCH_FRAME ? 1 : call_handler(c, handler, rec, node, cx);
     if (r == 0) {  // ExceptionContinueExecution
       if (flags & EXCEPTION_NONCONTINUABLE) rc_fail("rc32: continue after a noncontinuable exception", code);
       ctx_load(c, cx);
@@ -91,9 +148,7 @@ void rc32_unwind(rc_ctx *c, uint32_t target_frame, uint32_t record, uint32_t ret
   uint32_t node = ld32(c->fs + RC32_TEB_SEH);
   while (node != END_OF_CHAIN && node && node != target_frame) {
     uint32_t handler = ld32(node + 4);
-    c->r[4] = (cx - 64) & ~15u;
-    uint32_t a[4] = {record, node, cx, 0};
-    rc32_call(c, handler, a, 4, (uint32_t)c->r[1], (uint32_t)c->r[2], 0);
+    if (handler != DISPATCH_FRAME) call_handler(c, handler, record, node, cx);
     node = ld32(node);
     st32(c->fs + RC32_TEB_SEH, node);
   }
@@ -134,9 +189,10 @@ void rc32_resume_try(rc_ctx *c, uint32_t ip) {
   uint32_t esp = (uint32_t)c->r[4];
   for (int k = ntop - 1; k >= 0; k--) {
     rc32_resume_rec *r = &res[k];
-    if (r->esp <= esp) continue;  // a frame below the target: being unwound
+    if (r->esp < esp) continue;  // a frame below the target: being unwound (a catch funclet's own esp can be the target)
     for (int j = 0; j < r->n; j++) {
       if (r->ips[j] == ip) {
+        if (log_resume()) fprintf(stderr, "rc32: resume at 0x%x in F_%x, esp 0x%x\n", ip, r->func, esp);
         ntop = k + 1;
         r->ip = ip;
         _longjmp(r->jb, 1);

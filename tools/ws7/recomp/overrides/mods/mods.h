@@ -12,13 +12,19 @@
 //   RS_MODS_FIXES=0    rsmacfixes off: keyboard keys, path-MD5 cache, batched DLC mounting, number-table
 //                      hash, thread priority raised, open-file limit; every overridden function then
 //                      behaves exactly like the original (default on)
+//   RS_MODS_INTRO=0    the intro screens (logos, legal screens, intro video) play at start-up (default:
+//                      skipped, the game goes straight to the title screen)
 //   RS_MODS_BUDGET_MS  per-frame budget of the batched DLC mounting (default 50; 0 = one per frame)
 //   RS_MODS_NO_THREAD=1  do not start the End-key poller thread (tests)
+//   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only, without the
+//                      menu entries the installer's overlay adds (Direct Connect) (default on)
 //   RS_MODS_LOG=1      log what is applied to stderr
 typedef struct {
   int bypass;
   int fixes;
   double budget_s;
+  int intro;  // skip the intro screens
+  int overlay;
 } rs_mods_config;
 
 const rs_mods_config *rs_mods_config_get(void);

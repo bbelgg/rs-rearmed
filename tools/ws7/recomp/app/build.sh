@@ -54,11 +54,13 @@ mkdir -p "$work" "$app/Contents/MacOS" "$app/Contents/Resources" "$app/Contents/
 tgt=${RC_TARGET_DIR:-$work/target}
 [ -n "${RC_TARGET_DIR:-}" ] || "${RC_PY:-python3}" -I "$root/tools/targets/targets.py" gen "$tgt" > /dev/null
 
-# first existing arm64 slice among the candidates
+# first existing arm64 slice among the candidates; none is not an error here (set -e would end the build
+# silently on the assignment): each shim says below what is missing
 arm64_of() {
   for f in "$@"; do
     [ -f "$f" ] && lipo -archs "$f" 2>/dev/null | grep -qw arm64 && { echo "$f"; return; }
   done
+  return 0
 }
 shim_steam=${SHIM_STEAM:-$(arm64_of "$root/shims/steam/build/libsteam_api.dylib" "$root/build-rosetta/shims/steam/libsteam_api.dylib")}
 shim_bink=${SHIM_BINK:-$(arm64_of "$root/build/shims/bink/libBink2Macx64.dylib" "$root/build-rosetta/shims/bink/libBink2Macx64.dylib")}
@@ -80,7 +82,8 @@ cc_obj() {  # src [extra flags]  -> work/o/<base>.o
 
 objs=""
 for s in rsp_engine.c rsp_paths.c rsp_config.c rsp_logic.c rsp_renderer.c rsp_overlay.c; do objs="$objs $(cc_obj "$plat/src/$s")"; done
-objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-declarations)"
+rs_version=$(head -n1 "$root/VERSION")  # the window title's release, as CMake sets it
+objs="$objs $(cc_obj "$plat/src/rsp_shell.m" -fno-objc-arc -Wno-deprecated-declarations -DRSP_VERSION="\"$rs_version\"")"
 objs="$objs $(cc_obj "$plat/src/rsp_present_metal.m" -fno-objc-arc)"
 objs="$objs $(cc_obj "$here/seam_platform.c" -I"$tgt")"
 objs="$objs $(cc_obj "$tgt/rc_target.c" -w)"  # the target's name tables for the runtime (rc_hook_add_name)

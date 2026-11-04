@@ -19,7 +19,7 @@
   ],
   "links": [
     { "label": "Releases", "url": "https://github.com/bbelgg/rs-rearmed/releases" },
-    { "label": "Building", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/BUILDING.md" },
+    { "label": "Building", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/mac/INSTALL.md" },
     { "label": "Issues", "url": "https://github.com/bbelgg/rs-rearmed/issues" }
   ],
   "help": [

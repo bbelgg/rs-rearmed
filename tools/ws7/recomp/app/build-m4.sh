@@ -114,13 +114,3 @@ progress 0.97 "Checking the app"
 LLVM_PROFILE_FILE=$out/app/work/init-only-%p%c.profraw \
   "$out/app/Rocksmith2014.app/Contents/MacOS/Rocksmith2014" --init-only 2>&1 | grep 'init-only:'
 echo "app: $out/app/Rocksmith2014.app"
-
-# Build the "Re-ARMed" title logo unless RS_REARMED=0.
-if [ "${RS_REARMED:-1}" != 0 ]; then
-  game_dir="${RS_GAME_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014}"
-  rearmed_psarc="$game_dir/static.psarc.rearmed"
-  if [ ! -f "$rearmed_psarc" ]; then
-    echo "loadscreen: building Re-ARMed title logo..."
-    sh "$root/tools/loadscreen/build.sh" "$rearmed_psarc" || echo "loadscreen: failed (non-fatal), skipping"
-  fi
-fi

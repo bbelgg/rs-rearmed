@@ -3,7 +3,7 @@
 Everything the build knows about one game binary — which address a function is at, how its arguments are
 passed, where a field sits in a struct — lives here, one directory per supported binary. The rest of the
 tree uses names only, so the same source builds for every target
-([docs/PORT-FROM-WINDOWS.md](../../docs/PORT-FROM-WINDOWS.md) has the design).
+([docs/recompiler](../../docs/recompiler/README.md#per-game-tables) has the design).
 
 ```
 tools/targets/
@@ -12,11 +12,12 @@ tools/targets/
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map yet); 919 symbols matched, the rest `unsupported`
   names/             shared by every target
     overrides/*.list the functions each override module replaces
     hooks.list       hook points (the names mods use with rc_hook_add_name)
     seam.list        what the platform seam (app/seam_platform.c) calls and reads
-    refs.list        other functions and globals native code calls or reads
+    refs.list        other functions and globals native code calls or reads (also the shims/game tests)
     offsets.list     the struct fields, sizes and vtable slots native code uses
     relaxed.list     functions the translator emits without per-access fences (xlat/relaxed.py)
   targets.py         reads the tables; `gen` writes what one build needs
@@ -39,6 +40,10 @@ left out of that target's build, and native code that uses the name does not com
 - `skip/<module>.skip`: gen_image.py's skip lists, from `names/` and `drops.map`.
 
 The override, seam and app builds use that directory (`RC_TARGET_DIR`), or make their own when run alone.
+The CMake build makes one per target it needs (`cmake/RSTargetNames.cmake`): the differential tests of
+`shims/game` and `shims/platform` map the Mac image, so they use mac-x64's, and their `RS_ORIG_*`, `RS_KEY_*`
+and `RS_RANGE_*` defines are `RC_ADDR(name)` (`shims/game/include/rs_names.h`). `check.py` reads those
+sources too.
 
 ## Adding a game function, global or field
 

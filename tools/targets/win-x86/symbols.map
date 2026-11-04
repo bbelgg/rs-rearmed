@@ -1,0 +1,1185 @@
+# Symbols of the win-x86 image (Learn & Play): NAME ADDRESS CONVENTION PROTOTYPE (tools/targets/targets.py).
+# ADDRESS: runtime address at the image base 0xf80000 (what F_<addr> and the vtables hold; link address +
+# 0xb80000). CONVENTION: cdecl, stdcall, thiscall, fastcall, custom (a function; custom = register arguments
+# whole-program optimisation (LTCG) made up, the comment says which registers), data (a global), code (an
+# address inside a function). PROTOTYPE: the Mac's, as far as it is known (- = not recorded); the
+# convention, not the prototype, says how the arguments arrive.
+# Matched against the Mac image by class_info / QueryInterface pairs, library call order, exports, unique
+# strings, name tables and vtable shape; a `# medium` or `# low confidence` comment marks the weaker matches.
+# MSVC folds QueryInterface and QueryInterface_const, so both names share one address (two names may).
+# `NAME unsupported REASON` = no counterpart in this image, or not matched yet. One name per line, grouped
+# by the list in names/ that has it first.
+
+# --- names/seam.list
+game_bootstrap                                                   unsupported  no standalone LP function: WinMain (0x1309ad0) inlines it (set game root 0x1343c90, LoadConfig 'Rocksmith.ini' 0x149df40, VFS 'Global FS Backend' 0x101ab50)
+game_frame                                                       unsupported  no standalone LP function: WinMain hands the frame loop to MainService_Win32 (main_service 0x1eef048, vtable +0x40)
+game_shutdown                                                    unsupported  no standalone LP function found: WinMain's exit path (0x1309d6e..) runs the shutdown inline (vtable +0x3c, delete, 0x1309540, 0x101b830, 0x14a2b50)
+set_app_focus                                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+input_sink                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+set_resolution                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+set_fullscreen                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+get_fullscreen                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+get_resolution                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+set_visual_quality                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+service_manager                                                  0x0133cfc0  cdecl     void *(void)  # medium confidence; LP reads [0x1ee0bfc]+4
+ui_current                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ui_menu                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ui_accepts                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ui_event                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+efd_set_path_hooks                                               unsupported  not found; likely inlined into WinMain next to the set-game-root call (LTCG)
+app_focus                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+main_service                                                     0x1eef048  data      void *  # medium confidence
+lua_owner                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+gl_context                                                       unsupported  Mac-only (NSOpenGLContext); LP draws through D3D9
+game_config                                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/hooks.list
+ak_post_event_name                                               0x1a44870  cdecl     uint32_t(const char *event, uint64_t game_object, ...)
+too_many_inputs                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rr_speed_ratio                                                   0x00f89360  cdecl     float(float slider_percent)  # medium confidence; LP returns the percentage (Mac returns 100/percentage); callers divide
+ak_set_rtpc_name                                                 0x1a42400  cdecl     int(const char *, float, uint64_t, int, int)
+camera_set_frustum                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
+si_open                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/refs.list
+scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys
+game_char_to_key                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+game_key_state                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+thread_priority_table                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+path_table_lock                                                  unsupported  a CRITICAL_SECTION here (*0x1ed915c), not a pthread_mutex_t
+path_table                                                       0x1ed9158  data      void *  # std::map of MD5 -> object, read by path_intern
+path_intern                                                      0x0141c130  custom    void *(const char *s, int len)  # ecx = len, stack = s; the Mac path_md5 wrapper is inlined into its callers
+path_release                                                     0x0141c3c0  custom    int(void *obj)  # edi = obj
+dlc_update_head                                                  0x01446570  thiscall  void(void *coord)
+dlc_install_step                                                 0x01449580  custom    void(void *coord)
+dlc_enum_check                                                   0x014493a0  custom    bool(void *coord)
+dlc_update_tail                                                  0x01449660  stdcall   void(void *coord)
+std_tree_destroy                                                 0x00f964a0  thiscall  void(void *tree, void *root)
+json_number_table                                                0x1ee14c8  data      void *  # a Dinkumware hash_map here
+json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154), not a pthread_mutex_t
+json_number_vtable                                               0x1d5a130  data      void *[]  # 0x1400040
+const_two_pow_63                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+hashtable_prime_sizes                                            0x1d1e010  data      uint32_t[28]  # medium confidence; inside MSVC's list from 0x1d1e008 (7, 23, ...)
+efd_alloc                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+json_number_base_ctor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+json_number_base_dtor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+sng_load_verify_ret                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_platform_settings                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_sink_ring_alloc                                               unsupported  Mac-only: the CoreAudio sink; the Windows Wwise build has its own sink
+ak_lengine_thread_id                                             unsupported  Mac-only type (pthread_t); the Windows LEngine thread is a Win32 thread
+ak_lengine_start_time                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_render_loop                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_render_engine                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+la_vcosf                                                         unsupported  Mac-only (Accelerate vForce import pointer)
+dsp_two_pi                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_two                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_ramp0                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_half4                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_four4                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_k046                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_k054                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_one4                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+efd_malloc                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+psarc_key_iv                                                     unsupported  no global in LP: the IV is built from immediates on the stack (0x19be16b: mov [ebp-0x2c], 0x1aa15e9 ...)
+property_object_ctor                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+game_interface_helper_new                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rs_steam_service_ctor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rs_connect_service_steam_ctor                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rs_dlc_service_steam_ctor                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rs_profile_service_ctor                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rs_connect_service                                               0x1ef5e90  data      void *
+rs_connect_game_interface                                        0x1ef5e94  data      void *
+service_manager_holder                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+GRCamera_class_info                                              0x1ef2090  data      efd::ClassInfo
+GRCameraBackground_class_info                                    0x1ef22d0  data      efd::ClassInfo
+GRCameraBGBehavior_Animated_class_info                           0x1ef2510  data      efd::ClassInfo
+GRCameraBGBehavior_BuildUp_class_info                            0x1ef2750  data      efd::ClassInfo
+GRCameraBGBehavior_Customize_class_info                          0x1ef2990  data      efd::ClassInfo
+GRCameraBGBehavior_Debug_class_info                              0x1ef2bd0  data      efd::ClassInfo
+GRCameraBGBehavior_Panning_class_info                            0x1ef2e10  data      efd::ClassInfo
+CameraSong_class_info                                            0x1ef3058  data      efd::ClassInfo
+GRCameraDebug_class_info                                         0x1ef32a8  data      efd::ClassInfo
+GRCameraScripted_class_info                                      0x1ef34f0  data      efd::ClassInfo
+GRCameraService_class_info                                       0x1ef3720  data      efd::ClassInfo
+IGRCameraImpl_class_info                                         0x1ef3928  data      efd::ClassInfo
+DatabaseCommandQueue_class_info                                  0x1ef52f8  data      efd::ClassInfo
+DatabaseMessageSystem_class_info                                 0x1ef5920  data      efd::ClassInfo
+DatabaseService_class_info                                       0x1ef5b30  data      efd::ClassInfo
+GRCrowdBox_class_info                                            0x1ef0f60  data      efd::ClassInfo
+GRCrowdSystem_class_info                                         0x1ef11a8  data      efd::ClassInfo
+GRLightService_class_info                                        0x1eea810  data      efd::ClassInfo
+GRMusicService_class_info                                        0x1ef0420  data      efd::ClassInfo
+JSONFactory_class_info                                           0x1ef5090  data      efd::ClassInfo
+JSONFactory__Response_class_info                                 0x1ef4e80  data      efd::ClassInfo
+PostEffectColorCorrect_class_info                                0x1ef13b0  data      efd::ClassInfo
+PostEffectsService_class_info                                    0x1ef15d8  data      efd::ClassInfo
+GRClipFadeEffectComponent_class_info                             0x1ef1a08  data      efd::ClassInfo
+GRDisplayRatioAdjuster_class_info                                0x1ef1c40  data      efd::ClassInfo
+GRShowLightsSystem_class_info                                    0x1ef3b38  data      efd::ClassInfo
+GRVenueMenuPresentation_Flow_class_info                          0x1ef3d70  data      efd::ClassInfo
+MainService_MacOS_class_info                                     unsupported  Mac-only class; the Windows counterpart is MainService_Win32 (class_info 0x1eef270, class ID 0x1000601)
+NSP_PlayListService_class_info                                   0x1ee8320  data      efd::ClassInfo
+RSLogger_class_info                                              0x1ee3010  data      efd::ClassInfo
+RSDejaOutDestination_class_info                                  0x1ee2e08  data      efd::ClassInfo
+GuitarService_class_info                                         0x1eeaca0  data      efd::ClassInfo
+GRLocalization_class_info                                        0x1ef1e80  data      efd::ClassInfo
+GRSongDirectory_class_info                                       0x1ee9fb0  data      efd::ClassInfo
+DetectionService_class_info                                      0x1ee7928  data      efd::ClassInfo
+VenueService_class_info                                          0x1eeed10  data      efd::ClassInfo
+GameService_class_info                                           0x1ee3be8  data      efd::ClassInfo
+GRAlphaSortingComponent_class_info                               0x1eeff80  data      efd::ClassInfo
+GRBackground_class_info                                          0x1ef0908  data      efd::ClassInfo
+GRBackgroundService_class_info                                   0x1ef0b10  data      efd::ClassInfo
+GRObjectEffectComponent_class_info                               0x1eeaa20  data      efd::ClassInfo
+GRWorldTextManager_class_info                                    0x1ef0680  data      efd::ClassInfo
+GraphAssetFactory_class_info                                     0x1eea3f8  data      efd::ClassInfo
+GraphAssetFactory__Response_class_info                           0x1eea600  data      efd::ClassInfo
+GRComponent_class_info                                           0x1ef01d0  data      efd::ClassInfo
+MainService_class_info                                           0x1eef058  data      efd::ClassInfo
+PreloadHelper_class_info                                         0x1eef500  data      efd::ClassInfo
+PreloadHelperResponse_class_info                                 0x1eef710  data      efd::ClassInfo
+PreloadItem_class_info                                           0x1eefb20  data      efd::ClassInfo
+RSBootService_class_info                                         0x1eeb968  data      efd::ClassInfo
+RSRenderService_class_info                                       0x1eeb748  data      efd::ClassInfo
+GCTickable_class_info                                            0x1ee5640  data      efd::ClassInfo
+RSAudioService_class_info                                        0x1ee2300  data      efd::ClassInfo
+UIManagerI_class_info                                            0x1eec670  data      efd::ClassInfo
+UIMenu_LAS_SongsList_class_info                                  0x1eecb90  data      efd::ClassInfo
+UIService_class_info                                             0x1eed988  data      efd::ClassInfo
+ResourceService_class_info                                       0x1eeb110  data      efd::ClassInfo
+GRMinigameCamera_class_info                                      0x1ef0d38  data      efd::ClassInfo
+OscilleratorScopeModel_class_info                                0x1ee8df0  data      efd::ClassInfo
+ReactiveEffectsService_class_info                                0x1ee9018  data      efd::ClassInfo
+GCColorShift_class_info                                          0x1ee4518  data      efd::ClassInfo
+GC2DAssetHelper_class_info                                       0x1ee3e38  data      efd::ClassInfo
+GCAccumulatedActor_class_info                                    0x1ee4080  data      efd::ClassInfo
+GCPauseManager_class_info                                        0x1ee53f8  data      efd::ClassInfo
+GRCameraNarniaVenue_class_info                                   0x1ee2758  data      efd::ClassInfo
+FormLoader_class_info                                            0x1ee3878  data      efd::ClassInfo
+ClipFadeManager_class_info                                       0x1ef17f8  data      efd::ClassInfo
+GEService_class_info                                             0x1ee67e0  data      efd::ClassInfo
+NarniaPortalModel_class_info                                     0x1ee74f0  data      efd::ClassInfo
+SongListService_class_info                                       0x1ee9d98  data      efd::ClassInfo
+NarniaService_class_info                                         0x1ee7718  data      efd::ClassInfo
+GRSL2Spawner_class_info                                          0x1ee9b68  data      efd::ClassInfo
+NarniaFogModel_class_info                                        0x1ee70b0  data      efd::ClassInfo
+NarniaFogParticle_class_info                                     0x1ee72d0  data      efd::ClassInfo
+MissionService_class_info                                        0x1ee6e90  data      efd::ClassInfo
+ToneService_class_info                                           0x1eebb90  data      efd::ClassInfo
+StringTuner_class_info                                           0x1eebdc8  data      efd::ClassInfo
+TunerService_class_info                                          0x1eec248  data      efd::ClassInfo
+InstrumentLoader_class_info                                      0x1ee6c30  data      efd::ClassInfo
+GRCrowdPoint_class_info                                          0x1ee6568  data      efd::ClassInfo
+GearManager_class_info                                           0x1ee5af0  data      efd::ClassInfo
+GearService_class_info                                           0x1ee6138  data      efd::ClassInfo
+FogService_class_info                                            0x1ee3448  data      efd::ClassInfo
+GlobalFogSettings_class_info                                     0x1ee3650  data      efd::ClassInfo
+ManifestManager_class_info                                       0x1ee2bf8  data      efd::ClassInfo  # medium confidence
+StatsService_class_info                                          0x1eea1f0  data      efd::ClassInfo
+GRCameraLoft_class_info                                          0x1ee2518  data      efd::ClassInfo
+GEVideoScreenModel_class_info                                    0x1ee6a00  data      efd::ClassInfo
+TunerProgressBuiltin_class_info                                  0x1eec010  data      efd::ClassInfo
+GameColorManager_class_info                                      0x1ee9648  data      efd::ClassInfo
+GRCameraSessionMode_class_info                                   0x1ee29c8  data      efd::ClassInfo
+GCAttachmentManager_class_info                                   0x1ee42d0  data      efd::ClassInfo
+UIMenu_ShopSongs_class_info                                      0x1eed408  data      efd::ClassInfo
+GRLoftAmbientLight_class_info                                    0x1eedbc0  data      efd::ClassInfo
+GRLoftSpotLight_class_info                                       0x1eee028  data      efd::ClassInfo
+GRLoftState_class_info                                           0x1eee688  data      efd::ClassInfo
+LoftPostEffectsManager_class_info                                0x1eeeaf0  data      efd::ClassInfo
+RSVenueForkEmitterGear_class_info                                0x1ee6348  data      efd::ClassInfo
+UIMenu_ShopGear_class_info                                       0x1eecfd8  data      efd::ClassInfo
+UIMenu_ShopPacks_class_info                                      0x1eed1f0  data      efd::ClassInfo
+GearPlacementNode_class_info                                     0x1ee5f10  data      efd::ClassInfo
+GearLava_class_info                                              0x1ee8790  data      efd::ClassInfo
+GearNifCache_class_info                                          0x1ee5cf8  data      efd::ClassInfo
+GRVenueAmbientAnimations_class_info                              0x1eee8a8  data      efd::ClassInfo
+GRSoundIntensity_class_info                                      0x1ee89b8  data      efd::ClassInfo
+GRVenuePointLight_class_info                                     0x1ee8be0  data      efd::ClassInfo
+GRLoftCabinetScreen_class_info                                   0x1eede00  data      efd::ClassInfo
+GCLdbChlgService_class_info                                      0x1ee4fc8  data      efd::ClassInfo
+GearChangeController_class_info                                  0x1ee58d8  data      efd::ClassInfo
+GCGFxMouseEventHandler_class_info                                0x1ee4950  data      efd::ClassInfo
+AchievementService_class_info                                    0x1ee20e0  data      efd::ClassInfo
+PrizeService_class_info                                          0x1ee8588  data      efd::ClassInfo
+GCKinectEventHandler_class_info                                  0x1ee4d88  data      efd::ClassInfo
+FavoritesService_class_info                                      0x1ee3238  data      efd::ClassInfo
+RSConnectExtension_RDV_class_info                                0x1ef66f0  data      efd::ClassInfo
+RSConnectService_Steam_class_info                                0x1ef5ed0  data      efd::ClassInfo
+RSSteamService_class_info                                        0x1ef60d8  data      efd::ClassInfo
+RSDLCService_Steam_class_info                                    0x1ef62e0  data      efd::ClassInfo  # medium confidence
+RSProfileService_MacOS_class_info                                0x1ef64e8  data      efd::ClassInfo  # medium confidence
+RSSteamAchievement_class_info                                    0x1ef7730  data      efd::ClassInfo
+RSSteamActivityFeed_class_info                                   0x1ef7b40  data      efd::ClassInfo
+RSSteamCloudFile_class_info                                      0x1ef6d08  data      efd::ClassInfo
+RSSteamDownloadableContent_class_info                            0x1ef68f8  data      efd::ClassInfo
+RSSteamLeaderboards_class_info                                   0x1ef6f10  data      efd::ClassInfo
+RSSteamLeaderboardRequest_class_info                             0x1ef7118  data      efd::ClassInfo
+RSSteamLeaderboardRequestUpload_class_info                       0x1ef7320  data      efd::ClassInfo
+RSSteamLeaderboardRequestDownload_class_info                     0x1ef7528  data      efd::ClassInfo
+RSSteamWebApi_class_info                                         0x1ef6b00  data      efd::ClassInfo
+FrkService_class_info                                            0x1ef7d50  data      efd::ClassInfo
+GFxAssetTaskAssetFactory_class_info                              0x1f06cd0  data      efd::ClassInfo
+GFxInputRouterModel_class_info                                   0x1f075d0  data      efd::ClassInfo
+GFxMovieModel_class_info                                         0x1f06ab0  data      efd::ClassInfo
+GFxService_class_info                                            0x1f07238  data      efd::ClassInfo
+sub_LuaResumeCoroutineTask_class_info                            0x1f007e0  data      efd::ClassInfo
+LuaScriptFactory_class_info                                      0x1f00a38  data      efd::ClassInfo
+SchedulerLua_class_info                                          0x1f00580  data      efd::ClassInfo
+AttachNifData_class_info                                         0x1f046e8  data      efd::ClassInfo
+CameraService_class_info                                         0x1f02758  data      efd::ClassInfo
+LightService_class_info                                          0x1f030e8  data      efd::ClassInfo
+NIFFactory_class_info                                            0x1f04b08  data      efd::ClassInfo
+RenderService_class_info                                         0x1f041d8  data      efd::ClassInfo
+SceneGraphCache_class_info                                       0x1f02c78  data      efd::ClassInfo
+SceneGraphService_class_info                                     0x1f02a10  data      efd::ClassInfo
+ShaderService_class_info                                         0x1f043e0  data      efd::ClassInfo
+InputActionMessage_class_info                                    0x1f01178  data      efd::ClassInfo
+InputHandler_class_info                                          0x1f01658  data      efd::ClassInfo
+InputService_class_info                                          0x1f00ea8  data      efd::ClassInfo
+InputStickMessage_class_info                                     0x1f01428  data      efd::ClassInfo
+KeyDownMessage_class_info                                        0x1f01878  data      efd::ClassInfo
+KeyUpMessage_class_info                                          0x1f01a80  data      efd::ClassInfo
+MouseMoveMessage_class_info                                      0x1f01e90  data      efd::ClassInfo
+MouseDownMessage_class_info                                      0x1f02098  data      efd::ClassInfo
+MouseUpMessage_class_info                                        0x1f022a0  data      efd::ClassInfo
+Entity_class_info                                                0x1efcdb8  data      efd::ClassInfo
+sub_EntityChangeMessage_class_info                               0x1efcfe0  data      efd::ClassInfo
+EntityFactory_class_info                                         0x1efeac0  data      efd::ClassInfo
+EntityLoadRequest_class_info                                     0x1efd620  data      efd::ClassInfo
+EntityLoadResult_class_info                                      0x1efd828  data      efd::ClassInfo
+EntityPreloadRequest_class_info                                  0x1efda30  data      efd::ClassInfo
+EntityPreloadResponse_class_info                                 0x1efdc38  data      efd::ClassInfo
+EntityLoaderService_class_info                                   0x1efe050  data      efd::ClassInfo
+EntityManager_class_info                                         0x1efcb98  data      efd::ClassInfo
+EntitySetLoadState_class_info                                    0x1efe470  data      efd::ClassInfo
+sub_EventMessage_class_info                                      0x1eff708  data      efd::ClassInfo
+FlatModelFactory_class_info                                      0x1eff910  data      efd::ClassInfo
+FlatModelManager_class_info                                      0x1efd1e8  data      efd::ClassInfo
+PendingBehavior_class_info                                       0x1eff2f8  data      efd::ClassInfo
+Scheduler_class_info                                             0x1efd408  data      efd::ClassInfo
+ScriptFactoryResponse_class_info                                 0x1f0b818  data      efd::ClassInfo
+WorldFactory_class_info                                          0x1efe680  data      efd::ClassInfo
+AnimationService_class_info                                      0x1f058e8  data      efd::ClassInfo
+KFMFactory_class_info                                            0x1f061a0  data      efd::ClassInfo
+KFMFactory__ResponseData_class_info                              0x1f063a8  data      efd::ClassInfo
+AssetCacheResponse_class_info                                    0x1efa098  data      efd::ClassInfo
+AssetConfigService_class_info                                    0x1efbb50  data      efd::ClassInfo
+AssetFactoryManager_class_info                                   0x1ef9858  data      efd::ClassInfo
+AssetLoadRequest_class_info                                      0x1ef9600  data      efd::ClassInfo
+AssetLoadResponse_class_info                                     0x1ef93f8  data      efd::ClassInfo
+sub_AssetLocatorRequest_class_info                               0x1efb740  data      efd::ClassInfo
+sub_AssetConfigurationMessage_class_info                         0x1efb948  data      efd::ClassInfo
+sub_AssetLocatorResponse_class_info                              0x1ef9a60  data      efd::ClassInfo
+AssetTagsInfoResponse_class_info                                 0x1ef9c68  data      efd::ClassInfo
+AssetLocatorService_class_info                                   0x1ef8fe0  data      efd::ClassInfo
+ConfigManager_class_info                                         0x1efaef0  data      efd::ClassInfo
+SectionEntry_class_info                                          0x1efc990  data      efd::ClassInfo
+ConfigSource_class_info                                          0x1efa6d0  data      efd::ClassInfo
+CommandLineSource_class_info                                     0x1efa8d8  data      efd::ClassInfo
+IniSource_class_info                                             0x1efaae0  data      efd::ClassInfo
+EnvVarSource_class_info                                          0x1eface8  data      efd::ClassInfo
+DebugOutDestination_class_info                                   0x1efc788  data      efd::ClassInfo
+FileDestination_class_info                                       0x1efc378  data      efd::ClassInfo
+GenericAssetFactory_class_info                                   0x1efb100  data      efd::ClassInfo
+GenericAssetLoadResponse_class_info                              0x1efb518  data      efd::ClassInfo
+sub_IMessage_class_info                                          0x1ef8bd0  data      efd::ClassInfo
+Logger_class_info                                                0x1ef9e70  data      efd::ClassInfo
+MessageService_class_info                                        0x1ef89c0  data      efd::ClassInfo
+NetMessage_class_info                                            0x1f0add0  data      efd::ClassInfo
+AssignNetIDMessage_class_info                                    0x1f0afd8  data      efd::ClassInfo
+PrintDestination_class_info                                      0x1efc580  data      efd::ClassInfo
+ServiceManager_class_info                                        0x1ef83b8  data      efd::ClassInfo
+sub_StreamMessage_class_info                                     0x1efbf60  data      efd::ClassInfo
+MacOSPlatformService_class_info                                  unsupported  Mac-only class; the Windows counterpart is Win32PlatformService (class_info 0x1efa4c8, class ID 0x700001a)
+AudioBankAssetFactory_class_info                                 0x1f0a930  data      efd::ClassInfo
+AudioBankAssetLoadResponse_class_info                            0x1f0a710  data      efd::ClassInfo
+AudioMessage_class_info                                          0x1f09c50  data      efd::ClassInfo
+AudioService_class_info                                          0x1f08b90  data      efd::ClassInfo
+SceneGraphRemovedMessage_class_info                              0x1f03758  data      efd::ClassInfo
+SceneGraphAddedMessage_class_info                                0x1f03550  data      efd::ClassInfo
+SceneGraphsUpdatedMessage_class_info                             0x1f03960  data      efd::ClassInfo
+SceneGraphMessage_class_info                                     0x1f03348  data      efd::ClassInfo
+JSONFactory__JSONFactoryData_class_info                          0x1ef4c68  data      efd::ClassInfo
+ReturnToTitleScreen_class_info                                   0x1ee9938  data      efd::ClassInfo
+PreloadHelperComplete_class_info                                 0x1eef918  data      efd::ClassInfo
+SceneGraphCacheResponse_class_info                               0x1f02e88  data      efd::ClassInfo
+PreloadGroup_class_info                                          0x1eefd28  data      efd::ClassInfo
+GCPauseMessage_class_info                                        0x1ee51d8  data      efd::ClassInfo
+RSGraphAssetFactoryLoadResponse_class_info                       0x1eeb320  data      efd::ClassInfo
+RSConnectGameInterface_Impl_class_info                           0x1eeb530  data      efd::ClassInfo
+ReactiveRingModel_class_info                                     0x1ee9228  data      efd::ClassInfo
+RingParticleEmitter_class_info                                   0x1ee9438  data      efd::ClassInfo
+GCGFxMouseEventMessage_class_info                                0x1ee4748  data      efd::ClassInfo
+GCKinectEventMessage_class_info                                  0x1ee4b80  data      efd::ClassInfo
+NiFrkParticleEffectModel_class_info                              0x1ef8108  data      efd::ClassInfo
+GFxAssetTaskRequest_class_info                                   0x1f06f08  data      efd::ClassInfo
+GFXModelResponse_class_info                                      0x1f06810  data      efd::ClassInfo
+LuaScriptFactoryResponseData_class_info                          0x1f00c40  data      efd::ClassInfo
+NIFFactoryResponse_class_info                                    0x1f048f8  data      efd::ClassInfo
+AttachmentMadeMessage_class_info                                 0x1f03d70  data      efd::ClassInfo
+AttachmentMessage_class_info                                     0x1f03b68  data      efd::ClassInfo
+AttachmentBrokenMessage_class_info                               0x1f03f78  data      efd::ClassInfo
+InputActionMapsLoaded_class_info                                 0x1f024c8  data      efd::ClassInfo
+ScheduledTask_class_info                                         0x1eff500  data      efd::ClassInfo
+EntityFactory__EntityFactoryData_class_info                      0x1efecc8  data      efd::ClassInfo
+EntityFactoryRequest_class_info                                  0x1eff0e8  data      efd::ClassInfo
+EntityFactoryResponse_class_info                                 0x1efeed0  data      efd::ClassInfo
+ResponseData_class_info                                          0x1effb18  data      efd::ClassInfo
+FlatModelFactoryRequest_class_info                               0x1effd30  data      efd::ClassInfo
+FlatModelFactoryResponse_class_info                              0x1efe260  data      efd::ClassInfo
+ScriptFactoryRequest_class_info                                  0x1f00350  data      efd::ClassInfo
+WorldFactoryData_class_info                                      0x1efe888  data      efd::ClassInfo
+WorldFactoryRequest_class_info                                   0x1f00148  data      efd::ClassInfo
+WorldFactoryResponse_class_info                                  0x1efff38  data      efd::ClassInfo
+ActorAddedMessage_class_info                                     0x1f05b80  data      efd::ClassInfo
+ActorRemovedMessage_class_info                                   0x1f05d88  data      efd::ClassInfo
+KFMFactoryRequest_class_info                                     0x1f065b0  data      efd::ClassInfo
+KFMFactoryResponse_class_info                                    0x1f05f90  data      efd::ClassInfo
+AssetLocationMap_class_info                                      0x1ef91e8  data      efd::ClassInfo
+ResponseData2_class_info                                         0x1efb308  data      efd::ClassInfo
+AudioBankAssetLoadRequest_class_info                             0x1f0a478  data      efd::ClassInfo
+PostEventMessage_class_info                                      0x1f09638  data      efd::ClassInfo
+PostTriggerMessage_class_info                                    0x1f08e18  data      efd::ClassInfo
+SetParamMessage_class_info                                       0x1f09020  data      efd::ClassInfo
+SetStateMessage_class_info                                       0x1f09e58  data      efd::ClassInfo
+SetSwitchMessage_class_info                                      0x1f0a268  data      efd::ClassInfo
+DoPrepareEventCallbackBehaviorMessage_class_info                 0x1f0a060  data      efd::ClassInfo
+DoUnprepareEventCallbackBehaviorMessage_class_info               0x1f09430  data      efd::ClassInfo
+DoLoadBankCallbackBehaviorMessage_class_info                     0x1f09228  data      efd::ClassInfo
+DoUnloadBankCallbackBehaviorMessage_class_info                   0x1f09a48  data      efd::ClassInfo
+DoPostEventExNotifyCallbackBehaviorMessage_class_info            0x1f09840  data      efd::ClassInfo
+mach_header                                                      unsupported  Mac-only; the LP counterpart is the image's IMAGE_DOS_HEADER at the image base 0xf80000
+objc_classref_MessageBox                                         unsupported  Mac-only (Objective-C class reference)
+
+# --- names/relaxed.list
+roomverb_fdn                                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+roomverb_fdn_lr                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+roomverb_early_reflections                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+roomverb_allpass                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+parametric_eq_biquad                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+peak_limiter_follower                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+expander_gain                                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+meter_peak_rms                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_buffer_zero_pad                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+vorbis_codebook_decode_vq                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+vorbis_huffman_decode                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+vorbis_bits_look                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+vorbis_bits_adv                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_analysis_window                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/overrides/audio.list
+ak_lengine_thread                                                unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+input_queue_read                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_sink_ring_init                                                unsupported  Mac-only: the CoreAudio sink; the Windows Wwise build has its own sink
+
+# --- names/overrides/crypto.list
+rsg_rijndael_key_setup_enc                                       0x142c6c0  custom    int(uint32_t *, const uint8_t *, int)  # register args eax,ecx,edi (LTCG)
+rsg_rijndael_key_setup_dec                                       0x142c960  custom    int(uint32_t *, const uint8_t *, int)  # register args (LTCG)
+rsg_rijndael_encrypt                                             0x142cba0  custom    void(const uint32_t *, int, const uint8_t *, uint8_t *)  # register args eax,ecx (LTCG)
+rsg_rijndael_decrypt                                             0x142dc80  custom    void(const uint32_t *, int, const uint8_t *, uint8_t *)  # register args eax,ecx (LTCG)
+rsg_bpe_expand                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_cryptopp_aes_ctr_decrypt                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_cryptopp_dsa_sha1_verify                                     0x019bfeb0  cdecl     _Bool(const uint8_t *, uint32_t, const char *)
+rsg_cryptopp_aes_cfb_decrypt                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/overrides/efd.list
+rsg_ak_get_id_from_string                                        0x1a422b0  cdecl     uint32_t(const char *)
+rsg_efd_msghelper_on_init                                        0x0fc70c0  cdecl     int(void *)  # medium confidence
+rsg_efd_msghelper_on_tick                                        unsupported  medium-confidence match was an unrelated getter
+rsg_efd_msghelper_display_name                                   0x1479310  cdecl     const char *(void *)  # medium confidence
+rsg_efd_category_init_u0                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_category_init_u2                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_path_standardize                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+efd_sqrt_table_new                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_id_set_type                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_id_set_usage                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_id_set_shard                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_id_set_net_id                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_id_set_base_id                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8_units_at                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8_units                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8_tail_missing                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8string_length                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8string_to_upper                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_utf8string_to_lower                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+efd_snprintf                                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/overrides/efd_ds.list
+rsg_efd_datastream_init                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_init_copy                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_destroy                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_read                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_write                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_seek                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_write_stream                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_read_stream                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_write_id                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_read_id                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/overrides/efd_qi.list
+GRCamera_QueryInterface                                          0x13b46e0  thiscall  -
+GRCamera_QueryInterface_const                                    0x13b46e0  thiscall  -
+GRCameraBackground_QueryInterface                                0x13b6000  thiscall  -
+GRCameraBackground_QueryInterface_const                          0x13b6000  thiscall  -
+GRCameraBGBehavior_Animated_QueryInterface                       0x13b9690  thiscall  -
+GRCameraBGBehavior_Animated_QueryInterface_const                 0x13b9690  thiscall  -
+GRCameraBGBehavior_BuildUp_QueryInterface                        0x13bcdd0  thiscall  -
+GRCameraBGBehavior_BuildUp_QueryInterface_const                  0x13bcdd0  thiscall  -
+GRCameraBGBehavior_Customize_QueryInterface                      0x13c1030  thiscall  -
+GRCameraBGBehavior_Customize_QueryInterface_const                0x13c1030  thiscall  -
+GRCameraBGBehavior_Debug_QueryInterface                          0x13c3bc0  thiscall  -
+GRCameraBGBehavior_Debug_QueryInterface_const                    0x13c3bc0  thiscall  -
+GRCameraBGBehavior_Panning_QueryInterface                        0x13c4ca0  thiscall  -
+GRCameraBGBehavior_Panning_QueryInterface_const                  0x13c4ca0  thiscall  -
+CameraSong_QueryInterface                                        0x13ca3e0  thiscall  -
+CameraSong_QueryInterface_const                                  0x13ca3e0  thiscall  -
+GRCameraDebug_QueryInterface                                     0x13d0160  thiscall  -
+GRCameraDebug_QueryInterface_const                               0x13d0160  thiscall  -
+GRCameraScripted_QueryInterface                                  0x13d0de0  thiscall  -
+GRCameraScripted_QueryInterface_const                            0x13d0de0  thiscall  -
+GRCameraService_QueryInterface                                   0x13d3c80  thiscall  -
+GRCameraService_QueryInterface_const                             0x13d3c80  thiscall  -
+IGRCameraImpl_QueryInterface                                     0x13d5150  thiscall  -
+IGRCameraImpl_QueryInterface_const                               0x13d5150  thiscall  -
+DatabaseCommandQueue_QueryInterface                              0x140f1c0  thiscall  -
+DatabaseCommandQueue_QueryInterface_const                        0x140f1c0  thiscall  -
+DatabaseMessageSystem_QueryInterface                             0x1411130  thiscall  -
+DatabaseMessageSystem_QueryInterface_const                       0x1411130  thiscall  -
+DatabaseService_QueryInterface                                   0x1411be0  thiscall  -
+DatabaseService_QueryInterface_const                             0x1411be0  thiscall  -
+GRCrowdBox_QueryInterface                                        0x13831a0  thiscall  -
+GRCrowdBox_QueryInterface_const                                  0x13831a0  thiscall  -
+GRCrowdSystem_QueryInterface                                     0x1388130  thiscall  -
+GRCrowdSystem_QueryInterface_const                               0x1388130  thiscall  -
+GRLightService_QueryInterface                                    0x1108c90  thiscall  -
+GRLightService_QueryInterface_const                              0x1108c90  thiscall  -
+GRMusicService_QueryInterface                                    0x133c0a0  thiscall  -
+GRMusicService_QueryInterface_const                              0x133c0a0  thiscall  -
+JSONFactory_QueryInterface                                       0x13fbc50  thiscall  -
+JSONFactory_QueryInterface_const                                 0x13fbc50  thiscall  -
+JSONFactory__Response_QueryInterface                             0x13fbdf0  thiscall  -
+JSONFactory__Response_QueryInterface_const                       0x13fbdf0  thiscall  -
+PostEffectColorCorrect_QueryInterface                            0x1391810  thiscall  -
+PostEffectColorCorrect_QueryInterface_const                      0x1391810  thiscall  -
+PostEffectsService_QueryInterface                                0x139b240  thiscall  -
+PostEffectsService_QueryInterface_const                          0x139b240  thiscall  -
+GRClipFadeEffectComponent_QueryInterface                         0x13a7f50  thiscall  -
+GRClipFadeEffectComponent_QueryInterface_const                   0x13a7f50  thiscall  -
+GRDisplayRatioAdjuster_QueryInterface                            0x13aa200  thiscall  -
+GRDisplayRatioAdjuster_QueryInterface_const                      0x13aa200  thiscall  -
+GRShowLightsSystem_QueryInterface                                0x13d5a80  thiscall  -
+GRShowLightsSystem_QueryInterface_const                          0x13d5a80  thiscall  -
+GRVenueMenuPresentation_Flow_QueryInterface                      0x13de250  thiscall  -
+GRVenueMenuPresentation_Flow_QueryInterface_const                0x13de250  thiscall  -
+MainService_MacOS_QueryInterface                                 unsupported  Mac-only class; Windows counterpart MainService_Win32 (class_info 0x1eef270)
+MainService_MacOS_QueryInterface_const                           unsupported  Mac-only class; Windows counterpart MainService_Win32 (class_info 0x1eef270)
+NSP_PlayListService_QueryInterface                               0x1073550  thiscall  -
+NSP_PlayListService_QueryInterface_const                         0x1073550  thiscall  -
+RSLogger_QueryInterface                                          0x0fb0480  thiscall  -
+RSLogger_QueryInterface_const                                    0x0fb0480  thiscall  -
+RSDejaOutDestination_QueryInterface                              0x0fafee0  thiscall  -
+RSDejaOutDestination_QueryInterface_const                        0x0fafee0  thiscall  -
+GuitarService_QueryInterface                                     0x1118b60  thiscall  -
+GuitarService_QueryInterface_const                               0x1118b60  thiscall  -
+GRLocalization_QueryInterface                                    0x13b0f20  thiscall  -
+GRLocalization_QueryInterface_const                              0x13b0f20  thiscall  -
+GRSongDirectory_QueryInterface                                   0x10e74e0  thiscall  -
+GRSongDirectory_QueryInterface_const                             0x10e74e0  thiscall  -
+DetectionService_QueryInterface                                  0x105be50  thiscall  -
+DetectionService_QueryInterface_const                            0x105be50  thiscall  -
+VenueService_QueryInterface                                      0x12f91e0  thiscall  -
+VenueService_QueryInterface_const                                0x12f91e0  thiscall  -
+GameService_QueryInterface                                       0x0ff0440  thiscall  -
+GameService_QueryInterface_const                                 0x0ff0440  thiscall  -
+GRAlphaSortingComponent_QueryInterface                           0x131aee0  thiscall  -
+GRAlphaSortingComponent_QueryInterface_const                     0x131aee0  thiscall  -
+GRBackground_QueryInterface                                      0x1376160  thiscall  -
+GRBackground_QueryInterface_const                                0x1376160  thiscall  -
+GRBackgroundService_QueryInterface                               0x137bfb0  thiscall  -
+GRBackgroundService_QueryInterface_const                         0x137bfb0  thiscall  -
+GRObjectEffectComponent_QueryInterface                           0x110ba80  thiscall  -
+GRObjectEffectComponent_QueryInterface_const                     0x110ba80  thiscall  -
+GRWorldTextManager_QueryInterface                                0x135a040  thiscall  -
+GRWorldTextManager_QueryInterface_const                          0x135a040  thiscall  -
+GraphAssetFactory_QueryInterface                                 0x11085b0  thiscall  -
+GraphAssetFactory_QueryInterface_const                           0x11085b0  thiscall  -
+GraphAssetFactory__Response_QueryInterface                       0x1108680  thiscall  -
+GraphAssetFactory__Response_QueryInterface_const                 0x1108680  thiscall  -
+GRComponent_QueryInterface                                       0x132b970  thiscall  -
+GRComponent_QueryInterface_const                                 0x132b970  thiscall  -
+MainService_QueryInterface                                       0x130a630  thiscall  -
+MainService_QueryInterface_const                                 0x130a630  thiscall  -
+PreloadHelper_QueryInterface                                     0x130e0b0  thiscall  -
+PreloadHelper_QueryInterface_const                               0x130e0b0  thiscall  -
+PreloadHelperResponse_QueryInterface                             0x130fe20  thiscall  -
+PreloadHelperResponse_QueryInterface_const                       0x130fe20  thiscall  -
+PreloadItem_QueryInterface                                       0x130fc60  thiscall  -
+PreloadItem_QueryInterface_const                                 0x130fc60  thiscall  -
+RSBootService_QueryInterface                                     0x1125570  thiscall  -
+RSBootService_QueryInterface_const                               0x1125570  thiscall  -
+RSRenderService_QueryInterface                                   0x1125270  thiscall  -
+RSRenderService_QueryInterface_const                             0x1125270  thiscall  -
+GCTickable_QueryInterface                                        0x100b530  thiscall  -
+GCTickable_QueryInterface_const                                  0x100b530  thiscall  -
+RSAudioService_QueryInterface                                    0x0f87a20  thiscall  -
+RSAudioService_QueryInterface_const                              0x0f87a20  thiscall  -
+UIManagerI_QueryInterface                                        0x11513c0  thiscall  -
+UIManagerI_QueryInterface_const                                  0x11513c0  thiscall  -
+UIMenu_LAS_SongsList_QueryInterface                              0x11cfaa0  thiscall  -
+UIMenu_LAS_SongsList_QueryInterface_const                        0x11cfaa0  thiscall  -
+UIService_QueryInterface                                         0x12e9df0  thiscall  -
+UIService_QueryInterface_const                                   0x12e9df0  thiscall  -
+ResourceService_QueryInterface                                   0x1122870  thiscall  -
+ResourceService_QueryInterface_const                             0x1122870  thiscall  -
+GRMinigameCamera_QueryInterface                                  0x137c740  thiscall  -
+GRMinigameCamera_QueryInterface_const                            0x137c740  thiscall  -
+OscilleratorScopeModel_QueryInterface                            0x1094220  thiscall  -
+OscilleratorScopeModel_QueryInterface_const                      0x1094220  thiscall  -
+ReactiveEffectsService_QueryInterface                            0x10948f0  thiscall  -
+ReactiveEffectsService_QueryInterface_const                      0x10948f0  thiscall  -
+GCColorShift_QueryInterface                                      0x0ffc520  thiscall  -
+GCColorShift_QueryInterface_const                                0x0ffc520  thiscall  -
+GC2DAssetHelper_QueryInterface                                   0x0ff6280  thiscall  -
+GC2DAssetHelper_QueryInterface_const                             0x0ff6280  thiscall  -
+GCAccumulatedActor_QueryInterface                                0x0ff74c0  thiscall  -
+GCAccumulatedActor_QueryInterface_const                          0x0ff74c0  thiscall  -
+GCPauseManager_QueryInterface                                    0x100b040  thiscall  -
+GCPauseManager_QueryInterface_const                              0x100b040  thiscall  -
+GRCameraNarniaVenue_QueryInterface                               0x0f8fcb0  thiscall  -
+GRCameraNarniaVenue_QueryInterface_const                         0x0f8fcb0  thiscall  -
+FormLoader_QueryInterface                                        0x0fb3c60  thiscall  -
+FormLoader_QueryInterface_const                                  0x0fb3c60  thiscall  -
+ClipFadeManager_QueryInterface                                   0x13a2230  thiscall  -
+ClipFadeManager_QueryInterface_const                             0x13a2230  thiscall  -
+GEService_QueryInterface                                         0x102ce50  thiscall  -
+GEService_QueryInterface_const                                   0x102ce50  thiscall  -
+NarniaPortalModel_QueryInterface                                 0x1059690  thiscall  -
+NarniaPortalModel_QueryInterface_const                           0x1059690  thiscall  -
+SongListService_QueryInterface                                   0x10d28b0  thiscall  -
+SongListService_QueryInterface_const                             0x10d28b0  thiscall  -
+NarniaService_QueryInterface                                     0x105a8e0  thiscall  -
+NarniaService_QueryInterface_const                               0x105a8e0  thiscall  -
+GRSL2Spawner_QueryInterface                                      0x10d12b0  thiscall  -
+GRSL2Spawner_QueryInterface_const                                0x10d12b0  thiscall  -
+NarniaFogModel_QueryInterface                                    0x1058ae0  thiscall  -
+NarniaFogModel_QueryInterface_const                              0x1058ae0  thiscall  -
+NarniaFogParticle_QueryInterface                                 0x10591a0  thiscall  -
+NarniaFogParticle_QueryInterface_const                           0x10591a0  thiscall  -
+MissionService_QueryInterface                                    0x10581a0  thiscall  -
+MissionService_QueryInterface_const                              0x10581a0  thiscall  -
+ToneService_QueryInterface                                       0x112ef90  thiscall  -
+ToneService_QueryInterface_const                                 0x112ef90  thiscall  -
+StringTuner_QueryInterface                                       0x1135260  thiscall  -
+StringTuner_QueryInterface_const                                 0x1135260  thiscall  -
+TunerService_QueryInterface                                      0x1136c10  thiscall  -
+TunerService_QueryInterface_const                                0x1136c10  thiscall  -
+InstrumentLoader_QueryInterface                                  0x10351e0  thiscall  -
+InstrumentLoader_QueryInterface_const                            0x10351e0  thiscall  -
+GRCrowdPoint_QueryInterface                                      0x1018d90  thiscall  -
+GRCrowdPoint_QueryInterface_const                                0x1018d90  thiscall  -
+GearManager_QueryInterface                                       0x1014f40  thiscall  -
+GearManager_QueryInterface_const                                 0x1014f40  thiscall  -
+GearService_QueryInterface                                       0x1018570  thiscall  -
+GearService_QueryInterface_const                                 0x1018570  thiscall  -
+FogService_QueryInterface                                        0x0fb1440  thiscall  -
+FogService_QueryInterface_const                                  0x0fb1440  thiscall  -
+GlobalFogSettings_QueryInterface                                 0x0fb1520  thiscall  -
+GlobalFogSettings_QueryInterface_const                           0x0fb1520  thiscall  -
+ManifestManager_QueryInterface                                   0x0faa3c0  thiscall  -  # medium confidence
+ManifestManager_QueryInterface_const                             0x0faa3c0  thiscall  -  # medium confidence
+StatsService_QueryInterface                                      0x10fe8f0  thiscall  -
+StatsService_QueryInterface_const                                0x10fe8f0  thiscall  -
+GRCameraLoft_QueryInterface                                      0x0f8e670  thiscall  -
+GRCameraLoft_QueryInterface_const                                0x0f8e670  thiscall  -
+GEVideoScreenModel_QueryInterface                                0x102cf20  thiscall  -
+GEVideoScreenModel_QueryInterface_const                          0x102cf20  thiscall  -
+TunerProgressBuiltin_QueryInterface                              0x1135ee0  thiscall  -
+TunerProgressBuiltin_QueryInterface_const                        0x1135ee0  thiscall  -
+GameColorManager_QueryInterface                                  0x1097a60  thiscall  -
+GameColorManager_QueryInterface_const                            0x1097a60  thiscall  -
+GRCameraSessionMode_QueryInterface                               0x0f91830  thiscall  -
+GRCameraSessionMode_QueryInterface_const                         0x0f91830  thiscall  -
+GCAttachmentManager_QueryInterface                               0x0ff8350  thiscall  -
+GCAttachmentManager_QueryInterface_const                         0x0ff8350  thiscall  -
+UIMenu_ShopSongs_QueryInterface                                  0x123f7e0  thiscall  -
+UIMenu_ShopSongs_QueryInterface_const                            0x123f7e0  thiscall  -
+GRLoftAmbientLight_QueryInterface                                0x12efee0  thiscall  -
+GRLoftAmbientLight_QueryInterface_const                          0x12efee0  thiscall  -
+GRLoftSpotLight_QueryInterface                                   0x12f13d0  thiscall  -
+GRLoftSpotLight_QueryInterface_const                             0x12f13d0  thiscall  -
+GRLoftState_QueryInterface                                       0x12f1660  thiscall  -
+GRLoftState_QueryInterface_const                                 0x12f1660  thiscall  -
+LoftPostEffectsManager_QueryInterface                            0x12f63c0  thiscall  -
+LoftPostEffectsManager_QueryInterface_const                      0x12f63c0  thiscall  -
+RSVenueForkEmitterGear_QueryInterface                            0x1018aa0  thiscall  -
+RSVenueForkEmitterGear_QueryInterface_const                      0x1018aa0  thiscall  -
+UIMenu_ShopGear_QueryInterface                                   0x122e0e0  thiscall  -
+UIMenu_ShopGear_QueryInterface_const                             0x122e0e0  thiscall  -
+UIMenu_ShopPacks_QueryInterface                                  0x1235010  thiscall  -
+UIMenu_ShopPacks_QueryInterface_const                            0x1235010  thiscall  -
+GearPlacementNode_QueryInterface                                 0x1017610  thiscall  -
+GearPlacementNode_QueryInterface_const                           0x1017610  thiscall  -
+GearLava_QueryInterface                                          0x10919f0  thiscall  -
+GearLava_QueryInterface_const                                    0x10919f0  thiscall  -
+GearNifCache_QueryInterface                                      0x10158d0  thiscall  -
+GearNifCache_QueryInterface_const                                0x10158d0  thiscall  -
+GRVenueAmbientAnimations_QueryInterface                          0x12f3e30  thiscall  -
+GRVenueAmbientAnimations_QueryInterface_const                    0x12f3e30  thiscall  -
+GRSoundIntensity_QueryInterface                                  0x1092d00  thiscall  -
+GRSoundIntensity_QueryInterface_const                            0x1092d00  thiscall  -
+GRVenuePointLight_QueryInterface                                 0x10932c0  thiscall  -
+GRVenuePointLight_QueryInterface_const                           0x10932c0  thiscall  -
+GRLoftCabinetScreen_QueryInterface                               0x12f0110  thiscall  -
+GRLoftCabinetScreen_QueryInterface_const                         0x12f0110  thiscall  -
+GCLdbChlgService_QueryInterface                                  0x100acc0  thiscall  -
+GCLdbChlgService_QueryInterface_const                            0x100acc0  thiscall  -
+GearChangeController_QueryInterface                              0x1012b10  thiscall  -
+GearChangeController_QueryInterface_const                        0x1012b10  thiscall  -
+GCGFxMouseEventHandler_QueryInterface                            0x0ffd9f0  thiscall  -
+GCGFxMouseEventHandler_QueryInterface_const                      0x0ffd9f0  thiscall  -
+AchievementService_QueryInterface                                0x0f81010  thiscall  -
+AchievementService_QueryInterface_const                          0x0f81010  thiscall  -
+PrizeService_QueryInterface                                      0x1091730  thiscall  -
+PrizeService_QueryInterface_const                                0x1091730  thiscall  -
+GCKinectEventHandler_QueryInterface                              0x10041e0  thiscall  -
+GCKinectEventHandler_QueryInterface_const                        0x10041e0  thiscall  -
+FavoritesService_QueryInterface                                  0x0fb1010  thiscall  -
+FavoritesService_QueryInterface_const                            0x0fb1010  thiscall  -
+RSConnectExtension_RDV_QueryInterface                            0x144b2a0  thiscall  -
+RSConnectExtension_RDV_QueryInterface_const                      0x144b2a0  thiscall  -
+RSConnectService_Steam_QueryInterface                            0x1446c50  thiscall  -
+RSConnectService_Steam_QueryInterface_const                      0x1446c50  thiscall  -
+RSSteamService_QueryInterface                                    0x14473f0  thiscall  -
+RSSteamService_QueryInterface_const                              0x14473f0  thiscall  -
+RSDLCService_Steam_QueryInterface                                0x1449170  thiscall  -  # medium confidence
+RSDLCService_Steam_QueryInterface_const                          0x1449170  thiscall  -  # medium confidence
+RSProfileService_MacOS_QueryInterface                            0x144a1b0  thiscall  -  # medium confidence
+RSProfileService_MacOS_QueryInterface_const                      0x144a1b0  thiscall  -  # medium confidence
+RSSteamAchievement_QueryInterface                                0x145eff0  thiscall  -
+RSSteamAchievement_QueryInterface_const                          0x145eff0  thiscall  -
+RSSteamActivityFeed_QueryInterface                               0x14627e0  thiscall  -
+RSSteamActivityFeed_QueryInterface_const                         0x14627e0  thiscall  -
+RSSteamCloudFile_QueryInterface                                  0x145cd30  thiscall  -
+RSSteamCloudFile_QueryInterface_const                            0x145cd30  thiscall  -
+RSSteamDownloadableContent_QueryInterface                        0x145ab20  thiscall  -
+RSSteamDownloadableContent_QueryInterface_const                  0x145ab20  thiscall  -
+RSSteamLeaderboards_QueryInterface                               0x145d340  thiscall  -
+RSSteamLeaderboards_QueryInterface_const                         0x145d340  thiscall  -
+RSSteamLeaderboardRequest_QueryInterface                         0x145d090  thiscall  -
+RSSteamLeaderboardRequest_QueryInterface_const                   0x145d090  thiscall  -
+RSSteamLeaderboardRequestUpload_QueryInterface                   0x145d160  thiscall  -
+RSSteamLeaderboardRequestUpload_QueryInterface_const             0x145d160  thiscall  -
+RSSteamLeaderboardRequestDownload_QueryInterface                 0x145d240  thiscall  -
+RSSteamLeaderboardRequestDownload_QueryInterface_const           0x145d240  thiscall  -
+RSSteamWebApi_QueryInterface                                     0x145c150  thiscall  -
+RSSteamWebApi_QueryInterface_const                               0x145c150  thiscall  -
+FrkService_QueryInterface                                        0x146a9e0  thiscall  -
+FrkService_QueryInterface_const                                  0x146a9e0  thiscall  -
+GFxAssetTaskAssetFactory_QueryInterface                          0x179b0a0  thiscall  -
+GFxAssetTaskAssetFactory_QueryInterface_const                    0x179b0a0  thiscall  -
+GFxInputRouterModel_QueryInterface                               0x17a46d0  thiscall  -
+GFxInputRouterModel_QueryInterface_const                         0x17a46d0  thiscall  -
+GFxMovieModel_QueryInterface                                     0x1794540  thiscall  -
+GFxMovieModel_QueryInterface_const                               0x1794540  thiscall  -
+GFxService_QueryInterface                                        0x179fc50  thiscall  -
+GFxService_QueryInterface_const                                  0x179fc50  thiscall  -
+sub_LuaResumeCoroutineTask_QueryInterface                        0x14f44d0  thiscall  -
+sub_LuaResumeCoroutineTask_QueryInterface_const                  0x14f44d0  thiscall  -
+LuaScriptFactory_QueryInterface                                  0x1506af0  thiscall  -
+LuaScriptFactory_QueryInterface_const                            0x1506af0  thiscall  -
+SchedulerLua_QueryInterface                                      0x14f3590  thiscall  -
+SchedulerLua_QueryInterface_const                                0x14f3590  thiscall  -
+AttachNifData_QueryInterface                                     0x1554b90  thiscall  -
+AttachNifData_QueryInterface_const                               0x1554b90  thiscall  -
+CameraService_QueryInterface                                     0x1538260  thiscall  -
+CameraService_QueryInterface_const                               0x1538260  thiscall  -
+LightService_QueryInterface                                      0x154c110  thiscall  -
+LightService_QueryInterface_const                                0x154c110  thiscall  -
+NIFFactory_QueryInterface                                        0x1557010  thiscall  -
+NIFFactory_QueryInterface_const                                  0x1557010  thiscall  -
+RenderService_QueryInterface                                     0x1551960  thiscall  -
+RenderService_QueryInterface_const                               0x1551960  thiscall  -
+SceneGraphCache_QueryInterface                                   0x1548750  thiscall  -
+SceneGraphCache_QueryInterface_const                             0x1548750  thiscall  -
+SceneGraphService_QueryInterface                                 0x153a970  thiscall  -
+SceneGraphService_QueryInterface_const                           0x153a970  thiscall  -
+ShaderService_QueryInterface                                     0x15521f0  thiscall  -
+ShaderService_QueryInterface_const                               0x15521f0  thiscall  -
+InputActionMessage_QueryInterface                                0x152c890  thiscall  -
+InputActionMessage_QueryInterface_const                          0x152c890  thiscall  -
+InputHandler_QueryInterface                                      0x15342a0  thiscall  -
+InputHandler_QueryInterface_const                                0x15342a0  thiscall  -
+InputService_QueryInterface                                      0x152c7c0  thiscall  -
+InputService_QueryInterface_const                                0x152c7c0  thiscall  -
+InputStickMessage_QueryInterface                                 0x152ce70  thiscall  -
+InputStickMessage_QueryInterface_const                           0x152ce70  thiscall  -
+KeyDownMessage_QueryInterface                                    0x15364e0  thiscall  -
+KeyDownMessage_QueryInterface_const                              0x15364e0  thiscall  -
+KeyUpMessage_QueryInterface                                      0x15365c0  thiscall  -
+KeyUpMessage_QueryInterface_const                                0x15365c0  thiscall  -
+MouseMoveMessage_QueryInterface                                  0x15367f0  thiscall  -
+MouseMoveMessage_QueryInterface_const                            0x15367f0  thiscall  -
+MouseDownMessage_QueryInterface                                  0x15368d0  thiscall  -
+MouseDownMessage_QueryInterface_const                            0x15368d0  thiscall  -
+MouseUpMessage_QueryInterface                                    0x15369b0  thiscall  -
+MouseUpMessage_QueryInterface_const                              0x15369b0  thiscall  -
+Entity_QueryInterface                                            0x14c45c0  thiscall  -
+Entity_QueryInterface_const                                      0x14c45c0  thiscall  -
+sub_EntityChangeMessage_QueryInterface                           0x0f91460  thiscall  -
+sub_EntityChangeMessage_QueryInterface_const                     0x0f91460  thiscall  -
+EntityFactory_QueryInterface                                     0x14dfd80  thiscall  -
+EntityFactory_QueryInterface_const                               0x14dfd80  thiscall  -
+EntityLoadRequest_QueryInterface                                 0x14d73d0  thiscall  -
+EntityLoadRequest_QueryInterface_const                           0x14d73d0  thiscall  -
+EntityLoadResult_QueryInterface                                  0x14d7360  thiscall  -
+EntityLoadResult_QueryInterface_const                            0x14d7360  thiscall  -
+EntityPreloadRequest_QueryInterface                              0x14d72f0  thiscall  -
+EntityPreloadRequest_QueryInterface_const                        0x14d72f0  thiscall  -
+EntityPreloadResponse_QueryInterface                             0x14d7440  thiscall  -
+EntityPreloadResponse_QueryInterface_const                       0x14d7440  thiscall  -
+EntityLoaderService_QueryInterface                               0x14dcb20  thiscall  -
+EntityLoaderService_QueryInterface_const                         0x14dcb20  thiscall  -
+EntityManager_QueryInterface                                     0x14c0bd0  thiscall  -
+EntityManager_QueryInterface_const                               0x14c0bd0  thiscall  -
+EntitySetLoadState_QueryInterface                                0x14dde80  thiscall  -
+EntitySetLoadState_QueryInterface_const                          0x14dde80  thiscall  -
+sub_EventMessage_QueryInterface                                  0x14c4550  thiscall  -
+sub_EventMessage_QueryInterface_const                            0x14c4550  thiscall  -
+FlatModelFactory_QueryInterface                                  0x14e3280  thiscall  -
+FlatModelFactory_QueryInterface_const                            0x14e3280  thiscall  -
+FlatModelManager_QueryInterface                                  0x14ca0c0  thiscall  -
+FlatModelManager_QueryInterface_const                            0x14ca0c0  thiscall  -
+PendingBehavior_QueryInterface                                   0x14e0ca0  thiscall  -
+PendingBehavior_QueryInterface_const                             0x14e0ca0  thiscall  -
+Scheduler_QueryInterface                                         0x14d15c0  thiscall  -
+Scheduler_QueryInterface_const                                   0x14d15c0  thiscall  -
+ScriptFactoryResponse_QueryInterface                             0x17d9b90  thiscall  -
+ScriptFactoryResponse_QueryInterface_const                       0x17d9b90  thiscall  -
+WorldFactory_QueryInterface                                      0x14df380  thiscall  -
+WorldFactory_QueryInterface_const                                0x14df380  thiscall  -
+AnimationService_QueryInterface                                  0x1787680  thiscall  -
+AnimationService_QueryInterface_const                            0x1787680  thiscall  -
+KFMFactory_QueryInterface                                        0x1790780  thiscall  -
+KFMFactory_QueryInterface_const                                  0x1790780  thiscall  -
+KFMFactory__ResponseData_QueryInterface                          0x1790850  thiscall  -
+KFMFactory__ResponseData_QueryInterface_const                    0x1790850  thiscall  -
+AssetCacheResponse_QueryInterface                                0x10172d0  thiscall  -
+AssetCacheResponse_QueryInterface_const                          0x10172d0  thiscall  -
+AssetConfigService_QueryInterface                                0x14acb00  thiscall  -
+AssetConfigService_QueryInterface_const                          0x14acb00  thiscall  -
+AssetFactoryManager_QueryInterface                               0x1488b50  thiscall  -
+AssetFactoryManager_QueryInterface_const                         0x1488b50  thiscall  -
+AssetLoadRequest_QueryInterface                                  0x14887e0  thiscall  -
+AssetLoadRequest_QueryInterface_const                            0x14887e0  thiscall  -
+AssetLoadResponse_QueryInterface                                 0x0fafbc0  thiscall  -
+AssetLoadResponse_QueryInterface_const                           0x0fafbc0  thiscall  -
+sub_AssetLocatorRequest_QueryInterface                           0x1483540  thiscall  -
+sub_AssetLocatorRequest_QueryInterface_const                     0x1483540  thiscall  -
+sub_AssetConfigurationMessage_QueryInterface                     0x1483790  thiscall  -
+sub_AssetConfigurationMessage_QueryInterface_const               0x1483790  thiscall  -
+sub_AssetLocatorResponse_QueryInterface                          0x0faf840  thiscall  -
+sub_AssetLocatorResponse_QueryInterface_const                    0x0faf840  thiscall  -
+AssetTagsInfoResponse_QueryInterface                             0x14831e0  thiscall  -
+AssetTagsInfoResponse_QueryInterface_const                       0x14831e0  thiscall  -
+AssetLocatorService_QueryInterface                               0x1483800  thiscall  -
+AssetLocatorService_QueryInterface_const                         0x1483800  thiscall  -
+ConfigManager_QueryInterface                                     0x14a1100  thiscall  -
+ConfigManager_QueryInterface_const                               0x14a1100  thiscall  -
+SectionEntry_QueryInterface                                      0x14b1cc0  thiscall  -
+SectionEntry_QueryInterface_const                                0x14b1cc0  thiscall  -
+ConfigSource_QueryInterface                                      0x14a0770  thiscall  -
+ConfigSource_QueryInterface_const                                0x14a0770  thiscall  -
+CommandLineSource_QueryInterface                                 0x14a0700  thiscall  -
+CommandLineSource_QueryInterface_const                           0x14a0700  thiscall  -
+IniSource_QueryInterface                                         0x14a0690  thiscall  -
+IniSource_QueryInterface_const                                   0x14a0690  thiscall  -
+EnvVarSource_QueryInterface                                      unsupported  LP builds EnvVarSource's class_info (0x1eface8) but no QueryInterface reads it (only the builder 0x14a07d0 and its initializer)
+EnvVarSource_QueryInterface_const                                unsupported  same as EnvVarSource_QueryInterface
+DebugOutDestination_QueryInterface                               0x14aec80  thiscall  -
+DebugOutDestination_QueryInterface_const                         0x14aec80  thiscall  -
+FileDestination_QueryInterface                                   0x14ae920  thiscall  -
+FileDestination_QueryInterface_const                             0x14ae920  thiscall  -
+GenericAssetFactory_QueryInterface                               0x14a2390  thiscall  -
+GenericAssetFactory_QueryInterface_const                         0x14a2390  thiscall  -
+GenericAssetLoadResponse_QueryInterface                          0x14a29f0  thiscall  -
+GenericAssetLoadResponse_QueryInterface_const                    0x14a29f0  thiscall  -
+sub_IMessage_QueryInterface                                      0x1343ab0  thiscall  -
+sub_IMessage_QueryInterface_const                                0x1343ab0  thiscall  -
+Logger_QueryInterface                                            0x1494a80  thiscall  -
+Logger_QueryInterface_const                                      0x1494a80  thiscall  -
+MessageService_QueryInterface                                    0x14819a0  thiscall  -
+MessageService_QueryInterface_const                              0x14819a0  thiscall  -
+NetMessage_QueryInterface                                        0x17d8fe0  thiscall  -
+NetMessage_QueryInterface_const                                  0x17d8fe0  thiscall  -
+AssignNetIDMessage_QueryInterface                                0x17d8f70  thiscall  -
+AssignNetIDMessage_QueryInterface_const                          0x17d8f70  thiscall  -
+PrintDestination_QueryInterface                                  0x14aeb40  thiscall  -
+PrintDestination_QueryInterface_const                            0x14aeb40  thiscall  -
+ServiceManager_QueryInterface                                    0x147a850  thiscall  -
+ServiceManager_QueryInterface_const                              0x147a850  thiscall  -
+sub_StreamMessage_QueryInterface                                 0x1488360  thiscall  -
+sub_StreamMessage_QueryInterface_const                           0x1488360  thiscall  -
+MacOSPlatformService_QueryInterface                              unsupported  Mac-only class; Windows counterpart Win32PlatformService (class_info 0x1efa4c8)
+MacOSPlatformService_QueryInterface_const                        unsupported  Mac-only class; Windows counterpart Win32PlatformService (class_info 0x1efa4c8)
+AudioBankAssetFactory_QueryInterface                             0x17d6ae0  thiscall  -
+AudioBankAssetFactory_QueryInterface_const                       0x17d6ae0  thiscall  -
+AudioBankAssetLoadResponse_QueryInterface                        0x17d6970  thiscall  -
+AudioBankAssetLoadResponse_QueryInterface_const                  0x17d6970  thiscall  -
+AudioMessage_QueryInterface                                      unsupported  LP builds AudioMessage's class_info (0x1f09c50) but no QueryInterface reads it (only the builder 0x17d5230 and its initializer)
+AudioMessage_QueryInterface_const                                unsupported  same as AudioMessage_QueryInterface
+AudioService_QueryInterface                                      0x17ca6f0  thiscall  -
+AudioService_QueryInterface_const                                0x17ca6f0  thiscall  -
+SceneGraphRemovedMessage_QueryInterface                          0x110afb0  thiscall  -
+SceneGraphRemovedMessage_QueryInterface_const                    0x110afb0  thiscall  -
+SceneGraphAddedMessage_QueryInterface                            0x110aed0  thiscall  -
+SceneGraphAddedMessage_QueryInterface_const                      0x110aed0  thiscall  -
+SceneGraphsUpdatedMessage_QueryInterface                         0x110acc0  thiscall  -
+SceneGraphsUpdatedMessage_QueryInterface_const                   0x110acc0  thiscall  -
+SceneGraphMessage_QueryInterface                                 0x110af40  thiscall  -
+SceneGraphMessage_QueryInterface_const                           0x110af40  thiscall  -
+JSONFactory__JSONFactoryData_QueryInterface                      0x13fbd20  thiscall  -
+JSONFactory__JSONFactoryData_QueryInterface_const                0x13fbd20  thiscall  -
+ReturnToTitleScreen_QueryInterface                               0x0fb10e0  thiscall  -
+ReturnToTitleScreen_QueryInterface_const                         0x0fb10e0  thiscall  -
+PreloadHelperComplete_QueryInterface                             0x130e040  thiscall  -
+PreloadHelperComplete_QueryInterface_const                       0x130e040  thiscall  -
+SceneGraphCacheResponse_QueryInterface                           0x10173d0  thiscall  -
+SceneGraphCacheResponse_QueryInterface_const                     0x10173d0  thiscall  -
+PreloadGroup_QueryInterface                                      0x130fd40  thiscall  -
+PreloadGroup_QueryInterface_const                                0x130fd40  thiscall  -
+GCPauseMessage_QueryInterface                                    0x100af50  thiscall  -
+GCPauseMessage_QueryInterface_const                              0x100af50  thiscall  -
+RSGraphAssetFactoryLoadResponse_QueryInterface                   0x1123660  thiscall  -
+RSGraphAssetFactoryLoadResponse_QueryInterface_const             0x1123660  thiscall  -
+RSConnectGameInterface_Impl_QueryInterface                       0x11239f0  thiscall  -
+RSConnectGameInterface_Impl_QueryInterface_const                 0x11239f0  thiscall  -
+ReactiveRingModel_QueryInterface                                 0x10949c0  thiscall  -
+ReactiveRingModel_QueryInterface_const                           0x10949c0  thiscall  -
+RingParticleEmitter_QueryInterface                               0x1097560  thiscall  -
+RingParticleEmitter_QueryInterface_const                         0x1097560  thiscall  -
+GCGFxMouseEventMessage_QueryInterface                            0x0ffd910  thiscall  -
+GCGFxMouseEventMessage_QueryInterface_const                      0x0ffd910  thiscall  -
+GCKinectEventMessage_QueryInterface                              0x1004070  thiscall  -
+GCKinectEventMessage_QueryInterface_const                        0x1004070  thiscall  -
+NiFrkParticleEffectModel_QueryInterface                          0x146e160  thiscall  -
+NiFrkParticleEffectModel_QueryInterface_const                    0x146e160  thiscall  -
+GFxAssetTaskRequest_QueryInterface                               0x179afc0  thiscall  -
+GFxAssetTaskRequest_QueryInterface_const                         0x179afc0  thiscall  -
+GFXModelResponse_QueryInterface                                  0x1122a50  thiscall  -
+GFXModelResponse_QueryInterface_const                            0x1122a50  thiscall  -
+LuaScriptFactoryResponseData_QueryInterface                      0x1506be0  thiscall  -
+LuaScriptFactoryResponseData_QueryInterface_const                0x1506be0  thiscall  -
+NIFFactoryResponse_QueryInterface                                0x1548840  thiscall  -
+NIFFactoryResponse_QueryInterface_const                          0x1548840  thiscall  -
+AttachmentMadeMessage_QueryInterface                             0x153ab70  thiscall  -
+AttachmentMadeMessage_QueryInterface_const                       0x153ab70  thiscall  -
+AttachmentMessage_QueryInterface                                 0x153ab00  thiscall  -
+AttachmentMessage_QueryInterface_const                           0x153ab00  thiscall  -
+AttachmentBrokenMessage_QueryInterface                           0x153abe0  thiscall  -
+AttachmentBrokenMessage_QueryInterface_const                     0x153abe0  thiscall  -
+InputActionMapsLoaded_QueryInterface                             0x1536f40  thiscall  -
+InputActionMapsLoaded_QueryInterface_const                       0x1536f40  thiscall  -
+ScheduledTask_QueryInterface                                     0x14c4620  thiscall  -
+ScheduledTask_QueryInterface_const                               0x14c4620  thiscall  -
+EntityFactory__EntityFactoryData_QueryInterface                  0x14dfd10  thiscall  -
+EntityFactory__EntityFactoryData_QueryInterface_const            0x14dfd10  thiscall  -
+EntityFactoryRequest_QueryInterface                              0x14dfdf0  thiscall  -
+EntityFactoryRequest_QueryInterface_const                        0x14dfdf0  thiscall  -
+EntityFactoryResponse_QueryInterface                             0x14e0060  thiscall  -
+EntityFactoryResponse_QueryInterface_const                       0x14e0060  thiscall  -
+ResponseData_QueryInterface                                      0x14e3210  thiscall  -
+ResponseData_QueryInterface_const                                0x14e3210  thiscall  -
+FlatModelFactoryRequest_QueryInterface                           0x14f05f0  thiscall  -
+FlatModelFactoryRequest_QueryInterface_const                     0x14f05f0  thiscall  -
+FlatModelFactoryResponse_QueryInterface                          0x14dd090  thiscall  -
+FlatModelFactoryResponse_QueryInterface_const                    0x14dd090  thiscall  -
+ScriptFactoryRequest_QueryInterface                              0x14f3440  thiscall  -
+ScriptFactoryRequest_QueryInterface_const                        0x14f3440  thiscall  -
+WorldFactoryData_QueryInterface                                  0x14df310  thiscall  -
+WorldFactoryData_QueryInterface_const                            0x14df310  thiscall  -
+WorldFactoryRequest_QueryInterface                               0x14f2c80  thiscall  -
+WorldFactoryRequest_QueryInterface_const                         0x14f2c80  thiscall  -
+WorldFactoryResponse_QueryInterface                              0x14f0d20  thiscall  -
+WorldFactoryResponse_QueryInterface_const                        0x14f0d20  thiscall  -
+ActorAddedMessage_QueryInterface                                 0x1787550  thiscall  -
+ActorAddedMessage_QueryInterface_const                           0x1787550  thiscall  -
+ActorRemovedMessage_QueryInterface                               0x17875c0  thiscall  -
+ActorRemovedMessage_QueryInterface_const                         0x17875c0  thiscall  -
+KFMFactoryRequest_QueryInterface                                 0x1791860  thiscall  -
+KFMFactoryRequest_QueryInterface_const                           0x1791860  thiscall  -
+KFMFactoryResponse_QueryInterface                                0x1790590  thiscall  -
+KFMFactoryResponse_QueryInterface_const                          0x1790590  thiscall  -
+AssetLocationMap_QueryInterface                                  0x14838e0  thiscall  -
+AssetLocationMap_QueryInterface_const                            0x14838e0  thiscall  -
+ResponseData2_QueryInterface                                     0x14a2460  thiscall  -
+ResponseData2_QueryInterface_const                               0x14a2460  thiscall  -
+AudioBankAssetLoadRequest_QueryInterface                         0x17d5f80  thiscall  -
+AudioBankAssetLoadRequest_QueryInterface_const                   0x17d5f80  thiscall  -
+PostEventMessage_QueryInterface                                  0x17d52b0  thiscall  -
+PostEventMessage_QueryInterface_const                            0x17d52b0  thiscall  -
+PostTriggerMessage_QueryInterface                                0x17d5390  thiscall  -
+PostTriggerMessage_QueryInterface_const                          0x17d5390  thiscall  -
+SetParamMessage_QueryInterface                                   0x17d5470  thiscall  -
+SetParamMessage_QueryInterface_const                             0x17d5470  thiscall  -
+SetStateMessage_QueryInterface                                   0x17d5550  thiscall  -
+SetStateMessage_QueryInterface_const                             0x17d5550  thiscall  -
+SetSwitchMessage_QueryInterface                                  0x17d5630  thiscall  -
+SetSwitchMessage_QueryInterface_const                            0x17d5630  thiscall  -
+DoPrepareEventCallbackBehaviorMessage_QueryInterface             0x17d5710  thiscall  -
+DoPrepareEventCallbackBehaviorMessage_QueryInterface_const       0x17d5710  thiscall  -
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface           0x17d59b0  thiscall  -
+DoUnprepareEventCallbackBehaviorMessage_QueryInterface_const     0x17d59b0  thiscall  -
+DoLoadBankCallbackBehaviorMessage_QueryInterface                 0x17d57f0  thiscall  -
+DoLoadBankCallbackBehaviorMessage_QueryInterface_const           0x17d57f0  thiscall  -
+DoUnloadBankCallbackBehaviorMessage_QueryInterface               0x17d58d0  thiscall  -
+DoUnloadBankCallbackBehaviorMessage_QueryInterface_const         0x17d58d0  thiscall  -
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface        0x17d5a90  thiscall  -
+DoPostEventExNotifyCallbackBehaviorMessage_QueryInterface_const  0x17d5a90  thiscall  -
+
+# --- names/overrides/jpeg.list
+jpeg_CreateDecompress                                            0x1997d20  cdecl     void(j_decompress_ptr, int, size_t)
+jpeg_finish_decompress                                           0x1998090  cdecl     boolean(j_decompress_ptr)
+jpeg_read_header                                                 0x1998160  cdecl     int(j_decompress_ptr, boolean)
+jpeg_abort_decompress                                            0x1997e30  cdecl     void(j_decompress_ptr)
+jpeg_destroy_decompress                                          0x1997e20  cdecl     void(j_decompress_ptr)
+jpeg_start_decompress                                            0x1997c40  cdecl     boolean(j_decompress_ptr)
+jpeg_read_scanlines                                              0x1997ba0  cdecl     JDIMENSION(j_decompress_ptr, JSAMPARRAY, JDIMENSION)
+jpeg_read_coefficients                                           0x1998280  cdecl     jvirt_barray_ptr *(j_decompress_ptr)
+jpeg_resync_to_restart                                           0x1999e60  cdecl     boolean(j_decompress_ptr, int)
+jpeg_std_error                                                   0x199a1a0  cdecl     struct jpeg_error_mgr *(struct jpeg_error_mgr *)
+
+# --- names/overrides/lua.list
+lua_checkstack                                                   0x014fb5d0  custom    int(lua_State *, int)
+lua_xmove                                                        0x014fb640  custom    void(lua_State *, lua_State *, int)
+lua_atpanic                                                      unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_newthread                                                    unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gettop                                                       unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_settop                                                       0x014fb690  custom    void(lua_State *, int)
+lua_remove                                                       0x014fb6e0  custom    void(lua_State *, int)
+lua_insert                                                       0x014fb720  custom    void(lua_State *, int)
+lua_replace                                                      unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushvalue                                                    0x014fb770  custom    void(lua_State *, int)
+lua_type                                                         unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_typename                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_iscfunction                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_isnumber                                                     0x014fb790  custom    int(lua_State *, int)
+lua_isinteger                                                    0x014fb7d0  custom    int(lua_State *, int)
+lua_isintvalue                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_isstring                                                     0x014fb830  custom    int(lua_State *, int)
+lua_isuserdata                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_rawequal                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_lessthan                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_tonumber                                                     0x014fb860  custom    lua_Number(lua_State *, int)
+lua_tointeger                                                    0x014fb8b0  custom    lua_Integer(lua_State *, int)
+lua_toboolean                                                    0x014fb900  custom    int(lua_State *, int)
+lua_tolstring                                                    0x014fb920  custom    const char *(lua_State *, int, size_t *)
+lua_objlen                                                       0x014fb9a0  custom    size_t(lua_State *, int)
+lua_tocfunction                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_touserdata                                                   0x014fba20  custom    void *(lua_State *, int)
+lua_tothread                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_topointer                                                    0x014fba40  custom    const void *(lua_State *, int)  # medium confidence
+lua_pushnil                                                      unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushnumber                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushinteger                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushlstring                                                  0x014fbaa0  custom    void(lua_State *, const char *, size_t)
+lua_pushstring                                                   0x14fbae0  custom    void(lua_State *, const char *)  # register args: L in esi (LTCG); low confidence
+lua_pushfstring                                                  0x014fbb50  custom    -
+lua_pushcclosure                                                 0x14fbb80  custom    void(lua_State *, lua_CFunction, int)  # register args esi (LTCG); low confidence
+lua_pushboolean                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushlightuserdata                                            unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pushthread                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gettable                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_getfield                                                     0x014fbc80  custom    void(lua_State *, int, const char *)
+lua_rawget                                                       0x014fbce0  custom    void(lua_State *, int)
+lua_rawgeti                                                      0x014fbd10  custom    void(lua_State *, int, int)
+lua_createtable                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_getmetatable                                                 0x014fbd50  custom    int(lua_State *, int)
+lua_getfenv                                                      0x014fbdb0  custom    void(lua_State *, int)
+lua_settable                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_setfield                                                     0x014fbe10  custom    void(lua_State *, int, const char *)
+lua_rawset                                                       0x014fbe70  custom    void(lua_State *, int)
+lua_rawseti                                                      0x014fbee0  custom    void(lua_State *, int, int)
+lua_setmetatable                                                 0x014fbf90  custom    int(lua_State *, int)
+lua_setfenv                                                      0x014fc040  custom    int(lua_State *, int)
+lua_call                                                         unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_pcall                                                        unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_load                                                         unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_dump                                                         unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_status                                                       unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gc                                                           0x014fc100  custom    int(lua_State *, int, int)
+lua_error                                                        unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_next                                                         unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_concat                                                       0x014fc1e0  custom    void(lua_State *, int)
+lua_newuserdata                                                  0x014fc250  custom    void *(lua_State *, size_t)
+lua_getupvalue                                                   0x014fc2b0  custom    const char *(lua_State *, int, int)  # medium confidence
+lua_setupvalue                                                   0x014fc330  custom    const char *(lua_State *, int, int)  # medium confidence
+lua_pushvalue_as_number                                          0x014fc3e0  custom    int(lua_State *, int)  # medium confidence
+luaL_argerror                                                    0x14fc4a0  custom    int(lua_State *, int, const char *)  # register args ecx (LTCG)
+luaL_error                                                       0x14fc680  custom    -  # register args esi = L (LTCG); fmt and varargs on the stack; calls luaL_where with level 1
+luaL_where                                                       0x14fc5c0  custom    void(lua_State *, int)  # register args edx = L, ecx = level (LTCG); strings "Sl", "%s:%d: "
+luaL_checkoption                                                 0x14fc6f0  custom    int(lua_State *, int, const char *, const char *const *)  # register args eax (LTCG); medium confidence
+luaL_optlstring                                                  0x014fca10  custom    const char *(lua_State *, int, const char *, size_t *)
+luaL_checklstring                                                0x014fc990  custom    const char *(lua_State *, int, size_t *)
+luaL_newmetatable                                                0x014fc7a0  custom    int(lua_State *, const char *)
+luaL_checkudata                                                  0x014fc8c0  custom    void *(lua_State *, int, const char *)
+luaL_checkstack                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_checktype                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_checkany                                                    unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_checknumber                                                 0x014fca90  custom    lua_Number(lua_State *, int)
+luaL_optnumber                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_checkinteger                                                0x014fcb70  cdecl     lua_Integer(lua_State *, int)
+luaL_optinteger                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_getmetafield                                                0x014fcc40  custom    int(lua_State *, int, const char *)  # medium confidence
+luaL_callmeta                                                    0x014fccc0  custom    int(lua_State *, int, const char *)  # medium confidence
+luaL_register                                                    0x014fcd30  custom    -
+luaL_findtable                                                   0x014fd040  custom    const char *(lua_State *, int, const char *, int)  # medium confidence
+luaL_gsub                                                        0x014fcee0  custom    const char *(lua_State *, const char *, const char *, const char *)
+luaL_buffinit                                                    unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_addstring                                                   unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_pushresult                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_prepbuffer                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+luaL_addvalue                                                    0x014fd4b0  custom    void(luaL_Buffer *)
+luaL_ref                                                         0x014fd520  custom    int(lua_State *, int)  # medium confidence
+luaL_unref                                                       0x014fd640  custom    void(lua_State *, int, int)  # medium confidence
+luaL_loadbuffer                                                  0x014fdaf0  custom    int(lua_State *, const char *, size_t, const char *)
+luaL_loadstring                                                  0x014fdb50  custom    int(lua_State *, const char *)
+lua_sethook                                                      unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gethook                                                      unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gethookmask                                                  unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_gethookcount                                                 unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_getstack                                                     0x150b180  custom    int(lua_State *, int, lua_Debug *)  # register args: edx=L, ecx=level, edi=ar (LTCG)
+lua_getlocal                                                     unsupported  medium-confidence match was findlocal (proved by string "(*temporary)")
+lua_setlocal                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_getinfo                                                      0x0150b530  custom    int(lua_State *, const char *, lua_Debug *)
+lua_resume                                                       0x150a7a0  custom    int(lua_State *, int)  # register args eax (LTCG); medium confidence
+lua_yield                                                        unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_newstate                                                     unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+lua_close                                                        unsupported  no standalone copy: LTCG inlines the Lua API into its callers
+
+# --- names/overrides/mods.list
+num_dtor                                                         0x013fff60  thiscall  -  # the deleting destructor, ret 4
+num_intern                                                       0x01400040  custom    -  # edi = out, stack = the double
+num_rehash                                                       unsupported  no counterpart: Dinkumware rehashes inside insert; the hash is a function of its own (0x1400650, F_1400650 in win32_overrides.c)
+path_md5                                                         unsupported  inlined into its callers: the override wraps path_intern (F_141c130 in win32_overrides.c)
+dlc_update                                                       0x1449310  thiscall  -  # medium confidence
+key_down                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+key_up                                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+thread_set_priority                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+sng_verify                                                       0x019bfeb0  cdecl     _Bool(const uint8_t *, uint32_t, const char *)  # same function as rsg_cryptopp_dsa_sha1_verify, as on the Mac
+
+# --- names/overrides/online.list
+efd_get_config_bool                                              0x1124120  stdcall   -
+rsconnect_factory                                                0x143c9a0  cdecl     -
+signin_start_no_uplay                                            0x143eae0  thiscall  -
+dlc_worker_flush                                                 0x0144bbd0  custom    -
+dlc_job_preview                                                  0x0144bc80  thiscall  -
+dlc_job_request                                                  0x0144bdb0  thiscall  -
+open_uplay_url                                                   0x143c680  custom    -  # register args eax (LTCG)
+dlc_connection_changed                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+autologin                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+
+# --- names/overrides/png.list
+png_set_sig_bytes                                                0x1986f20  cdecl     void(png_structp, int)
+png_get_io_ptr                                                   0x1987610  cdecl     png_voidp(png_structp)
+png_sig_cmp                                                      0x1986f50  cdecl     int(png_const_bytep, png_size_t, png_size_t)
+png_create_info_struct                                           0x1988570  cdecl     png_infop(png_structp)
+png_get_valid                                                    0x1988ac0  cdecl     png_uint_32(png_const_structp, png_const_infop, png_uint_32)
+png_get_rowbytes                                                 0x1988ae0  cdecl     png_size_t(png_const_structp, png_const_infop)
+png_get_gAMA                                                     0x1988b30  cdecl     png_uint_32(png_const_structp, png_const_infop, double *)
+png_get_IHDR                                                     0x1988b60  cdecl     png_uint_32(png_structp, png_infop, png_uint_32 *, png_uint_32 *, int *, int *, int *, int *, int *)
+png_create_read_struct                                           0x1989ac0  cdecl     png_structp(png_const_charp, png_voidp, png_error_ptr, png_error_ptr)
+png_destroy_read_struct                                          0x1989af0  cdecl     void(png_structpp, png_infopp, png_infopp)
+png_read_end                                                     0x19896a0  cdecl     void(png_structp, png_infop)
+png_read_row                                                     0x19891b0  cdecl     void(png_structp, png_bytep, png_bytep)  # medium confidence
+png_read_image                                                   0x1989600  cdecl     void(png_structp, png_bytepp)
+png_read_update_info                                             0x1989160  cdecl     void(png_structp, png_infop)
+png_read_info                                                    0x1988e40  cdecl     void(png_structp, png_infop)
+png_set_read_fn                                                  0x198f840  cdecl     void(png_structp, png_voidp, png_rw_ptr)
+png_set_strip_16                                                 0x1989bc0  cdecl     void(png_structp)
+png_set_palette_to_rgb                                           0x1989d30  cdecl     void(png_structp)
+png_set_expand_gray_1_2_4_to_8                                   0x1989d50  cdecl     void(png_structp)
+png_set_tRNS_to_alpha                                            0x1989d70  cdecl     void(png_structp)
+png_set_gray_to_rgb                                              0x1989d90  cdecl     void(png_structp)
+png_set_gamma                                                    0x1989cf0  cdecl     void(png_structp, double, double)
+png_error                                                        0x1986da0  custom    void(png_structp, png_const_charp)  # register args eax (LTCG)
+png_set_longjmp_fn                                               0x1986b30  cdecl     -
+png_get_error_ptr                                                0x1986bd0  cdecl     png_voidp(png_const_structp)
+png_longjmp                                                      0x1986b50  cdecl     void(png_structp, int)
+
+# --- names/overrides/zlib.list
+compress2                                                        0x19b0840  cdecl     int(Bytef *, uLongf *, const Bytef *, uLong, int)
+compressBound                                                    0x19b08e0  cdecl     uLong(uLong)
+crc32                                                            0x19b2480  cdecl     uLong(uLong, const Bytef *, uInt)
+inflateReset                                                     0x19b0980  cdecl     int(z_streamp)
+inflateInit_                                                     0x19b0b00  cdecl     int(z_streamp, const char *, int)
+inflate                                                          0x19b0c40  cdecl     int(z_streamp, int)
+inflateEnd                                                       0x19b2170  cdecl     int(z_streamp)
+uncompress                                                       0x19b0790  cdecl     int(Bytef *, uLongf *, const Bytef *, uLong)
+
+# --- names added after the initial fill (addr-migrate brought them in)
+RSConnectExtension_RDV_ctor                                      unsupported  not yet matched
+RSConnectExtension_RDV_vtable                                    unsupported  not yet matched
+adler32                                                          unsupported  not yet matched
+boot_intro_update                                                0x01126950  stdcall   bool(void *boot)
+efd_free                                                         unsupported  not yet matched
+efd_ibase_get_class_id                                           0x00f81300  thiscall  uint32_t(const void *)
+efd_init                                                         unsupported  not yet matched
+efd_logger_singleton                                             unsupported  not yet matched
+efd_shutdown                                                     unsupported  not yet matched
+efd_sqrt_table                                                   unsupported  not yet matched
+efd_string_table                                                 unsupported  not yet matched
+efd_string_table_collisions                                      unsupported  not yet matched
+efd_string_table_count                                           unsupported  not yet matched
+engine_efd_begin                                                 unsupported  not yet matched
+engine_efd_end                                                   unsupported  not yet matched
+engine_egf_begin                                                 unsupported  not yet matched
+engine_egf_end                                                   unsupported  not yet matched
+engine_nimain_begin                                              unsupported  not yet matched
+engine_nimain_end                                                unsupported  not yet matched
+frontend_open_file                                               0x0101ba80  custom    void **(void **out, const char *path)
+steam_dlc_owned                                                  0x01448b10  thiscall  bool(void *steam, int app)  # slot 47 of the Steam wrapper; matched by its place in InstallContentPackage (0x1449d58)
+key_pkg_aes                                                      unsupported  not yet matched
+key_pkg_dsa_blob                                                 unsupported  not yet matched
+key_pkg_dsa_blob_len                                             unsupported  not yet matched
+key_preview                                                      unsupported  not yet matched
+key_profile                                                      unsupported  not yet matched
+key_psarc_hex                                                    unsupported  not yet matched
+key_sng_aes_blob                                                 unsupported  not yet matched
+key_sng_aes_blob_len                                             unsupported  not yet matched
+key_sng_dsa_blob                                                 unsupported  not yet matched
+key_sng_dsa_blob_len                                             unsupported  not yet matched
+lib_cryptopp_begin                                               unsupported  not yet matched
+lib_cryptopp_end                                                 unsupported  not yet matched
+luaopen_base                                                     0x0151b660  cdecl     int(lua_State *)
+luaopen_debug                                                    0x015159c0  cdecl     int(lua_State *)
+luaopen_math                                                     0x01516410  cdecl     int(lua_State *)
+luaopen_os                                                       0x0151ddd0  cdecl     int(lua_State *)
+luaopen_package                                                  0x0151f470  cdecl     int(lua_State *)
+luaopen_string                                                   0x01518ef0  cdecl     int(lua_State *)
+luaopen_table                                                    0x01520bd0  cdecl     int(lua_State *)
+profile_load                                                     unsupported  not yet matched
+rs_connect_ext_call_slot21                                       unsupported  not yet matched
+rs_connect_ext_call_slot22                                       unsupported  not yet matched
+rs_connect_ext_call_slot23                                       unsupported  not yet matched
+rs_connect_ext_call_slot25                                       unsupported  not yet matched
+rs_connect_ext_call_slot28                                       unsupported  not yet matched
+rs_connect_ext_call_slot29                                       unsupported  not yet matched
+rs_connect_ext_call_slot36                                       unsupported  not yet matched
+rsg_efd_category_init_svc                                        unsupported  not yet matched
+rsg_efd_fixedstring_assign                                       unsupported  not yet matched
+rsg_efd_fixedstring_c_str                                        unsupported  not yet matched
+rsg_efd_fixedstring_equals                                       unsupported  not yet matched
+rsg_efd_fixedstring_exists                                       unsupported  not yet matched
+rsg_efd_fixedstring_init                                         unsupported  not yet matched
+rsg_efd_fixedstring_init_copy                                    unsupported  not yet matched
+rsg_efd_fixedstring_init_cstr                                    unsupported  not yet matched
+rsg_efd_fixedstring_length                                       unsupported  not yet matched
+rsg_efd_fixedstring_release                                      unsupported  not yet matched
+rsg_efd_msghelper_init                                           unsupported  not yet matched
+rsg_efd_msghelper_on_net_id                                      unsupported  not yet matched
+rsg_efd_msghelper_on_preinit                                     unsupported  not yet matched
+rsg_efd_msghelper_on_shutdown                                    unsupported  not yet matched
+rsg_pkgconfig_decrypt                                            unsupported  not yet matched
+rsg_profile_encrypt                                              unsupported  not yet matched

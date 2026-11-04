@@ -1,6 +1,6 @@
 #!/bin/sh
 # Builds the offline MSL shader corpus from shader dumps and checks every program against GL
-# (docs/METAL-DESIGN.md "Shader translation"). Runs on the user's machine at build time: the dumps
+# (docs/mac/METAL.md "Shader translation"). Runs on the user's machine at build time: the dumps
 # come from their game and are never committed.
 #
 #   build-msl-corpus.sh --verify <msl_verify> --out <dir> [--scaleform <dir>] [--cg <dir>] [--jobs <n>]

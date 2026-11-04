@@ -12,22 +12,36 @@ emit_int / emit_sse / jumptab is shared, only what depends on the mode is overri
     callee-cleaned arguments of stdcall/thiscall/fastcall functions (the convention needs no
     other handling inside translated code: the caller pushes, the callee pops, as on x86);
   * calls through the IAT (`call [slot]`, `jmp [slot]`) become the import's thunk I_<slot>
-    (arguments at esp, no return address, runtime/rc32.h); any other indirect call or jump
-    goes through rc32_icall;
+    (arguments at esp, no return address, runtime/rc32.h; thunk_prefix names it for an image
+    that shares a process with others); any other indirect call or jump goes through
+    rc32_icall;
+  * import calls a packer replaced (VMProtect: `call stub` plus a junk byte, `push reg; call
+    stub`, the stub computing the API address) are the original `call/jmp [slot]` again when
+    a wrapper table lists them (read_wrappers, set_wrappers): decoding resumes after the
+    original instruction, so the junk byte is never decoded; a stub that also pushes the call's
+    arguments (VMProtect moved `push reg` / `push imm` / `lea r, [ebp-x]; push r` into it) has
+    them listed in the row's pushes column, emitted before the call; a register the stub leaves
+    holding the import's address (the `mov reg, [imp]; call reg` it replaced; the code calls reg
+    again later) is in the sets column and loaded from the slot before the call; a stub that
+    stands for `mov reg, [imp]` (kind load, reg in pushed_reg) is that instruction again;
   * the direction flag is modelled (a local `df`: MSVC's memmove copies backwards with std);
-  * x87 and MMX (emit_x87.py); pushad/popad, pushfd/popfd, enter, loop/jecxz, rdtsc;
+  * x87 and MMX (emit_x87.py); pushad/popad, pushfd/popfd, enter, loop/jecxz, rdtsc, AES-NI;
   * functions with resume points (addresses in their body that other code points to: SEH
-    scope-table handlers, C++ catch continuations; the CRT's handlers get there with an
-    indirect jump) register a host frame at entry, which rc32_icall longjmps to when asked to
-    jump to one of them (rc32_seh.c).
+    scope-table handlers, C++ catch continuations, the return of a setjmp call; the CRT gets
+    there with an indirect jump) register a host frame at entry, which rc32_icall longjmps to
+    when asked to jump to one of them (rc32_seh.c). The CRT's own setjmp and longjmp run: a setjmp
+    call keeps its real return address (setjmp_slot), so what longjmp jumps to is that resume point.
 
-Function discovery (PE has no function-starts table) is find_functions().
+Function discovery (PE has no function-starts table) is find_functions(); its data_code (code
+found in non-executable sections) must be handed to every Translator32 that translates
+(set_data_code), as build/gen_image_pe.py does.
 
-Usage (from tools/ws7/recomp): python3 -m xlat.x86_32 IMAGE.dll OUT.c [ADDR ...]
+Usage (from tools/ws7/recomp): python3 -m xlat.x86_32 IMAGE.dll OUT.c [--wrappers TSV] [ADDR ...]
 """
 import bisect
 import collections
 import os
+import re
 import struct
 import sys
 
@@ -37,9 +51,10 @@ from capstone import x86
 from . import core
 from .common import COND, CTYPE, MASK, NOPS, REGS, STYPE, Unsupported  # noqa: F401
 from .emit_x87 import X87Mixin
-from .pe import Image
+from .pe import SCN_WRITE, Image
 
 M32 = 0xffffffff
+JCC = {"j" + c for c in COND}
 # imports that do not return
 NORETURN32 = {"kernel32.dll!ExitProcess", "kernel32.dll!ExitThread", "kernel32.dll!FatalExit",
               "kernel32.dll!FatalAppExitA", "kernel32.dll!FatalAppExitW", "msvcrt.dll!exit",
@@ -47,7 +62,11 @@ NORETURN32 = {"kernel32.dll!ExitProcess", "kernel32.dll!ExitThread", "kernel32.d
               "msvcr100.dll!_CxxThrowException", "msvcr90.dll!_CxxThrowException",
               "msvcrt.dll!_CxxThrowException", "msvcr100.dll!_invalid_parameter_noinfo_noreturn"}
 STRING = {"movs", "stos", "lods", "scas", "cmps"}
+AES = {"aesenc", "aesenclast", "aesdec", "aesdeclast", "aesimc", "aeskeygenassist"}
+SETJMP = {d + "!" + n for d in ("msvcr100.dll", "msvcrt.dll") for n in ("_setjmp3", "_setjmp", "setjmp")}
+EH_MAGIC = (0x19930520, 0x19930521, 0x19930522)   # FuncInfo: the versions MSVC writes for 32-bit code
 PADDING = {0xcc, 0x90}
+DCACHE = 50000   # decoded instructions a translator keeps: 2-3 KB each with Capstone's detail
 # instructions compiled 32-bit code does not contain: a gap piece that decodes to one is data
 JUNK = {"daa", "das", "aaa", "aas", "aam", "aad", "lds", "les", "lfs", "lgs", "lss", "lgdt", "lidt",
         "sgdt", "sidt", "lldt", "sldt", "ltr", "str", "lmsw", "smsw", "arpl", "bound", "into", "in",
@@ -56,11 +75,46 @@ JUNK = {"daa", "das", "aaa", "aas", "aam", "aad", "lds", "les", "lfs", "lgs", "l
         "rsm", "ud0", "ud1", "sysexit", "sysenter", "syscall", "sysret", "xlatb", "lar", "lsl",
         "verr", "verw", "pushal", "popal", "int"}
 
+
+def junk(i, seen):
+    """An instruction compiled code never has (JUNK), or a gs: operand. `wait` next to an x87
+    instruction is the CRT's hand-written x87 code (`fprem; wait; fnstsw ax; wait; sahf`), not
+    data."""
+    if i.mnemonic in ("wait", "fwait"):
+        n = seen.get(i.address + i.size)
+        return not (n is not None and n.mnemonic.startswith("f")) and not any(
+            p.address + p.size == i.address and p.mnemonic.startswith("f") for p in seen.values())
+    return i.mnemonic in JUNK or "ptr gs:" in i.op_str
+
 PRELUDE = r'''// Generated by tools/ws7/recomp/xlat/x86_32.py from original 32-bit x86 machine code.
 // Derived from the input image: build output only, never commit. Do not edit; regenerate.
 #include "rc32_gen.h"
 
 '''
+
+
+class Cover:
+    """Which bytes of an image the instructions found so far cover: a set of addresses would take a
+    gigabyte for the game."""
+    def __init__(self, lo, size):
+        self.lo, self.b = lo, bytearray(size)
+
+    def add(self, a, n):
+        k = a - self.lo
+        self.b[k:k + n] = b"\1" * n
+
+    def __contains__(self, a):
+        k = a - self.lo
+        return 0 <= k < len(self.b) and self.b[k] != 0
+
+    def __len__(self):
+        return sum(self.b)
+
+
+class Found(collections.namedtuple("Found", "jumps junk flag_calls")):
+    """What find_functions keeps of a function: the instructions themselves would be gigabytes. jumps:
+    targets of its direct `jmp`s; junk: it has an instruction compiled code never has; flag_calls:
+    functions it calls where the next instruction reads the flags."""
 
 
 class _Insn:
@@ -72,12 +126,78 @@ class _Insn:
         return getattr(self._i, k)
 
 
+class _Wrap(_Insn):
+    """A packer's import-call site (a wrappers.tsv row) as the instruction it replaced: a
+    Capstone `call/jmp dword ptr [slot]` decoded at the site, spanning the whole site (the
+    push and the stub's pop cancel out; the junk byte after the call is skipped). slot is
+    None when the table could not name the import."""
+    def __init__(self, i, size, row, slot):
+        _Insn.__init__(self, i, i.mnemonic)
+        self.size, self.wrap, self.slot = size, row, slot
+        self.op_str = "%s ; packer stub 0x%x%s%s" % (i.op_str if slot is not None else "<unresolved import>",
+                                                    row["stub"], ", push " + row["pushed_reg"]
+                                                    if row["pushed_reg"] and row["kind"] != "load" else "",
+                                                    ", pushes " + ",".join(row["pushes"]) if row.get("pushes") else "")
+        if row.get("sets"):
+            self.op_str += ", sets " + ",".join(row["sets"])
+
+
+REG32 = ("eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi")  # ModRM reg field order
+WRAP_COLS = ("call_site", "stub", "kind", "resume", "pushed_reg", "import", "pushes", "sets")
+
+
+def wrap_push(tok):
+    """A pushes-column word as a C expression: a 32-bit register, a register plus or minus a hex
+    offset ("ebp-0x33c"), or a hex constant."""
+    for op in "+-":
+        r, sep, k = tok.partition(op)
+        if sep and r in REGS and REGS[r][1] == 4:
+            return "(uint32_t)(%s %s 0x%xu)" % (REGS[r][0], op, int(k, 16))
+    if tok in REGS and REGS[tok][1] == 4:
+        return "(uint32_t)%s" % REGS[tok][0]
+    return "0x%xu" % (int(tok, 16) & 0xffffffff)
+
+
+def read_wrappers(path):
+    """The rows of a wrapper table (tab-separated, columns WRAP_COLS; an optional header line,
+    blank lines and `#` comments are skipped): dicts with the addresses as ints (resume None
+    for jmp), pushed_reg and import as strings ("" when empty), pushes a list (the words the
+    stub pushes before calling, in push order: wrap_push), sets a list (32-bit registers that
+    hold the import's address after the stub)."""
+    rows = []
+    for n, line in enumerate(open(path), 1):
+        line = line.rstrip("\r\n")
+        if not line.strip() or line.lstrip().startswith("#"):
+            continue
+        f = line.split("\t")
+        f += [""] * (len(WRAP_COLS) - len(f))
+        if f[0] == WRAP_COLS[0]:
+            continue
+        try:
+            r = {"call_site": int(f[0], 16), "stub": int(f[1], 16), "kind": f[2].strip(),
+                 "resume": int(f[3], 16) if f[3].strip() else None, "pushed_reg": f[4].strip(),
+                 "import": f[5].strip(), "pushes": [t for t in f[6].strip().split(",") if t],
+                 "sets": [t for t in f[7].strip().split(",") if t]}
+            for t in r["pushes"]:
+                wrap_push(t)
+            if any(t not in REGS or REGS[t][1] != 4 or t == "esp" for t in r["sets"]):
+                raise ValueError("sets: %r" % r["sets"])
+        except ValueError:
+            raise ValueError("%s:%d: bad wrapper row %r" % (path, n, line))
+        rows.append(r)
+    return rows
+
+
 class Translator32(X87Mixin, core.Translator):
     M32 = True
     STOP = ("ret", "ud2", "hlt", "int3", "retf", "iretd", "ljmp")
     LOOPS = ("loop", "loope", "loopne", "jecxz", "jcxz")
+    # A direct call target in a non-executable section is code too (find_functions): the
+    # section table of an image rebuilt from a memory dump (the unpacked Learn & Play exe) does
+    # not say where its code is.
+    code_in_data = True
 
-    def __init__(self, image_path, functions=None):
+    def __init__(self, image_path, functions=None, wrappers=None):
         self.img = Image(image_path)
         self.md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32)
         self.md.detail = True
@@ -97,6 +217,12 @@ class Translator32(X87Mixin, core.Translator):
         self.has_resume = False
         self.resume_ips = []
         self._dcache = {}
+        self.data_code, self._dc_lo = [], []   # (lo, hi): code in non-executable sections (find_functions)
+        self._dc_insns = set()
+        self._trial = False
+        self.thunk_prefix = "I_"  # import thunk names: <prefix><slot> (gen_image_pe.py --module)
+        self.flag_callees = set()  # functions whose callers read the flags they leave (find_functions)
+        self.set_wrappers(wrappers or ())
         if functions is None:
             functions = self.find_functions()
         self.set_functions(functions)
@@ -108,12 +234,94 @@ class Translator32(X87Mixin, core.Translator):
             self.__dict__.pop("_noret_cache", None)
         self.__dict__.pop("_jt_cache", None)
 
+    def set_data_code(self, ranges):
+        """Ranges of non-executable sections that hold code (find_functions' data_code)."""
+        self.data_code = sorted(ranges)
+        self._dc_lo = [lo for lo, _ in self.data_code]
+
+    def set_wrappers(self, rows):
+        """Packer import-call sites (read_wrappers rows); before find_functions, which must see
+        them. A row's import is called through its IAT slot when the image imports it, else
+        through a slot of its own: the lowest stub of that import inside the image, or, when
+        all its stubs are outside, its lowest call site (the runtime stores the import pointer
+        there; translated code never runs the stub or the site's original bytes). wrap_imports
+        holds those extra slots (slot -> "dll!name"); import_slots() is the order of every slot."""
+        self.imports = dict(self.img.imports)
+        self.wrap_imports = {}
+        self.wrappers = {}
+        self._dcache.clear()
+        byname = {}
+        for s, n in sorted(self.img.imports.items()):
+            byname.setdefault(n, s)
+        img = self.img
+        lo, hi = img.base + img.size_of_headers, img.base + img.size_of_image - 4
+        own = {}
+        for r in rows:
+            n = r["import"]
+            if n and n not in byname:
+                inside = lo <= r["stub"] <= hi
+                own[n] = min(own.get(n, (2, 0)), (0, r["stub"]) if inside else (1, r["call_site"]))
+        self.wrap_imports = {a: n for n, (_, a) in own.items()}
+        taken = sorted(self.img.imports)
+        for p in sorted(self.wrap_imports):
+            k = bisect.bisect_left(taken, p - 3)
+            if k < len(taken) and taken[k] < p + 4:
+                raise ValueError("wrapper slot 0x%x (stub of %s) overlaps slot 0x%x" % (p, self.wrap_imports[p], taken[k]))
+            bisect.insort(taken, p)
+        self.imports.update(self.wrap_imports)
+        slot_of = dict(byname)
+        slot_of.update((n, s) for s, n in self.wrap_imports.items())
+        for r in rows:
+            a, kind = r["call_site"], r["kind"]
+            if (r.get("pushes") or r.get("sets")) and kind != "call":
+                raise ValueError("wrapper at 0x%x: pushes or sets on a %s" % (a, kind))
+            if kind == "load":
+                reg = r["pushed_reg"]
+                if reg not in REGS or REGS[reg][1] != 4 or reg == "esp" or r["resume"] is None \
+                        or not 5 <= r["resume"] - a <= 16:
+                    raise ValueError("wrapper at 0x%x: load %r, resume %r" % (a, reg, r["resume"]))
+                slot = slot_of.get(r["import"]) if r["import"] else None
+                code = bytes([0x8b, 0x05 | REG32.index(reg) << 3]) + struct.pack("<I", slot or 0)
+                self.wrappers[a] = _Wrap(next(self.md.disasm(code, a, 1)), r["resume"] - a, r, slot)
+                continue
+            if kind == "call":
+                if r["resume"] is None or not 5 <= r["resume"] - a <= 16:
+                    raise ValueError("wrapper at 0x%x: resume %r" % (a, r["resume"]))
+                size = r["resume"] - a
+            elif kind == "jmp":
+                size = 6      # the `jmp [slot]` it replaced: `call stub` and its junk byte, or `push reg; call stub`
+            else:
+                raise ValueError("wrapper at 0x%x: kind %r" % (a, kind))
+            slot = slot_of.get(r["import"]) if r["import"] else None
+            code = (b"\xff\x15" if kind == "call" else b"\xff\x25") + struct.pack("<I", slot or 0)
+            self.wrappers[a] = _Wrap(next(self.md.disasm(code, a, 1)), size, r, slot)
+
+    def import_slots(self):
+        """Every import slot in thunk order (imports.c, rc32_imports): the IAT's, then the
+        wrapper table's own."""
+        return sorted(self.img.imports) + sorted(self.wrap_imports)
+
+    def decodable(self, a):
+        """Code may be decoded at a: an executable section; a range of data_code; while
+        find_functions tries a function in a non-executable section, any file data."""
+        if self.img.is_code(a):
+            return True
+        if self._trial:
+            return self.img.foff(a) is not None and a >= self.img.base + self.img.size_of_headers
+        if a in self._dc_insns:
+            return True
+        k = bisect.bisect_right(self._dc_lo, a) - 1 if self.data_code else -1
+        return k >= 0 and a < self.data_code[k][1]
+
     def insn(self, a):
         i = self._dcache.get(a)
         if i is not None:
             return i
-        if not self.img.is_code(a):
+        if a in self.wrappers:
+            return self.wrappers[a]
+        if not self.decodable(a):
             raise Unsupported("not code at 0x%x" % a)
+        cache = not self._trial or self.img.is_code(a)   # a rejected trial leaves nothing behind
         o = self.img.foff(a)
         if o is None:
             raise Unsupported("no file data at 0x%x" % a)
@@ -121,9 +329,10 @@ class Translator32(X87Mixin, core.Translator):
             m = i.mnemonic
             if m.startswith(("bnd ", "repz ret", "rep ret", "notrack ")):
                 i = _Insn(i, m.split()[-1])
-            if len(self._dcache) > 400000:
+            if len(self._dcache) > DCACHE:
                 self._dcache.clear()
-            self._dcache[a] = i
+            if cache:
+                self._dcache[a] = i
             return i
         raise Unsupported("undecodable at 0x%x" % a)
 
@@ -151,7 +360,15 @@ class Translator32(X87Mixin, core.Translator):
         return "RC_M(%s)" % self.gea(i, op)
 
     def read_only(self, op):
-        return False
+        """A fixed address in a section nothing writes (a constant of .rdata, a table of them with a
+        register index): no TSO fence (RC_LDC). The sections are as the original program had them: a
+        write there faults on Windows."""
+        m = op.mem
+        if m.segment not in (0, x86.X86_REG_DS):
+            return False
+        a = m.disp & M32
+        s = self.img.section_of(a)
+        return s is not None and not s[5] & SCN_WRITE and s[1] <= a and a + max(op.size, 1) <= s[1] + s[2]
 
     def on_stack(self, op):
         b = op.mem.base
@@ -184,11 +401,219 @@ class Translator32(X87Mixin, core.Translator):
         a = op.mem.disp & M32
         return a if a in self.imports else None
 
+    def seh_scopes(self):
+        """The __except blocks of MSVC's frame-based SEH, by the instruction that names the
+        scope table: {address of `push scopetable`: [handler, ...]}. The frame is set up inline
+        (`push -2` (SEH4) / `push -1` (SEH3); `push scopetable; push _except_handlerN`) or by
+        a call (`push scopetable; call __SEH_prolog4`, whose first instructions are `push
+        _except_handlerN; push dword ptr fs:[0]`). A scope record is {enclosing level, filter,
+        handler}, after a 16-byte cookie header in SEH4; a record with a filter is an __except
+        (the handler is reached by a jump, inside the function), one without is a __finally
+        (a function the unwind calls) and is left out."""
+        if "_seh" in self.__dict__:
+            return self._seh
+        img, out = self.img, {}
+
+        def records(tab, seh4):
+            hs, n = [], 0
+            a = tab + (16 if seh4 else 0)
+            while n < 64:
+                lvl, flt, h = img.u32(a), img.u32(a + 4), img.u32(a + 8)
+                if h is None or not (lvl == (0xfffffffe if seh4 else M32) or lvl < n) \
+                        or not img.is_code(h) or not (flt == 0 or img.is_code(flt)):
+                    break
+                if flt:
+                    hs.append(h)
+                n, a = n + 1, a + 12
+            return hs if n else None
+
+        for lo, hi in self.code:
+            o = img.foff(lo)
+            if o is None:
+                continue
+            d = img.data[o:o + (hi - lo)]
+            k = d.find(b"\x68")
+            while 0 <= k < len(d) - 10:
+                tab = struct.unpack_from("<I", d, k + 1)[0]
+                seh4 = None
+                if k >= 2 and d[k - 2] == 0x6a and d[k - 1] in (0xfe, 0xff) and d[k + 5] == 0x68:
+                    seh4 = d[k - 1] == 0xfe
+                elif d[k + 5] == 0xe8:
+                    t = (lo + k + 10 + struct.unpack_from("<i", d, k + 6)[0]) & M32
+                    if img.u8(t) == 0x68 and img.u32(t + 5) == 0x0035ff64 and img.u8(t + 9) == 0:
+                        seh4 = records(tab, True) is not None
+                if seh4 is not None and img.foff(tab) is not None:
+                    hs = records(tab, seh4)
+                    if hs:
+                        out[lo + k] = hs
+                k = d.find(b"\x68", k + 1)
+        self._seh = out
+        self.seh_targets = {h for hs in out.values() for h in hs}
+        self.cxx_scopes()
+        return out
+
+    def catch_conts(self, h, more=()):
+        """The continuations of the catch funclet at h: a funclet ends `mov eax, offset CONT; ret`
+        (pops or `add esp` may stand between them), and that is where the CRT resumes the function.
+        A walk of its code that follows the direct jumps near it; calls are taken to return. more:
+        the continuations of try blocks inside it, the rest of its code when the try ends in a throw."""
+        conts, seen, work = set(), set(), [h] + list(more)
+        while work and len(seen) < 4096:
+            a, prev = work.pop(), []
+            while a not in seen and self.img.is_code(a):
+                seen.add(a)
+                try:
+                    i = self.insn(a)
+                except Unsupported:
+                    break
+                m = i.mnemonic
+                if self.call_slot(i, NORETURN32) is not None:
+                    break
+                if m == "ret":
+                    for p in reversed(prev):
+                        o = p.operands
+                        if p.mnemonic == "mov" and p.op_str.startswith("eax, ") and o[1].type == x86.X86_OP_IMM:
+                            if self.img.is_code(o[1].imm & M32):
+                                conts.add(o[1].imm & M32)
+                            break
+                        if p.mnemonic != "pop" and not p.op_str.startswith("esp, "):
+                            break
+                    break
+                if m in ("jmp", "int3") or x86.X86_GRP_JUMP in i.groups:
+                    t = i.operands[0] if i.operands else None
+                    if t is not None and t.type == x86.X86_OP_IMM and abs((t.imm & M32) - h) < 0x10000:
+                        work.append(t.imm & M32)
+                    if m in ("jmp", "int3"):
+                        break
+                prev = prev[-3:] + [i]
+                a += i.size
+        return conts
+
+    def cxx_scopes(self):
+        """The catch continuations of MSVC's C++ exception handling, what seh_scopes is for
+        __except: {address of the instruction that names the frame's __ehhandler thunk: [CONT, ...]}.
+        The thunk is `mov eax, offset FuncInfo; jmp __CxxFrameHandler3` (with /GS, cookie checks
+        first). FuncInfo's try map names the catch funclets, and each funclet returns the address
+        the function goes on at (catch_conts), which nothing else may reach: no function start,
+        but part of the body of the function that owns the frame, or of the catch funclet the try
+        block is inside (cxx_nested: funclet -> [CONT, ...]), which is the live C frame then."""
+        if "_cxx" in self.__dict__:
+            return self._cxx
+        img, thunks = self.img, {}
+        self._cxx, self.cxx_nested, self.cont_targets = {}, {}, set()
+        for lo, hi in self.code:
+            o = img.foff(lo)
+            if o is None:
+                continue
+            for m in re.finditer(rb"\xb8(?=(....)(?:\xe9|\xff\x25))", img.data[o:o + (hi - lo)], re.S):
+                fi = struct.unpack("<I", m.group(1))[0]
+                if img.u32(fi) in EH_MAGIC:
+                    thunks[lo + m.start()] = fi
+        addrs = sorted(thunks)
+
+        def thunk_at(t):
+            """The FuncInfo of the __ehhandler thunk at t: it runs straight into the `mov eax`."""
+            k = bisect.bisect_left(addrs, t)
+            if k == len(addrs) or addrs[k] - t > 0x40:
+                return None
+            a = t
+            try:
+                while a < addrs[k]:
+                    i = self.insn(a)
+                    if i.mnemonic in ("ret", "jmp", "int3"):
+                        return None
+                    a += i.size
+            except Unsupported:
+                return None
+            return thunks[addrs[k]] if a == addrs[k] else None
+
+        tries = {}
+        for r in sorted(img.relocs):
+            t = img.u32(r)
+            if t is None or img.u8(r - 1) not in (0x68, 0xb8) or not img.is_code(r - 1) or not img.is_code(t):
+                continue
+            fi = thunk_at(t)
+            if fi is None:
+                continue
+            if fi not in tries:
+                tries[fi] = self.try_map(fi)
+            top = {c for cs, around in tries[fi] if not around for c in cs}
+            if top:
+                self._cxx[r - 1] = sorted(top)
+        for tm in tries.values():
+            for cs, around in tm:
+                for h in around:
+                    self.cxx_nested.setdefault(h, set()).update(cs)
+        self.cont_targets = {c for cs in self._cxx.values() for c in cs} | {
+            c for cs in self.cxx_nested.values() for c in cs}
+        self.seh_targets |= self.cont_targets
+        return self._cxx
+
+    def try_map(self, fi):
+        """FuncInfo's try blocks: (their continuations, the funclets of the innermost catch the
+        block is inside, [] for one in the function itself). A block is inside another's catch
+        when its states lie between that block's tryHigh and catchHigh."""
+        img = self.img
+        n, tbm = img.u32(fi + 12), img.u32(fi + 16)
+        if not n or n > 4096 or tbm is None or img.u32(tbm) is None:
+            return []
+        rows = []
+        for k in range(n):
+            lo, hi, chi, nh, hp = (img.u32(tbm + 20 * k + 4 * j) for j in range(5))
+            if hp is None or nh is None or nh > 256:
+                return []
+            hs = [img.u32(hp + 16 * j + 12) for j in range(nh)]
+            if not all(h and img.is_code(h) for h in hs):
+                return []
+            rows.append((lo, hi, chi, hs))
+
+        def inside(a, b):
+            return b[1] < a[0] and a[1] <= b[2]
+
+        def conts(row):
+            more = {c for r in rows if inside(r, row) for c in conts(r)}
+            return {c for h in row[3] for c in self.catch_conts(h, more)}
+
+        return [(conts(r), max((b for b in rows if inside(r, b)), default=(0, 0, 0, []))[3]) for r in rows]
+
+    def call_slot(self, i, names):
+        """The import slot of a call of an import in names, direct or through a `jmp [slot]` thunk
+        (the game's, which VMProtect left as wrappers), or None."""
+        if i.mnemonic != "call":
+            return None
+        op = i.operands[0]
+        s = self.iat_slot(i, op)
+        if s is None and op.type == x86.X86_OP_IMM and self.img.is_code(op.imm & M32):
+            try:
+                t = self.insn(op.imm & M32)
+            except Unsupported:
+                return None
+            if t.mnemonic == "jmp":
+                s = self.iat_slot(t, t.operands[0])
+        return s if s is not None and self.imports[s] in names else None
+
+    def setjmp_slot(self, i):
+        """A setjmp call's slot, or None: it keeps its return address on the stack, for the CRT's
+        setjmp to save (the import thunk would replace it, rc32_import_thunk)."""
+        return self.call_slot(i, SETJMP)
+
     # --- discovery: the base rules, plus no-return imports -------------------
     def discover(self, entry):
-        seen, labels = core.Translator.discover(self, entry)
+        # the __except blocks of the SEH frames the function sets up and its catch continuations:
+        # part of its body (no flow reaches them, the CRT's handler jumps there)
+        extra, seh, cxx = [], self.seh_scopes(), self.cxx_scopes()
+        nested = self.cxx_nested.get(entry, ())
+        while True:
+            seen, labels = core.Translator.discover(self, entry, extra)
+            more = sorted(({h for a in seen if a in seh for h in seh[a]} |
+                           {t for a in seen if a in cxx for t in cxx[a]} | set(nested)) - set(extra) - {entry})
+            if not more:
+                break
+            extra += more
         if entry == self.entry:     # not a nested discovery (is_noreturn)
-            self.resume_ips = sorted(a for a in self.resume.get(entry, ()) if a in seen)
+            ips = {a for a in self.resume.get(entry, ()) if a in seen} | (self.cont_targets & set(seen)) | {
+                a + i.size for a, i in seen.items() if self.setjmp_slot(i) is not None}
+            self.resume_ips = sorted(ips)
             self.has_resume = bool(self.resume_ips)
             labels |= set(self.resume_ips)
         for a, i in seen.items():
@@ -230,16 +655,25 @@ class Translator32(X87Mixin, core.Translator):
         if m == "int":
             out.append('rc_fail("int 0x%x", 0x%xull);' % (ops[0].imm & 0xff, A))
             return True
+        if isinstance(i, _Wrap) and i.slot is None:
+            out.append("rc32_wrapper_unresolved(c, 0x%xu, 0x%xu);" % (A, i.wrap["stub"]))
+            return True
+        if isinstance(i, _Wrap) and i.wrap.get("pushes"):   # the stub's argument pushes, then the call below
+            out.append(" ".join(self.push4(wrap_push(t)) for t in i.wrap["pushes"]))
+        if isinstance(i, _Wrap) and i.wrap.get("sets"):     # registers the stub leaves holding the import
+            out.append(" ".join("%s = (uint32_t)RC_LDS(uint32_t, RC_M(0x%xu));" % (REGS[t][0], i.slot) for t in i.wrap["sets"]))
         if m in ("ret", "retn"):
             n = (ops[0].imm & 0xffff) if ops else 0
+            if self.entry in self.flag_callees:
+                out.append("RC32_FLAGS_OUT();")
             out.append("RC32_RET_SAVE(); rsp = (uint32_t)(rsp + %d); %sSPILL_RET(); return;" % (4 + n, self.leave_fn()))
             return True
         if m == "jmp" and ops[0].type != x86.X86_OP_IMM:
             slot = self.iat_slot(i, ops[0])
             if slot is not None:
                 self.imports_used.add(slot)
-                out.append("/* %s (tail) */ RC32_RET_SAVE(); rsp = (uint32_t)(rsp + 4); %sSPILL(); I_%x(c); FILL(); SPILL_RET(); return;"
-                           % (self.imports[slot], self.leave_fn(), slot))
+                out.append("/* %s (tail) */ RC32_RET_SAVE(); rsp = (uint32_t)(rsp + 4); %sSPILL(); %s%x(c); FILL(); SPILL_RET(); return;"
+                           % (self.imports[slot], self.leave_fn(), self.thunk_prefix, slot))
                 return True
             tgt = self.rd(i, ops[0], 4)
             if A in self.tables:
@@ -275,17 +709,24 @@ class Translator32(X87Mixin, core.Translator):
         if m == "call":
             ret = (A + i.size) & M32
             op = ops[0]
+            slot = self.setjmp_slot(i)
+            if slot is not None:      # an indirect call of what the slot holds: the return address stays
+                out.append("/* %s */ { uint32_t tgt = RC_LDS(uint32_t, RC_M(0x%xu)); %s SPILL_CALL(); rc32_icall(c, tgt); "
+                           "FILL_CALL(); %s }" % (self.imports[slot], slot, self.push4("0x%xu" % ret), self.ret_other(ret)))
+                return True
             if op.type == x86.X86_OP_IMM:
                 t = op.imm & M32
                 if t == ret:      # call $+5; pop reg: the address of the next instruction
                     out.append(self.push4("0x%xu" % ret))
                     return True
-                out.append("%s %s %s" % (self.push4("0x%xu" % ret), self.call_internal(t), self.ret_other(ret)))
+                flags = t in self.flag_callees
+                out.append("%s%s %s %s%s" % ("RC32_FLAGS_OUT(); " if flags else "", self.push4("0x%xu" % ret), self.call_internal(t),
+                                             self.ret_other(ret), " RC32_FLAGS_IN();" if flags else ""))
                 return True
             slot = self.iat_slot(i, op)
             if slot is not None:
                 self.imports_used.add(slot)
-                out.append("/* %s */ SPILL(); I_%x(c); FILL();" % (self.imports[slot], slot))
+                out.append("/* %s */ SPILL(); %s%x(c); FILL();" % (self.imports[slot], self.thunk_prefix, slot))
                 return True
             out.append("{ uint32_t tgt = %s; %s SPILL_CALL(); rc32_icall(c, tgt); FILL_CALL(); %s }"
                        % (self.rd(i, op, 4), self.push4("0x%xu" % ret), self.ret_other(ret)))
@@ -360,6 +801,11 @@ class Translator32(X87Mixin, core.Translator):
             out.append("{ uint32_t f = RC_LDS(uint32_t, RC_M(rsp)); rsp = (uint32_t)(rsp + 4); "
                        "cf = f & 1; pf = (f >> 2) & 1; zf = (f >> 6) & 1; sf = (f >> 7) & 1; df = (f >> 10) & 1; "
                        "of = (f >> 11) & 1; eflags_other = f & 0x3ff138u; }")   # 0x3ff138: EFLAGS less modelled/pack bits
+            # the trap flag: a single-step exception (raised here, not after the next instruction;
+            # the CPU clears TF when it delivers it). Anti-debugging code sets it under __try and
+            # takes a handler that never runs for a debugger that swallowed the trap.
+            out.append("if (eflags_other & 0x100u) { eflags_other &= ~0x100u; SPILL(); "
+                       "rc32_raise(c, 0x80000004u, 0, 0, 0); FILL(); }  // EXCEPTION_SINGLE_STEP")
             return True
         if m == "std":
             out.append("df = 1;")
@@ -372,6 +818,26 @@ class Translator32(X87Mixin, core.Translator):
             s = self.xr(i, ops[1]) if ops[1].type == x86.X86_OP_REG else \
                 "%s(rc_v128, %s)" % (self.LD(ops[1]), self.ea(i, ops[1]))
             out.append("%s = rc32_pmaddubsw(%s, %s);" % (d, d, s))
+            return True
+        if m in AES and ops[0].type == x86.X86_OP_REG and self.xr(i, ops[0]):
+            d = self.xr(i, ops[0])
+            s = self.xr(i, ops[1]) if ops[1].type == x86.X86_OP_REG else \
+                "%s(rc_v128, %s)" % (self.LD(ops[1]), self.ea(i, ops[1]))
+            if m == "aesimc":
+                out.append("%s = rc32_aesimc(%s);" % (d, s))
+            elif m == "aeskeygenassist":
+                out.append("%s = rc32_aeskeygenassist(%s, 0x%xu);" % (d, s, ops[2].imm & 0xff))
+            else:
+                out.append("%s = rc32_aes_round(%s, %s, %d, %d);" % (d, d, s, "dec" in m, m.endswith("last")))
+            return True
+        # SSE4.1 dword lanes (the CPUID reports no SSE4.1: compiled in next to the AES-NI paths)
+        if m == "pextrd" and ops[1].type == x86.X86_OP_REG and self.xr(i, ops[1]):
+            out.append(self.wr(i, ops[0], "((rc_vd4)%s)[%d]" % (self.xr(i, ops[1]), ops[2].imm & 3)))
+            return True
+        if m == "pinsrd" and ops[0].type == x86.X86_OP_REG and self.xr(i, ops[0]):
+            d = self.xr(i, ops[0])
+            out.append("{ rc_vd4 t_ = (rc_vd4)%s; t_[%d] = (uint32_t)%s; %s = (rc_v128)t_; }"
+                       % (d, ops[2].imm & 3, self.rd(i, ops[1], 4), d))
             return True
         if m == "rdtsc":
             out.append("{ uint64_t t = rc32_rdtsc(); rax = (uint32_t)t; rdx = (uint32_t)(t >> 32); }")
@@ -423,8 +889,8 @@ class Translator32(X87Mixin, core.Translator):
             one = "RC_ST(%s, %s, RC_LD(%s, %s)); %s %s" % (ct, D, ct, S, adv("rsi"), adv("rdi"))
             if rep:
                 out.append("{ uint32_t len = (uint32_t)rcx * %d; if (!df && (uint32_t)(rdi - rsi) >= len && "
-                           "(uint64_t)rsi + len <= 0x100000000ull && (uint64_t)rdi + len <= 0x100000000ull) { "
-                           "memmove((void *)(uintptr_t)%s, (const void *)(uintptr_t)%s, len); rsi = (uint32_t)(rsi + len); "
+                           "(uint64_t)rsi + len <= 0x100000000ull && (uint64_t)rdi + len <= 0x100000000ull) { RC_FENCE_ST(); "
+                           "memmove((void *)(uintptr_t)%s, (const void *)(uintptr_t)%s, len); RC_FENCE_LD(); rsi = (uint32_t)(rsi + len); "
                            "rdi = (uint32_t)(rdi + len); rcx = 0; } else while ((uint32_t)rcx) { %s rcx = (uint32_t)(rcx - 1); } }"
                            % (n, D, S, one))
             else:
@@ -434,7 +900,7 @@ class Translator32(X87Mixin, core.Translator):
             if rep:
                 fast = "1" if n == 1 else "v == 0"
                 out.append("{ %s v = (%s)rax; uint32_t len = (uint32_t)rcx * %d; if (!df && (%s) && "
-                           "(uint64_t)rdi + len <= 0x100000000ull) { memset((void *)(uintptr_t)%s, (int)(uint8_t)v, len); "
+                           "(uint64_t)rdi + len <= 0x100000000ull) { RC_FENCE_ST(); memset((void *)(uintptr_t)%s, (int)(uint8_t)v, len); "
                            "rdi = (uint32_t)(rdi + len); rcx = 0; } else while ((uint32_t)rcx) { %s rcx = (uint32_t)(rcx - 1); } }"
                            % (ct, ct, n, fast, D, one))
             else:
@@ -481,26 +947,40 @@ class Translator32(X87Mixin, core.Translator):
         return core.Translator._jt_load_of(self, fn, d, reg, depth)
 
     def _jt_resolve(self, fn, jmp):
-        """The base resolution; else, for an absolute table whose bound is not found (the CRT's
-        hand-written memcpy indexes with a value masked in another block), the run of
-        relocated code pointers that starts at the table. Targets outside the function are
-        translated into it too (the descent follows them)."""
+        """The base resolution when it found the bound; else, for an absolute table, the run
+        of relocated code pointers at the table (table_run) when it is longer (the CRT's
+        hand-written memcpy indexes with a value masked in another block; `push 7; pop ecx;
+        cmp eax, ecx` bounds are not followed, and a resolution without a bound stops at the
+        first target past the next function start, while MSVC moves cold cases elsewhere:
+        msvcr100's _output_l). Targets outside the function are translated into it too (the
+        descent follows them)."""
         r = core.Translator._jt_resolve(self, fn, jmp)
-        if r:
+        if r and r["bound"] is not None:
             return r
         src = self._jt_source(fn, jmp)
         if not src or src["kind"] != "abs4" or src["tab"] is None:
-            return None
-        tab, targets = src["tab"], []
-        while tab + 4 * len(targets) in self.img.relocs and len(targets) < 1024:
-            v = self.img.u32(tab + 4 * len(targets))
-            if v is None or not self.img.is_code(v):
-                break
-            targets.append(v)
-        if not targets:
-            return None
+            return r
+        tab = src["tab"]
+        targets = [self.img.u32(w) for w in self.table_run(tab)]
+        if not targets or (r and len(r["targets"]) >= len(targets)):
+            return r
         return dict(targets=targets, pattern="abs4", bound=None, how="relocs", tab=tab, count=len(targets),
                     level1=None)
+
+    def table_run(self, tab):
+        """Addresses of the relocated code pointers of an indexed table at tab, in address
+        order: from tab on, else from its second word (memcpy's `and eax, 3; jmp [eax*4 + tab]`
+        on a path where eax is not 0); and the words before it (memmove's backward tails:
+        `neg ecx; jmp [ecx*4 + tab]` indexes back from the table's end, where the next table
+        may start). A switch over the loaded word only gains a case for a word no index
+        reaches."""
+        def run(t, step):
+            out = []
+            while t in self.img.relocs and len(out) < 1024 and self.img.is_code(self.img.u32(t) or 0):
+                out.append(t)
+                t += step
+            return out
+        return run(tab - 4, -4)[::-1] + (run(tab, 4) or run(tab + 4, 4))
 
     def _jt_read(self, addr, size, signed=False):
         v = core.Translator._jt_read(self, addr, size, False)
@@ -514,6 +994,8 @@ class Translator32(X87Mixin, core.Translator):
         k = next(n for n, s in enumerate(lines) if s.startswith("  (void)zf;"))
         extra = ["  uint8_t df = 0; (void)df;",
                  "  uint32_t eflags_other = 0; (void)eflags_other;  // EFLAGS bits outside cf/pf/zf/sf/of/df"]
+        if entry in self.flag_callees:
+            extra.append("  RC32_FLAGS_IN();")
         if self.has_resume:
             ips = self.resume_ips
             extra += ["  static const uint32_t resume_ips[] = {%s};" % ", ".join("0x%xu" % a for a in ips),
@@ -536,6 +1018,18 @@ class Translator32(X87Mixin, core.Translator):
         return lines
 
     # --- function discovery ------------------------------------------------------
+    @staticmethod
+    def merge_ranges(addrs, insn):
+        """[lo, hi) runs of the instructions at addrs (adjacent instructions join)."""
+        out = []
+        for a in sorted(addrs):
+            e = a + insn(a).size
+            if out and a <= out[-1][1]:
+                out[-1][1] = max(out[-1][1], e)
+            else:
+                out.append([a, e])
+        return [tuple(r) for r in out]
+
     def covered_by(self, seen):
         for a, i in seen.items():
             for k in range(i.size):
@@ -545,10 +1039,18 @@ class Translator32(X87Mixin, core.Translator):
         """Function starts: entry, exports, TLS callbacks and SafeSEH handlers; then, to a
         fixpoint, every direct call target and every relocated pointer into code found in a
         function's instructions; then relocated pointers into code from data (vtables,
-        callback tables, C++ EH funclets) that do not land inside a known function; then
-        what is left of the code sections, cut at padding. A pointer that lands inside a
-        known function's body from outside it is a resume point of that function (scope-table
-        handlers, catch continuations)."""
+        callback tables, C++ EH funclets) that do not land inside a known function, first
+        those in data sections, then the words in code sections that no indexed table holds
+        (`jmp/mov reg, [reg*4 + tab]`: a jump table, table_run); then what is left of the code sections, cut at padding. A pointer target in
+        code (an immediate or a word in a code section) is kept only if it does not look like
+        data (not_code: a relocated word, zero bytes, or the gap rule). A pointer that lands
+        inside a known function's body from outside it, other than a jump table's, is a
+        resume point of that function (scope-table handlers, catch continuations).
+
+        A direct call target in a non-executable section (code_in_data) is decoded as a
+        function too, and kept unless it decodes to an instruction compiled code never has (the
+        gap rule); so is the target of a jump into such a section that made a function fail.
+        The instructions found there become data_code, which the translation decodes as code."""
         img = self.img
         seeds = set()
         if img.entry:
@@ -557,32 +1059,81 @@ class Translator32(X87Mixin, core.Translator):
         if img.tls:
             seeds |= {a for a in img.tls["callbacks"] if img.is_code(a)}
         seeds |= {a for a in img.safeseh if img.is_code(a)}
-        funcs = {}       # start -> seen (dict addr -> insn) or None (failed)
+        funcs = {}       # start -> Found or None (failed)
         owner = {}       # instruction address -> function
-        cover = set()
+        cover = Cover(img.base, img.size_of_image + 0x1000)
         self.discovery_failed = {}
         self.set_functions(seeds)
         relocs = sorted(img.relocs)
 
+        def in_data(t):
+            """A direct call target in a non-executable section with file data (outside the
+            headers): tried as a function (code_in_data)."""
+            return not img.is_code(t) and img.foff(t) is not None and t >= img.base + img.size_of_headers
+
+        strict = set()   # starts kept only if they look like code (not_code), else rejected
+        rejected = set()
+        reloc_set = img.relocs
+
+        def not_code(f, seen):
+            """Why a pointer target is data: a relocated word (an entry of a pointer table), zero
+            bytes (`add [eax], al`: the null word that ends a table, as the _initterm bounds
+            point at), or an instruction compiled code never has (the gap rule)."""
+            if f in reloc_set or img.u16(f) == 0:
+                return "data at 0x%x" % f
+            bad = next((i for i in seen.values() if junk(i, seen)), None)
+            return None if bad is None else "data decodes to %s at 0x%x" % (bad.mnemonic, bad.address)
+
         def run(work):
+            seh = self.seh_targets
             while work:
                 f = work.pop()
-                if f in funcs:
+                if f in funcs or f in seh:   # an __except block: the body of the function it is in
+                    continue
+                if f in strict and f in cover:   # inside a function found since it was queued
+                    continue
+                if f in strict and not_code(f, {}):
+                    funcs[f] = None
+                    rejected.add(f)
                     continue
                 self.set_functions(set(funcs) | {f} | set(work), clear=False)
+                self._trial = not img.is_code(f)
                 try:
                     seen, _ = self.discover(f)
                 except Unsupported as e:
                     funcs[f] = None
-                    self.discovery_failed[f] = str(e)
+                    if f in strict:
+                        rejected.add(f)
+                    else:
+                        self.discovery_failed[f] = str(e)
                     continue
-                funcs[f] = seen
+                finally:
+                    self._trial = False
+                if not img.is_code(f) or f in strict:
+                    bad = not_code(f, seen) if f in strict else next(
+                        (i for i in seen.values() if junk(i, seen)), None)
+                    if bad is not None:
+                        funcs[f] = None
+                        if f in strict:
+                            rejected.add(f)
+                        else:
+                            self.discovery_failed[f] = "data decodes to %s at 0x%x" % (bad.mnemonic, bad.address)
+                        continue
+                    self._dc_insns.update(a for a in seen if not img.is_code(a))
+                funcs[f] = Found(
+                    {i.operands[0].imm & M32 for i in seen.values()
+                     if i.mnemonic == "jmp" and i.operands[0].type == x86.X86_OP_IMM},
+                    any(junk(i, seen) for i in seen.values()),
+                    {i.operands[0].imm & M32 for a, i in seen.items()
+                     if i.mnemonic == "call" and i.operands[0].type == x86.X86_OP_IMM
+                     and a + i.size in seen and seen[a + i.size].mnemonic in JCC})
                 for a, i in seen.items():
                     owner.setdefault(a, f)
-                    cover.update(range(a, a + i.size))
+                    cover.add(a, i.size)
                     if i.mnemonic == "call" and i.operands and i.operands[0].type == x86.X86_OP_IMM:
                         t = i.operands[0].imm & M32
-                        if img.is_code(t) and t not in funcs and t != a + i.size:
+                        if (img.is_code(t) or (self.code_in_data and in_data(t))) and t not in funcs \
+                                and t != a + i.size:
                             work.append(t)
                     # relocated immediates in the instruction: function pointers (push offset f,
                     # mov [x], offset f); not displacements (table bases)
@@ -594,38 +1145,71 @@ class Translator32(X87Mixin, core.Translator):
                                 and x86.X86_GRP_JUMP not in i.groups and i.mnemonic != "call":
                             self._ptr_cands.add(v)
                         k += 1
+                    # an indexed table of words in code (`jmp [reg*4 + tab]`, `mov reg,
+                    # [reg*4 + tab]`): a jump table, whose words are case labels
+                    if i.mnemonic != "call":
+                        for o in i.operands:
+                            if o.type == x86.X86_OP_MEM and o.mem.index and o.mem.scale == 4 \
+                                    and img.is_code(o.mem.disp & M32):
+                                tables.add(o.mem.disp & M32)
+
+        def table_words():
+            """Relocated words of the indexed tables (table_run)."""
+            return {w for t in tables for w in self.table_run(t)}
 
         self._ptr_cands = set()
+        tables = set()
+        self.seh_scopes()
         run(sorted(seeds))
-        # pointers from code (immediates) and from data
-        rounds = 0
+        # pointers from code (immediates) and from data; then relocated words in code sections
+        # that no instruction covers and no indexed table holds (Microsoft's DLLs merge
+        # .rdata into .text: vtables, _initterm and callback tables), each kept under the gap
+        # rule, since some of them are data too (unresolved tables, pointers into the middle of
+        # a function); then table words pointing into a known function's body where that
+        # function jumps with a plain `jmp`: a function the other one tail-calls (a deleting
+        # destructor's `jmp` to the destructor), not a resume point
         while True:
-            rounds += 1
-            data_ptrs = set()
+            data_ptrs, code_ptrs = set(), set()
+            jt = table_words()
             for r in relocs:
                 if r in cover:
                     continue
                 v = img.u32(r)
                 if v is not None and img.is_code(v):
-                    if img.is_code(r):
-                        continue      # data in code: jump tables (case labels), not functions
-                    data_ptrs.add(v)
-            cands = sorted((self._ptr_cands | data_ptrs) - set(funcs))
-            new = [v for v in cands if v not in cover]
+                    if not img.is_code(r):
+                        data_ptrs.add(v)
+                    elif r not in jt:   # else a jump table's case label, not a function
+                        code_ptrs.add(v)
+            new = [v for v in sorted((self._ptr_cands | data_ptrs) - set(funcs) - self.seh_targets) if v not in cover]
+            strict.update(v for v in new if v in self._ptr_cands and v not in data_ptrs)
+            if not new:
+                new = [v for v in sorted(code_ptrs - set(funcs) - self.seh_targets) if v not in cover]
+                strict.update(new)
+            if not new:
+                tails = set()
+                for v in (data_ptrs | code_ptrs) - set(funcs):
+                    f = owner.get(v)
+                    if f is not None and funcs.get(f) and v in funcs[f].jumps:
+                        tails.add(v)
+                new = sorted(tails)
+                # a jump target is code: not a strict start, which run skips once covered (a
+                # tail is: it was never entered, and the loop went on forever)
+                strict.difference_update(tails)
             if not new:
                 break
             run(new[::-1])
         # resume points: pointers into a function's body from outside it
         self.resume = collections.defaultdict(set)
+        jt = table_words()
         for r in relocs:
             v = img.u32(r)
             if v is None or v in funcs or v not in owner:
                 continue
             f = owner[v]
-            if owner.get(r) != f and not (img.is_code(r) and r not in cover):
+            if owner.get(r) != f and not (img.is_code(r) and r in jt):
                 self.resume[f].add(v)
         # what is left: cut the uncovered code at padding and try each piece
-        gaps = rejected = 0
+        gaps = gaps_rejected = 0
         # relocated words in code that no instruction covers are data (jump tables)
         datain = set()
         for r in relocs:
@@ -643,21 +1227,51 @@ class Translator32(X87Mixin, core.Translator):
                 gaps += 1
                 if a not in funcs:
                     run([a])
-                    seen = funcs.get(a)
-                    if seen is None or any(i.mnemonic in JUNK or "ptr gs:" in i.op_str for i in seen.values()):
+                    found = funcs.get(a)
+                    if found is None or found.junk:
                         funcs.pop(a, None)
                         self.discovery_failed.pop(a, None)
-                        rejected += 1
+                        gaps_rejected += 1
                 a = max(b, a + 1)
+        # a function that failed by running into a non-executable section (a jump to code there:
+        # a tail call of a function nothing calls directly): try the target as a function, then
+        # the function again
+        tried = set()
+        while self.code_in_data:
+            retry = {}
+            for f, why in self.discovery_failed.items():
+                p = why.split()
+                if p[:3] == ["not", "code", "at"] and img.is_code(f) and (f, p[3]) not in tried:
+                    t = int(p[3], 16)
+                    if in_data(t):
+                        retry[f] = t
+                        tried.add((f, p[3]))
+            run(sorted({t for t in retry.values() if t not in funcs})[::-1])
+            again = sorted(f for f, t in retry.items() if funcs.get(t))
+            if not again:
+                break
+            for f in again:
+                funcs.pop(f, None)
+                self.discovery_failed.pop(f, None)
+            run(again[::-1])
+        self.set_data_code(self.merge_ranges(self._dc_insns, self.insn))
+        self._dc_insns = set()
+        # flags are locals of a function, but the CRT's hand-written x87 helpers answer in ZF, or
+        # leave the caller's flags alone (`call helper; je`): a direct call followed by a conditional
+        # jump is such a call, and the flags pass through c->ret_flags both ways (rc32_gen.h)
+        self.flag_callees = {t for v in funcs.values() if v for t in v.flag_calls}
         self.discovery = {"seeds": len(seeds), "functions": sum(1 for v in funcs.values() if v),
-                          "failed": len(self.discovery_failed), "gaps": gaps, "gaps_rejected": rejected,
+                          "failed": len(self.discovery_failed), "gaps": gaps, "gaps_rejected": gaps_rejected,
+                          "code_ptrs": len(strict), "code_ptrs_rejected": len(rejected),
                           "resume_functions": len(self.resume),
+                          "data_code_functions": sum(1 for f, v in funcs.items() if v and not img.is_code(f)),
+                          "data_code_bytes": sum(h - l for l, h in self.data_code),
                           "code_bytes": sum(h - l for l, h in self.code), "covered_bytes": len(cover)}
         return sorted(f for f, v in funcs.items() if v)
 
 
-def translate(path, out, wanted=None):
-    tr = Translator32(path)
+def translate(path, out, wanted=None, wrappers=None):
+    tr = Translator32(path, wrappers=read_wrappers(wrappers) if wrappers else None)
     todo = sorted(wanted or tr.fsorted)
     lines, done, bad = [], [], {}
     used = set()
@@ -681,9 +1295,15 @@ def translate(path, out, wanted=None):
 
 
 def main():
-    path, out = sys.argv[1], sys.argv[2]
-    wanted = [int(a, 16) for a in sys.argv[3:]] or None
-    tr, done, bad = translate(path, out, wanted)
+    argv = sys.argv[1:]
+    wrappers = None
+    if "--wrappers" in argv:
+        k = argv.index("--wrappers")
+        wrappers = argv[k + 1]
+        del argv[k:k + 2]
+    path, out = argv[0], argv[1]
+    wanted = [int(a, 16) for a in argv[2:]] or None
+    tr, done, bad = translate(path, out, wanted, wrappers)
     print(tr.discovery)
     print("translated %d, unsupported %d" % (len(done), len(bad)))
     reasons = collections.Counter()

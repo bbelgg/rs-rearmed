@@ -5,16 +5,36 @@ Mac image.
 Usage: venv/bin/python -I gen_image_pe.py IMAGE OUTDIR [options]
   --jobs N, --chunk-insns N, --obj-dir DIR, --cflags "...", --opt -O2, --batch N
                     as for gen_image.py
-  --skip FILE       addresses (hex, one per line) an override module defines F_<addr> for
+  --skip FILE       addresses (hex, one per line) an override module defines F_<addr> for. A
+                    line `ADDR wrap`: the function is still translated, as W_<addr>, and the
+                    override module's F_<addr> (which every call and rc32_table reach) runs
+                    native code around it and calls W_<addr> for the original
+  --wrappers TSV    a packer's import-call sites (xlat/x86_32.py read_wrappers): each is
+                    translated as the `call/jmp [slot]` it replaced; an import the image's IAT
+                    lacks gets a thunk of its own (after the IAT's), one whose name the table
+                    leaves empty fails at run time (rc32_wrapper_unresolved)
+  --module NAME     an image that shares the process with others (a DLL beside the game):
+                    every global this tree defines is prefixed NAME_ (NAME_rc32_table,
+                    NAME_rc32_imports, NAME_rc32_mod, NAME_I_<slot>), so several trees link into
+                    one binary; the runtime loads each with rc32_image_add(&NAME_rc32_mod, ...).
+                    Without it the names are the plain ones (the main image: the game)
+
+Every translated TU is compiled with -DRC_MO_TSO (x86 total store order, runtime/rc.h), the game's
+and each DLL's alike: without it guest loads and stores are plain C accesses, clang hoists the load
+out of a spin loop (`b .` in the object code) and arm64 reorders what the game publishes to its
+other threads. As on the Mac, the whole image: the code that relies on it is not in a few components.
 
 Output in OUTDIR:
   part_<addr>.c     the translated functions (rc32_gen.h), chunked like gen_image.py
-  table.c           rc32_table (sorted guest address -> F_<addr>)
-  imports.c         one thunk I_<slot> per IAT slot, and rc32_imports. A thunk calls
-                    rc32_import_call(c, k): runtime/rc32_imports.c runs the runtime's own
-                    implementation of a few kernel32/ntdll functions and fails for the rest
-                    (the Win32 seams are not part of the front end); a test runner provides
-                    its own.
+  table.c           rc32_table (sorted guest address -> F_<addr>) and rc32_mod, the image's
+                    descriptor for the runtime (runtime/rc32.h)
+  imports.c         one thunk I_<slot> per IAT slot (and wrapper-table slot), and rc32_imports. A
+                    thunk calls rc32_import_thunk(c, &rc32_mod, k): the export of another loaded
+                    image when one provides the import, else the host: rc32_import_call(c, k)
+                    for the main image (runtime/rc32_imports.c runs the runtime's own
+                    implementation of a few kernel32/ntdll functions and fails for the rest; the
+                    Win32 seams are not part of the front end; a test runner provides its own),
+                    rc32_host_import for a --module image.
   decls.h, build.ninja (libgame_rc.a), manifest.json (per function: status, instructions,
                     callee-cleaned bytes, inferred convention; discovery and coverage totals).
 """
@@ -41,11 +61,14 @@ G.PRELUDE = PRELUDE
 _tr = None
 
 
-def _init(img, funcs, resume):
+def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix=""):
     global _tr
     from xlat.x86_32 import Translator32
-    _tr = Translator32(img, functions=funcs)
+    _tr = Translator32(img, functions=funcs, wrappers=wrappers)
+    _tr.thunk_prefix = prefix + "I_"
     _tr.resume = resume
+    _tr.flag_callees = flag_callees
+    _tr.set_data_code(data_code)
 
 
 def _work(batch):
@@ -113,36 +136,55 @@ def main():
     ap.add_argument("--cflags", default="")
     ap.add_argument("--opt", default="-O2")
     ap.add_argument("--batch", type=int, default=24)
+    ap.add_argument("--wrappers", default=None)
+    ap.add_argument("--module", default=None)
     args = ap.parse_args()
+    if args.module is not None and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", args.module):
+        ap.error("--module: a C identifier")
+    P = args.module + "_" if args.module else ""
+    # the chunker declares what each TU calls: the thunks carry the prefix
+    G.SYM_RE = re.compile(r"\b((?:%s)?[FI]_[0-9a-f]+)\(c\)" % re.escape(P))
     args.cflags = ("-DRC_GUEST32 " + args.cflags).strip()
     args.lto, args.prof, args.prof_dep = "", "", None
     args.obj_dir = args.obj_dir or os.path.join(args.outdir, "obj")
     os.makedirs(args.outdir, exist_ok=True)
     t0 = time.time()
-    from xlat.x86_32 import Translator32
-    tr = Translator32(args.image)
+    from xlat.x86_32 import Translator32, read_wrappers
+    wrappers = read_wrappers(args.wrappers) if args.wrappers else None
+    tr = Translator32(args.image, wrappers=wrappers)
     starts = list(tr.fsorted)
     resume = {f: v for f, v in tr.resume.items()}
+    flag_callees = set(tr.flag_callees)
+    data_code = list(tr.data_code)
     disc = dict(tr.discovery)
     imports = dict(tr.imports)
+    slots = tr.import_slots()
     exports = dict(tr.img.exports)
     del tr
-    skip = set()
+    skip, wrap = set(), set()
     for p in args.skip:
-        skip |= G.read_addrs(p)
+        skip |= G.read_addrs(p, None, wrap)
+    skip -= wrap
+    if wrap and P:
+        ap.error("--skip: `wrap` lines are for the main image only (not with --module)")
     todo = [f for f in starts if f not in skip]
     batches = [todo[i:i + args.batch] for i in range(0, len(todo), args.batch)]
-    ch = G.Chunker(args.outdir, args.chunk_insns, [], set())
+    ch = G.Chunker(args.outdir, args.chunk_insns, [(0, 1 << 32)], set(), wrap)   # every function: RC_MO_TSO
     status, callees, used = {}, set(), set()
     conv = {}
 
     def place(a, st, reason, n, text):
         if st == "stub":
             text = G.stub_text(a, reason)
+        if a in wrap:   # the original under another name; the override module's F_<a> calls it
+            text = text.replace("void F_%x(rc_ctx *c) {" % a, "void W_%x(rc_ctx *c) {" % a, 1)
+            st = "wrapped" if st == "ok" else st
         ch.add(a, n, text, [])
         status[a] = [st, reason, n, None]
 
-    with mp.Pool(args.jobs, _init, (args.image, starts, resume)) as pool:
+    print("  0/%d functions, %.0fs" % (len(todo), time.time() - t0), file=sys.stderr, flush=True)
+    with mp.Pool(args.jobs, _init, (args.image, starts, resume, flag_callees, data_code, wrappers, P)) as pool:
+        done = 0
         for res in pool.imap(_work, batches):
             for a, st, reason, n, text, cs, us, info in res:
                 place(a, st, reason, n, text)
@@ -150,6 +192,10 @@ def main():
                 used.update(us)
                 if info:
                     conv[a] = info
+            done += len(res)
+            # progress as gen_image.py prints it (the installer reads "  N/M functions")
+            if (done // args.batch) % 50 == 0 or done == len(todo):
+                print("  %d/%d functions, %.0fs" % (done, len(todo), time.time() - t0), file=sys.stderr, flush=True)
     known = set(status) | skip
     for t in sorted(callees - known):
         place(t, "stub", "callee 0x%x is not a function start" % t, 1, None)
@@ -162,17 +208,23 @@ def main():
     w = G.write_if_changed
     w(os.path.join(args.outdir, "decls.h"), "\n".join(
         ["// generated: prototypes of every translated function", '#include "rc32.h"'] +
-        ["void F_%x(rc_ctx *c);" % a for a in allf]) + "\n")
+        ["void F_%x(rc_ctx *c);" % a for a in allf] + ["void W_%x(rc_ctx *c);" % a for a in sorted(wrap)]) + "\n")
+    # the descriptor: the main image's host is rc32_import_call (the shims' dispatcher); a
+    # module's imports that no other image exports go to rc32_host_import
     w(os.path.join(args.outdir, "table.c"), "\n".join(
-        [PRELUDE.rstrip("\n"), '#include "decls.h"', "const rc32_entry rc32_table[] = {"] +
-        ["  {0x%xu, F_%x}," % (a, a) for a in allf] + ["};", "const int rc32_table_len = %d;" % len(allf), ""]))
-    slots = sorted(imports)
+        [PRELUDE.rstrip("\n"), '#include "decls.h"', "const rc32_entry %src32_table[] = {" % P] +
+        ["  {0x%xu, F_%x}," % (a, a) for a in allf] + ["};", "const int %src32_table_len = %d;" % (P, len(allf))] +
+        ["extern const rc32_import %src32_imports[];" % P, "extern const int %src32_imports_len;" % P] +
+        (["void rc32_import_call(rc_ctx *c, int k);"] if not P else []) +
+        ['rc32_module %src32_mod = {"%s", %src32_table, &%src32_table_len, %src32_imports, &%src32_imports_len, %s, 0};'
+         % (P, args.module or "", P, P, P, P, "0" if P else "rc32_import_call"), ""]))
     w(os.path.join(args.outdir, "imports.c"), "\n".join(
-        [PRELUDE.rstrip("\n"), "void rc32_import_call(rc_ctx *c, int k);"] +
-        ["void I_%x(rc_ctx *c) { rc32_import_call(c, %d); }  // %s" % (s, k, imports[s]) for k, s in enumerate(slots)] +
-        ["const rc32_import rc32_imports[] = {"] +
-        ['  {0x%xu, "%s", I_%x},' % (s, imports[s], s) for s in slots] +
-        ["  {0, 0, 0}", "};", "const int rc32_imports_len = %d;" % len(slots), ""]))
+        [PRELUDE.rstrip("\n"), "extern rc32_module %src32_mod;" % P] +
+        ["void %sI_%x(rc_ctx *c) { rc32_import_thunk(c, &%src32_mod, %d); }  // %s" % (P, s, P, k, imports[s])
+         for k, s in enumerate(slots)] +
+        ["const rc32_import %src32_imports[] = {" % P] +
+        ['  {0x%xu, "%s", %sI_%x},' % (s, imports[s], P, s) for s in slots] +
+        ["  {0, 0, 0}", "};", "const int %src32_imports_len = %d;" % (P, len(slots)), ""]))
     for fn in os.listdir(args.outdir):
         if fn.startswith("part_") and fn.endswith(".c") and fn not in ch.files:
             os.remove(os.path.join(args.outdir, fn))
@@ -183,7 +235,7 @@ def main():
         if v[0] == "stub":
             reasons[re.sub(r"0x[0-9a-f]+", "N", v[1].split(";")[0])[:60]] += 1
     convs = collections.Counter(c["conv"] for c in conv.values())
-    man = {"image": os.path.basename(args.image), "functions": len(allf), "counts": dict(cnt),
+    man = {"image": os.path.basename(args.image), "module": args.module, "functions": len(allf), "counts": dict(cnt),
            "instructions": sum(v[2] for v in status.values() if v[0] == "ok"),
            "discovery": disc, "conventions": dict(convs), "imports": len(slots), "imports_called": len(used),
            "exports": len(exports), "chunks": len(ch.chunks), "gen_seconds": round(time.time() - t0, 1),

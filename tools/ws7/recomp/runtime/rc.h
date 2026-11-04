@@ -44,6 +44,7 @@ typedef struct rc_ctx {
   rc_fpu fpu;
   uint32_t fs;     // guest address of the thread's TEB (the FS segment base)
   uint32_t ret_to; // the return address the last guest `ret` popped (rc32_gen.h)
+  uint32_t ret_flags; // the flags of a function whose caller reads them (Translator32.flag_callees)
 #endif
 } rc_ctx;
 

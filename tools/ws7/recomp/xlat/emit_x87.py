@@ -36,6 +36,7 @@ MMX_SHIFTS = set("psllw pslld psllq psrlw psrld psrlq psraw psrad".split())
 MMX_PACK = {"packsswb", "packuswb", "packssdw"}
 MMX_UNPCKH = {"punpckhbw": "punpcklbw", "punpckhwd": "punpcklwd", "punpckhdq": "punpckldq"}
 MMX_BITW = {"pand": "a & b", "por": "a | b", "pxor": "a ^ b", "pandn": "~a & b"}
+MMX_CVT = {"cvtpi2ps", "cvtpi2pd", "cvtps2pi", "cvttps2pi", "cvtpd2pi", "cvttpd2pi"}
 
 
 def _fp(n):
@@ -245,6 +246,8 @@ class X87Mixin:
             out.append("c->fpu.tag = 0xff;")
             return True
         ops = i.operands
+        if m in MMX_CVT:
+            return self.mmx_cvt(i, out)
         if not any(self.mmx_reg(i, o) is not None for o in ops):
             return False
         d, s = ops[0], ops[1] if len(ops) > 1 else None
@@ -318,6 +321,33 @@ class X87Mixin:
             out.append(pre + "%s = (%s & ~(0xffffull << %d)) | ((uint64_t)(uint16_t)%s << %d);"
                        % (D, D, k, self.rd(i, s, 2), k))
             return True
-        if m in ("cvtpi2ps", "cvtpi2pd", "cvtps2pi", "cvttps2pi", "cvtpd2pi", "cvttpd2pi"):
-            return False
         raise Unsupported("mmx %s at 0x%x" % (m, i.address))
+
+    def mmx_cvt(self, i, out):
+        """The MMX <-> SSE conversions. cvtpi2ps / cvtpi2pd: the two int32 of an MMX register (or
+        m64) to floats in the low half of an xmm (the high half kept) / to two doubles; a memory
+        source makes no MMX transition. cvt(t)ps2pi / cvt(t)pd2pi: two floats (the low half of an
+        xmm, or m64) / two doubles (xmm or m128) to int32, rounded as MXCSR says (t: truncated),
+        INT_MIN when out of range, as cvt(t)ps2dq / cvt(t)pd2dq do."""
+        m, (d, s) = i.mnemonic, i.operands[:2]
+        sm = self.mmx_reg(i, s)
+        zero = "(rc_v128){0, 0}"
+        if m.startswith("cvtpi2"):
+            x = self.xr(i, d)
+            v = "c->fpu.mm[%d]" % sm if sm is not None else "%s(uint64_t, %s)" % (self.LD(s), self.ea(i, s))
+            pre = "rc87_mmx(c); " if sm is not None else ""
+            if m == "cvtpi2ps":
+                out.append(pre + "%s = (rc_v128){rc_cvtdq2ps(%s, (rc_v128){%s, 0})[0], %s[1]};" % (x, zero, v, x))
+            else:
+                out.append(pre + "%s = rc_cvtdq2pd(%s, (rc_v128){%s, 0});" % (x, zero, v))
+            return True
+        pd = "pd" in m
+        if s.type == x86.X86_OP_REG:
+            v = self.xr(i, s) if pd else "(rc_v128){%s[0], 0}" % self.xr(i, s)
+        elif pd:
+            v = "%s(rc_v128, %s)" % (self.LD(s), self.ea(i, s))
+        else:
+            v = "(rc_v128){%s(uint64_t, %s), 0}" % (self.LD(s), self.ea(i, s))
+        fn = "rc_%s2dq" % m[:-3]
+        out.append("rc87_mmx(c); c->fpu.mm[%d] = %s(%s, %s)[0];" % (self.mmx_reg(i, d), fn, zero, v))
+        return True

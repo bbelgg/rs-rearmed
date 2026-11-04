@@ -17,6 +17,8 @@
 #       RC_TSO       tso-ranges file, lo-hi    (default: the whole image, 100000000-110000000;
 #                    TUs in a range are compiled with -DRC_MO_TSO)
 #       RC_PY        python with capstone      (default analysis/venv/bin/python)
+#       RS_NINJA     ninja                     (default the one next to RC_PY, from requirements.txt;
+#                    else ninja on PATH)
 # Output: $RC_OBJ_DIR/libgame_rc.a, $RC_OBJ_DIR/smoke (run result printed).
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
@@ -36,7 +38,9 @@ tso=${RC_TSO:-$obj/tso-ranges.txt}
 
 "$py" -I "$here/gen_image.py" "$img" "$gen" --jobs "$jobs" --tso-ranges "$tso" \
   --obj-dir "$obj" "--cflags=$cflags" "--opt=$opt" "--lto=$rc_lto" "--prof=$rc_pgo" ${rc_pgo_dep:+--prof-dep=$rc_pgo_dep} "$@"
-ninja -C "$gen" -j "$jobs"
+ninja=${RS_NINJA:-$(dirname "$py")/ninja}
+[ -n "${RS_NINJA:-}" ] || [ -x "$ninja" ] || ninja=ninja
+"$ninja" -C "$gen" -j "$jobs"
 smoke=${RC_SMOKE:-1}
 [ -z "$rc_lto" ] || smoke=${RC_SMOKE:-0}
 [ "$smoke" != 0 ] || { echo "smoke test skipped (RC_SMOKE=0; the default with RC_LTO)"; exit 0; }

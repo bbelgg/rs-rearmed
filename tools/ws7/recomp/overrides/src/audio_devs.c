@@ -17,41 +17,9 @@
 // another USB interface was connected. Here every UID read returns the one string kept for that UID, so a
 // pointer stays valid and equal pointers mean equal UIDs. RS_AUDIO_STABLE_UIDS=0 turns it off.
 #include <CoreAudio/CoreAudio.h>
-#include <os/lock.h>
 #include <stdatomic.h>
-#include <string.h>
 
 #include "audio.h"
-
-#define MAX_DEVS 128
-
-static int has_input(AudioObjectID dev) {
-  AudioObjectPropertyAddress a = {kAudioDevicePropertyStreams, kAudioObjectPropertyScopeInput,
-                                  kAudioObjectPropertyElementMain};
-  UInt32 size = 0;
-  return AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &size) == noErr && size > 0;
-}
-
-#define MAX_UIDS 64
-
-// The string kept for uid's text: the caller's reference is swapped for one to the kept string.
-static CFStringRef stable_uid(CFStringRef uid) {
-  static os_unfair_lock lock = OS_UNFAIR_LOCK_INIT;
-  static CFStringRef kept[MAX_UIDS];
-  static int n;
-  CFStringRef r = uid;
-  os_unfair_lock_lock(&lock);
-  int i = 0;
-  while (i < n && !CFEqual(kept[i], uid)) i++;
-  if (i < n) {
-    r = (CFStringRef)CFRetain(kept[i]);
-    CFRelease(uid);
-  } else if (n < MAX_UIDS) {
-    kept[n++] = (CFStringRef)CFRetain(uid);
-  }
-  os_unfair_lock_unlock(&lock);
-  return r;
-}
 
 int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t *size, void *data) {
@@ -59,25 +27,20 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
   const AudioObjectPropertyAddress *a = addr;
   if (st == noErr && a && a->mSelector == kAudioDevicePropertyDeviceUID && size && *size == sizeof(CFStringRef) &&
       data && *(CFStringRef *)data && rs_audio_env_on("RS_AUDIO_STABLE_UIDS", 1))
-    *(CFStringRef *)data = stable_uid(*(CFStringRef *)data);
+    *(CFStringRef *)data = rs_audio_stable_uid(*(CFStringRef *)data);
   rs_audio_trace_get(obj, addr, st, size ? *size : 0, data);
   if (st != noErr || obj != kAudioObjectSystemObject || a->mSelector != kAudioHardwarePropertyDevices ||
       !size || !data || !rs_audio_env_on("RS_AUDIO_INPUTS_FIRST", 1))
     return st;
   uint32_t n = *size / sizeof(AudioObjectID);
-  if (n < 2 || n > MAX_DEVS) return st;
-  AudioObjectID *devs = data, in[MAX_DEVS], out[MAX_DEVS];
-  uint32_t ni = 0, no = 0;
-  for (uint32_t i = 0; i < n; i++) {
-    if (has_input(devs[i])) in[ni++] = devs[i];
-    else out[no++] = devs[i];
-  }
-  int moved = memcmp(devs, in, ni * sizeof *in) != 0;
-  memcpy(devs, in, ni * sizeof *in);
-  memcpy(devs + ni, out, no * sizeof *out);
+  int moved = rs_audio_inputs_first(data, n);
   // Logged once per distinct device count (the list is read on start-up and on every hot-plug check).
   static _Atomic uint32_t last_n;
-  if (moved && atomic_exchange(&last_n, n) != n)
+  if (moved && atomic_exchange(&last_n, n) != n) {
+    const AudioObjectID *devs = data;
+    uint32_t ni = 0;
+    while (ni < n && rs_audio_has_input(devs[ni])) ni++;
     rs_audio_log("device list: %u devices, the %u with inputs first", n, ni);
+  }
   return st;
 }

@@ -327,3 +327,67 @@ DoPostEventExNotifyCallbackBehaviorMessage_class_info  # class-info table
 # app (app/rc_main.c)
 mach_header               # the image's Mach-O header (start of __TEXT)
 objc_classref_MessageBox  # the image's classref of MessageBox, redirected to the rewrite's class
+
+# differential tests (shims/game/harness, shims/game/test): the original functions and data the tests run
+# and read in the mapped Mac image (RS_ORIG_*, RS_KEY_*, RS_RANGE_* in shims/game/include)
+adler32                        # zlib
+luaopen_base                   # Lua standard libraries
+luaopen_debug
+luaopen_math
+luaopen_package
+luaopen_os
+luaopen_string
+luaopen_table
+rsg_efd_category_init_svc      # efd::Category from a MessageService
+rsg_efd_fixedstring_init       # efd::FixedString
+rsg_efd_fixedstring_init_cstr
+rsg_efd_fixedstring_init_copy
+rsg_efd_fixedstring_release
+rsg_efd_fixedstring_c_str
+rsg_efd_fixedstring_assign
+rsg_efd_fixedstring_exists
+rsg_efd_fixedstring_length
+rsg_efd_fixedstring_equals
+rsg_efd_msghelper_on_net_id    # efd IMessageHelperSystemService
+rsg_efd_msghelper_init
+rsg_efd_msghelper_on_preinit
+rsg_efd_msghelper_on_shutdown
+efd_ibase_get_class_id         # IBase slot 7, shared by classes that keep their ClassID in the class info
+efd_free                       # efd allocator free (ptr, size or -1)
+efd_init                       # efd::Init
+efd_shutdown                   # efd::Shutdown
+efd_logger_singleton           # -> {?, ILogger *}, made on the first log call
+efd_string_table               # GlobalStringTable *
+efd_string_table_count         # its string count
+efd_string_table_collisions    # its hash collisions
+efd_sqrt_table                 # fast-sqrt mantissa table (uint32_t *)
+rsg_profile_encrypt            # profile save: AES-256-ECB in place
+profile_load                   # profile load (?, path, ctx, callback)
+rsg_pkgconfig_decrypt          # package-config callback (efd::File *)
+key_sng_aes_blob_len           # key material: BPE blob lengths and blobs, raw keys (addresses only)
+key_sng_aes_blob
+key_sng_dsa_blob_len
+key_sng_dsa_blob
+key_pkg_dsa_blob_len
+key_pkg_dsa_blob
+key_pkg_aes
+key_psarc_hex
+key_profile
+key_preview
+RSConnectExtension_RDV_vtable  # the online extension's vtable (38 slots)
+RSConnectExtension_RDV_ctor    # its constructor (this): sizeof 0x18
+rs_connect_ext_call_slot21     # RSConnectService one-line callers: service -> slot 130 (the extension) -> slot n
+rs_connect_ext_call_slot22
+rs_connect_ext_call_slot23
+rs_connect_ext_call_slot25
+rs_connect_ext_call_slot28
+rs_connect_ext_call_slot29
+rs_connect_ext_call_slot36
+lib_cryptopp_begin             # component ranges [begin, end) for rsimage_run_inits (analysis/ws7/components.md)
+lib_cryptopp_end
+engine_efd_begin
+engine_efd_end
+engine_egf_begin
+engine_egf_end
+engine_nimain_begin
+engine_nimain_end

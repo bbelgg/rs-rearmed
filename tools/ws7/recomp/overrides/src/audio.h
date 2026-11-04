@@ -24,6 +24,7 @@
 #include <stdint.h>
 
 #include "rc_ov.h"
+#include "rs_audio_host.h"  // switches, log, device buffer, real-time thread, device list (shared with Learn & Play)
 
 // Wwise's AkPlatformInitSettings copy (0x101907da0): +0x54 uNumRefillsInVoice (u16), the ring is
 // refills x 256 frames per channel (sink Init 0x100aa7be0).
@@ -52,10 +53,5 @@ void rs_audio_trace_get(uint32_t obj, const void *addr, int32_t st, uint32_t siz
 
 // The sink's ring in refills of 256 frames: LatencyBuffer, also when the engine runs with more (audio_ring.c).
 uint32_t rs_audio_ring_refills(void);
-
-int rs_audio_log_on(void);
-void rs_audio_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-// An environment switch: unset or empty = dflt; "0", "n...", "f..." = 0; anything else = 1.
-int rs_audio_env_on(const char *name, int dflt);
 
 #endif

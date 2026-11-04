@@ -24,7 +24,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 DEFAULT_TARGET = "mac-x64"
 IDENT = re.compile(r"[A-Za-z_][A-Za-z0-9_]*$")
-CONVENTIONS = ("sysv", "cdecl", "stdcall", "thiscall", "fastcall", "data", "code")
+CONVENTIONS = ("sysv", "cdecl", "stdcall", "thiscall", "fastcall", "custom", "data", "code")
 
 
 class TargetError(Exception):

@@ -1,6 +1,6 @@
 #!/bin/sh
 # The Metal backend's offline shader corpus for a user's build, made from the game files alone
-# (docs/METAL-DESIGN.md "Shader translation"): no game run, no shader dumps. tools/ws7/recomp/app/
+# (docs/mac/METAL.md "Shader translation"): no game run, no shader dumps. tools/ws7/recomp/app/
 # build-m4.sh runs it and bundles the result; the installer's warm-up compiles it.
 #
 #   tools/metal/make-corpus.sh OUTDIR

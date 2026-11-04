@@ -17,6 +17,14 @@
 // ---- fakes for the runtime pieces seam_platform.c links against -------------
 uint64_t rc_slide;
 rc_fn rc_import_thunk(uint64_t h) { (void)h; return 0; }  // rc_native.c's weak reference
+// rc_native.c's other references: no guest code and no trampolines here, so every indirect call is native
+rc_fn rc_lookup(uint64_t host_addr) { (void)host_addr; return 0; }
+uint64_t rc_tramp_guest_of(uint64_t host) { (void)host; return 0; }
+void rc_unwind_sync(rc_ctx *c, const void *anchor) { (void)c; (void)anchor; }
+_Noreturn void rc_fail(const char *what, uint64_t addr) {
+  printf("rc_fail: %s 0x%llx\n", what, (unsigned long long)addr);
+  exit(1);
+}
 
 #define GA(a) (rc_slide + (uint64_t)(a))
 typedef struct { uint64_t va; int n; uint64_t a[8]; } call_t;

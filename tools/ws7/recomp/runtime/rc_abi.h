@@ -38,6 +38,7 @@
 #define RC_CC_STDCALL 2
 #define RC_CC_THISCALL 3
 #define RC_CC_FASTCALL 4
+#define RC_CC_CUSTOM 5  // register arguments only that function uses (win-x86, LTCG): read by hand
 
 // Each takes the name itself (pasted, never macro-expanded first: a name may also be a C macro).
 #define RC_ADDR(name) RC_ADDR_##name

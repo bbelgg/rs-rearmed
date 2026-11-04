@@ -82,3 +82,8 @@ profile_block_c                   # RSProfileService: byte, StartSignIn refuses 
 profile_set_pad_slot              # RSProfileService vtable: SetPad(this, player, pad)
 dlc_job_delete_slot               # DLC-preview job functor vtable: delete
 dlc_job_fail_slot                 # DLC-preview job functor vtable: completion (job, bool failed)
+boot_phase                        # RSBootService: u32 boot phase (0..3, 4 = booted)
+boot_intro_state                  # RSBootService: u32 intro state (0 load .. 3 playing, 4 ending, 5 done)
+boot_intro_playing                # RSBootService: u8 intro playing
+boot_step                         # RSBootService: u32 phase 3 step counter
+boot_phase3_steps                 # RSBootService: phase 3's step count (the counter's value once they are done)

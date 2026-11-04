@@ -1,0 +1,19 @@
+# Sample wrapper table for test/x86/handcases.py: VMProtect-style import calls in its snippets.
+# Columns (tab-separated): call_site, stub, kind (call/jmp/load), resume (call, load), pushed_reg
+# (load: the register loaded), import,
+# pushes (the words a stub pushes before the call, in push order), sets (registers the stub
+# leaves holding the import's address).
+# Real tables give the addresses in hex; here most are labels of the snippets, which
+# handcases.py replaces with their addresses.
+call_site	stub	kind	resume	pushed_reg	import	pushes	sets
+wr_call_junk_site	vm_stub_skip1	call	wr_call_junk_resume		kernel32.dll!GetTickCount
+wr_push_call_site	vm_stub_push_ecx	call	wr_push_call_resume	ecx	kernel32.dll!Sleep
+wr_xchg_site	vm_stub_xchg	call	wr_xchg_resume		kernel32.dll!GetVersion
+wr_args_site	vm_stub_args	call	wr_args_resume		kernel32.dll!Sleep	ebx,eax+0x1,0x55	esi
+wr_load_site	vm_stub_load	load	wr_load_resume	esi	kernel32.dll!Sleep
+wr_jmp_site	vm_stub_tail	jmp			kernel32.dll!Sleep
+wr_push_jmp_site	vm_stub_push_tail	jmp		edx	kernel32.dll!GetTickCount
+wr_qpc0_site	vm_stub_qpc0	call	wr_qpc0_resume		kernel32.dll!QueryPerformanceCounter
+wr_own_slot_site	vm_stub_qpc	call	wr_own_slot_resume		kernel32.dll!QueryPerformanceCounter
+wr_unresolved_site	vm_stub_unknown	call	wr_unresolved_resume
+wr_far_site	7ff00000	call	wr_far_resume		kernel32.dll!GetSystemTimeAsFileTime

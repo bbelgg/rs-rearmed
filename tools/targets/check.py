@@ -22,7 +22,8 @@ sys.path.insert(0, HERE)
 import targets  # noqa: E402
 
 ROOT = targets.ROOT
-SOURCES = ["tools/ws7/recomp/overrides/**/*.[ch]", "tools/ws7/recomp/app/*.c", "tools/ws7/recomp/app/*.h"]
+SOURCES = ["tools/ws7/recomp/overrides/**/*.[ch]", "tools/ws7/recomp/app/*.c", "tools/ws7/recomp/app/*.h",
+           "shims/game/include/*.h", "shims/game/harness/*.[ch]", "shims/game/test/*.[ch]"]
 SYM_USE = re.compile(r"\b(?:RC_ADDR|RC_FN|RC_GA|RC_CC|OV_GUEST|OV_GUESTV|OV_ALIAS|OV_ARGS_OF)\(\s*([A-Za-z_]\w*)")
 SEAM_USE = re.compile(r"\bG0?\(\s*([a-z_]\w*)")
 OFF_USE = re.compile(r"\bRC_OFF\(\s*([A-Za-z_]\w*)")

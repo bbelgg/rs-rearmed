@@ -107,8 +107,9 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
 
 
     # --- discovery ---------------------------------------------------------
-    def discover(self, entry):
-        seen, work, labels = {}, [entry], {entry}
+    def discover(self, entry, extra=()):
+        """extra: more addresses of the function's body no flow from entry reaches."""
+        seen, work, labels = {}, list(extra)[::-1] + [entry], {entry} | set(extra)
         self.tables = {}
         self.noret = set()   # calls to in-image functions that never return
         while work:

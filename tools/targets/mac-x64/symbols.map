@@ -7,6 +7,7 @@ rsg_rijndael_key_setup_enc                                       0x100001b40  sy
 rsg_rijndael_key_setup_dec                                       0x100001eb0  sysv  int(uint32_t *, const uint8_t *, int)
 rsg_rijndael_encrypt                                             0x100002080  sysv  void(const uint32_t *, int, const uint8_t *, uint8_t *)
 rsg_rijndael_decrypt                                             0x100002df0  sysv  void(const uint32_t *, int, const uint8_t *, uint8_t *)
+efd_ibase_get_class_id                                           0x10001cb60  sysv  uint32_t(const void *)
 GRCamera_QueryInterface                                          0x10001cbd0  sysv  -
 GRCamera_QueryInterface_const                                    0x10001cc30  sysv  -
 GRCameraBackground_QueryInterface                                0x100024580  sysv  -
@@ -94,6 +95,8 @@ path_release                                                     0x100158840  sy
 path_md5                                                         0x100158b70  sysv  -
 MainService_MacOS_QueryInterface                                 0x100168600  sysv  -
 MainService_MacOS_QueryInterface_const                           0x100168660  sysv  -
+rsg_profile_encrypt                                              0x100168c90  sysv  void(uint8_t *buf, int *len)
+profile_load                                                     0x100168df0  sysv  -
 NSP_PlayListService_QueryInterface                               0x100178660  sysv  -
 NSP_PlayListService_QueryInterface_const                         0x1001786c0  sysv  -
 game_bootstrap                                                   0x100179dc0  sysv  void(const char *app_dir, const char *cwd)
@@ -134,6 +137,7 @@ GraphAssetFactory__Response_QueryInterface_const                 0x10029ad00  sy
 GRComponent_QueryInterface                                       0x10029bee0  sysv  -
 GRComponent_QueryInterface_const                                 0x10029bf40  sysv  -
 service_manager                                                  0x1002a74f0  sysv  void *(void)
+rsg_pkgconfig_decrypt                                            0x1002a7550  sysv  -
 MainService_QueryInterface                                       0x1002a9f90  sysv  -
 MainService_QueryInterface_const                                 0x1002a9ff0  sysv  -
 PreloadHelper_QueryInterface                                     0x1002ab980  sysv  -
@@ -148,6 +152,7 @@ PreloadItem_QueryInterface                                       0x1002ad720  sy
 PreloadItem_QueryInterface_const                                 0x1002ad780  sysv  -
 PreloadGroup_QueryInterface                                      0x1002ad850  sysv  -
 PreloadGroup_QueryInterface_const                                0x1002ad8b0  sysv  -
+boot_intro_update                                                0x1002b10b0  sysv  bool(void *boot)
 RSBootService_QueryInterface                                     0x1002b2380  sysv  -
 RSBootService_QueryInterface_const                               0x1002b23e0  sysv  -
 GFXModelResponse_QueryInterface                                  0x1002b26e0  sysv  -
@@ -196,6 +201,8 @@ GC2DAssetHelper_QueryInterface                                   0x1003b1d90  sy
 GC2DAssetHelper_QueryInterface_const                             0x1003b1df0  sysv  -
 GCAccumulatedActor_QueryInterface                                0x1003c00d0  sysv  -
 GCAccumulatedActor_QueryInterface_const                          0x1003c0130  sysv  -
+frontend_open_file                                               0x1003c7810  sysv  void **(void **out, const char *path)
+steam_dlc_owned                                                  0x100a07800  sysv  bool(void *steam, int app)
 GCPauseManager_QueryInterface                                    0x1003e09a0  sysv  -
 GCPauseManager_QueryInterface_const                              0x1003e0a00  sysv  -
 GRCameraNarniaVenue_QueryInterface                               0x1003f1160  sysv  -
@@ -307,11 +314,19 @@ set_visual_quality                                               0x1008bb670  sy
 get_resolution                                                   0x1008bb850  sysv  void(int *w, int *h)
 FavoritesService_QueryInterface                                  0x1008c4140  sysv  -
 FavoritesService_QueryInterface_const                            0x1008c41a0  sysv  -
+RSConnectExtension_RDV_ctor                                      0x100a04590  sysv  void(void *obj)
 RSConnectExtension_RDV_QueryInterface                            0x100a048c0  sysv  -
 RSConnectExtension_RDV_QueryInterface_const                      0x100a04920  sysv  -
 rs_connect_service_steam_ctor                                    0x100a04e80  sysv  void(void *obj, void *steam)
 RSConnectService_Steam_QueryInterface                            0x100a05710  sysv  -
 RSConnectService_Steam_QueryInterface_const                      0x100a05770  sysv  -
+rs_connect_ext_call_slot21                                       0x100a05e10  sysv  void(void *service, const void *arg)
+rs_connect_ext_call_slot22                                       0x100a05e40  sysv  void(void *service, const void *arg)
+rs_connect_ext_call_slot28                                       0x100a05ea0  sysv  -
+rs_connect_ext_call_slot29                                       0x100a05ed0  sysv  -
+rs_connect_ext_call_slot23                                       0x100a05f10  sysv  void(void *service, const void *arg)
+rs_connect_ext_call_slot25                                       0x100a05f30  sysv  void(void *service, const void *arg)
+rs_connect_ext_call_slot36                                       0x100a05f50  sysv  void(void *service, const void *arg)
 rs_steam_service_ctor                                            0x100a06650  sysv  void(void *obj)
 RSSteamService_QueryInterface                                    0x100a07ce0  sysv  -
 RSSteamService_QueryInterface_const                              0x100a07d40  sysv  -
@@ -423,6 +438,7 @@ GFxMovieModel_QueryInterface_const                               0x100b75050  sy
 GFxService_QueryInterface                                        0x100b7e8e0  sysv  -
 GFxService_QueryInterface_const                                  0x100b7e940  sysv  -
 input_sink                                                       0x100ba1190  sysv  void(int code, int a, int b)
+adler32                                                          0x100e071d0  sysv  unsigned long(unsigned long, const uint8_t *, unsigned)
 compress2                                                        0x100e07620  sysv  int(Bytef *, uLongf *, const Bytef *, uLong, int)
 compressBound                                                    0x100e076d0  sysv  uLong(uLong)
 crc32                                                            0x100e076f0  sysv  uLong(uLong, const Bytef *, uInt)
@@ -525,6 +541,8 @@ luaL_ref                                                         0x100e14590  sy
 luaL_unref                                                       0x100e14650  sysv  void(lua_State *, int, int)
 luaL_loadbuffer                                                  0x100e14ab0  sysv  int(lua_State *, const char *, size_t, const char *)
 luaL_loadstring                                                  0x100e14b00  sysv  int(lua_State *, const char *)
+luaopen_base                                                     0x100e14b40  sysv  int(lua_State *)
+luaopen_debug                                                    0x100e19100  sysv  int(lua_State *)
 lua_sethook                                                      0x100e1a1a0  sysv  int(lua_State *, lua_Hook, int, int)
 lua_gethook                                                      0x100e1a1e0  sysv  lua_Hook(lua_State *)
 lua_gethookmask                                                  0x100e1a1f0  sysv  int(lua_State *)
@@ -535,11 +553,18 @@ lua_setlocal                                                     0x100e1a360  sy
 lua_getinfo                                                      0x100e1a450  sysv  int(lua_State *, const char *, lua_Debug *)
 lua_resume                                                       0x100e1c740  sysv  int(lua_State *, int)
 lua_yield                                                        0x100e1c980  sysv  int(lua_State *, int)
+luaopen_math                                                     0x100e23040  sysv  int(lua_State *)
+luaopen_package                                                  0x100e24090  sysv  int(lua_State *)
+luaopen_os                                                       0x100e256b0  sysv  int(lua_State *)
 lua_newstate                                                     0x100e29dd0  sysv  lua_State *(lua_Alloc, void *)
 lua_close                                                        0x100e2a1e0  sysv  void(lua_State *)
+luaopen_string                                                   0x100e2a5c0  sysv  int(lua_State *)
+luaopen_table                                                    0x100e2e290  sysv  int(lua_State *)
+engine_nimain_begin                                              0x100e34310  code  -
 camera_set_frustum                                               0x100e438c0  sysv  void(void *camera, const void *frustum)
 key_down                                                         0x101135520  sysv  -
 key_up                                                           0x101135560  sysv  -
+engine_nimain_end                                                0x101146090  code  -
 LuaScriptFactory_QueryInterface                                  0x10114ff10  sysv  -
 LuaScriptFactory_QueryInterface_const                            0x10114ff70  sysv  -
 LuaScriptFactoryResponseData_QueryInterface                      0x101150060  sysv  -
@@ -592,6 +617,7 @@ MouseDownMessage_QueryInterface                                  0x1011bf460  sy
 MouseDownMessage_QueryInterface_const                            0x1011bf4c0  sysv  -
 MouseUpMessage_QueryInterface                                    0x1011bf530  sysv  -
 MouseUpMessage_QueryInterface_const                              0x1011bf590  sysv  -
+engine_egf_begin                                                 0x1011c1c10  code  -
 ScheduledTask_QueryInterface                                     0x1011d2360  sysv  -
 ScheduledTask_QueryInterface_const                               0x1011d23b0  sysv  -
 Entity_QueryInterface                                            0x1011d2470  sysv  -
@@ -646,6 +672,7 @@ WorldFactoryRequest_QueryInterface                               0x10125f0b0  sy
 WorldFactoryRequest_QueryInterface_const                         0x10125f110  sysv  -
 WorldFactoryResponse_QueryInterface                              0x10125f620  sysv  -
 WorldFactoryResponse_QueryInterface_const                        0x10125f680  sysv  -
+engine_egf_end                                                   0x101260190  code  -
 AnimationService_QueryInterface                                  0x10126ddb0  sysv  -
 AnimationService_QueryInterface_const                            0x10126de10  sysv  -
 ActorAddedMessage_QueryInterface                                 0x10126e2c0  sysv  -
@@ -662,6 +689,7 @@ KFMFactoryResponse_QueryInterface                                0x101279ca0  sy
 KFMFactoryResponse_QueryInterface_const                          0x101279d00  sysv  -
 AssetCacheResponse_QueryInterface                                0x10127a6b0  sysv  -
 AssetCacheResponse_QueryInterface_const                          0x10127a710  sysv  -
+engine_efd_begin                                                 0x10127a980  code  -
 AssetConfigService_QueryInterface                                0x10127c7d0  sysv  -
 AssetConfigService_QueryInterface_const                          0x10127c830  sysv  -
 AssetFactoryManager_QueryInterface                               0x101283ce0  sysv  -
@@ -706,12 +734,27 @@ DebugOutDestination_QueryInterface                               0x1012ddbe0  sy
 DebugOutDestination_QueryInterface_const                         0x1012ddc40  sysv  -
 FileDestination_QueryInterface                                   0x1012e1550  sysv  -
 FileDestination_QueryInterface_const                             0x1012e15b0  sysv  -
+rsg_efd_fixedstring_init                                         0x1012e2320  sysv  void(void *)
+rsg_efd_fixedstring_init_cstr                                    0x1012e2340  sysv  void(void *, const char *)
+rsg_efd_fixedstring_init_copy                                    0x1012e23a0  sysv  void(void *, const void *)
+rsg_efd_fixedstring_release                                      0x1012e23e0  sysv  void(void *)
+rsg_efd_fixedstring_c_str                                        0x1012e2480  sysv  const char *(const void *)
+rsg_efd_fixedstring_assign                                       0x1012e2490  sysv  void *(void *, const void *)
+rsg_efd_fixedstring_exists                                       0x1012e2510  sysv  bool(const void *)
+rsg_efd_fixedstring_length                                       0x1012e2530  sysv  uint32_t(const void *)
+rsg_efd_fixedstring_equals                                       0x1012e2550  sysv  bool(const void *, const char *)
+efd_init                                                         0x1012e2790  sysv  void(void)
+efd_shutdown                                                     0x1012e27f0  sysv  void(void)
 GenericAssetFactory_QueryInterface                               0x1012e3200  sysv  -
 GenericAssetFactory_QueryInterface_const                         0x1012e3260  sysv  -
 ResponseData2_QueryInterface                                     0x1012e3360  sysv  -
 ResponseData2_QueryInterface_const                               0x1012e33c0  sysv  -
 GenericAssetLoadResponse_QueryInterface                          0x1012e3a90  sysv  -
 GenericAssetLoadResponse_QueryInterface_const                    0x1012e3af0  sysv  -
+rsg_efd_msghelper_on_net_id                                      0x1012e53a0  sysv  void(void *, const void *)
+rsg_efd_msghelper_init                                           0x1012e5470  sysv  void(void *, uint32_t)
+rsg_efd_msghelper_on_preinit                                     0x1012e54a0  sysv  int(void *)
+rsg_efd_msghelper_on_shutdown                                    0x1012e5680  sysv  int(void *)
 rsg_efd_msghelper_on_init                                        0x1012e5ba0  sysv  int(void *)
 rsg_efd_msghelper_on_tick                                        0x1012e5bb0  sysv  int(void *)
 rsg_efd_msghelper_display_name                                   0x1012e5bd0  sysv  const char *(void *)
@@ -719,7 +762,9 @@ Logger_QueryInterface                                            0x1012ebd10  sy
 Logger_QueryInterface_const                                      0x1012ebd70  sysv  -
 efd_alloc                                                        0x1012efc90  sysv  void *(size_t size, int hint)
 efd_malloc                                                       0x1012eff00  sysv  void *(size_t size, int hint)
+efd_free                                                         0x1012f00f0  sysv  void(void *ptr, size_t size)
 rsg_efd_category_init_u0                                         0x1012f44b0  sysv  uint64_t *(uint64_t *, uint32_t, uint32_t)
+rsg_efd_category_init_svc                                        0x1012f4520  sysv  uint64_t *(uint64_t *, void *, uint32_t)
 rsg_efd_category_init_u2                                         0x1012f45a0  sysv  uint64_t *(uint64_t *, uint32_t, uint32_t)
 MessageService_QueryInterface                                    0x1012f4cb0  sysv  -
 MessageService_QueryInterface_const                              0x1012f4d10  sysv  -
@@ -752,6 +797,7 @@ thread_set_priority                                              0x101313170  sy
 MacOSPlatformService_QueryInterface                              0x101313680  sysv  -
 MacOSPlatformService_QueryInterface_const                        0x1013136e0  sysv  -
 autologin                                                        0x101315d70  sysv  -
+engine_efd_end                                                   0x101319bd0  code  -
 AudioBankAssetFactory_QueryInterface                             0x10131d790  sysv  -
 AudioBankAssetFactory_QueryInterface_const                       0x10131d7f0  sysv  -
 AudioBankAssetLoadRequest_QueryInterface                         0x10131dc30  sysv  -
@@ -784,10 +830,12 @@ AudioService_QueryInterface                                      0x101337230  sy
 AudioService_QueryInterface_const                                0x101337290  sysv  -
 input_queue_read                                                 0x10133b310  sysv  -
 si_open                                                          0x10133bee0  sysv  bool(void *self, int slot)
+lib_cryptopp_begin                                               0x101343dd0  code  -
 rsg_cryptopp_aes_ctr_decrypt                                     0x101376328  sysv  _Bool(const uint8_t *, uint64_t, const char *, uint32_t, uint8_t *, uint32_t)
 rsg_cryptopp_dsa_sha1_verify                                     0x10137683d  sysv  _Bool(const uint8_t *, uint32_t, const char *)
 sng_verify                                                       0x10137683d  sysv  _Bool(const uint8_t *, uint32_t, const char *)
 rsg_cryptopp_aes_cfb_decrypt                                     0x101376f8f  sysv  -
+lib_cryptopp_end                                                 0x101383700  code  -
 dsp_two                                                          0x1013ea36c  data  float
 const_two_pow_63                                                 0x1013eaa50  data  double
 hashtable_prime_sizes                                            0x1013eaa70  data  uint64_t[28]
@@ -798,12 +846,23 @@ dsp_four4                                                        0x1013eadb0  da
 dsp_k046                                                         0x1013eadc0  data  float[4]
 dsp_k054                                                         0x1013eadd0  data  float[4]
 dsp_one4                                                         0x1013eade0  data  float[4]
+key_psarc_hex                                                    0x1013eba80  data  char[65]
+key_pkg_aes                                                      0x1013ecc60  data  uint8_t[32]
+key_preview                                                      0x1013f9a90  data  uint8_t[32]
 thread_priority_table                                            0x10142d3f0  data  int32_t[7]
 psarc_key_iv                                                     0x10142e3d0  data  uint8_t[16]
 la_vcosf                                                         0x1017e8b68  data  void *
 json_number_vtable                                               0x1017f5c70  data  void *[]
+RSConnectExtension_RDV_vtable                                    0x101822c98  data  void *[]
 objc_classref_MessageBox                                         0x10186da28  data  Class
 game_config                                                      0x101873e08  data  rsp_config
+key_profile                                                      0x101877060  data  uint8_t[32]
+key_sng_aes_blob_len                                             0x1018784b0  data  uint32_t
+key_sng_aes_blob                                                 0x1018784c0  data  uint8_t[]
+key_sng_dsa_blob_len                                             0x101878508  data  uint32_t
+key_sng_dsa_blob                                                 0x101878510  data  uint8_t[]
+key_pkg_dsa_blob_len                                             0x10187aa70  data  uint32_t
+key_pkg_dsa_blob                                                 0x10187aa80  data  uint8_t[]
 GRCamera_class_info                                              0x1018ddbb0  data  efd::ClassInfo
 GRCameraBackground_class_info                                    0x1018de018  data  efd::ClassInfo
 GRCameraBGBehavior_Animated_class_info                           0x1018de480  data  efd::ClassInfo
@@ -1053,14 +1112,19 @@ FileDestination_class_info                                       0x101938c48  da
 GenericAssetFactory_class_info                                   0x101939058  data  efd::ClassInfo
 ResponseData2_class_info                                         0x101939460  data  efd::ClassInfo
 GenericAssetLoadResponse_class_info                              0x101939868  data  efd::ClassInfo
+efd_string_table                                                 0x101939c70  data  void *
+efd_string_table_count                                           0x101939c78  data  uint64_t
+efd_string_table_collisions                                      0x101939c80  data  uint64_t
 sub_IMessage_class_info                                          0x101939c98  data  efd::ClassInfo
 Logger_class_info                                                0x10193a4a8  data  efd::ClassInfo
+efd_logger_singleton                                             0x10193a8b0  data  void *
 MessageService_class_info                                        0x10193b100  data  efd::ClassInfo
 NetMessage_class_info                                            0x10193b918  data  efd::ClassInfo
 AssignNetIDMessage_class_info                                    0x10193bd20  data  efd::ClassInfo
 PrintDestination_class_info                                      0x10193c9c0  data  efd::ClassInfo
 ServiceManager_class_info                                        0x10193d218  data  efd::ClassInfo
 sub_StreamMessage_class_info                                     0x10193de70  data  efd::ClassInfo
+efd_sqrt_table                                                   0x10193e6f8  data  uint32_t *
 MacOSPlatformService_class_info                                  0x10193e718  data  efd::ClassInfo
 AudioBankAssetFactory_class_info                                 0x10193ed08  data  efd::ClassInfo
 AudioBankAssetLoadRequest_class_info                             0x10193f110  data  efd::ClassInfo

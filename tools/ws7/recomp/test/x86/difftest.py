@@ -12,7 +12,7 @@ the scratch region, the TEB and the image's writable sections.
 
 Usage (from tools/ws7/recomp, with a Python that has capstone and unicorn):
   python3 -m test.x86.difftest IMAGE.dll --out DIR [--cases N] [--sample N] [--only ADDR,...]
-                               [--jobs N] [--report FILE.json]
+                               [--jobs N] [--report FILE.json] [--wrappers TSV]
   IMAGE may also be several, or come from $RC32_TEST_DLLS (os.pathsep-separated); without an
   image the test is skipped (exit 0). Images are read, never copied or committed; everything
   built goes to --out.
@@ -44,7 +44,7 @@ SENTINEL = 0xfffffff0
 GDT = 0x00380000
 FS_SEL = 0x08
 WIRE_FPU = struct.Struct("<8d8QHHBB2x")
-RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_teb.c", "rc32_seh.c"]
+RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_main.c", "rc32_teb.c", "rc32_seh.c", "rc32_wrappers.c"]
 TRANSCENDENTAL = {(0xd9, 0xf0), (0xd9, 0xf1), (0xd9, 0xf2), (0xd9, 0xf3), (0xd9, 0xf9), (0xd9, 0xfb),
                   (0xd9, 0xfe), (0xd9, 0xff), (0xd9, 0xfd), (0xd9, 0xf5), (0xd9, 0xf8),
                   (0xd9, 0xf4), (0xd8, 0xf8), (0xdc, 0xf8), (0xde, 0xf8)}  # fxtract, fprem(1)/fdiv NaN payloads
@@ -93,7 +93,7 @@ def rc_cpuid(leaf):
 
 # --- the image, as both sides load it -------------------------------------------------------
 class Loaded:
-    def __init__(self, img, imp_area):
+    def __init__(self, img, imp_area, slots=None):
         self.img = img
         self.base, self.size = img.base, img.size_of_image
         b = bytearray(self.size)
@@ -102,7 +102,7 @@ class Loaded:
             n = min(rs, vs) if vs else rs
             o = va - img.base
             b[o:o + n] = img.data[ro:ro + n]
-        self.slots = sorted(img.imports)
+        self.slots = slots if slots is not None else sorted(img.imports)   # Translator32.import_slots()
         for k, s in enumerate(self.slots):
             struct.pack_into("<I", b, s - img.base, imp_area + 4 * k)
         self.bytes = bytes(b)
@@ -516,13 +516,14 @@ def compare(case, c, u, tol):
 
 
 # --- build ------------------------------------------------------------------------------
-def build(image, out, jobs, cflags, trace=False):
+def build(image, out, jobs, cflags, trace=False, wrappers=None):
     cflags = "-DRC32_KEEP_LOADS " + cflags
     gen = os.path.join(out, "gen-trace" if trace else "gen")
     py = sys.executable
     env = dict(os.environ, RC_EMIT_TRACE="1" if trace else "0")
     subprocess.check_call([py, "-I", os.path.join(RECOMP, "build", "gen_image_pe.py"), image, gen,
-                           "--jobs", str(jobs), "--opt=-O1", "--cflags=-w " + cflags + (" -DRC_TRACE" if trace else "")],
+                           "--jobs", str(jobs), "--opt=-O1", "--cflags=-w " + cflags + (" -DRC_TRACE" if trace else "")] +
+                          (["--wrappers", wrappers] if wrappers else []),
                           stdout=subprocess.DEVNULL, env=env)
     subprocess.check_call(["ninja", "-C", gen, "-j", str(jobs)], stdout=subprocess.DEVNULL)
     rt = os.path.join(RECOMP, "runtime")
@@ -581,18 +582,23 @@ def hook_points(tr, funcs):
     return sorted(pts), mmx, trans, ccset, x87set
 
 
+def translator(image, args):
+    from xlat.x86_32 import Translator32, read_wrappers
+    w = getattr(args, "wrappers", None)
+    return Translator32(image, wrappers=read_wrappers(w) if w else None)
+
+
 def debug_case(image, args):
     """--debug FUNC:CASE: run one case with function-entry traces on both sides and print where
     the two call sequences part, then both end states."""
-    from xlat.x86_32 import Translator32
     from unicorn import UC_HOOK_CODE
     name = os.path.splitext(os.path.basename(image))[0]
     out = os.path.join(args.out, name)
     os.makedirs(out, exist_ok=True)
-    exe, man = build(image, out, args.jobs, args.cflags, trace=True)
+    exe, man = build(image, out, args.jobs, args.cflags, trace=True, wrappers=getattr(args, "wrappers", None))
     f, k = args.debug.split(":")
     f, k = int(f, 16), int(k)
-    tr = Translator32(image)
+    tr = translator(image, args)
     ok = sorted(int(a, 16) for a, v in man["per_function"].items() if v[0] == "ok")
     pts, mmx, trans, ccset, x87set = hook_points(tr, ok)
     os.environ["RC32_RUNNER_VERBOSE"] = "1"
@@ -602,7 +608,7 @@ def debug_case(image, args):
         runner = Runner.__new__(Runner)
         runner.exe, runner.image, runner.p = exe, image, p
         magic, runner.imp_area, runner.base, runner.size = struct.unpack("<4I", p.stdout.read(16))
-        ld = Loaded(tr.img, runner.imp_area)
+        ld = Loaded(tr.img, runner.imp_area, tr.import_slots())
         uc = Unicorn(ld, runner.imp_area, len(ld.slots), pts, tr.insn)
         utrace = []
         uc.dbg = True
@@ -632,12 +638,11 @@ def debug_case(image, args):
 
 
 def run_image(image, args):
-    from xlat.x86_32 import Translator32
     name = os.path.splitext(os.path.basename(image))[0]
     out = os.path.join(args.out, name)
     os.makedirs(out, exist_ok=True)
-    exe, man = build(image, out, args.jobs, args.cflags)
-    tr = Translator32(image)
+    exe, man = build(image, out, args.jobs, args.cflags, wrappers=getattr(args, "wrappers", None))
+    tr = translator(image, args)
     ok = sorted(int(a, 16) for a, v in man["per_function"].items() if v[0] == "ok")
     funcs = ok
     if args.only:
@@ -647,7 +652,7 @@ def run_image(image, args):
     pts, mmx, trans, ccset, x87set = hook_points(tr, ok)
     stubs = {int(a, 16) for a, v in man["per_function"].items() if v[0] == "stub"}
     runner = Runner(exe, image)
-    ld = Loaded(tr.img, runner.imp_area)
+    ld = Loaded(tr.img, runner.imp_area, tr.import_slots())
     uc = Unicorn(ld, runner.imp_area, len(ld.slots), pts, tr.insn)
     res = collections.Counter()
     per = {}
@@ -705,6 +710,7 @@ def main():
     ap.add_argument("--report")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--debug", help="FUNC:CASE: trace one case (see debug_case)")
+    ap.add_argument("--wrappers", help="a packer's import-call sites (build/gen_image_pe.py --wrappers)")
     args = ap.parse_args()
     images = args.images or [p for p in os.environ.get("RC32_TEST_DLLS", "").split(os.pathsep) if p]
     images = [p for p in images if os.path.exists(p)]

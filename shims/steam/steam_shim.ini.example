@@ -1,4 +1,5 @@
-# Copy to steam_shim.ini next to libsteam_api.dylib. Every key is optional;
+# Copy to .rearmed/steam_shim.ini in the game directory (survives reinstalls),
+# or next to libsteam_api.dylib inside the app bundle. Every key is optional;
 # environment variables (in brackets) take precedence.
 
 # auto: use Valve's library if it loads and SteamAPI_Init succeeds, else stub

@@ -71,7 +71,8 @@ The stub also answers the Enumerate entry of the main menu (`src/enumerate.h`, s
 
 `auto` (the default) uses real when Valve's library loads and
 `SteamAPI_Init` succeeds through it, and stub otherwise. Settings go in
-`steam_shim.ini`, or in `RS_STEAM_*` environment variables (see
+`steam_shim.ini` (in `.rearmed/` next to the app bundle, or inside the bundle
+next to `libsteam_api.dylib`), or in `RS_STEAM_*` environment variables (see
 [steam_shim.ini.example](steam_shim.ini.example)).
 
 The native app bundles the arm64 slice (`tools/ws7/recomp/app/build.sh`); the launcher

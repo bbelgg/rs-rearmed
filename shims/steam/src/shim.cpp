@@ -161,9 +161,11 @@ static void load_config() {
     std::string self_dir = exe_dir;
     if (dladdr((void *)&load_config, &info) && info.dli_fname) self_dir = dirname_of(info.dli_fname);
 
-    // steam_shim.ini next to this dylib: key=value lines, '#' comments.
+    // steam_shim.ini: .rearmed/ in the game directory (survives rebuilds), then next to
+    // this dylib.  key=value lines, '#' comments.
     std::map<std::string, std::string> ini;
-    std::string text = read_file(self_dir + "/steam_shim.ini");
+    std::string text = read_file(c.game_dir + "/.rearmed/steam_shim.ini");
+    if (text.empty()) text = read_file(self_dir + "/steam_shim.ini");
     size_t pos = 0;
     while (pos < text.size()) {
         size_t nl = text.find('\n', pos);

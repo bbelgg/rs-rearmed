@@ -81,7 +81,8 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 `unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
-counterparts). What the names are still to be used for is in [PLAN.md](PLAN.md#next-work).
+counterparts). The build uses them for the hook points and what a mod asks for by name; the built-in fixes name their addresses in
+`win32_overrides.c`, and the Mac overrides are not built here ([PLAN.md](PLAN.md#next-work)).
 
 ## Runtime
 
@@ -349,8 +350,36 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   three functions it is inlined into. As on the Mac the hash is the value's bits with -0 made +0; the table masks
   it rather than taking a prime modulus, so the bits are mixed down first.
 
-`RS_MODS_LOG=1` logs them. The `mods/` folder and the hook points need more of the game's functions by name than
-the Windows target has. The loading-screen fix isn't here either (Metal's safe load lives in the Mac shell).
+`RS_MODS_LOG=1` logs them. The loading-screen fix isn't here (Metal's safe load lives in the Mac shell).
+
+- **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared, called from `win-x86/app/lp_main.c`): every `.dylib` in
+  `<home>/mods/` is loaded at startup, before the game runs, with the Mac's switches and log lines. A mod is a
+  native arm64 dylib as on the Mac and hooks a game function by name with `rc_hook_add_name("game_frame", pre, post,
+  user)`; a mod built with `tools/ws7/recomp/runtime/rc_mod.h` is the same dylib for both editions. The hooks run
+  on a view of the call, the Mac's SysV one, made from `tools/targets/win-x86`
+  ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A name the game doesn't have gives -1 and a log
+  line; `rc_target()` returns `win-x86`. A hook point that is also a built-in fix is `N_<addr>` in
+  `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
+  log line: built for the Mac alone, it would misread this game's memory.
+
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Eleven of the 14
+  are. Five of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
+  its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
+  Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /
+  the game's percentage, which is where the Mac's same curve ends; `too_many_inputs` and `frontend_open_file` read
+  their registers. `input_sink` and `set_app_focus` have no such function here (`unsupported`), and `si_open`
+  (`InputOn`: other arguments, a `PaError` for the bool) is refused. Each gives -1 and a log line.
+
+  Two things stay different with the call the same. A mod's hooks run around a built-in fix here, where on the Mac the fix
+  is a pre hook of its own that can answer first: during DLC mounting a mod on `steam_dlc_owned` saw 148 calls here,
+  answered 1, and one on the Mac (2026-11-04, the probe mod). And `game_frame` is a tick of the Run loop: 19,499 ticks against
+  17,593 presents in a 240 s run, where the Mac has 15,909 against 15,893; where the extra ticks fall was not looked into.
+
+  The network rule holds with mods in the folder. `win32_net.c` answers the game's own calls, but a mod is
+  native code, so before anything else the app looks whether it has mods to load and, if so, starts itself again
+  with `libnetguard.dylib` inserted (from its own `Contents/MacOS`; dyld inserts only at a start), which is
+  how the Mac edition always runs. Without the guard no mods load. Without mods there is no guard, and nothing
+  to guard.
 
 What the Windows build has instead are native replacements of single game functions by address
 (`win-x86/build/skip.txt`, `win-x86/shims/win32_overrides.c`). Among them:
@@ -359,7 +388,7 @@ What the Windows build has instead are native replacements of single game functi
   `tools/play-native/cache_overlay.py` makes `game/Update/patcharchives.psarc` from the copy's own
   `cache.psarc` at each copy or refresh, and the engine mounts it at `PatchUpdate/`. `FrontEnd_OpenFile`
   (0x101ba80; path in `ecx`, the result pointer on the stack, removed by the caller) is a native function
-  here, since the Windows build has no hook points: for a `cacheN.7z` it opens `PatchUpdate/<name>` first,
+  here: for a `cacheN.7z` it opens `PatchUpdate/<name>` first,
   then does what the original does (the lower-case path to the front-end file system's `Open`, slot +0x10
   of the singleton at 0x1ee67c4, and an `AddRef` for the caller). `RS_MODS_OVERLAY=0` as on the Mac.
 - **Enumerate.** The same entry and the same code as the Mac's ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)):

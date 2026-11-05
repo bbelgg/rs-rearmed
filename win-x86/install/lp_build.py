@@ -41,6 +41,7 @@ WINBUILD = os.path.join(ROOT, "win-x86", "build")
 APP_NAME = "RS Re-ARMed Learn & Play"
 BUNDLE_ID = "io.github.bbelgg.rs-rearmed.learn-play"
 EXE = "rs2014_lp"
+TARGET = "win-x86"  # tools/targets
 
 
 class BuildError(Exception):
@@ -67,6 +68,12 @@ def tree_hash(paths):
 
 def files_in(d, exts):
     return [os.path.join(d, f) for f in os.listdir(d) if f.endswith(exts) and not f.startswith("._")]
+
+
+def hook_tables_hash():
+    """The tables that say which of the game's functions are hook points (gen_image_pe.py --target)."""
+    tables = os.path.join(ROOT, "tools", "targets")
+    return tree_hash([os.path.join(tables, "names", "hooks.list"), os.path.join(tables, TARGET, "symbols.map")])
 
 
 def translator_hash():
@@ -313,7 +320,8 @@ class Unit:
         k = {"src": sha256_file(self.src), "module": self.module, "translator": translator_hash(), "py": py_id,
              "opts": TRANSLATE_OPTS,
              "wrappers": sha256_file(self.wrappers) if self.wrappers else None,
-             "skip": sha256_file(self.skip) if self.skip else None, "obj": self.obj}
+             "skip": sha256_file(self.skip) if self.skip else None, "obj": self.obj,
+             "hooks": hook_tables_hash() if self.module is None else None}
         return hashlib.sha256(json.dumps(k, sort_keys=True).encode()).hexdigest()
 
     def lib_key(self, tkey):
@@ -401,6 +409,8 @@ class Builder:
             cmd += ["--wrappers", u.wrappers]
         if u.skip:
             cmd += ["--skip", u.skip]
+        if not u.module:
+            cmd += ["--target", TARGET]
         logp = os.path.join(self.logs, "translate-%s.log" % u.name)
         with open(logp, "w") as log:
             log.write(" ".join(shlex.quote(c) for c in cmd) + "\n")
@@ -721,6 +731,9 @@ def install_app(work, game, app=None, home=None, run=subprocess.run, say=None):
     os.makedirs(os.path.join(res, "dlls"))
     shutil.copy2(os.path.join(out, EXE), macos)
     shutil.copy2(os.path.join(out, "libRSOpenGL.dylib"), macos)
+    guard = os.path.join(out, "libnetguard.dylib")  # without it the app loads no mods
+    if os.path.isfile(guard):
+        shutil.copy2(guard, macos)
     shutil.copy2(os.path.join(out, "lp_game.exe"), res)
     for f in sorted(os.listdir(os.path.join(out, "dlls"))):
         if f.lower().endswith(".dll") and not f.startswith("._"):
@@ -735,7 +748,8 @@ def install_app(work, game, app=None, home=None, run=subprocess.run, say=None):
         for f in files:
             if f.startswith("._"):
                 os.remove(os.path.join(d, f))
-    for target in (os.path.join(macos, "libRSOpenGL.dylib"), new):
+    guard = os.path.join(macos, "libnetguard.dylib")
+    for target in [os.path.join(macos, "libRSOpenGL.dylib")] + ([guard] if os.path.isfile(guard) else []) + [new]:
         r = run(["/usr/bin/codesign", "--force", "--sign", "-", target], capture_output=True, text=True)
         if r.returncode:
             raise BuildError("codesign %s failed: %s" % (target, (r.stderr or "").strip()))

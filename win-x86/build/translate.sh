@@ -55,6 +55,7 @@ echo "=== Translating $img → $gen (jobs=$jobs) ==="
   --obj-dir "$obj" \
   --cflags="-w" \
   --opt="-O2" \
+  --target win-x86 \
   $skip $wrappers
 
 # The image carries its import directory, so imports.c is already the game's IAT. An

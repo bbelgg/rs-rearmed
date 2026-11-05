@@ -9,6 +9,11 @@ Usage: venv/bin/python -I gen_image_pe.py IMAGE OUTDIR [options]
                     line `ADDR wrap`: the function is still translated, as W_<addr>, and the
                     override module's F_<addr> (which every call and rc32_table reach) runs
                     native code around it and calls W_<addr> for the original
+  --target ID       the hook points of tools/targets/ID (names/hooks.list; main image only): each
+                    is translated as W_<addr>, and table.c defines F_<addr>, which runs the hooks
+                    registered at run time around it (runtime/rc_hook.h). On a function --skip
+                    also names, the override module defines N_<addr> instead of F_<addr>, and
+                    the hooks run around that, so a mod sees the function the game now has
   --wrappers TSV    a packer's import-call sites (xlat/x86_32.py read_wrappers): each is
                     translated as the `call/jmp [slot]` it replaced; an import the image's IAT
                     lacks gets a thunk of its own (after the IAT's), one whose name the table
@@ -27,7 +32,8 @@ other threads. As on the Mac, the whole image: the code that relies on it is not
 Output in OUTDIR:
   part_<addr>.c     the translated functions (rc32_gen.h), chunked like gen_image.py
   table.c           rc32_table (sorted guest address -> F_<addr>) and rc32_mod, the image's
-                    descriptor for the runtime (runtime/rc32.h)
+                    descriptor for the runtime (runtime/rc32.h), and the hook points: their
+                    F_<addr>, rc_hook_points, and what each one's code removes (rc_hook_code_pops)
   imports.c         one thunk I_<slot> per IAT slot (and wrapper-table slot), and rc32_imports. A
                     thunk calls rc32_import_thunk(c, &rc32_mod, k): the export of another loaded
                     image when one provides the import, else the host: rc32_import_call(c, k)
@@ -125,6 +131,48 @@ def convention(tr, f):
     return {"pops": pops, "conv": conv}
 
 
+def hook_points(target):
+    """The hook points of a target (tools/targets), sorted: rc_hook_call's index order."""
+    sys.path.insert(0, os.path.join(RECOMP, "..", "..", "targets"))
+    import targets
+    t = targets.Target(target)
+    return sorted(a for a in (t.addr(n) for n in targets.name_lists().get("hooks", [])) if a is not None)
+
+
+def check_hook_prototypes(target, conv):
+    """Says which hook points' prototypes disagree with the function's own `ret N`: hooks on them are refused
+    at run time (rc32_hook.c), and the table wants a look."""
+    import targets
+    t = targets.Target(target)
+    for n in targets.name_lists().get("hooks", []):
+        if t.addr(n) is None:
+            continue
+        abi, code = targets.hook_abi(t, n), (conv.get(t.addr(n)) or {}).get("pops")
+        if abi and abi["pops"] >= 0 and code is not None and abi["pops"] != code:
+            print("warning: hook point %s: its prototype has %d bytes of arguments, its code removes %d"
+                  % (n, abi["pops"], code), file=sys.stderr)
+
+
+def hook_table(hooks, native, conv):
+    """The lines of table.c for the hook points. Without hooks registered (rc_hook_on) a point is one load
+    and a branch more than the function: a hot one must not show on the game thread."""
+    if not hooks:
+        return []
+    L = ['#include "rc_hook.h"', ""]
+    for k, a in enumerate(hooks):
+        fn = "%s_%x" % ("N" if a in native else "W", a)
+        L.append("void F_%x(rc_ctx *c) { if (__builtin_expect(rc_hook_on[%d], 0)) rc_hook_call(%d, c, %s); else %s(c); }"
+                 % (a, k, k, fn, fn))
+    pops = [(conv.get(a) or {}).get("pops") for a in hooks]
+    return L + ["", "// hook points, in rc_hook_call's index order",
+                "const uint64_t rc_hook_points[] = {"] + ["  0x%xull," % a for a in hooks] + \
+        ["  0", "};", "const int rc_hook_npoints = %d;" % len(hooks), "",
+         "// what each one's `ret N`s remove, -1 unknown (rc32_hook.c checks the prototypes against it)",
+         "int rc_hook_code_pops(int index) {",
+         "  static const short pops[] = {%s};" % ", ".join(str(-1 if p is None else p) for p in pops),
+         "  return pops[index];", "}", ""]
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
@@ -138,6 +186,7 @@ def main():
     ap.add_argument("--batch", type=int, default=24)
     ap.add_argument("--wrappers", default=None)
     ap.add_argument("--module", default=None)
+    ap.add_argument("--target", default=None)
     args = ap.parse_args()
     if args.module is not None and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", args.module):
         ap.error("--module: a C identifier")
@@ -167,6 +216,14 @@ def main():
     skip -= wrap
     if wrap and P:
         ap.error("--skip: `wrap` lines are for the main image only (not with --module)")
+    hooks = hook_points(args.target) if args.target else []
+    if hooks and P:
+        ap.error("--target: hook points are for the main image only (not with --module)")
+    for h in hooks:
+        if h not in starts:
+            ap.error("--target: hook point 0x%x is not a function start of this image" % h)
+    native = (skip | wrap) & set(hooks)     # the override module's N_<addr> is the function
+    wrap |= set(hooks) - skip
     todo = [f for f in starts if f not in skip]
     batches = [todo[i:i + args.batch] for i in range(0, len(todo), args.batch)]
     ch = G.Chunker(args.outdir, args.chunk_insns, [(0, 1 << 32)], set(), wrap)   # every function: RC_MO_TSO
@@ -208,7 +265,8 @@ def main():
     w = G.write_if_changed
     w(os.path.join(args.outdir, "decls.h"), "\n".join(
         ["// generated: prototypes of every translated function", '#include "rc32.h"'] +
-        ["void F_%x(rc_ctx *c);" % a for a in allf] + ["void W_%x(rc_ctx *c);" % a for a in sorted(wrap)]) + "\n")
+        ["void F_%x(rc_ctx *c);" % a for a in allf] + ["void W_%x(rc_ctx *c);" % a for a in sorted(wrap)] +
+        ["void N_%x(rc_ctx *c);" % a for a in sorted(native)]) + "\n")
     # the descriptor: the main image's host is rc32_import_call (the shims' dispatcher); a
     # module's imports that no other image exports go to rc32_host_import
     w(os.path.join(args.outdir, "table.c"), "\n".join(
@@ -217,7 +275,7 @@ def main():
         ["extern const rc32_import %src32_imports[];" % P, "extern const int %src32_imports_len;" % P] +
         (["void rc32_import_call(rc_ctx *c, int k);"] if not P else []) +
         ['rc32_module %src32_mod = {"%s", %src32_table, &%src32_table_len, %src32_imports, &%src32_imports_len, %s, 0};'
-         % (P, args.module or "", P, P, P, P, "0" if P else "rc32_import_call"), ""]))
+         % (P, args.module or "", P, P, P, P, "0" if P else "rc32_import_call"), ""] + hook_table(hooks, native, conv)))
     w(os.path.join(args.outdir, "imports.c"), "\n".join(
         [PRELUDE.rstrip("\n"), "extern rc32_module %src32_mod;" % P] +
         ["void %sI_%x(rc_ctx *c) { rc32_import_thunk(c, &%src32_mod, %d); }  // %s" % (P, s, P, k, imports[s])
@@ -242,6 +300,8 @@ def main():
            "stub_reasons": reasons.most_common(60),
            "per_function": {"%x" % a: v + [conv.get(a)] for a, v in sorted(status.items())}}
     json.dump(man, open(os.path.join(args.outdir, "manifest.json"), "w"), indent=0)
+    if hooks:
+        check_hook_prototypes(args.target, conv)
     print("generated %d functions (%s) in %d TUs, %.1fs; discovery %s; conventions %s"
           % (len(allf), dict(cnt), len(ch.chunks), time.time() - t0, disc, dict(convs)))
 

@@ -48,8 +48,10 @@ Everything tied to one binary (function addresses, calling conventions, struct o
   that does not mark it `unsupported`, or when native code uses a name no list has.
 
 `mac-x64` is a full target. `win-x86` has an entry for every name, `check.py` covers both: 957 of the 1,142
-symbols and 56 of the 75 offsets are read from the Windows code, and an `unsupported` line says why for the
+symbols and 57 of the 76 offsets are read from the Windows code, and an `unsupported` line says why for the
 rest (inlined by LTCG, Mac-only, not needed, or not proved). Its `target.toml` also holds the install pins.
+The Windows build uses it for the hook points (`gen_image_pe.py --target`) and for what a mod asks for by name;
+its built-in fixes still name addresses in `win32_overrides.c`.
 
 ## Overrides and hook points
 
@@ -60,10 +62,38 @@ rest (inlined by LTCG, Mac-only, not needed, or not proved). Its `target.toml` a
   fixes).
 - **Hook points.** `runtime/rc_hook.h`: `rc_hook_add_name(name, pre, post, user)` runs code before and
   after a named game function (`tools/targets/names/hooks.list`); `rc_hook_add(addr, ...)` takes a Mac
-  address; `rc_target()` names the target. The Mac app exports this runtime to mods.
+  address; `rc_target()` names the target. Both apps export this runtime to mods. A name the game doesn't
+  have (`unsupported` in its `symbols.map`) gives -1 and a log line, at load, in either edition.
+- **What a hook sees.** The same on every target: the Mac's SysV call. On the 32-bit guest a hook's `rc_ctx *`
+  is a view of the call made from the target's tables (`runtime/rc32_hook.c`), not the guest's context: the
+  arguments in `rdi rsi rdx rcx r8 r9` and `xmm0-7` whatever the convention, a guest pointer as a host
+  pointer (null stays null), the stack pointer on a host copy of the return address. What a hook changes goes
+  back: arguments before the original runs, the result after it (to `eax`, `edx:eax` or `st0`, by the prototype),
+  and the guest's `ret N` for a hook that does the call itself. So `rc_args` and `ov_ret_*`, which a mod has
+  inline, mean the same in both. `targets.py` makes the table from each hook point's prototype in
+  `symbols.map`. A hook point of a name is the Mac's call on every target, and `targets.py` compares the two
+  prototypes. What differs is adapted there: register arguments of a function of its own (`custom`) are named
+  (`const char *path@ecx`), an argument the compiler folded away has its one value (`int event=0x98`), one the
+  Mac's call hasn't is hidden, a result of another form converted
+  ([the forms](../../tools/targets/README.md#hook-points-on-a-target-with-another-abi)). A point that still isn't the
+  Mac's call, a function whose prototype doesn't say where its arguments are, or a stdcall, thiscall or
+  fastcall one whose stack arguments don't add up to its own `ret N` (`rc_hook_code_pops`, from the translator;
+  the translation warns too), is refused with a log line. A cdecl or `custom` function's `ret` says nothing of its
+  arguments, so there the prototype in the table is all there is. `RC_HOOK_TRACE=name,name` logs a point's raw calls,
+  refused ones too, to check a table in a run. On the Mac the view is not needed: the hook gets the context, by
+  the same code as ever.
+- **Mods.** `runtime/rc_mod.h` is what a mod includes, one source and one arm64 dylib for both editions:
+  `RC_OFF`, `RC_SLOT`, `RC_ADDR` and `RC_GA` look the name up when the mod runs (`rc_off`, `rc_addr`, from the
+  tables in `rc_target.c`), a guest pointer is read with `rc_mod_ptr` and `RC_HOST`, and `OV_GUEST`
+  calls by the game's convention (`rc_call_name`). `runtime/rc_mods.c` is the `mods/` folder for both apps.
+  Learn & Play loads only a library that has `rc_mod_abi` (`rc_mod.h` defines it): one built without it has the
+  Mac's offsets compiled in and reads a pointer as 8 bytes, so none of its code runs. The Mac loads both.
+- **Native code on the guest's own context** (the overrides): `OV_ARGS_OF(name, a, c)` reads by the name's
+  convention, `OV_ARGS_CC(a, c, cc)` is the same for a helper that serves several functions, and neither compiles
+  for a `custom` function: those are read by hand. `ov32_ret` and `ov32_ret_f` end an override.
 - **Windows.** The 32-bit runtime overrides an export of a translated DLL by name
   (`rc32_override_add(dll, name, fn)`, used for msvcr100's math) and replaces virtual methods by writing
-  host thunk cells into game vtables (the online layer). Hook points are not there yet.
+  host thunk cells into game vtables (the online layer).
 
 ## The 64-bit front end (Mac)
 
@@ -76,12 +106,15 @@ entry and exit; `RC_RELAXED=0` fences them too). `--o1 FILE` compiles listed fun
 
 ## The 32-bit front end (Windows)
 
-`gen_image_pe.py IMAGE OUT [--jobs N] [--wrappers TSV] [--module NAME] [--skip FILE] [--opt -O2]`.
+`gen_image_pe.py IMAGE OUT [--jobs N] [--wrappers TSV] [--module NAME] [--skip FILE] [--target ID] [--opt -O2]`.
 
 A `--skip` line `ADDR` is an override, as on the Mac. A line `ADDR wrap` keeps the function translated, as
 `W_<addr>`, and the override module's `F_<addr>` (what every call and `rc32_table` reach) runs native code
-and calls `W_<addr>` for the original: the 32-bit form of a hook point, without the run-time hook table
-(main image only).
+and calls `W_<addr>` for the original (main image only).
+
+`--target ID` makes the target's hook points: each is translated as `W_<addr>`, and `table.c` defines its
+`F_<addr>`, which is one load and a branch more than the function until a hook is registered (`rc_hook_on`). A
+hook point that is also an override is `N_<addr>` in the override module, and the hooks run around that.
 
 ### Decode and memory
 
@@ -199,6 +232,11 @@ the discovery finds in it; `crt_probe -eh` runs it on the real, translated msvcr
 Known differences the comparator accepts: flags images spilled below the final `esp`, AF, x87 C0/C2/C3
 after arithmetic, values beyond `double`'s exponent range, and Unicorn's own results for partial `fprem`
 and out-of-domain `fsqrt`/`fyl2x`.
+
+Hook points have a test of their own that needs no game (`tools/ws7/recomp/test/hooks`, ctest `recomp.hooks`): one mod
+dylib, built once, runs in the 64-bit and the 32-bit runtime and reads the same call in both, for each
+convention (cdecl, stdcall, thiscall, fastcall, register arguments, floats, 64-bit values, stack arguments past
+the sixth, folded ones), changes arguments and results, does the call itself and calls game code first.
 
 The 64-bit front end is checked by the Mac build itself: the whole image regenerates byte for byte across
 runs and scheduling, and the shims' differential tests compare replaced functions against the original

@@ -84,8 +84,16 @@ needs it: 441 archives peak at 461 descriptors, over the 256 of an app started f
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
-Not there yet: mods and hook points,
-the loading-screen fix, the OpenGL renderer (no window path), the install-time shader warm-up.
+Mods and hook points (2026-11-04): 11 of the 14 hook points, the `mods/` folder and one mod ABI
+with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The same `probe_mod.dylib`, its SHA-256 in both logs, ran to the
+note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, 9 of the 11 points called
+with the arguments the Mac run shows (`rr_speed_ratio` and `ui_event` were not reached), `game_frame`'s quit answered on both. No mod
+code runs without the guard (no `libnetguard.dylib`, or a restart that lost it) or from a library built without `rc_mod.h`. With no
+mod the table doesn't show on the game thread ([PERFORMANCE.md](PERFORMANCE.md#hook-points)). Started with `open`, the app
+restarts with the guard and loads the mod, but that run had no game files: the test bundle has no macOS permission for the
+volume the test copy is on, and `open` waits there for an answer. A whole game by `open` with a mod is open.
+
+Not there yet: the loading-screen fix, the OpenGL renderer (no window path), the install-time shader warm-up.
 
 Where it stands against the plan's phases:
 
@@ -179,7 +187,7 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
 
 - The `tools/targets/win-x86` target filled in: every name in `tools/targets/names` has an entry (`check.py`
   covers both targets), and `target.toml` has the image's `.text` and SHA-256 and, since it moved there,
-  the install pins. 957 of the 1,142 symbols and 56 of the 75 offsets are read from the Windows code; 12 of
+  the install pins. 957 of the 1,142 symbols and 57 of the 76 offsets are read from the Windows code; 12 of
   the 14 hook points are there (not `input_sink`: events are window messages, nor `set_app_focus`: inlined in
   the platform tick; the map names a place a hook can use for each). The 185 symbols left say why in the map:
   94 are inlined by LTCG (46 of them the Lua API), 32 are not needed here (the Mac's differential tests and
@@ -188,12 +196,11 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
   plug-in DSP, small efd helpers): those have candidates in the map, and a wrong address would be worse than
   the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
   register arguments), which their overrides have to read by hand.
-- With it: the hook points (a mod built for the Mac then runs on both when it uses only hook points,
-  `rc_args`/`ov_ret_*` and `RC_OFF`) and the `mods/` folder (the built-in fixes are in, or not needed: the keys and End key
-  are the Mac game's own table, thread priorities are `LP_QOS`).
-  What it needs on the way: `thiscall` argument access for shared adapter helpers (an `OV_ARGS_CC`), the
-  hook point's convention for `rc_args`, and the pointer-width layouts in `mods.c` and `audio_in.c` named per
-  target.
+- Hook points and mods, left to do: a whole game by `open` with a mod ([Status](#status)); `rr_speed_ratio` and `ui_event` in a run
+  (Riff Repeater, the focus loss); `si_open`, refused for
+  now: a run shows what looks like the slot as its first stack word and 0 for success, so an adapter looks possible; `input_sink` and
+  `set_app_focus`; the overlay API for mods that draw, and `OV_VCALL`, which the app doesn't export. `mods.c` and `audio_in.c`
+  are not built here, so their pointer-width layouts need no names per target.
 - A build-time shader corpus from the Windows image and the PC `static.psarc`, and the install-time warm-up,
   as on the Mac.
 - The checks the Mac port has had that are left: a guitar through Direct Connect, long sessions.

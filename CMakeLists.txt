@@ -59,6 +59,10 @@ foreach(shim libstdcxx bink opengl cg game platform)
   add_subdirectory(shims/${shim})
 endforeach()
 
+# Hook points and the mods folder on both runtimes, with the one mod dylib (tools/ws7/recomp/test/hooks)
+add_test(NAME recomp.hooks COMMAND make -C ${CMAKE_SOURCE_DIR}/tools/ws7/recomp/test/hooks test
+         OUT=${CMAKE_BINARY_DIR}/recomp-hooks)
+
 # The per-game name tables (tools/targets): every name resolves in every target.
 if(Python3_FOUND)
   add_test(NAME targets.check COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/targets/test_targets.py)

@@ -21,7 +21,8 @@ where you point them and never copied into the repository.
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export over 3,000-5,500 inputs each (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
-| Tables | `python3 tools/targets/check.py` | shared with the Mac port: every name in `mac-x64` and `win-x86` |
+| Tables | `python3 tools/targets/check.py` | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
+| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
 
 ### The recompiler
 
@@ -204,6 +205,15 @@ the wall time, to match them with snapshots. `LP_WINDOW_SCRIPT=20:900x700,30:tog
 toggles full screen at those seconds; `quit`, `unfocus` and `focus` are the same steps as Command-Q and as the
 window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window.
 
+**Mods**: `make -C tools/ws7/recomp/test/hooks OUT=DIR`, `DIR/probe_mod.dylib` into `<LP_HOME>/mods/`, and the script to the note
+highway above, with `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:
+probe_mod.dylib`, a line for each point the game hasn't, `[probe]` lines (`[probe] file sha256`: the file that ran), and
+`logs/netguard.log` its `mode=block` line. The screens are the script's own: the mod changes nothing. No mod without the guard:
+a copy of the app without `Contents/MacOS/libnetguard.dylib` logs `[rc] mods not loaded: no libnetguard.dylib beside the app`, and
+`LP_MODS_GUARD=1` (a restart that lost the guard) `the network guard did not load`; neither has a `[probe]` line. A test copy on
+another volume and `open`: a bundle without the permission stops in `open()` at its first look at that volume, until the
+question is answered (`sample` shows `rc_mods_count`, `scandir`, `__open_nocancel`). It is not a hang.
+
 Display sleep: during a run with a window, `pmset -g assertions` lists `rs2014_lp` with `NoDisplaySleepAssertion`
 named "Rocksmith 2014 is preventing your Mac from sleeping.", counted under `PreventUserIdleDisplaySleep`. It is
 gone after the quit, and an `LP_OFFSCREEN=1` run has only the `game` activity's `PreventUserIdleSystemSleep`.
@@ -371,6 +381,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 |---|---|
 | `LP_LOG=1\|2\|3` | imports: the first call of each / every call / and every call into the seam's COM objects (D3D9, audio, Steam) with its result; also every `LoadLibrary` and `GetProcAddress` |
 | `LP_LOG_FILES=1\|2` | files the game opens, including the missing ones it probes for |
+| `RC_HOOK_TRACE=NAME,NAME` | the raw calls of those hook points, the first 8 of each, refused ones too: return address, `ecx edx esi edi`, four stack words, then `eax` and `st0`. The way to check a table's address and prototype in a run |
 | `LP_LOG_TO=FILE` | append the log there (the app logs to `logs/last-run.log` by default) |
 | `LP_FRAME_LOG=MS` | every frame longer than MS ms, with the game thread's CPU, context switches and what ran in it (links, file reads, first import calls, exceptions, the slowest COM methods); the frame rate every 10 s |
 | `LP_THREAD_CPU=S` | each thread's CPU over the last S seconds, by name (`w32 game`, `w32 thread <start address>`), and a line of what has gone of the guest's memory: the arena, `VirtualAlloc` and `VirtualFree`, threads made, handles open, GL programs |

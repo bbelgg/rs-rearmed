@@ -1057,6 +1057,7 @@ class FakeRun:
             out = env["LP_OUT"]
             os.makedirs(os.path.join(out, "dlls"), exist_ok=True)
             write(os.path.join(out, "rs2014_lp"), b"exe")
+            write(os.path.join(out, "libnetguard.dylib"), b"guard")
             shutil.copy(env["LP_IMAGE"], os.path.join(out, "lp_game.exe"))
             shutil.copy(os.path.join(env["LP_GL_DIR"], "libRSOpenGL.dylib"), out)
             for d in os.listdir(os.path.join(env["LP_BUILD"], "modules", "in")):
@@ -1363,6 +1364,7 @@ class TestApp(BuildBase):
         c = os.path.join(app, "Contents")
         self.assertEqual(read(os.path.join(c, "MacOS", "rs2014_lp")), b"exe")
         self.assertTrue(os.path.isfile(os.path.join(c, "MacOS", "libRSOpenGL.dylib")))
+        self.assertTrue(os.path.isfile(os.path.join(c, "MacOS", "libnetguard.dylib")))  # mods load only with it
         self.assertEqual(read(os.path.join(c, "Resources", "lp_game.exe")), read(self.image))
         self.assertEqual(len(os.listdir(os.path.join(c, "Resources", "dlls"))), 5)
         import plistlib
@@ -1372,7 +1374,8 @@ class TestApp(BuildBase):
         self.assertIn("NSMicrophoneUsageDescription", p)
         self.assertNotIn("LSEnvironment", p)  # the game finds its folders by itself (lp_main.c)
         signed = [c[-1] for c in self.run_.calls if c[0].endswith("codesign")]
-        self.assertEqual(signed, [os.path.join(app + ".new", "Contents", "MacOS", "libRSOpenGL.dylib"), app + ".new"])
+        self.assertEqual(signed, [os.path.join(app + ".new", "Contents", "MacOS", f)
+                                  for f in ("libRSOpenGL.dylib", "libnetguard.dylib")] + [app + ".new"])
         with open(os.path.join(home, "game-dir")) as f:
             self.assertEqual(f.read(), os.path.abspath(self.game) + "\n")
         for sub in ("userdata", "steam", "logs"):

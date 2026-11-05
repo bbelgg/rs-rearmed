@@ -9,7 +9,8 @@ Fails (exit 1) when
   - an overridden or hooked name is not a function in a target (convention data / code);
   - native code uses a name (RC_ADDR, RC_FN, RC_GA, RC_OFF, RC_SLOT, OV_GUEST, OV_ALIAS, OV_ARGS_OF, the
     seam's G, rc_hook_add_name) that no list in names/ has, or uses a symbol as an offset or the reverse;
-  - a target's map has a name that no list has (stale), or a list has a name twice.
+  - a target's map has a name that no list has (stale), or a list has a name twice;
+  - a hook point of a target with another ABI has a prototype the runtime can't show a hook (targets.py hook_abi).
 So adding a game function to the build means: its name in names/, its address in every target.
 """
 import glob
@@ -23,7 +24,7 @@ import targets  # noqa: E402
 
 ROOT = targets.ROOT
 SOURCES = ["tools/ws7/recomp/overrides/**/*.[ch]", "tools/ws7/recomp/app/*.c", "tools/ws7/recomp/app/*.h",
-           "shims/game/include/*.h", "shims/game/harness/*.[ch]", "shims/game/test/*.[ch]"]
+           "tools/ws7/recomp/test/hooks/probe_mod.c", "shims/game/include/*.h", "shims/game/harness/*.[ch]", "shims/game/test/*.[ch]"]
 SYM_USE = re.compile(r"\b(?:RC_ADDR|RC_FN|RC_GA|RC_CC|OV_GUEST|OV_GUESTV|OV_ALIAS|OV_ARGS_OF)\(\s*([A-Za-z_]\w*)")
 SEAM_USE = re.compile(r"\bG0?\(\s*([a-z_]\w*)")
 OFF_USE = re.compile(r"\bRC_OFF\(\s*([A-Za-z_]\w*)")
@@ -97,6 +98,12 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
             if n not in t.offsets and n not in t.unsupported:
                 errs.append("target %s: no offset %s (add it to %s/offsets.map, or `%s unsupported REASON`)"
                             % (t.id, n, t.id, n))
+        for n in lists.get("hooks", []):
+            try:
+                if n in t.symbols:
+                    targets.hook_abi(t, n, next((m for m in tgts if m.id == targets.DEFAULT_TARGET), None))
+            except targets.TargetError as e:
+                errs.append(str(e))
         for n in sorted(set(t.symbols) - sym_names):
             errs.append("target %s: symbols.map has %s, which no list in names/ has" % (t.id, n))
         for n in sorted(set(t.offsets) - off_names):

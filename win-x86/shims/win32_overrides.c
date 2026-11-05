@@ -4,6 +4,8 @@
 // resolves F_<addr> to the definition below (win32_shims.a). Each is entered as the translated
 // function would be: the return address at guest esp, the arguments above it, the result left in eax;
 // it pops the return address into c->ret_to as a guest `ret` does (and removes stdcall arguments).
+// One that is also a hook point (tools/targets/names/hooks.list) is N_<addr> here: the generated F_<addr>
+// runs a mod's hooks around it, and a mod sees the function as the game now has it.
 #include <ctype.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -28,7 +30,7 @@ static inline void ov_ret32(rc_ctx *c, uint32_t eax) {
 // before_intro_update), off with the same RS_MODS_INTRO=0. The Mac boot_intro_update is 0x1126950
 // here (matched by its mPlaybackState / mScreenState reads and the same five-state switch), stdcall
 // bool update(RSBootService *boot) (`ret 4`), translated as W_1126950 (skip.txt `wrap`); this runs
-// first. RSBootService fields of the Windows build: u32 boot phase +0x48 (dispatcher 0x112614d; phase 2
+// first (N_: it is a hook point). RSBootService fields of the Windows build: u32 boot phase +0x48 (dispatcher 0x112614d; phase 2
 // = 0x1126680, with the game's own skip at 0x1126759; phase 3 = 0x1126fc0), u32 phase 3 step counter
 // +0x28 (10 once its steps are done: the same 11-case switch on counter + 1, 0x112727a), u32 intro
 // state +0x60 (0 load the movie's model, 1 wait for it, 2 wait for the movie to start, 3 play, 4 end,
@@ -44,7 +46,7 @@ static inline void ov_ret32(rc_ctx *c, uint32_t eax) {
 void W_1126950(rc_ctx *c);
 static int lp_intro_skip = -1;
 
-void F_1126950(rc_ctx *c) {
+void N_1126950(rc_ctx *c) {
   if (lp_intro_skip < 0) {
     const char *e = getenv("RS_MODS_INTRO");
     lp_intro_skip = !(e && (e[0] == '0' || e[0] == 'n' || e[0] == 'N' || e[0] == 'f' || e[0] == 'F'));
@@ -121,7 +123,7 @@ static uint32_t fe_open(rc_ctx *c, uint32_t path, uint32_t slot) {
   return s;
 }
 
-void F_101ba80(rc_ctx *c) {
+void N_101ba80(rc_ctx *c) {
   uint32_t esp = (uint32_t)c->r[4];
   uint32_t out = rd32(esp + 4);
   const char *path = RC32_H((uint32_t)c->r[1]);
@@ -273,7 +275,7 @@ void F_10f41c0(rc_ctx *c) {
 void W_1448b10(rc_ctx *c);
 static int dlc_mounting;  // the game thread's
 
-void F_1448b10(rc_ctx *c) {
+void N_1448b10(rc_ctx *c) {
   cfg_load();
   if (!dlc_mounting || !g_cfg.bypass) {
     W_1448b10(c);

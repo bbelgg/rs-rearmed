@@ -27,7 +27,6 @@
 //   RC_TRACE_INITS=1   print each initializer before running it
 //   RS_STEAM_MODE      defaults to "stub" (the game must not call home)
 #include <CoreFoundation/CoreFoundation.h>
-#include <dirent.h>
 #include <dlfcn.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
@@ -45,6 +44,7 @@
 #include <sys/ucontext.h>
 
 #include "rc_abi.h"
+#include "rc_hook.h"
 #include "rc_rt.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
@@ -155,27 +155,6 @@ static void *load_shim(const char *path, int required) {
   if (!h) fprintf(stderr, "[rc] dlopen %s: %s\n", path, dlerror());
   else if (getenv("RC_LOG_UNRESOLVED")) fprintf(stderr, "[rc] shim loaded: %s\n", path);
   return h;
-}
-
-// Mods (step 3b of main): a library, or every .dylib in a folder, in name order.
-static int dylib_name(const struct dirent *d) {
-  size_t n = strlen(d->d_name);
-  return d->d_name[0] != '.' && n > 6 && !strcmp(d->d_name + n - 6, ".dylib");
-}
-static void load_mods(const char *where) {
-  struct dirent **names;
-  int n = scandir(where, &names, dylib_name, alphasort);
-  if (n < 0) {
-    if (exists(where)) load_shim(where, 0);
-    return;
-  }
-  for (int i = 0; i < n; i++) {
-    char p[1280];
-    snprintf(p, sizeof p, "%s/%s", where, names[i]->d_name);
-    if (load_shim(p, 0)) fprintf(stderr, "[rc] mod loaded: %s\n", names[i]->d_name);
-    free(names[i]);
-  }
-  free(names);
 }
 
 // ---------------------------------------------------------------------------
@@ -335,15 +314,9 @@ int main(int argc, char **argv, char **envp, char **apple) {
   // reinstall keeps), or RS_MODS_PATH (a folder or one library); RS_LOAD_MODS=0 skips them. A mod's constructor
   // registers its hooks (rc_hook.h) now that the image is mapped; the game runs them later.
   g_phase = "mods";
-  e = getenv("RS_LOAD_MODS");
-  if (!(e && *e == '0')) {
-    const char *mods = getenv("RS_MODS_PATH");
-    if (!(mods && *mods) && have_bundle) {
-      snprintf(path, sizeof path, "%s/../../mods", bundle);  // <home>/game/Rocksmith2014.app -> <home>/mods
-      mods = path;
-    }
-    if (mods && *mods) load_mods(mods);
-  }
+  snprintf(path, sizeof path, "%s/../../mods", bundle);  // <home>/game/Rocksmith2014.app -> <home>/mods
+  const char *mods = rc_mods_where(have_bundle ? path : NULL);
+  if (mods) rc_mods_load(mods);
 
   // 4. initializers, translated, on the main thread's guest context. The
   // x86 initializers take (argc, argv, envp, apple).

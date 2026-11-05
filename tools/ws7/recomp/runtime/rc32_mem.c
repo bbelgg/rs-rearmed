@@ -19,6 +19,7 @@
 #define ARENA_HI 0xf0000000u
 
 uint8_t *rc_mem;
+uint64_t rc_slide;  // the same base under the name a mod knows (RC_A)
 static uint32_t arena_next = ARENA_LO, arena_committed = ARENA_LO;
 static pthread_mutex_t arena_mu = PTHREAD_MUTEX_INITIALIZER;
 // the images' ranges [lo, hi)
@@ -34,6 +35,7 @@ int rc32_mem_init(void) {
     return -1;
   }
   rc_mem = p;
+  rc_slide = (uint64_t)(uintptr_t)p;
   return 0;
 }
 

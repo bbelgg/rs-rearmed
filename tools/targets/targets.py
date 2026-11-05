@@ -199,22 +199,160 @@ def gen_header(t):
     return "\n".join(L)
 
 
+# Hook points of a guest with another ABI: what the runtime needs to show a hook the Mac's SysV call
+# (runtime/rc_hook.h). Kinds: b h i q 8-, 16-, 32-, 64-bit integer, p pointer, f float, d double, v none,
+# c an argument with one value that this target's code doesn't take (`int event=0x98`), x one the Mac's call
+# doesn't have, kept from the hook (`void *manager=hidden`). Results the Mac's call has in another form:
+# e the Mac's bool is a field of the first argument having a value (`bool<service_manager_state=7>`),
+# r the Mac's float is 100 / this one (`float<100/x>`).
+KINDS = {"bool": "b", "char": "b", "int8_t": "b", "uint8_t": "b", "short": "h", "int16_t": "h", "uint16_t": "h",
+         "int": "i", "long": "i", "unsigned": "i", "int32_t": "i", "uint32_t": "i", "size_t": "i",
+         "int64_t": "q", "uint64_t": "q", "float": "f", "double": "d", "void": "v"}
+REGS = {"eax": 0, "ecx": 1, "edx": 2, "ebx": 3, "esi": 6, "edi": 7}
+CC_IDS = {"sysv": 0, "cdecl": 1, "stdcall": 2, "thiscall": 3, "fastcall": 4, "custom": 5}  # RC_CC_* (rc_abi.h)
+MAX_HOOK_ARGS = 8  # RC_HOOK_MAXARGS
+
+
+def _kind(text, where):
+    """(kind, register or None) of `type name` or `type name@ecx` in a prototype; of `type name=0x98`, ("=0x98",
+    None): an argument the compiler folded away, the same in every call."""
+    t, eq, value = text.strip().partition("=")
+    if eq:
+        return "=" + value.strip(), None if value.strip() != "hidden" else _hidden_reg(t)
+    t, _, reg = t.partition("@")
+    if reg and reg.strip() not in REGS:
+        raise TargetError("%s: no register %r" % (where, reg))
+    if "*" in t or "&" in t:
+        return "p", reg.strip() or None
+    words = [w for w in re.findall(r"\w+", t) if w not in ("const", "volatile", "signed")]
+    if words[:1] == ["unsigned"] and len(words) > 1 and words[1] in KINDS:
+        words = words[1:]
+    if not words or words[0] not in KINDS:
+        raise TargetError("%s: type %r is not in targets.py KINDS" % (where, t))
+    return ("q" if words[:2] == ["long", "long"] else KINDS[words[0]]), reg.strip() or None
+
+
+def _hidden_reg(text):
+    return text.partition("@")[2].strip() or None
+
+
+def parse_proto(proto, where):
+    """`ret(args)` -> (return kind, [(kind, register or None), ...], True when it ends in `...`). A return in
+    another form than the Mac's, `bool<name=7>` or `float<100/x>`, is the kind e or r, with what follows it."""
+    i = proto.find("(")
+    if i < 0 or not proto.rstrip().endswith(")"):
+        raise TargetError("%s: expected a prototype, got %r" % (where, proto))
+    m = re.match(r"\s*(\w+)<(.*)>\s*$", proto[:i])
+    if m:
+        ret = {"bool": "e", "float": "r"}[m.group(1)] + m.group(2)
+    else:
+        ret = _kind(proto[:i], where)[0]
+    body = proto[i + 1:proto.rstrip().rindex(")")].strip()
+    args = [a.strip() for a in body.split(",")] if body and body != "void" else []
+    variadic = bool(args) and args[-1] == "..."
+    return ret, [_kind(a, where) for a in (args[:-1] if variadic else args)], variadic
+
+
+def _shape(ret, args, variadic):
+    """What a hook reads of a call: the return and the arguments it is shown, by what they are to a mod.
+    An integer's width is not part of it (a size or an id is pointer-sized); a bool is its own."""
+    def cls(k):
+        return "i" if k[0] in "hiq=" and k != "=hidden" else k[0]
+    return {"e": "b", "r": "f"}.get(ret[0], cls(ret)), [cls(k) for k, _ in args if k != "=hidden"], variadic
+
+
+def hook_abi(t, name, mac=None):
+    """What a hook point's call looks like: None for SysV, the runtime has nothing to do. Else
+    {"cc", "ret", "ret_off", "ret_is", "pops" (-1 unknown), "args": [(kind, stack word or ~register, value), ...],
+    "why"}. "args" None means hooks on it are refused at run time, for the reason in "why": without a
+    prototype, or a `custom` function without `@register` in it, nothing is known of its arguments; and against the
+    Mac's prototype (mac: its Target) a point of the same name has to read the same: a mod is built for one
+    call. A difference is adapted in the prototype (`=value`, `=hidden`, `bool<...>`, `float<...>`) or refused."""
+    _, conv, proto = t.symbols[name]
+    if conv == "sysv":
+        return None
+    d = {"cc": CC_IDS[conv], "ret": "v", "ret_off": 0, "ret_is": 0, "pops": -1, "args": None,
+         "why": "its prototype doesn't say what it takes"}
+    if proto == "-":
+        return d
+    where = "%s/symbols.map: %s" % (t.id, name)
+    ret, args, variadic = parse_proto(proto, where)
+    if len(args) > MAX_HOOK_ARGS:
+        raise TargetError("%s: more than %d arguments" % (where, MAX_HOOK_ARGS))
+    d["ret"] = ret[0] if ret[0] in "er" else ret
+    if ret[0] == "e":
+        field, _, value = ret[1:].partition("=")
+        if field not in t.offsets:
+            raise TargetError("%s: no offset %s" % (where, field))
+        d["ret_off"], d["ret_is"] = t.offsets[field], int(value, 0)
+    if conv == "custom" and not any(r for k, r in args):
+        d["why"] = "its prototype doesn't say which registers it takes"
+        return d
+    if mac is not None and name in mac.symbols and mac.symbols[name][2] != "-":
+        macproto = mac.symbols[name][2]
+        if _shape(ret, args, variadic) != _shape(*parse_proto(macproto, "mac-x64/symbols.map: " + name)):
+            d["why"] = "here it is %s, on the Mac %s" % (proto, macproto)
+            return d
+    regs = {"thiscall": ["ecx"], "fastcall": ["ecx", "edx"]}.get(conv, [])
+    out, word = [], 0
+    for kind, reg in args:
+        if kind == "=hidden":
+            kind = "x"
+        elif kind[0] == "=":
+            out.append(("c", 0, int(kind[1:], 0)))
+            continue
+        if reg and conv != "custom":
+            raise TargetError("%s: @%s on a %s function" % (where, reg, conv))
+        if conv != "custom" and regs and kind not in "qfd":
+            reg = regs.pop(0)
+        if reg:
+            out.append((kind, ~REGS[reg], 0))
+        else:
+            out.append((kind, word, 0))
+            word += 2 if kind in "qd" else 1
+    d["args"], d["why"] = out, None
+    # what the callee removes; with `...`, or in a function of its own making, only its code says
+    d["pops"] = 0 if conv == "cdecl" else -1 if variadic or conv == "custom" else 4 * word
+    return d
+
+
+def _c_string(s):
+    return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
+
+
 def gen_runtime_c(t, lists):
-    """The target's name tables for the runtime (rc_hook_add_name, rc_target)."""
+    """The target's name tables for the runtime (rc_hook_add_name, rc_off, rc_addr, rc_target)."""
     mac = t if t.id == DEFAULT_TARGET else Target(DEFAULT_TARGET, t.base)
     L = ["// Generated by tools/targets/targets.py for target %s. Do not edit." % t.id,
          '#include "rc_hook.h"', "",
          'const char rc_target_id[] = "%s";' % t.id, "",
          "// names/hooks.list: this target's address of each hook point and the mac-x64 address of the same",
-         "// point (rc_hook_add with a mac-x64 address keeps working on every target)",
+         "// point (rc_hook_add with a mac-x64 address keeps working on every target); a target without the",
+         "// point has address 0 and the reason; a guest with another ABI has how its call looks",
          "const rc_hook_name rc_target_hooks[] = {"]
     for name in lists.get("hooks", []):
         a = t.addr(name)
-        if a is None:
-            continue
         m = mac.addr(name) if mac.resolves(name) else None
-        L.append('  {"%s", 0x%xull, 0x%xull},' % (name, a, m or 0))
-    L += ["  {0, 0, 0},", "};", ""]
+        if a is None:
+            L.append('  {"%s", 0, 0x%xull, %s},' % (name, m or 0, _c_string(t.unsupported[name])))
+            continue
+        abi = hook_abi(t, name, mac)
+        if abi is None:
+            L.append('  {"%s", 0x%xull, 0x%xull},' % (name, a, m or 0))
+            continue
+        args = abi["args"]
+        L.append("  {\"%s\", 0x%xull, 0x%xull, %s, %d, '%s', %d, %d, {%s}, %d, %d}," % (
+            name, a, m or 0, _c_string(abi["why"]) if abi["why"] else "0", abi["cc"], abi["ret"], abi["pops"],
+            -1 if args is None else len(args), ", ".join("{'%s', %d, %d}" % x for x in args or []),
+            abi["ret_off"], abi["ret_is"]))
+    L += ["  {0, 0, 0},", "};", "",
+          "// offsets.map and symbols.map by name, for a mod built once for every target (rc_off, rc_addr):",
+          "// sorted, the runtime searches them; a symbol has its convention, data and code -1",
+          "const rc_target_value rc_target_offsets[] = {"]
+    L += ['  {"%s", %d},' % (n, t.offsets[n]) for n in sorted(t.offsets)]
+    L += ["  {0, 0},", "};", "const rc_target_value rc_target_symbols[] = {"]
+    L += ['  {"%s", 0x%x, %d},' % (n, t.symbols[n][0], CC_IDS.get(t.symbols[n][1], -1)) for n in sorted(t.symbols)]
+    L += ["  {0, 0},", "};", ""]
     return "\n".join(L)
 
 

@@ -9,6 +9,7 @@ UIMenu_LAS_SongsList_qi_this_adj  -0x2c0  # read in its QueryInterface: lea eax,
 UIMenu_ShopSongs_qi_this_adj      -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
 UIMenu_ShopGear_qi_this_adj       -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
 UIMenu_ShopPacks_qi_this_adj      -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
+service_manager_state             0x20    # ServiceManager: u32 state (the Run loop 0x1479da0 ends on 7)
 service_manager_quit              unsupported  Mac-only: the shell's request flag; here WM_QUIT goes straight to the manager's slot 21 (0x149edb6)
 game_config_vsync                 unsupported  not located: no code here reads the field as vsync; only the Mac shell needs it
 input_sink_full_char              unsupported  Mac-only: a slot of the Mac input_sink's frame

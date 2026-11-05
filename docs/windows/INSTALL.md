@@ -154,7 +154,8 @@ The steps one at a time: `python3 win-x86/install/lp_install.py --help`.
 | `…/learn-play/gamefiles.py` | the tool that refreshes the copy |
 | `…/learn-play/userdata/` | the game's writes: `game/Rocksmith.ini` (audio and display settings) |
 | `…/learn-play/steam/` | your profiles and progress |
-| `…/learn-play/logs/` | `last-run.log`, `previous-run.log` |
+| `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
+| `…/learn-play/mods/` | mods loaded at startup |
 
 On the first start, profiles in your Steam cloud folder for the game, if Steam has one on this Mac, are
 copied into `steam/` (without `crd`).
@@ -301,6 +302,11 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 `[Audio] LatencyBuffer` in `Rocksmith.ini` is the game's audio setting, as on the Mac. Diagnostics switches:
 [TESTING.md](TESTING.md#diagnostics).
 
+Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/learn-play/mods/` is loaded at startup
+(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). A mod has to be built
+with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the game:
+[DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
+
 ## Update and uninstall
 
 - **Update**: run the installer or `learn-play.sh` again. The game image and the translated
@@ -321,9 +327,16 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
   beyond the tone designer, the DLC preview, and playing through Direct Connect ([PLAN.md](PLAN.md#status)).
 - Custom songs (CDLC, the `_p.psarc` versions) are listed and play: the song-file signature check and
   the Windows game's list of known song keys are skipped (`RS_MODS_BYPASS=0` turns both back on;
-  [PLAN.md](PLAN.md#built-in-for-140)). No mods. The built-in fixes are the batched DLC mounting
+  [PLAN.md](PLAN.md#built-in-for-140)). The built-in fixes are the batched DLC mounting
   (`RS_MODS_BUDGET_MS=N`, default 50 ms a frame), the higher open-file limit, the song path cache and the
   number-table hash (`RS_MODS_FIXES=0` turns them off).
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log), and 11 of
+  the 14 hook points are there. A mod can't yet: hook `input_sink` or `set_app_focus` (the game has no such function) or `si_open`
+  (it takes other arguments here); draw with the overlay API; use what the Mac app exports beyond `rc_mod.h`, such as `OV_VCALL` and
+  `ov_fn` (the mod then fails to load, with the reason in the log); pass floating point arguments to `rc_call_guest`; call a
+  function that takes its own registers by name; give the game a pointer to its own memory (the game gets null, with
+  a line in the log); or quit by `game_frame`'s result, from a pre or a post hook (not taken, with a line in the log; a pre hook still skips the tick). A field this game
+  doesn't have gives `RC_NO_OFF`: test `RC_HAS_OFF`.
 - Song archives: the Windows game reads the PC files, `*_p.psarc`, not the Mac `*_m.psarc`. Custom songs
   will need the `_p.psarc` (PC) version; a Mac-only collection does not load. Official DLC has both: each DLC's
   Steam depot holds the `_m` and the `_p` archive, and only the `_p` one goes into the copy.

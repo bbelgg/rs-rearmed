@@ -36,6 +36,94 @@ class Repo(unittest.TestCase):
             shutil.rmtree(d)
 
 
+    def test_gen_win(self):
+        d = tempfile.mkdtemp()
+        try:
+            targets.gen("win-x86", d)
+            c = open(os.path.join(d, "rc_target.c")).read()
+            self.assertIn("""{"steam_dlc_owned", 0x1448b10ull, 0x100a07800ull, 0, 3, 'b', 4, 2, {{'p', -2, 0}, {'i', 0, 0}}, 0, 0},""", c)
+            self.assertIn("""{"frontend_open_file", 0x101ba80ull, 0x1003c7810ull, 0, 5, 'p', -1, 2, {{'p', 0, 0}, {'p', -2, 0}}, 0, 0},""", c)
+            self.assertIn('{"boot_phase", 72},', c)
+            # a name in common with the Mac is the Mac's call, adapted or refused
+            self.assertIn("""{"game_frame", 0x1479df0ull, 0x10017a020ull, 0, 3, 'e', 0, 1, {{'x', -2, 0}}, 32, 7},""", c)
+            self.assertIn("""{"rr_speed_ratio", 0xf89360ull, 0x1002ddd70ull, 0, 1, 'r', 0, 1, {{'f', 0, 0}}, 0, 0},""", c)
+            self.assertRegex(c, r'\{"si_open", 0x17c50a0ull, 0x10133bee0ull, "[^"]+", 5, ')
+        finally:
+            shutil.rmtree(d)
+
+
+class HookAbi(unittest.TestCase):
+    def abi(self, conv, proto, mac=None):
+        t = targets.Target.__new__(targets.Target)
+        t.id, t.symbols, t.offsets = "t", {"f": (0x1000, conv, proto)}, {"fld": 0x20}
+        m = None
+        if mac:
+            m = targets.Target.__new__(targets.Target)
+            m.id, m.symbols = "mac-x64", {"f": (0x2000, "sysv", mac)}
+        return targets.hook_abi(t, "f", m)
+
+    def test_same_name_same_call(self):
+        self.assertIsNotNone(self.abi("thiscall", "bool(void *a, int b)", "bool(void *a, int b)")["args"])
+        # an id or a size is pointer-sized: a 64-bit one on the Mac is the same to a mod
+        self.assertIsNotNone(self.abi("cdecl", "int(uint32_t a, ...)", "int(uint64_t a, ...)")["args"])
+
+    def test_other_call_is_refused(self):
+        for proto, mac in (("void(void *a)", "void(void *a, int b)"), ("int(void *a)", "bool(void *a)"),
+                           ("void(float a)", "void(int a)"), ("void(void *a)", "bool(void)"),
+                           ("void(void *a, ...)", "void(void *a, int b)")):
+            d = self.abi("cdecl", proto, mac)
+            self.assertIsNone(d["args"], proto)
+            self.assertIn(mac, d["why"])
+
+    def test_adapted_is_the_mac_call(self):
+        d = self.abi("thiscall", "bool<fld=7>(void *m=hidden)", "bool(void)")
+        self.assertEqual(d["args"], [("x", ~1, 0)])
+        self.assertEqual((d["ret"], d["ret_off"], d["ret_is"], d["pops"]), ("e", 0x20, 7, 0))
+        d = self.abi("cdecl", "float<100/x>(float p)", "float(float p)")
+        self.assertEqual((d["ret"], d["args"]), ("r", [("f", 0, 0)]))
+        self.assertIsNotNone(self.abi("stdcall", "void(void *m, int e=0x98)", "void(void *m, int e)")["args"])
+
+    def test_sysv_needs_nothing(self):
+        self.assertIsNone(self.abi("sysv", "int(int)"))
+
+    def test_stack(self):
+        d = self.abi("stdcall", "uint64_t(const char *s, uint64_t q, double v, bool b)")
+        self.assertEqual(d["args"], [("p", 0, 0), ("q", 1, 0), ("d", 3, 0), ("b", 5, 0)])
+        self.assertEqual((d["ret"], d["pops"]), ("q", 24))
+
+    def test_this_and_fast(self):
+        self.assertEqual(self.abi("thiscall", "void(void *me, int a)")["args"], [("p", ~1, 0), ("i", 0, 0)])
+        d = self.abi("fastcall", "float(int a, double d, int b, int c)")
+        self.assertEqual(d["args"], [("i", ~1, 0), ("d", 0, 0), ("i", ~2, 0), ("i", 2, 0)])
+        self.assertEqual((d["ret"], d["pops"]), ("f", 12))
+
+    def test_custom_says_where(self):
+        d = self.abi("custom", "void **(void **out, const char *path@ecx, int n@edi)")
+        self.assertEqual(d["args"], [("p", 0, 0), ("p", ~1, 0), ("i", ~7, 0)])
+        self.assertEqual(d["pops"], -1)  # its code says
+
+    def test_folded_argument(self):
+        d = self.abi("stdcall", "void(void *menu, int event=0x98, int arg=0)")
+        self.assertEqual(d["args"], [("p", 0, 0), ("c", 0, 0x98), ("c", 0, 0)])
+        self.assertEqual(d["pops"], 4)
+
+    def test_custom_silent_is_refused(self):
+        self.assertIsNone(self.abi("custom", "int(void *a, int b)")["args"])
+        self.assertIsNone(self.abi("custom", "-")["args"])
+
+    def test_variadic_stdcall_has_no_size(self):
+        self.assertEqual(self.abi("stdcall", "int(int a, ...)")["pops"], -1)
+        self.assertEqual(self.abi("cdecl", "int(int a, ...)")["pops"], 0)
+
+    def test_unknown_type_fails(self):
+        with self.assertRaises(targets.TargetError):
+            self.abi("cdecl", "NiPoint3(int)")
+        with self.assertRaises(targets.TargetError):
+            self.abi("cdecl", "int(int a@ecx)")
+        with self.assertRaises(targets.TargetError):
+            self.abi("custom", "int(int a@xmm0)")
+
+
 class Synthetic(unittest.TestCase):
     """A scratch tree: names/ plus a second target that lacks one name."""
 

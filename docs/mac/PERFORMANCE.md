@@ -133,6 +133,11 @@ shaders about 330-390 s against 270-375 s. p99 is higher, 18.1-18.6 ms against 1
 in 150 s against one in 53 s; Learn & Play shows the same p99 on this song, which suggests the song or the display and not
 the code, but no run shows that. Nothing recorded got clearly worse, and nothing here proves it did not.
 
+## Hook points
+
+Unchanged for this edition: the hook table is built in as it always was, and a function without hooks is called as
+before. The run-time table and what it costs are Learn & Play's ([Windows](../windows/PERFORMANCE.md#hook-points)).
+
 ## The build: memory and time
 
 A first install through the app on 2026-11-04 took 12 minutes, with the system's shader cache warm so that Preparing

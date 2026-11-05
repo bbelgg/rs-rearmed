@@ -18,28 +18,46 @@
 // does not compile for that target unless it tests `#ifndef RC_UNSUPPORTED_<name>`.
 //
 // Target ABIs. mac-x64 (RC_TARGET_ABI_SYSV64): guest pointers are host pointers, 8-byte stack slots, the
-// SysV argument registers. The win-x86 layer (RC_TARGET_ABI_WIN32, not built yet) changes only what these
-// macros and rc_ov.h's expand to: guest pointers are 32-bit offsets into the reserved 4 GB guest window
-// (RC_HOST adds its base, RC_GUEST subtracts it), arguments are read from the stack (plus ecx for thiscall,
-// ecx/edx for fastcall, by RC_CC_<name>), float results go to x87 st0, and a stdcall / thiscall
-// function's callee-cleaned argument bytes are popped by the per-target wrapper generated from symbols.map,
-// so callers written with these macros do not change.
+// SysV argument registers. win-x86 (RC_TARGET_ABI_WIN32) changes only what these macros and rc_ov.h's expand
+// to: guest pointers are 32-bit offsets into the reserved 4 GB guest window (RC_HOST adds its base, RC_GUEST
+// subtracts it), arguments are read from the stack (plus ecx for thiscall, ecx/edx for fastcall, by
+// RC_CC_<name>), and float results go to x87 st0. A hook is shown the SysV call on either (rc_hook.h).
+//
+// A mod (rc_mod.h, RC_MOD) is built once for every target, so it knows no table: the same macros look the name
+// up when the mod runs (rc_off, rc_addr), and a guest pointer's width and base are read from the runtime.
 #ifndef RC_ABI_H
 #define RC_ABI_H
 
 #include <stdint.h>
 
 #include "rc.h"
+#include "rc_cc.h"
+#ifndef RC_MOD
 #include "rc_target_names.h"
+#endif
 
-// Calling conventions (RC_CC_<name> in rc_target_names.h)
-#define RC_CC_SYSV 0
-#define RC_CC_CDECL 1
-#define RC_CC_STDCALL 2
-#define RC_CC_THISCALL 3
-#define RC_CC_FASTCALL 4
-#define RC_CC_CUSTOM 5  // register arguments only that function uses (win-x86, LTCG): read by hand
-
+#ifdef RC_MOD
+#include "rc_hook.h"
+// Each lookup once per place it is used. A name the target doesn't have logs a line (rc_hook.h) and gives
+// RC_NO_OFF or 0: test RC_HAS_OFF(name) first, where the mod can go on without it.
+#define RC_MOD_ONCE_(T, get) ({ static T v_; static int got_; \
+  if (!__atomic_load_n(&got_, __ATOMIC_ACQUIRE)) { v_ = (get); __atomic_store_n(&got_, 1, __ATOMIC_RELEASE); } v_; })
+#define RC_ADDR(name) RC_MOD_ONCE_(uint64_t, rc_addr(#name))
+#define RC_OFF(name) RC_MOD_ONCE_(int64_t, rc_off(#name))
+#define RC_SLOT(name) RC_MOD_ONCE_(int64_t, rc_off(#name "_slot"))
+#define RC_HAS_OFF(name) (RC_OFF(name) != RC_NO_OFF)
+#define RC_GA(name) RC_A(RC_ADDR(name))
+static inline void *RC_HOST(uint64_t g) {
+  if (rc_guest_ptr_size == 8) return (void *)(uintptr_t)g;
+  return (uint32_t)g ? (void *)(uintptr_t)(rc_slide + (uint32_t)g) : (void *)0;
+}
+static inline uint64_t RC_GUEST(const void *h) {
+  if (rc_guest_ptr_size == 8 || !h) return (uint64_t)(uintptr_t)h;
+  return (uint64_t)(uintptr_t)h - rc_slide;
+}
+#define RC_RET_ADDR(c) RC_LD(uint64_t, (c)->r[4])
+#define RC_FRAME_PTR(c) ((c)->r[5])
+#else
 // Each takes the name itself (pasted, never macro-expanded first: a name may also be a C macro).
 #define RC_ADDR(name) RC_ADDR_##name
 #define RC_FN(name) RC_FN_##name
@@ -53,8 +71,15 @@
 #define RC_GUEST(h) ((uint64_t)(uintptr_t)(h))
 #define RC_RET_ADDR(c) RC_LD(uint64_t, (c)->r[4])
 #define RC_FRAME_PTR(c) ((c)->r[5])
+#elif defined(RC_TARGET_ABI_WIN32)
+#include "rc32.h"
+#define RC_HOST(g) RC32_H(g)
+#define RC_GUEST(h) ((uint64_t)RC32_G(h))
+#define RC_RET_ADDR(c) RC_LD(uint32_t, RC32_H((c)->r[4]))
+#define RC_FRAME_PTR(c) ((c)->r[5])
 #else
-#error "rc_abi.h: no ABI layer for this target yet (only RC_TARGET_ABI_SYSV64)"
+#error "rc_abi.h: no ABI layer for this target"
+#endif
 #endif
 
 #endif

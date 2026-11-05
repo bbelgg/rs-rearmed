@@ -48,29 +48,67 @@ static inline void ov_args_init(rc_args *a, rc_ctx *c) {
 }
 #define OV_ARGS(a, c) rc_args a; ov_args_init(&a, (c))
 static inline void ov_args_init_cc(rc_args *a, rc_ctx *c, int cc) {
+#ifdef RC_GUEST32
+  if (cc != RC_CC_SYSV) {  // an override on the guest's own context; a hook's view is SysV
+    rc32_args_init(a, c, cc);
+    return;
+  }
+#endif
   (void)cc;  // mac-x64: every function is SysV
   ov_args_init(a, c);
 }
 // The arguments of the override of `name`, read by its calling convention (RC_CC_<name>: the same as
 // OV_ARGS on mac-x64; on win-x86 thiscall / fastcall take the first ones from ecx / edx). Use it in an
-// adapter; OV_ARGS stays for helpers that serve several functions of the target's default convention.
-#define OV_ARGS_OF(name, a, c) rc_args a; ov_args_init_cc(&a, (c), RC_CC_##name)
+// adapter. A helper that serves several functions gets the convention from its caller: OV_ARGS_CC(a, c, cc),
+// with RC_CC(name) there. A `custom` function has no convention to read by: read it by hand, these don't compile.
+// OV_ARGS is a hook's: a hook sees the SysV call on every target (rc_hook.h).
+#define OV_ARGS_CC(a, c, cc) rc_args a; ov_args_init_cc(&a, (c), (cc))
+#ifdef RC_MOD
+#define OV_ARGS_OF(name, a, c) OV_ARGS(a, c)
+#else
+#define OV_ARGS_OF(name, a, c) \
+  _Static_assert(RC_CC_##name != RC_CC_CUSTOM, #name " takes its own registers: read them by hand"); \
+  OV_ARGS_CC(a, c, RC_CC_##name)
+#endif
+#ifdef RC_GUEST32
+#define OV_U64(a) ((a).cc != RC_CC_SYSV ? rc32_arg_q(&(a)) : rc_arg_i(&(a)))
+#define OV_F64(a) rc_f64((a).cc != RC_CC_SYSV ? rc32_arg_q(&(a)) : rc_arg_f(&(a)))
+#define OV_PTR(a, T) ((a).cc != RC_CC_SYSV ? (T *)(void *)(rc_mem + rc32_arg_i(&(a))) : (T *)(uintptr_t)rc_arg_i(&(a)))
+#else
 #define OV_U64(a) rc_arg_i(&(a))
+#define OV_F64(a) rc_f64(rc_arg_f(&(a)))
+#define OV_PTR(a, T) ((T *)(uintptr_t)rc_arg_i(&(a)))
+#endif
 #define OV_I32(a) ((int32_t)rc_arg_i(&(a)))
 #define OV_U32(a) ((uint32_t)rc_arg_i(&(a)))
-#define OV_PTR(a, T) ((T *)(uintptr_t)rc_arg_i(&(a)))
-#define OV_F64(a) rc_f64(rc_arg_f(&(a)))
 #define OV_F32(a) rc_f32((uint32_t)rc_arg_f(&(a)))
 
 // --- results -----------------------------------------------------------------------
 // Each pops the return address. A 32-bit result zero-extends into rax, as a write
-// to eax does; 8- and 16-bit ones zero-extend as well.
+// to eax does; 8- and 16-bit ones zero-extend as well. On a 32-bit guest these are a hook's (its view is
+// SysV: the view gives the guest the result and does its `ret N`); an override on the guest's own context
+// ends with ov32_ret, ov32_ret_f.
 static inline void ov_ret_void(rc_ctx *c) { c->r[4] += 8; }
 static inline void ov_ret_u64(rc_ctx *c, uint64_t v) { c->r[0] = v; c->r[4] += 8; }
 static inline void ov_ret_u32(rc_ctx *c, uint32_t v) { c->r[0] = v; c->r[4] += 8; }
 static inline void ov_ret_f64(rc_ctx *c, double d) { rc_ret_f64(c, d); c->r[4] += 8; }
 static inline void ov_ret_f32(rc_ctx *c, float f) { rc_ret_f32(c, f); c->r[4] += 8; }
 static inline void ov_ret_rax_rdx(rc_ctx *c, uint64_t a, uint64_t d) { c->r[0] = a; c->r[2] = d; c->r[4] += 8; }
+#ifdef RC_GUEST32
+// `ret N`, N what the function removes: the record a translated `ret` makes (rc32_gen.h)
+static inline void ov32_ret_(rc_ctx *c, uint32_t pops) {
+  uint32_t sp = (uint32_t)c->r[4];
+  memcpy(&c->ret_to, rc_mem + sp, 4);
+  c->r[4] = sp + 4 + pops;
+}
+static inline void ov32_ret(rc_ctx *c, uint32_t eax, uint32_t pops) { c->r[0] = eax; ov32_ret_(c, pops); }
+static inline void ov32_ret_f(rc_ctx *c, double st0, uint32_t pops) {
+  c->fpu.top = (c->fpu.top - 1) & 7;
+  c->fpu.st[c->fpu.top] = st0;
+  c->fpu.tag &= ~(1u << c->fpu.top);
+  ov32_ret_(c, pops);
+}
+#endif
 #define OV_RET_I32(c, v) ov_ret_u32((c), (uint32_t)(v))
 #define OV_RET_U64(c, v) ov_ret_u64((c), (uint64_t)(v))
 #define OV_RET_PTR(c, p) ov_ret_u64((c), (uint64_t)(uintptr_t)(p))
@@ -126,10 +164,16 @@ static inline uint64_t ov_call_guest(uint64_t vmaddr, const uint64_t *ints, int 
   return rc_call_guest(RC_A(vmaddr), ints, nint, 0, 0, 0);
 }
 // Call the game function `name` (tools/targets) with integer arguments, by its convention.
+#ifdef RC_MOD
+#define OV_GUEST(name, ...) ({ const uint64_t ov_args_[] = {__VA_ARGS__}; \
+    rc_call_name(#name, ov_args_, (int)(sizeof ov_args_ / sizeof *ov_args_)); })
+#define OV_GUESTV(name, ...) rc_call_name(#name, __VA_ARGS__)
+#else
 #define OV_GUEST(name, ...) ({ const uint64_t ov_args_[] = {__VA_ARGS__}; \
     ov_call_guest(RC_ADDR_##name, ov_args_, (int)(sizeof ov_args_ / sizeof *ov_args_)); })
 // The same with the arguments in an array: OV_GUESTV(name, ints, nint)
 #define OV_GUESTV(name, ...) ov_call_guest(RC_ADDR_##name, __VA_ARGS__)
+#endif
 
 
 // A virtual call on an object that is either translated guest code's (vtable entries are image

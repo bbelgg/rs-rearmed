@@ -2,7 +2,8 @@
 # are named by image VA, e.g. the entry F_1adb8f4) that an override module defines F_<addr> for, so
 # gen_image_pe.py drops them from translation and the hand-written native function takes their place
 # (win-x86/shims/win32_overrides.c). The Windows counterpart of the Mac built-in mods
-# (tools/targets/names/overrides/mods.list).
+# (tools/targets/names/overrides/mods.list). One that is also a hook point (tools/targets/names/hooks.list)
+# is defined as N_<addr>: the generated F_<addr> runs the hooks around it.
 #
 # CDLC (RSBypass): the SNG loader's signature check (0x10d96a0; RVA 0x1596a0), which calls the DSA
 # verifier 0x19bfeb0 on a song file. Skipped as on the Mac (sng_verify): unsigned song files load;
@@ -26,8 +27,9 @@
 1126950 wrap
 # Direct Connect: FrontEnd_OpenFile (0x101ba80; the Mac's 0x1003c7810), replaced by a native one that
 # opens a cacheN.7z from the installer's overlay (Update/patcharchives.psarc, which the engine mounts at
-# PatchUpdate/) before cache.psarc: the counterpart of the Mac pre hook in overrides/mods/mods.c.
-101ba80
+# PatchUpdate/) before cache.psarc: the counterpart of the Mac pre hook in overrides/mods/mods.c. `wrap`: it
+# never runs, but its `ret N` is what a mod's hook point on it goes by (rc_hook_code_pops).
+101ba80 wrap
 # Path MD5 cache (rsmacfixes): the path intern (0x141c130, the Mac path_intern; RVA 0x49c130), with the
 # Mac's wrapper path_md5 inlined into its callers. `wrap`: W_141c130 stays translated for a path not
 # cached and for RS_MODS_FIXES=0.

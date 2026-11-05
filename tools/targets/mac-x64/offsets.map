@@ -6,6 +6,7 @@ UIMenu_ShopSongs_qi_this_adj      -0x3f0  # this adjustment of its QueryInterfac
 UIMenu_ShopGear_qi_this_adj       -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
 UIMenu_ShopPacks_qi_this_adj      -0x3f0  # this adjustment of its QueryInterface (IBase sub-object to the object)
 service_manager_quit              0x144   # ServiceManager: u8 quit flag
+service_manager_state             0x40    # ServiceManager: u32 state (game_frame 0x10017a030)
 game_config_vsync                 0x3c    # config block: u32 vsync
 input_sink_full_char              -0x28   # input_sink's frame (frame pointer relative): the full character
 thread_priority_index             0x20    # engine thread: int32 priority index

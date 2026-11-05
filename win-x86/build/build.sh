@@ -12,7 +12,7 @@
 #                   obj/                               the seam, the runtime, the app
 #                   out/                               the result (LP_OUT)
 #   LP_OUT        output directory (default $LP_BUILD/out): rs2014_lp, lp_game.exe, dlls/,
-#                 libRSOpenGL.dylib
+#                 libRSOpenGL.dylib, libnetguard.dylib
 #   LP_IMAGE      the game image (lp_image.py), copied to the output
 #   LP_TRANSLATE  1: run translate.sh first (about 50 minutes), else use game/obj as it is
 #   LP_MODULES_BUILD  1: run build_modules.sh first (needs its LP_* DLL paths)
@@ -54,13 +54,21 @@ echo "===== Shims ====="
 OBJ_DIR=$obj "$here/build_shims.sh"
 
 echo "===== Runtime ====="
+# the target's names and hook points for the runtime (rc_hook_add_name, rc_off): tools/targets
+tgt=$obj/target
+"${LP_PY:-python3}" -I "$root/tools/targets/targets.py" gen --target win-x86 "$tgt"
 CC="clang -arch arm64 -O2 -g -DRC_GUEST32 -I$runtime"
-for m in rc32_mem rc32_image rc32_main rc32_teb rc32_seh rc32_wrappers; do
+for m in rc32_mem rc32_image rc32_main rc32_teb rc32_seh rc32_wrappers rc32_hook rc_hook rc_mods; do
   $CC -w -c "$runtime/$m.c" -o "$obj/rt/$m.o"
 done
+$CC -w -c "$tgt/rc_target.c" -o "$obj/rt/rc_target.o"
 
 echo "===== App ====="
 $CC -Wall -I"$root/win-x86/shims" -c "$root/win-x86/app/lp_main.c" -o "$obj/lp_main.o"
+# The network guard: Learn & Play has no socket of its own to guard, but a mod is native code. The app loads
+# it before any mod (lp_main.c), and without it loads no mods; the same library as the Mac edition's.
+clang -arch arm64 -dynamiclib -O1 -mmacosx-version-min=11.0 -o "$out/libnetguard.dylib" "$root/tools/ws8/netguard/netguard.c"
+codesign -f -s - "$out/libnetguard.dylib" 2>/dev/null
 $CC -Wall -c "$root/win-x86/app/lp_screen.c" -o "$obj/lp_screen.o"
 clang -arch arm64 -O2 -g -Wall -fobjc-arc -DLP_VERSION="\"$(cat "$root/VERSION")\"" -I"$root/shims/opengl/src" -c "$root/win-x86/app/lp_window.m" -o "$obj/lp_window.o"
 

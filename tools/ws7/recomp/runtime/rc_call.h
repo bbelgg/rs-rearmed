@@ -4,6 +4,7 @@
 #define RC_CALL_H
 #include <stddef.h>
 #include "rc.h"
+#include "rc_cc.h"
 
 // --- Calls through __stubs ---------------------------------------------------
 //
@@ -31,12 +32,42 @@ typedef struct rc_args {
   rc_ctx *c;
   uint32_t gi, fi;  // integer / SSE registers consumed so far
   uint64_t sp;      // next stack argument
+#ifdef RC_GUEST32
+  int cc;           // RC_CC_SYSV: a hook's view of the call (rc_hook.h); else the guest's own (below)
+#endif
 } rc_args;
 
 static inline void rc_args_init(rc_args *a, rc_ctx *c) {
   a->c = c; a->gi = 0; a->fi = 0; a->sp = c->r[4];
+#ifdef RC_GUEST32
+  a->cc = RC_CC_SYSV;
+#endif
 }
+#ifdef RC_GUEST32
+// The arguments of a 32-bit guest's function, as an override gets them on the guest's own context: 4-byte
+// stack words above the return address, the first in ecx for thiscall, the first two in ecx, edx for fastcall.
+// A pointer stays the guest's. The width of what comes next is the caller's to say: rc32_arg_i is one word.
+extern uint8_t *rc_mem;
+static inline void rc32_args_init(rc_args *a, rc_ctx *c, int cc) {
+  a->c = c; a->gi = 0; a->fi = 0; a->sp = (uint32_t)c->r[4] + 4u; a->cc = cc;
+}
+static inline uint32_t rc32_arg_i(rc_args *a) {
+  if (a->gi == 0 && (a->cc == RC_CC_THISCALL || a->cc == RC_CC_FASTCALL)) { a->gi = 1; return (uint32_t)a->c->r[1]; }
+  if (a->gi == 1 && a->cc == RC_CC_FASTCALL) { a->gi = 2; return (uint32_t)a->c->r[2]; }
+  uint32_t v = RC_LD(uint32_t, rc_mem + (uint32_t)a->sp);
+  a->sp = (uint32_t)a->sp + 4u;
+  return v;
+}
+static inline uint64_t rc32_arg_q(rc_args *a) {  // a 64-bit argument or a double: two words on the stack
+  uint64_t v = RC_LD(uint64_t, rc_mem + (uint32_t)a->sp);
+  a->sp = (uint32_t)a->sp + 8u;
+  return v;
+}
+#endif
 static inline uint64_t rc_arg_i(rc_args *a) {
+#ifdef RC_GUEST32
+  if (a->cc != RC_CC_SYSV) return rc32_arg_i(a);
+#endif
   static const uint8_t order[6] = {7, 6, 2, 1, 8, 9};  // rdi rsi rdx rcx r8 r9
   if (a->gi < 6) return a->c->r[order[a->gi++]];
   uint64_t v = RC_LD(uint64_t, a->sp);
@@ -45,6 +76,9 @@ static inline uint64_t rc_arg_i(rc_args *a) {
 }
 // Low 64 bits of the next SSE argument (float in the low 32).
 static inline uint64_t rc_arg_f(rc_args *a) {
+#ifdef RC_GUEST32
+  if (a->cc != RC_CC_SYSV) return rc32_arg_i(a);  // a float (a double: rc32_arg_q, OV_F64)
+#endif
   if (a->fi < 8) return a->c->x[a->fi++][0];
   uint64_t v = RC_LD(uint64_t, a->sp);
   a->sp += 8;

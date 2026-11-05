@@ -312,6 +312,33 @@ a frame). The "13% more than the Mac build" of [Against the Mac build](#against-
 it is 43%. Footprint is 1.28-1.36 GB against 1.05 GB before, at a larger picture and with the memory order. Not done: the
 memory order's cost at this frame rate ([Memory order](#memory-order)).
 
+## Hook points
+
+What the hook table costs the game thread with no mod loaded: nothing that shows (2026-11-04). The same song and screen by
+the same input script, 75 Hz display, no snapshots, 120 s of frames from the tuner into the song, three runs of each in
+turn, after a run that warmed the shader cache:
+
+| | with hook points | without |
+|---|---|---|
+| Mean frame | 13.362, 13.359, 13.359 ms | 13.359, 13.359, 13.359 ms |
+| Median frame | 13.34-13.35 ms | 13.34-13.35 ms |
+| p99 | 14.64, 14.64, 15.40 ms | 14.60, 15.21, 14.92 ms |
+| Frames over 20 ms | 12, 9, 9 | 10, 9, 10 |
+| Frames over 33 ms, worst | 2, 92.6 ms | 2, 92.4 ms |
+| `w32 game`, the song | 38.1% of a core (37.2-38.7) | 38.0% (37.3-38.5) |
+| Process, the song | 63.3% | 63.1% |
+
+"Without" is the same sources, translator and tables translated without `--target`, so the nine hook points that are
+not built-in fixes are plain functions (the three that are keep a one-line `F_` to their `N_`); both have the same 1,198,690
+memory fences. The difference is inside what runs of one build differ by. The two long frames are in both, at the Return
+that leaves the tuner for the song. In the unit test a point without hooks is 0.01 ns a call more than the function, with
+a mod's pre and post hook 36 ns; a song calls `ak_set_rtpc_name` 9 times a frame and `camera_set_frustum` 6.4 times. One run
+with the probe mod on every point has the same figures: mean 13.362 ms, `w32 game` 37.8%.
+
+Compare like with like: a first try used the build from before the x86 memory order as "without". That build has no fences
+at all, and it showed 32% against 38% of a core and no frame over 20 ms, which is the memory order and says
+nothing about hook points.
+
 ## The build: memory and time
 
 Through the app on 2026-11-04, with the seed and nothing placed first: 25 minutes in all, the build 24 of them and the game 19.

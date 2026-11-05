@@ -24,6 +24,9 @@
 //   LP_LOG_TO    append the log (stderr) to this file (an app started with `open` has no terminal)
 //   LP_FRAME_LOG frames longer than this many ms are logged with what happened in them
 //   LP_QOS       0: the default QoS for the game's threads (not user-interactive / -initiated)
+//   RS_LOAD_MODS 0: no mods
+//   RS_MODS_PATH the mods: a folder or one library     default LP_HOME/mods (an installed app)
+//   RC_HOOK_TRACE hook points to log the raw calls of (rc_hook.h)
 //
 // The installed app (win-x86/install/lp_install.py app-install): the executable in
 // <app>/Contents/MacOS, the image and the DLLs in <app>/Contents/Resources, and everything that
@@ -41,6 +44,7 @@
 //   userdata/    LP_USER_DIR: Rocksmith.ini and the game's other writes
 //   steam/       RS_STEAM_DATA_DIR: the offline Steam layer's saves (profiles, progress)
 //   logs/        last-run.log and previous-run.log (stderr; LP_LOG_TO overrides it)
+//   mods/        every .dylib here is loaded at the start, as on the Mac (mods_guard, rc_mods.c)
 // Nothing there is in the bundle, so a reinstall keeps it, and the bundle's signature stays whole.
 // The Metal disk cache is the app's own too (RS_METAL_CACHE_DIR, default
 // ~/Library/Caches/rs-rearmed/learn-play/metal), beside the Mac edition's .../rs-rearmed/metal.
@@ -60,6 +64,7 @@
 
 #include "../online/online32.h"
 #include "rc32.h"
+#include "rc_hook.h"
 #include "win32_shims.h"
 
 // The 64-bit runtime pieces linked here (rc_tramp, rc_setjmp, rc_thread) look functions up by
@@ -218,22 +223,88 @@ static void steam_account_default(const char *home_dir) {
   }
 }
 
+static int in_bundle(void) {
+  size_t n = strlen(exe_dir);
+  static const char tail[] = ".app/Contents/MacOS";
+  return n >= sizeof tail && !strcmp(exe_dir + n - (sizeof tail - 1), tail);
+}
+
+static void user_home(char *home, size_t n) {
+  const char *h = getenv("LP_HOME");
+  if (h && *h)
+    snprintf(home, n, "%s", h);
+  else
+    snprintf(home, n, "%s/Library/Application Support/RS Re-ARMed/learn-play", getenv("HOME") ? getenv("HOME") : "/tmp");
+}
+
+// What to load from the mods folder, and the network guard before it. The game itself has no way to the
+// network here (win32_net.c refuses its calls, and no host socket call is linked in), but a mod is native
+// code and could make one; so with mods the process runs as the Mac edition's always does, with libnetguard
+// inserted, which takes starting again: dyld only inserts at a start. No guard, no mods. The message waits
+// for the log (mods_message).
+static const char *mods_folder, *mods_message;
+
+static int netguard_loaded(void) {
+  char path[PATH_MAX], want[PATH_MAX], got[PATH_MAX];
+  snprintf(path, sizeof path, "%s/libnetguard.dylib", exe_dir);
+  if (!realpath(path, want)) return 0;
+  for (uint32_t k = 0, n = _dyld_image_count(); k < n; k++) {
+    const char *name = _dyld_get_image_name(k);
+    if (strstr(name, "/libnetguard.dylib") && realpath(name, got) && !strcmp(got, want)) return 1;
+  }
+  return 0;
+}
+
+static void mods_guard(char **argv) {
+  static char dflt[PATH_MAX], guard[PATH_MAX], log[PATH_MAX];
+  if (in_bundle()) {
+    char home[PATH_MAX];
+    user_home(home, sizeof home);
+    snprintf(dflt, sizeof dflt, "%s/mods", home);
+    snprintf(log, sizeof log, "%s/logs", home);
+  }
+  const char *where = rc_mods_where(dflt);
+  if (!where) return;
+  if (netguard_loaded()) {
+    mods_folder = where;
+    return;
+  }
+  if (!rc_mods_count(where)) return;  // a mod copied in from here on waits for the next start
+  snprintf(guard, sizeof guard, "%s/libnetguard.dylib", exe_dir);
+  if (access(guard, R_OK) != 0) {
+    mods_message = "[rc] mods not loaded: no libnetguard.dylib beside the app";
+    return;
+  }
+  if (getenv("LP_MODS_GUARD")) {
+    mods_message = "[rc] mods not loaded: the network guard did not load";
+    return;
+  }
+  setenv("LP_MODS_GUARD", "1", 1);
+  const char *inserted = getenv("DYLD_INSERT_LIBRARIES");
+  char *both = NULL;
+  if (inserted && *inserted && asprintf(&both, "%s:%s", guard, inserted) < 0) both = NULL;
+  setenv("DYLD_INSERT_LIBRARIES", both ? both : guard, 1);
+  if (*log) {
+    mkdir_p(log);
+    strlcat(log, "/netguard.log", sizeof log);
+    setenv("RS_NETGUARD_LOG", log, 0);
+  }
+  char self[PATH_MAX];
+  uint32_t sz = sizeof self;
+  if (!_NSGetExecutablePath(self, &sz)) execv(self, argv);
+  mods_message = "[rc] mods not loaded: the app could not start again with the network guard";
+}
+
 // An installed app: the defaults from LP_HOME (see the top of this file). 0 when this executable
 // is not in an app bundle (a build's out/ directory: the defaults beside it).
 static int installed_defaults(void) {
+  if (!in_bundle()) return 0;
   size_t n = strlen(exe_dir);
-  static const char tail[] = ".app/Contents/MacOS";
-  if (n < sizeof tail || strcmp(exe_dir + n - (sizeof tail - 1), tail)) return 0;
   char res[PATH_MAX], home[PATH_MAX];
   snprintf(res, sizeof res, "%.*s/Resources", (int)(n - strlen("/MacOS")), exe_dir);
   dflt_env_in("LP_IMAGE", res, "lp_game.exe");
   dflt_env_in("LP_DLL_DIR", res, "dlls");
-  const char *h = getenv("LP_HOME");
-  if (h && *h)
-    snprintf(home, sizeof home, "%s", h);
-  else
-    snprintf(home, sizeof home, "%s/Library/Application Support/RS Re-ARMed/learn-play",
-             getenv("HOME") ? getenv("HOME") : "/tmp");
+  user_home(home, sizeof home);
   setenv("LP_HOME", home, 1);
   if (!getenv("LP_GAME_DIR") || !*getenv("LP_GAME_DIR")) {
     char f[PATH_MAX], line[PATH_MAX] = "";
@@ -327,12 +398,12 @@ void lp_mods_init(void);    // win32_overrides.c
 
 int main(int argc, char **argv) {
   (void)argc;
-  (void)argv;
   char self[PATH_MAX];
   uint32_t sz = sizeof self;
   if (_NSGetExecutablePath(self, &sz) || !realpath(self, exe_dir)) snprintf(exe_dir, sizeof exe_dir, ".");
   char *sl = strrchr(exe_dir, '/');
   if (sl) *sl = 0;
+  mods_guard(argv);  // may start this process again: before the log is turned over
   int installed = installed_defaults();
   const char *image = dflt_env("LP_IMAGE", "lp_game.exe");
   const char *dlls = dflt_env("LP_DLL_DIR", "dlls");
@@ -390,6 +461,11 @@ int main(int argc, char **argv) {
   }
   // The offline online layer (win-x86/online): RSConnect's vtables patched before the game runs.
   on32_install(&on32_learn_play);
+  // The mods, with the images mapped and the game not started, as on the Mac: a mod's constructor registers
+  // its hooks (rc_hook.h).
+  if (mods_message) fprintf(stderr, "%s\n", mods_message);
+  if (mods_folder) rc_mods_load(mods_folder);
+  rc_hook_trace_init();
   uint32_t base = rc32_image_base(0);
   uint32_t lfanew = *(uint32_t *)RC32_H(base + 0x3c), entry = base + *(uint32_t *)RC32_H(base + lfanew + 40);
   fprintf(stderr, "lp: mapped the game at 0x%x (%d functions, %d imports), entry 0x%x\n", base, rc32_table_len,

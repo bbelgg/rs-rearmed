@@ -9,6 +9,7 @@ UIMenu_ShopPacks_qi_this_adj      # this adjustment of its QueryInterface (IBase
 
 # seam (app/seam_platform.c)
 service_manager_quit  # ServiceManager: u8 quit flag
+service_manager_state # ServiceManager: u32 state, 7 = finished (game_frame answers quit then)
 game_config_vsync     # config block: u32 vsync
 
 # mods (overrides/mods/mods.c)

@@ -25,6 +25,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   played. All suites of [TESTING.md](TESTING.md) pass; the figures are in [PERFORMANCE.md](PERFORMANCE.md).
 - **Full-screen shape**: on a 16:10 screen the 16:9 picture is stretched, as in the original under Rosetta. The Windows
   game's bars are its own code, which the Mac game does not have.
+- **Mods on both editions**: a mod built with `rc_mod.h` is one dylib for this app and Learn & Play, which has 11 of the
+  14 hook points ([Windows plan](../windows/PLAN.md#status)). This edition's own mod interface is as it was.
 - **Enumerate** (new in 1.4.0, both editions): SHOP is ENUMERATE, second in the main menu, and brings new songs in
   without a restart ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Changed and removed songs still need a refresh.
 
@@ -77,8 +79,8 @@ Being looked into, with no promise of if or when:
 - **Input channel selection**: choosing which input of an audio interface with more than one input the game
   listens to.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)
-  already serve the Windows port; its parity work (hook points and built-in fixes by name on both targets)
-  is in the [Windows plan](../windows/PLAN.md#next-work).
+  already serve the Windows port; hook points and the mods folder are shared now, and the rest of its
+  parity work is in the [Windows plan](../windows/PLAN.md#next-work).
 - **Build options**: `-mno-outline` for the generated C gave the Windows port 4% of its game thread
   ([Windows performance](../windows/PERFORMANCE.md#opportunities-by-expected-payoff)); not measured on the
   Mac yet.

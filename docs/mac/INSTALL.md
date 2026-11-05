@@ -381,8 +381,9 @@ launchctl unsetenv RS_MODS_BYPASS     # back to the default
 ```
 
 Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup
-(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). How mods hook
-the game: [DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
+(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). A mod built with
+`rc_mod.h` is the same dylib for Learn & Play. How mods hook the game:
+[DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
 
 ## Update and uninstall
 
@@ -410,6 +411,9 @@ the game: [DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
 - With Metal, the first time a song, venue or mode is played, a few short stutters (up to about half a
   second) can show in its first half-minute while Metal compiles what it draws for the first time. Later
   plays are smooth.
+- Mods for both editions: a mod built with `rc_mod.h` runs on Learn & Play too, within what that game has
+  ([Windows install](../windows/INSTALL.md#known-issues)). Here it can do all a mod could; a mod built without it is for
+  this edition alone.
 - Mods that draw with OpenGL themselves show nothing with Metal; the rest of the mod works. Use a version
   that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL renderer.
 

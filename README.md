@@ -61,7 +61,7 @@ port, and several features are not there yet.
 | Multiplayer (local) | ⚠️ | ⚠️ |
 | DLC | ✅ | ✅ ¹ |
 | Custom songs (CDLC) | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ❌ |
+| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 11 of the 14 hook points |
 | Built-in fixes (rs-mac-fixes, RSBypass) | ✅ | ✅ |
 | Loading-screen fix (fast-load `cache.psarc` with Metal) | ✅ | ❌ |
 | "Re-ARMed" title logo | ✅ | ✅ |
@@ -192,11 +192,23 @@ there. Learn & Play does the same in its own copy of the game files
 ### Mods loaded at startup
 
 From 1.2.0 the game loads every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` at startup, so
-mods can change how it works without a rebuild. A reinstall keeps that folder. The build gives them **hook
-points**, game functions they can run code before and after (`tools/targets/names/hooks.list`,
-`tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports its runtime to them. A mod finds a
-hook point by its name, `rc_hook_add_name("game_frame", pre, post, user)`; `rc_hook_add` with a game
-address keeps working, and `rc_target()` says which game the app was built from (`mac-x64`).
+mods can change how it works without a rebuild; Learn & Play does the same from `.../RS Re-ARMed/learn-play/mods/`. A
+reinstall keeps that folder. The build gives them **hook points**, game functions they can run code before and
+after (`tools/targets/names/hooks.list`, `tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports
+its runtime to them. A mod finds a hook point by its name, `rc_hook_add_name("game_frame", pre, post, user)`;
+`rc_hook_add` with a game address keeps working, and `rc_target()` says which game the app was built from (`mac-x64`,
+`win-x86`).
+
+For a mod that runs in both editions, include `tools/ws7/recomp/runtime/rc_mod.h` and build it once:
+
+```bash
+clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runtime -Itools/ws7/recomp/overrides \
+    mod.c -o mod.dylib
+```
+
+A hook sees the same call in both, the Mac's: read it with `OV_ARGS`, finish it with `ov_ret_*`, read the game's
+fields by name with `RC_OFF` and a pointer among them with `rc_mod_ptr`. `tools/ws7/recomp/test/hooks/probe_mod.c` is a
+small one. Learn & Play leaves out a library built without `rc_mod.h`, with a line in the log.
 
 `RS_LOAD_MODS=0` starts the game without them; `RS_MODS_PATH` loads another folder or a single library.
 
@@ -275,8 +287,8 @@ Being looked into for future releases, with no promise of if or when:
 - **RSMods:** more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
 - **Input channel selection:** choosing which input of an external audio interface the game listens to,
   on interfaces with more than one input.
-- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (mods and hook
-  points, the shaders prepared at install, the OpenGL renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
+- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (the shaders prepared at
+  install, the OpenGL renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
 
 ## FAQ
 

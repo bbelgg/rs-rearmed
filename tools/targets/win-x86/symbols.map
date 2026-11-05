@@ -2,8 +2,8 @@
 # ADDRESS: runtime address at the image base 0xf80000 (what F_<addr> and the vtables hold; link address +
 # 0xb80000). CONVENTION: cdecl, stdcall, thiscall, fastcall, custom (a function; custom = register arguments
 # whole-program optimisation (LTCG) made up, the comment says which registers), data (a global), code (an
-# address inside a function). PROTOTYPE: the Mac's, as far as it is known (- = not recorded); the
-# convention, not the prototype, says how the arguments arrive.
+# address inside a function). PROTOTYPE: the Mac's, as far as it is known (- = not recorded); on a hook point it is
+# this game's own, with what differs from the Mac's call marked (tools/targets/README.md), and says how the arguments arrive.
 # Matched against the Mac image by class_info / QueryInterface pairs, library call order, exports, unique
 # strings, name tables, vtable shape and the Windows code that reads them; a `# medium` or `# low confidence`
 # comment marks the weaker matches.
@@ -13,7 +13,7 @@
 
 # --- names/seam.list
 game_bootstrap                                                   unsupported  no standalone LP function: WinMain (0x1309ad0) inlines it (set game root 0x1343c90, LoadConfig 'Rocksmith.ini' 0x149df40, VFS 'Global FS Backend' 0x101ab50)
-game_frame                                                       0x01479df0  thiscall  void(void *service_manager)  # the frame: ServiceManager tick, slot 19 of the vtable 0x1d5f088 (the Mac game_frame ends in the same slot, 0x1002a98c0, and its quit check is here in the Run loop 0x1479da0); takes the manager, returns nothing
+game_frame                                                       0x01479df0  thiscall  bool<service_manager_state=7>(void *service_manager=hidden)  # the frame: ServiceManager tick, slot 19 of the vtable 0x1d5f088 (the Mac game_frame ends in the same slot, 0x1002a98c0, and its quit check is here in the Run loop 0x1479da0); takes the manager, returns nothing
 game_shutdown                                                    unsupported  no standalone LP function found: WinMain's exit path (0x1309d6e..) runs the shutdown inline (vtable +0x3c, delete, 0x1309540, 0x101b830, 0x14a2b50)
 set_app_focus                                                    unsupported  inlined: the platform tick 0x149ed00 handles the posted 0x7e8 (gained) and 0x7e9 (lost) in the message loop; a hook can use the two calls it makes, 0x1a45490 (AK restore sink) and 0x1a45480 (AK release sink)
 input_sink                                                       unsupported  no counterpart: events reach the game as window messages. MainService_Win32's window procedure 0x130d790 (stdcall hwnd, msg, wparam, lparam) passes them to the Scaleform one, 0x17a1850, which builds the same events the Mac sink does (5/6 key, 0x1a char); a hook can use 0x17a1680 (queues one event, ecx = the event), which both paths end in
@@ -26,7 +26,7 @@ service_manager                                                  0x0133cfc0  cde
 ui_current                                                       unsupported  inlined: the global *0x1ee062c, read directly (0x130d806)
 ui_menu                                                          unsupported  inlined: the field +0x24 of *0x1ee062c, read directly (0x130d813)
 ui_accepts                                                       0x01163e70  custom    bool(void *menu)  # esi = menu; same loop as too_many_inputs, slot 25 (= Mac 26); the two call sites are the Mac function's (0x130d81e, 0x1341b66)
-ui_event                                                         0x01163d50  stdcall   void(void *menu)  # LTCG folded the event and arg: every caller sends (0x98, 0), the Mac's two callers too, so only the menu is on the stack (ret 4)
+ui_event                                                         0x01163d50  stdcall   void(void *menu, int event=0x98, int arg=0)  # LTCG folded the event and arg: every caller sends (0x98, 0), the Mac's two callers too, so only the menu is on the stack (ret 4)
 efd_set_path_hooks                                               unsupported  inlined into WinMain: it writes the six hooks itself (0x1309c7b..0x1309c9b, 0x1ee18f0..0x1ee1904)
 app_focus                                                        unsupported  no such global: focus is the byte +0x149 of the app object (*0x1ee0bfc), 1 = lost, set in the platform tick 0x149ed00
 main_service                                                     0x1eef048  data      void *  # WinMain stores MainService_Win32 (vtable 0x1d4c9d0) here and calls through it
@@ -35,13 +35,13 @@ gl_context                                                       unsupported  Ma
 game_config                                                      0x1f0bbf0  data      rsp_config  # the static block the config getter 0x1161260 returns; 0x20 bytes more in front than the Mac's (ScreenWidth +0x30 against +0x10 in the ini writer 0x149d610)
 
 # --- names/hooks.list
-ak_post_event_name                                               0x1a44870  cdecl     uint32_t(const char *event, uint64_t game_object, ...)
-too_many_inputs                                                  0x01163ed0  custom    bool(void *input_manager)  # esi = input manager; called from the "TooManyGuitarInputs" popup (0x1341670 = Mac 0x1000e11a0); same loop over the list at +0x138, slot 24 (= Mac 25)
-rr_speed_ratio                                                   0x00f89360  cdecl     float(float slider_percent)  # the same curve with the same constants (25, 100, 400); it returns the percentage, the Mac 100 / percentage: the callers divide
-ak_set_rtpc_name                                                 0x1a42400  cdecl     int(const char *, float, uint64_t, int, int)
+ak_post_event_name                                               0x1a44870  cdecl     uint32_t(const char *event, uint32_t game_object, ...)  # AkGameObjectID is pointer-sized: 4 bytes here (cExternals at +0x1c)
+too_many_inputs                                                  0x01163ed0  custom    bool(void *input_manager@esi)  # called from the "TooManyGuitarInputs" popup (0x1341670 = Mac 0x1000e11a0); same loop over the list at +0x138, slot 24 (= Mac 25)
+rr_speed_ratio                                                   0x00f89360  cdecl     float<100/x>(float slider_percent)  # the same curve with the same constants (25, 100, 400); it returns the percentage, the Mac 100 / percentage: the callers divide
+ak_set_rtpc_name                                                 0x1a42400  cdecl     int(const char *, float, uint32_t, int, int)
 camera_set_frustum                                               0x01557f20  fastcall  void(void *camera, const void *frustum)  # ecx = camera, edx = frustum: the same fields in the same order as the Mac function (near clamp against +0x14c/+0x148 = Mac +0x1a0/+0x19c), 7 callers against 7, one of them the matched 0x134bc60
 ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
-si_open                                                          0x017c50a0  custom    int(void *self, ...)  # SoundInputPortAudio::InputOn: edi = the input, 4 stack arguments (ret 0x10, not the Mac's slot), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
+si_open                                                          0x017c50a0  custom    int(void *self@edi, ...)  # SoundInputPortAudio::InputOn: edi = the input, 4 stack arguments (ret 0x10, not the Mac's slot), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
 
 # --- names/refs.list
 scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys
@@ -1139,7 +1139,7 @@ engine_egf_begin                                                 unsupported  no
 engine_egf_end                                                   unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
 engine_nimain_begin                                              unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
 engine_nimain_end                                                unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
-frontend_open_file                                               0x0101ba80  custom    void **(void **out, const char *path)
+frontend_open_file                                               0x0101ba80  custom    void **(void **out, const char *path@ecx)
 steam_dlc_owned                                                  0x01448b10  thiscall  bool(void *steam, int app)  # slot 47 of the Steam wrapper; matched by its place in InstallContentPackage (0x1449d58)
 key_pkg_aes                                                      unsupported  no global: built from immediates on the stack at 0x130ab34 (not the Mac's bytes)
 key_pkg_dsa_blob                                                 0x1e6ade0  data      uint8_t[]  # passed to the decoder 0x10d9730 by the package config 0x130aa80

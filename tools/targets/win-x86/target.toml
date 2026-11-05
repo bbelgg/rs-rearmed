@@ -5,7 +5,7 @@
 id = "win-x86"
 description = "Rocksmith 2014 Learn & Play, Windows (x86-32 PE, Steam)"
 front_end = "x86-32-pe"       # tools/ws7/recomp/xlat/x86_32.py, build/gen_image_pe.py
-abi = "win32"                 # runtime/rc_abi.h: RC_TARGET_ABI_WIN32 (not built yet)
+abi = "win32"                 # runtime/rc_abi.h: RC_TARGET_ABI_WIN32
 image_base = 0xf80000         # runtime addresses (win-x86/online/names.tsv); link addresses + 0xb80000
 text = [0xf81000, 0x1c36bec]  # .text of the unpacked image
 # SHA-256 of the unpacked image the tables were made for: the exe below through win-x86/image/lp_image.py,

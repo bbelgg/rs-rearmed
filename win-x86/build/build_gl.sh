@@ -40,4 +40,10 @@ clang++ -O2 -g -arch arm64 -mmacosx-version-min=11.0 -dynamiclib -Wl,-headerpad_
   -o "$out/libRSOpenGL.dylib" "$o"/rsgl.o "$o"/nsgl_hook.o "$o"/gltrace.o "$o"/rs_gfx.o "$o"/rsmtl_stubs.o \
   "$o"/mtl_*.o "$o"/msl_*.o \
   -framework OpenGL -framework AppKit -framework ImageIO -framework Metal -framework QuartzCore -framework Foundation
+# The corpus step's translator (tools/metal/build-msl-corpus.sh, as msl.cmake builds it).
+# Without it there is no corpus, which doesn't stop a build.
+clang -O2 -g -arch arm64 -mmacosx-version-min=11.0 -fobjc-arc -w -c "$src/test/msl_verify.m" -o "$o/msl_verify.o" &&
+clang++ -O2 -g -arch arm64 -mmacosx-version-min=11.0 -o "$out/msl_verify" "$o/msl_verify.o" "$o/msl_xlat.o" "$o/msl_corpus.o" \
+  -framework Foundation -framework Metal -framework OpenGL -framework CoreGraphics -framework ImageIO ||
+  echo "no msl_verify: this build has no shader corpus"
 echo "=== Done: $out/libRSOpenGL.dylib ==="

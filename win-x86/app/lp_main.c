@@ -223,6 +223,13 @@ static void steam_account_default(const char *home_dir) {
   }
 }
 
+// The installed app's Metal disk cache, the game's and the warm-up's.
+static void metal_cache_default(void) {
+  char caches[PATH_MAX];
+  snprintf(caches, sizeof caches, "%s/Library/Caches/rs-rearmed/learn-play", getenv("HOME") ? getenv("HOME") : "/tmp");
+  dflt_env_in("RS_METAL_CACHE_DIR", caches, "metal");
+}
+
 static int in_bundle(void) {
   size_t n = strlen(exe_dir);
   static const char tail[] = ".app/Contents/MacOS";
@@ -339,9 +346,7 @@ static int installed_defaults(void) {
   }
   dflt_env_in("LP_USER_DIR", home, "userdata");
   dflt_env_in("RS_STEAM_DATA_DIR", home, "steam");
-  char caches[PATH_MAX];
-  snprintf(caches, sizeof caches, "%s/Library/Caches/rs-rearmed/learn-play", getenv("HOME") ? getenv("HOME") : "/tmp");
-  dflt_env_in("RS_METAL_CACHE_DIR", caches, "metal");
+  metal_cache_default();
   mkdir_p(getenv("LP_USER_DIR"));
   mkdir_p(getenv("RS_STEAM_DATA_DIR"));
   steam_env_defaults(getenv("LP_GAME_DIR"));
@@ -396,13 +401,27 @@ static void *run_game(void *p) {
 void lp_window_loop(void);  // lp_window.m
 void lp_mods_init(void);    // win32_overrides.c
 
+int rs_gfx_warm_only(double max_seconds, double interval, FILE *out);  // libRSOpenGL
+
+// --warm-shaders: the install's shader warm-up (tools/play-native/warm-shaders.sh), as the Mac app's:
+// no window, nothing of the game loaded, in the installed app's own executable because Metal's
+// shader cache belongs to the app. Exit 0 ready, 1 timed out, 2 no Metal.
+static int warm_shaders(void) {
+  if (in_bundle()) metal_cache_default();
+  const char *e = getenv("RS_METAL_WARM_MAX_SECONDS");
+  double max_s = e && *e ? atof(e) : 3600;
+  setvbuf(stdout, 0, _IOLBF, 0);
+  return rs_gfx_warm_only(max_s > 0 ? max_s : 3600, 0.5, stdout);
+}
+
 int main(int argc, char **argv) {
-  (void)argc;
   char self[PATH_MAX];
   uint32_t sz = sizeof self;
   if (_NSGetExecutablePath(self, &sz) || !realpath(self, exe_dir)) snprintf(exe_dir, sizeof exe_dir, ".");
   char *sl = strrchr(exe_dir, '/');
   if (sl) *sl = 0;
+  for (int i = 1; i < argc; i++)
+    if (!strcmp(argv[i], "--warm-shaders")) return warm_shaders();
   mods_guard(argv);  // may start this process again: before the log is turned over
   int installed = installed_defaults();
   const char *image = dflt_env("LP_IMAGE", "lp_game.exe");

@@ -2,8 +2,10 @@
 
     build WORK --image EXE --dlls DIR --game DIR [--py PYTHON] [--jobs N]
         translate the game image and the DLLs it runs with (gen_image_pe.py), compile them, build
-        libRSOpenGL (build_gl.sh), the Win32 seam, the runtime and the app, and link
-        WORK/out/rs2014_lp (win-x86/build/build.sh). Each translation is keyed by the SHA-256 of its
+        libRSOpenGL (build_gl.sh), the Win32 seam, the runtime and the app, link
+        WORK/out/rs2014_lp (win-x86/build/build.sh), and make the Metal shader corpus
+        WORK/out/rsmsl-corpus.bin from the game files (tools/metal/make-corpus.sh --learn-play; without it
+        the app works, it compiles its shaders while it plays). Each translation is keyed by the SHA-256 of its
         input and of the translator; a step whose key matches what is there is skipped, so a run
         that was stopped continues where it was, and a rerun after an update redoes only what the
         update changed.
@@ -526,6 +528,9 @@ class Builder:
         self.frac("app", 0.0)
         self.say("  libRSOpenGL, the Win32 seam, the runtime, the link")
         self.app()
+        self.label = "Preparing the shader corpus"
+        self.frac("app", 0.8)
+        self.corpus()
         self.progress(1.0, "Built")
         return time.time() - t0
 
@@ -542,6 +547,37 @@ class Builder:
             if r.returncode:
                 raise BuildError("%s failed (exit %d); the log is %s:\n%s" % (script, r.returncode, logp, tail(logp)))
             self.frac("app", 0.5)
+
+    def corpus(self):
+        """WORK/out/rsmsl-corpus.bin; a build without one is a working build, so this never fails it. Under a minute.
+        As on the Mac, RS_MSL_CORPUS_FILE bundles that file instead and RS_SHADER_CORPUS=0 makes none."""
+        out = os.path.join(self.work, "shaders")
+        made = os.environ.get("RS_MSL_CORPUS_FILE") or os.path.join(out, "msl", "rsmsl-corpus.bin")
+        dest = os.path.join(self.work, "out", "rsmsl-corpus.bin")
+        remove(dest)
+        if os.environ.get("RS_SHADER_CORPUS") == "0":
+            return False
+        if os.environ.get("RS_MSL_CORPUS_FILE"):
+            return self.corpus_copy(made, dest, made)
+        env = dict(os.environ, RC_IMAGE=self.image, RS_GAME_DIR=self.game,
+                   MSL_VERIFY=os.path.join(self.work, "gl", "msl_verify"),
+                   LP_SHADERS=os.path.join(self.work, "obj", "lp_shaders"))
+        logp = os.path.join(self.logs, "shaders.log")
+        with open(logp, "w") as log:
+            r = self.runner(["/bin/sh", os.path.join(ROOT, "tools", "metal", "make-corpus.sh"), "--learn-play", out],
+                            env=env, stdout=log, stderr=subprocess.STDOUT)
+        return self.corpus_copy(made, dest, logp) if not r.returncode else self.no_corpus(logp)
+
+    def corpus_copy(self, made, dest, where):
+        try:
+            shutil.copy2(made, dest)
+        except OSError:
+            return self.no_corpus(where)
+        return True
+
+    def no_corpus(self, where):
+        self.say("  no shader corpus (not fatal: the game compiles its shaders while it plays); see %s" % where)
+        return False
 
 
 def tail(path, n=30):
@@ -735,6 +771,9 @@ def install_app(work, game, app=None, home=None, run=subprocess.run, say=None):
     if os.path.isfile(guard):
         shutil.copy2(guard, macos)
     shutil.copy2(os.path.join(out, "lp_game.exe"), res)
+    corpus = os.path.join(out, "rsmsl-corpus.bin")  # the warm-up compiles it; libRSOpenGL looks up shaders in it
+    if os.path.isfile(corpus):
+        shutil.copy2(corpus, res)
     for f in sorted(os.listdir(os.path.join(out, "dlls"))):
         if f.lower().endswith(".dll") and not f.startswith("._"):
             shutil.copy2(os.path.join(out, "dlls", f), os.path.join(res, "dlls", f))

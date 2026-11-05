@@ -6,6 +6,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 - **Released**: `VERSION` says which release this is. 1.4.0 is the first with the experimental Windows (Learn & Play)
   port.
+- **Shader warm-up**: the loop is now in libRSOpenGL (`rs_gfx_warm_only`), which Learn & Play's install runs too; nothing changed
+  here. `tools/metal/make-corpus.sh --learn-play` and `build-msl-corpus.sh --pairs` are that edition's way through the same tools.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with
   the owning account logged in to Steam, since only the Steam client knows which of them it owns.
 - **What works**: the whole game as a native arm64 app, offline: songs, DLC and custom songs, Session

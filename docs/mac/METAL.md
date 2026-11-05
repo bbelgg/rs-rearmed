@@ -194,7 +194,7 @@ cannot starve the loading threads; a draw that needs one still waits for it or c
 
 **Install-time warm-up** (`--warm-shaders`, `rsp_mtl_warm_only` in `rsp_present_metal.m`,
 `tools/play-native/warm-shaders.sh`, run by `install.sh` and the installer's "Preparing shaders"
-step): the installed app's own executable, before it loads anything of the game (no image, no
+step; the loop is `rs_gfx_warm_only` in libRSOpenGL, which Learn & Play's `--warm-shaders` runs too): the installed app's own executable, before it loads anything of the game (no image, no
 window, no NSApplication, so no Dock icon), re-executes itself with `RS_GL_BACKEND=metal` if needed,
 makes an offscreen context (which opens the disk cache and starts the manifest's warming) and runs
 `rs_gfx_prepare` with the same corpus rule, printing `progress F Preparing shaders… N of M` (F never
@@ -224,6 +224,7 @@ Sources: `shims/opengl/src/msl/`, `tools/metal/`. `rsmsl_translate` (see `msl_xl
 every shader the game can compile; keyed by a hash of both sources), then translates at run time and logs it
 (`RS_MSL_LOG`).
 
+Learn & Play's corpus goes the same way from Direct3D bytecode ([its design](../windows/DESIGN.md#shader-corpus)).
 The corpus of a user's build is made from the game files alone (`tools/metal/make-corpus.sh`, run by
 `build-m4.sh`, a few seconds): Scaleform's GL HAL keeps the full source of each shader in the image,
 one set per GLSL version; `extract_scaleform.py` takes the `#version 120` set (66 vertex, 147 fragment

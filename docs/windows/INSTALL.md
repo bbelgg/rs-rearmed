@@ -111,6 +111,9 @@ is done. **Stop** in the box ends the run; what is done is kept, and Build & Ins
    This is the long part. If it is stopped, run it again and it continues where it was.
 8. **Installing**: `~/Applications/RS Re-ARMed Learn & Play.app`. The build files are deleted afterwards,
    except about 140 MB of translated code that makes a later run much quicker.
+9. **Preparing shaders**: the installed app compiles the game's Metal shaders once, so the first play doesn't stall on
+   them: about 20 seconds the first time, a second on later installs. The button shows **Skip** during this step; the game then
+   compiles them as it first uses them. It can't fail the install.
 
 Once it is installed, **Refresh Game Files** (with Game: Learn & Play chosen) has Steam fetch DLC you bought since,
 and syncs the app's copy of the game files with Steam's folders again.
@@ -138,6 +141,9 @@ update. `tools/play-native/learn-play.sh --refresh` only refreshes the game file
 | `LP_NATIVE_APP` | where to install the app (default `~/Applications/RS Re-ARMed Learn & Play.app`) |
 | `LP_KEEP_BUILD` | `1`: keep all build files; `0`: delete them all, the cache too |
 | `LP_JOBS` | parallel jobs |
+| `RS_WARM_SHADERS` | `0`: no "Preparing shaders" at the end; run `tools/play-native/warm-shaders.sh "<the app>"` later to do it then |
+| `RS_SHADER_CORPUS` | `0`: no shader corpus |
+| `RS_MSL_CORPUS_FILE` | bundle this `rsmsl-corpus.bin` instead of making one |
 | `RC_PY` | a Python with the packages of `win-x86/install/requirements.txt`, instead of the one made in `$RS_BUILD_DIR/venv` |
 
 The steps one at a time: `python3 win-x86/install/lp_install.py --help`.
@@ -310,7 +316,8 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
 ## Update and uninstall
 
 - **Update**: run the installer or `learn-play.sh` again. The game image and the translated
-  code are reused; only what changed is rebuilt; the game files are refreshed.
+  code are reused; only what changed is rebuilt; the game files are refreshed. Preparing shaders then takes a second,
+  unless the shaders changed or macOS was updated.
 - **New DLC**: **Refresh Game Files**, or `learn-play.sh --refresh`.
 - **Uninstall**: delete the app and `~/Library/Application Support/RS Re-ARMed/learn-play` (back up
   `steam/` first to keep your progress); that removes the copy of the game files too, unless the game is on
@@ -341,9 +348,10 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   will need the `_p.psarc` (PC) version; a Mac-only collection does not load. Official DLC has both: each DLC's
   Steam depot holds the `_m` and the `_p` archive, and only the `_p` one goes into the copy.
 - Two crashes have been seen once each and not reproduced yet.
-- Shaders are compiled the first time they are used (there is no install-time warm-up for this build yet). The
-  first start after an install reaches the title about 10 seconds later, the way to the note highway has about
-  20 seconds more of stalls, and the first song a few short stutters. The second play is smooth.
+- A shader the install's list doesn't have is compiled the first time it is used: a short stall, once. That goes for the
+  Guitarcade's games, which nobody could reach without a guitar when the list was made, and may for some venues. After a macOS update every
+  shader is compiled again; run `tools/play-native/warm-shaders.sh "$HOME/Applications/RS Re-ARMed Learn & Play.app"` or
+  click Build & Install again. Unlike the Mac edition, the game doesn't do this by itself at its next start.
 - With another app in front, the hidden full-screen game runs at about 120 fps. It does no harm, but uses more
   power than it needs.
 - Metal only: the OpenGL renderer has no window path in this build (`RS_GL_BACKEND=gl` draws offscreen),

@@ -5,7 +5,8 @@
 # the game will need (the disk cache's manifest and the app's bundled shader corpus) once, now, so
 # the first Metal start does not spend minutes on "Preparing shaders" (or, with a fast-load
 # cache.psarc and no warm-up at all, stall on the loading screen). Runs APP's own executable with
-# --warm-shaders (default: the installed app, $RS_NATIVE_HOME/game/Rocksmith2014.app): no window, no
+# --warm-shaders (default: the installed app, $RS_NATIVE_HOME/game/Rocksmith2014.app; Learn & Play's
+# installer passes its app, docs/windows/PERFORMANCE.md "Shader preparation"): no window, no
 # game. Metal's shader cache belongs to an app (its bundle identifier and bundle path), so only the
 # installed app itself can fill the one the game reads; it is run by its resolved path, as
 # LaunchServices starts it. A few minutes the first time (about 7 on an M2), a second or so when
@@ -23,7 +24,8 @@ if [[ ${RS_WARM_SHADERS:-1} == 0 ]]; then
     exit 0
 fi
 dir=$(cd -P "$app/Contents/MacOS" 2>/dev/null && pwd) || { echo "warm-shaders: no app at $app" >&2; exit 0; }
-exe=$dir/Rocksmith2014
+name=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' "$app/Contents/Info.plist" 2>/dev/null) || name=
+exe=$dir/${name:-Rocksmith2014}
 [[ -x $exe ]] || { echo "warm-shaders: no executable in $app" >&2; exit 0; }
 # A build from before the warm-up would start the game instead.
 if ! grep -qa -- '--warm-shaders' "$exe"; then
@@ -33,7 +35,7 @@ fi
 [[ -f "$app/Contents/Resources/rsmsl-corpus.bin" ]] ||
     echo "warm-shaders: the app has no shader corpus; only shaders known from earlier runs are compiled"
 
-echo "Preparing shaders (once per install or macOS update; the first time takes a few minutes)..."
+echo "Preparing shaders (once per install or macOS update; the first time can take a few minutes)..."
 if [[ -t 1 ]]; then
     "$exe" --warm-shaders 2>/dev/null | awk '
         $1 == "progress" { sub(/^progress [^ ]* /, ""); printf "\r%s   ", $0; fflush(); next }
@@ -44,7 +46,7 @@ fi
 rc=${PIPESTATUS[0]}
 case $rc in
     0) ;;
-    1) echo "warm-shaders: timed out; the game compiles the rest on its first Metal start" ;;
-    *) echo "warm-shaders: failed (status $rc); the game warms up on its first Metal start instead" ;;
+    1) echo "warm-shaders: timed out; the game compiles the rest when it needs them" ;;
+    *) echo "warm-shaders: failed (status $rc); the game compiles them when it needs them" ;;
 esac
 exit 0

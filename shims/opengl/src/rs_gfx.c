@@ -14,9 +14,12 @@
 #include <OpenGL/OpenGL.h>
 #include <OpenGL/gl3.h>
 #include <dlfcn.h>
+#include <mach/mach_time.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <unistd.h>
 
 #pragma clang diagnostic ignored "-Wdeprecated-declarations"
 
@@ -318,6 +321,92 @@ RS_EXPORT int rs_gfx_prepare_progress(rs_gfx_context *c, int *done, int *total) 
     if (done) *done = 0;
     if (total) *total = 0;
     return 0;
+}
+
+// --- Warm-only mode ------------------------------------------------------------------
+static double warm_now(void) {
+    static mach_timebase_info_data_t tb;
+    if (!tb.denom)
+        mach_timebase_info(&tb);
+    return (double)mach_absolute_time() * tb.numer / tb.denom / 1e9;
+}
+
+RS_EXPORT double rs_gfx_warm_line(char *buf, size_t n, int done, int total, double prev) {
+    double f = total > 0 ? (double)(done < total ? done : total) / total : 1.0;
+    if (f < prev)
+        f = prev;
+    if (total > 0)
+        snprintf(buf, n, "progress %.3f Preparing shaders… %d of %d", f, done < total ? done : total, total);
+    else
+        snprintf(buf, n, "progress %.3f Preparing shaders… nothing to compile", f);
+    return f;
+}
+
+typedef struct {
+    rs_gfx_context *ctx;
+    double max_seconds;
+    atomic_int done, rc;
+} warm_job;
+
+static void *warm_thread(void *arg) {
+    warm_job *j = arg;
+    atomic_store(&j->rc, rs_gfx_prepare(j->ctx, j->max_seconds));
+    atomic_store(&j->done, 1);
+    return NULL;
+}
+
+RS_EXPORT int rs_gfx_warm_only(double max_seconds, double interval, FILE *out) {
+    if (!METAL) {
+        fprintf(stderr, "[rs-gl] warm-shaders: no Metal backend (RS_GL_BACKEND=metal is needed)\n");
+        return 2;
+    }
+    double t0 = warm_now();
+    rs_gfx_context *ctx = rs_gfx_create_offscreen(16, 16);
+    if (!ctx) {
+        fprintf(stderr, "[rs-gl] warm-shaders: no Metal context (no Metal device?)\n");
+        return 2;
+    }
+    warm_job j = {ctx, max_seconds, 0, 0};
+    pthread_t th;
+    if (pthread_create(&th, NULL, warm_thread, &j)) {
+        rs_gfx_destroy(ctx);
+        return 2;
+    }
+    char line[160];
+    double f = 0, last_print = -1;
+    int last_done = -1, last_total = -1, done = 0, total = 0;
+    useconds_t poll = interval > 0 && interval < 0.1 ? (useconds_t)(interval * 1e6) : 100 * 1000;
+    while (!atomic_load(&j.done)) {
+        usleep(poll);
+        if (rs_gfx_prepare_progress(ctx, &done, &total) != 1)
+            continue;  // not started yet, or just finished
+        double t = warm_now();
+        if ((done == last_done && total == last_total) || (last_print >= 0 && t - last_print < interval))
+            continue;
+        f = rs_gfx_warm_line(line, sizeof line, done, total, f);
+        fprintf(out, "%s\n", line);
+        fflush(out);
+        last_done = done;
+        last_total = total;
+        last_print = t;
+    }
+    pthread_join(th, NULL);
+    int rc = atomic_load(&j.rc);
+    rs_gfx_prepare_progress(ctx, &done, &total);
+    // The step is over either way: F = 1 (on a timeout with the counts reached).
+    rs_gfx_warm_line(line, sizeof line, rc == 0 ? total : done, total, 1.0);
+    fprintf(out, "%s\n", line);
+    rs_gfx_destroy(ctx);  // the last context: the disk cache is written out
+    double dt = warm_now() - t0;
+    if (rc == 0)
+        fprintf(out, "warm-shaders: %d shader libraries ready in %.1f s\n", total, dt);
+    else if (rc == 1)
+        fprintf(out, "warm-shaders: timed out after %.0f s with %d of %d libraries; the game compiles the rest\n", dt,
+                done, total);
+    else
+        fprintf(out, "warm-shaders: rs_gfx_prepare failed (%d)\n", rc);
+    fflush(out);
+    return rc == 0 ? 0 : rc == 1 ? 1 : 2;
 }
 
 RS_EXPORT int rs_gfx_flush_cache(double max_seconds) { return METAL ? rsmtl_gfx_flush_cache(max_seconds) : 0; }

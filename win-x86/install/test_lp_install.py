@@ -1044,15 +1044,21 @@ with open(dep, "w") as f:
 
 
 class FakeRun:
-    """subprocess.run for build_gl.sh, build.sh, codesign, sips, lsregister: records the calls and makes
+    """subprocess.run for build_gl.sh, build.sh, make-corpus.sh, codesign, sips, lsregister: records the calls and makes
     the files the real ones would."""
 
     def __init__(self):
         self.calls = []
+        self.corpus_rc = 0
 
     def __call__(self, cmd, env=None, **kw):
         self.calls.append(list(cmd))
         script = os.path.basename(cmd[1]) if len(cmd) > 1 else ""
+        if script == "make-corpus.sh":
+            self.corpus_env = env
+            if not self.corpus_rc:
+                write(os.path.join(cmd[-1], "msl", "rsmsl-corpus.bin"), b"corpus")
+            return subprocess.CompletedProcess(cmd, self.corpus_rc, "", "")
         if script == "build.sh":
             out = env["LP_OUT"]
             os.makedirs(os.path.join(out, "dlls"), exist_ok=True)
@@ -1190,8 +1196,35 @@ class TestBuild(BuildBase):
         out = os.path.join(self.work, "out")
         self.assertEqual(sorted(os.listdir(os.path.join(out, "dlls"))),
                          ["bink2w32.dll", "d3dcompiler_42.dll", "d3dx9_42.dll", "msvcp100.dll", "msvcr100.dll"])
-        self.assertEqual([os.path.basename(c[1]) for c in self.run_.calls], ["build_gl.sh", "build.sh"])
+        self.assertEqual([os.path.basename(c[1]) for c in self.run_.calls], ["build_gl.sh", "build.sh", "make-corpus.sh"])
         self.assertEqual(self.fractions, sorted(self.fractions))
+        self.assertEqual(self.fractions[-1], 1.0)
+
+    def test_the_corpus_switches_are_the_macs(self):
+        given = os.path.join(self.work, "given.bin")
+        write(given, b"given")
+        with mock.patch.dict(os.environ, {"RS_MSL_CORPUS_FILE": given}):
+            self.builder().run()
+        dest = os.path.join(self.work, "out", "rsmsl-corpus.bin")
+        self.assertEqual(read(dest), b"given")
+        with mock.patch.dict(os.environ, {"RS_SHADER_CORPUS": "0"}):
+            self.builder().run()
+        self.assertFalse(os.path.exists(dest))
+        self.assertNotIn("make-corpus.sh", [os.path.basename(c[1]) for c in self.run_.calls])
+
+    def test_the_shader_corpus_is_made_from_the_game(self):
+        self.builder().run()
+        self.assertEqual(self.run_.calls[-1][2], "--learn-play")
+        self.assertEqual(self.run_.corpus_env["RC_IMAGE"], self.image)
+        self.assertEqual(self.run_.corpus_env["RS_GAME_DIR"], self.game)
+        self.assertEqual(read(os.path.join(self.work, "out", "rsmsl-corpus.bin")), b"corpus")
+
+    def test_a_build_goes_on_without_a_corpus(self):
+        write(os.path.join(self.work, "out", "rsmsl-corpus.bin"), b"old")
+        self.run_.corpus_rc = 1
+        self.builder().run()
+        self.assertFalse(os.path.exists(os.path.join(self.work, "out", "rsmsl-corpus.bin")))
+        self.assertTrue([s for s in self.said if "no shader corpus" in s])
         self.assertEqual(self.fractions[-1], 1.0)
 
     def test_dlls_staged_and_rebased(self):
@@ -1367,6 +1400,7 @@ class TestApp(BuildBase):
         self.assertTrue(os.path.isfile(os.path.join(c, "MacOS", "libnetguard.dylib")))  # mods load only with it
         self.assertEqual(read(os.path.join(c, "Resources", "lp_game.exe")), read(self.image))
         self.assertEqual(len(os.listdir(os.path.join(c, "Resources", "dlls"))), 5)
+        self.assertEqual(read(os.path.join(c, "Resources", "rsmsl-corpus.bin")), b"corpus")
         import plistlib
         with open(os.path.join(c, "Info.plist"), "rb") as f:
             p = plistlib.load(f)

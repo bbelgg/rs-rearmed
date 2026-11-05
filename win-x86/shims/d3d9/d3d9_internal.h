@@ -239,6 +239,9 @@ void d3d9_dev_unbind(d3d9_device *d, d3d9_obj *o);  // drop every binding of a r
 void d3d9_dev_blit(d3d9_device *d, GLuint tex, const float dst[4], const float src[4], int linear);
 void d3d9_dev_bind_target(d3d9_device *d, d3d9_surface *color, d3d9_surface *depth);
 void d3d9_state_defaults(d3d9_device *d, d3d9_state *s);
+void d3d9_shader_log_created(const d3d9_sm *sm);  // LP_SHADER_LOG (d3d9_device.c)
+void d3d9_shader_log_program(const char *kind, const d3d9_sm *vs, const d3d9_sm *ps, const void *key, size_t keylen,
+                             const char *vsrc, const char *fsrc);
 GLuint d3d9_gl_link(const char *vs, const char *fs, void (*bind)(GLuint, void *), void *arg, char *log, size_t loglen);
 GLint d3d9_gl_uloc(GLuint p, const char *name);  // name, else name[0]
 extern int d3d9_program_failures;

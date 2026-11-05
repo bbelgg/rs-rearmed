@@ -931,6 +931,7 @@ uint32_t d3d9_create_shader(d3d9_device *d, int ps, uint32_t func, uint32_t *out
     s->dev = d;
     s->sm = sm;
     s->id = d->next_shader_id++;
+    d3d9_shader_log_created(sm);
     // translate now: the pixel shader's GLSL is final; a vertex shader's is checked here and
     // generated again per pixel shader it is linked with
     char *g = d3d9_sm_glsl(sm, 0, err, sizeof err);

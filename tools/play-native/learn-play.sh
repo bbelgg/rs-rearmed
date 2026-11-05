@@ -42,6 +42,8 @@
 #      repository; userdata/: Rocksmith.ini; steam/: profiles and progress; logs/). Then the build's
 #      intermediates are deleted, except the translated libraries, a cache of about 140 MB
 #      (LP_KEEP_BUILD=1 keeps everything, LP_KEEP_BUILD=0 nothing).
+#   6. The Metal shaders (tools/play-native/warm-shaders.sh): the installed app compiles the build's shader corpus
+#      once, under a minute the first time, so the first play does not stall on them. RS_WARM_SHADERS=0 skips it.
 # Needs the Xcode command line tools (clang, make) and their python3; the build's Python packages
 # (win-x86/install/requirements.txt) go into $RS_BUILD_DIR/venv with pip. Everything runs natively (no Rosetta, no Homebrew, no
 # CMake or Ninja, no steamcmd); the Mac game install and its saves are never touched. The game runs offline.
@@ -189,6 +191,7 @@ case ${LP_KEEP_BUILD:-} in
     *) lpi build-clean "$build/lp" ;;
 esac
 app=${LP_NATIVE_APP:-$HOME/Applications/RS Re-ARMed Learn & Play.app}
+"$here/warm-shaders.sh" "$app"
 cat <<EOF
 
 Done. Start the game with:

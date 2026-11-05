@@ -65,7 +65,8 @@ frame over 20 ms on each.
 The Metal shader corpus (3880 distinct programs) compiles in about 270-375 s on a cold system cache
 (install-time warm-up, 8 threads), and in about 0.2 s when the system cache is warm. The first play of a
 song after an install has a few 0.3-0.8 s stalls in its first half-minute while pipelines are built for
-the first time; the second play has none.
+the first time; the second play has none. Learn & Play's corpus is 281 programs, from a list of what the game was seen linking:
+[its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
 
 ### Against the Windows port
 
@@ -110,8 +111,8 @@ follow the size of the picture.
 | Quit from inside a song | 0.3-0.5 s | 0.3-0.5 s |
 
 The first play after an install against the second, one run of each, with no shader cache at all: the app's cache emptied and
-the system's Metal cache for the bundle moved aside for the runs and put back after. Learn & Play has nothing to prepare at
-install; the Mac edition's Preparing shaders ran first and took about 330 and 390 s. Frames over 33 ms, and the time they took:
+the system's Metal cache for the bundle moved aside for the runs and put back after. Learn & Play had nothing to prepare at
+install then; the Mac edition's Preparing shaders ran first and took about 330 and 390 s. Frames over 33 ms, and the time they took:
 
 | | Mac, first | Mac, second | Learn & Play, first | Learn & Play, second |
 |---|---|---|---|---|
@@ -123,8 +124,9 @@ install; the Mac edition's Preparing shaders ran first and took about 330 and 39
 | Title takes keys | by 9.6 s | | by 20.5 s | |
 
 So with the shaders prepared at install the Mac's first play has one 0.6 s stall at Play Song and none in the song. Learn &
-Play's first play is what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
-in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first.
+Play's first play was what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
+in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first. Learn & Play
+prepares its shaders now too, in 16.5 s: [its numbers](../windows/PERFORMANCE.md#shader-preparation).
 
 **Against 1.3.0**: a comparison with the figures recorded above, not a same-day run: 1.3.0 was not built or run in this
 pass, and those figures come from other songs and a shorter window. CPU 44% of a core against the recorded 48-49%; game

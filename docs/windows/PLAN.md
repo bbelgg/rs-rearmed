@@ -15,8 +15,9 @@ Checked by hand on an Apple Silicon Mac (2026-11-01):
 - window and full screen (the in-game Windowed Mode switch was checked from screenshots of a scripted run).
 
 Performance: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 33 ms, at 63% of a core against the Mac
-port's 44% on the same song and screen ([PERFORMANCE.md](PERFORMANCE.md#final-pass-for-140)). The first play after an install
-has about 21 s more of shader stalls up to the highway and four short ones in the song; the second has none.
+port's 44% on the same song and screen ([PERFORMANCE.md](PERFORMANCE.md#final-pass-for-140)). The install prepares the shaders:
+the first play after it has about 1.2 s more of frames over 33 ms up to the highway than the second, and none in the
+song ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
 
 Checked in the app installed by the installer, started with `open` (2026-11-04, a build of `main` with the memory
 ordering, a test home, by keys and snapshots, [TESTING.md](TESTING.md#unattended-runs)): songs to their end and back to back, a
@@ -52,8 +53,8 @@ cache, and 34,300 numbers were hashed. The two were not timed apart: `RS_MODS_FI
 
 With the intro skip the title is up about 9 s after the start and took Return by 12 s, in a run pressing Return
 every 1.5 s (2026-11-04, one run, warm shader cache, quiet Mac), so the slow title is gone. The 27 s of the first
-measurements was the logo video, and the 15-35 s since then was not seen again. The first run after an install, with
-its shaders cold, reaches the title about 10 s later ([PERFORMANCE.md](PERFORMANCE.md#final-pass-for-140)).
+measurements was the logo video, and the 15-35 s since then was not seen again. The first run after an install has the title up at 7.8 s too, with the shaders prepared
+([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)); with them cold it was 16.5 s.
 
 The system's default output changing reaches the game: Wwise then makes a new sink, and the sound follows, there and
 back. Checked through the window script's `audio` step and by switching a real device during a song (2026-11-04). The
@@ -93,7 +94,7 @@ mod the table doesn't show on the game thread ([PERFORMANCE.md](PERFORMANCE.md#h
 restarts with the guard and loads the mod, but that run had no game files: the test bundle has no macOS permission for the
 volume the test copy is on, and `open` waits there for an answer. A whole game by `open` with a mod is open.
 
-Not there yet: the loading-screen fix, the OpenGL renderer (no window path), the install-time shader warm-up.
+Not there yet: the loading-screen fix, the OpenGL renderer (no window path).
 
 Where it stands against the plan's phases:
 
@@ -135,9 +136,11 @@ already, or has no need of them.
 - **CPU and memory**: 63% of a core against the Mac edition's 44%, and 1.3 GB against 0.8 GB, on the same song and
   screen. How much of the CPU is the memory order at the display's rate is not measured: the only figures are at
   120 fps ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
-- **First play**: without a warm-up at install, the first start has about 21 s more of stalls up to the highway
-  (worst 3.6 s) and four of about 0.32 s in the song; the second play has none
-  ([PERFORMANCE.md](PERFORMANCE.md#final-pass-for-140)).
+- **Shaders the list doesn't have**: the corpus has the programs seen in runs, and the Guitarcade's games wait for a guitar at
+  calibration, so of them it has only their effects, and of the venues (Venue Mode) one was seen, with four programs of its own. Run them
+  with `LP_SHADER_LOG` and add them ([TESTING.md](TESTING.md#shaders-of-a-run)). A program not in it stalls about 0.25 s the first time, as before.
+- **After a macOS update** the first play compiles again unless the warm-up is run again; the Mac edition does it at its next
+  start when safe load is on. In Learn & Play it would be `rs_gfx_prepare` at context creation, with a line on the black window.
 - **One DLC archive differs between depots**: 113 PC archive files in the depots are 73 different archives, and one
   name (`notegew2_p.psarc`) has two versions 2 bytes apart. The copy keeps one; what the bytes do has not been read.
 - **Song archives per platform**: the Windows game reads the PC archives, `*_p.psarc`; the Mac game
@@ -201,8 +204,6 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
   now: a run shows what looks like the slot as its first stack word and 0 for success, so an adapter looks possible; `input_sink` and
   `set_app_focus`; the overlay API for mods that draw, and `OV_VCALL`, which the app doesn't export. `mods.c` and `audio_in.c`
   are not built here, so their pointer-width layouts need no names per target.
-- A build-time shader corpus from the Windows image and the PC `static.psarc`, and the install-time warm-up,
-  as on the Mac.
 - The checks the Mac port has had that are left: a guitar through Direct Connect, long sessions.
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:

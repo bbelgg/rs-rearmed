@@ -3,6 +3,8 @@
 // tests use the offscreen contexts to run the same GL calls on both backends.
 #pragma once
 #include <OpenGL/CGLTypes.h>
+#include <stddef.h>
+#include <stdio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -46,6 +48,20 @@ int rs_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
 // grow once, when the corpus warm is decided; both only grow; done <= total). Returns 1 while
 // rs_gfx_prepare runs, 0 otherwise (before, after, GL), -1 for no context.
 int rs_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total);
+// Warm-only mode, both editions' --warm-shaders (the installer's shader warm-up: no window, no game;
+// docs/mac/METAL.md "Safe load"): an offscreen context opens the disk cache and starts warming its
+// manifest; rs_gfx_prepare(max_seconds) compiles that and, by its corpus rule (a small manifest or no
+// corpus-warmed record; RS_METAL_CORPUS_WARM overrides), every library of the bundled corpus.
+// Metal's own shader cache belongs to the app (bundle identifier and bundle path), so this must run
+// in the installed app's executable for the game's later compiles to hit it. Writes to `out`
+// "progress F Preparing shaders… N of M" lines (F = N/M, never decreasing) at most every `interval`
+// seconds while the counts change, one with F = 1 when it ends (also on a timeout), then a
+// "warm-shaders: ..." summary. Returns an exit status: 0 ready (also: nothing to compile), 1 timed
+// out (the rest compiles in the game), 2 no Metal context.
+int rs_gfx_warm_only(double max_seconds, double interval, FILE *out);
+// The progress line's fraction and label as rs_gfx_warm_only prints them: "progress F LABEL" with
+// F = max(prev, done/total) (1 when total is 0); returns F.
+double rs_gfx_warm_line(char *buf, size_t n, int done, int total, double prev);
 // The process is about to end without running atexit handlers (the shell's rsp_exit ends in
 // _exit): writes what the Metal disk cache still holds, as exit() would. From any thread, with
 // contexts still in use; drops the compiles still queued, so call it last. Waits at most

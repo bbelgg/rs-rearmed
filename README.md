@@ -81,7 +81,7 @@ port, and several features are not there yet.
 | Frame rate follows the display (75/120 Hz) | ✅ | ✅ 75 Hz |
 | Metal renderer | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ |
-| Shaders prepared at install | ✅ | ❌ |
+| Shaders prepared at install | ✅ | ✅ |
 | Installer app and install script | ✅ | ✅ |
 | Game image made on the Mac, with nothing from the user | ✅ | ✅ |
 | Performance | ✅ about Rosetta's CPU | ✅ the display's frame rate, about 43% more CPU than the Mac port |
@@ -171,7 +171,8 @@ OpenGL, which Apple deprecated.
 - **Shaders:** Metal compiles the game's shaders once. The installer does this in its "Preparing
   shaders" step (a few minutes the first time; Skip leaves it to the game's first start). After a macOS
   update the game recompiles them on its
-  next start, showing "Preparing shaders… N of M" on a black screen before it loads.
+  next start, showing "Preparing shaders… N of M" on a black screen before it loads. Learn & Play has the same step, in
+  about 20 seconds; after a macOS update run the installer again.
 
 ### The title logo
 
@@ -287,8 +288,8 @@ Being looked into for future releases, with no promise of if or when:
 - **RSMods:** more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
 - **Input channel selection:** choosing which input of an external audio interface the game listens to,
   on interfaces with more than one input.
-- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (the shaders prepared at
-  install, the OpenGL renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
+- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (the hook points left, the OpenGL
+  renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
 
 ## FAQ
 

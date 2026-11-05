@@ -68,6 +68,8 @@ if(Python3_FOUND)
   add_test(NAME targets.check COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/targets/test_targets.py)
   # The Learn & Play install steps (win-x86/install): fixture cabinets, no Steam, no network.
   add_test(NAME win-x86.install COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/win-x86/install/test_lp_install.py)
+  # Learn & Play's shader corpus sources (win-x86/shaders): hand-assembled shaders, nothing of the game.
+  add_test(NAME win-x86.shaders COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/win-x86/shaders/test_shaders.py)
   # The installs' own copy of the game files (tools/play-native/gamefiles.py): made-up game folders.
   add_test(NAME play-native.gamefiles COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_gamefiles.py)
   add_test(NAME steamless.decrypt COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/steamless/test_decrypt.py)

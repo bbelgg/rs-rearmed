@@ -72,6 +72,10 @@ codesign -f -s - "$out/libnetguard.dylib" 2>/dev/null
 $CC -Wall -c "$root/win-x86/app/lp_screen.c" -o "$obj/lp_screen.o"
 clang -arch arm64 -O2 -g -Wall -fobjc-arc -DLP_VERSION="\"$(cat "$root/VERSION")\"" -I"$root/shims/opengl/src" -c "$root/win-x86/app/lp_window.m" -o "$obj/lp_window.o"
 
+clang -arch arm64 -O2 -g -Wall -I"$root/win-x86/shims/d3d9" "$root/win-x86/shaders/lp_shaders.c" \
+  "$root/win-x86/shims/d3d9/d3d9_shader.c" "$root/win-x86/shims/d3d9/d3d9_ffp_gen.c" -o "$obj/lp_shaders" ||
+  echo "no lp_shaders: this build has no shader corpus"
+
 echo "===== Link ====="
 clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$obj"/rt/*.o \
   "$b/game/obj/libgame_rc.a" \

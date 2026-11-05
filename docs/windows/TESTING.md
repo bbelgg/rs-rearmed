@@ -11,6 +11,7 @@ where you point them and never copied into the repository.
 | Area | Command | What it checks |
 |---|---|---|
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
+| Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md) |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
 | Kernel32 waits | `make -C win-x86/shims/tests test OUT=DIR` | events, mutexes, semaphores, wait-any and wait-all, timeouts; an idle waiter is not woken by other objects; a wait keeps objects whose handles are closed; `PulseEvent`; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); the open-file limit from 256 (`rc_nofile.h`, shared with the Mac port) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
@@ -92,11 +93,16 @@ Every message of the box can be seen without touching Steam, with a stand-in:
   (No subscription) `, `Depot download complete : "..." (manifest 1) `, and clones the clean depot into
   `steamapps/content/app_221680/`. When the path doesn't exist, Steam isn't installed.
 - `LP_STEAM_PROCESS=<name>`: the process that counts as Steam: a small program under that name, running or not.
-  A copy of `/bin/sleep` is killed by macOS; compile one.
+  A copy of `/bin/sleep` is killed by macOS; compile one. Have it running before Build & Install: with it not running, the DLC step
+  opens the real Steam by its bundle identifier, which `LP_STEAM_EXE` doesn't stand in for.
 - `RS_XCODE_SELECT=<script>`: fails `-p` until a file is there, for Apple's tools.
 - `LP_CONFIG=<target.toml with a huge depot_disk_bytes>`: no room. Change the file with an atomic `mv` while the
   alert is up (a `cp` can be read half written), then Check Again.
 - `hdiutil attach` is refused in the agent's sandbox, so a really small disk was not tried.
+
+- Skip on Preparing shaders: the step is 16 s on Learn & Play, so for a test put a `sleep` at the top of the build folder's copy of `warm-shaders.sh`;
+  Build Again takes under a minute and leaves it there. `app_click` on Skip answers `cannotComplete` when the finish sheet opens before it returns:
+  the click worked. The sheet says the shaders are not prepared. A finished run, then Build Again and Skip, is the case to try: the note went by what the run before found.
 
 - `RS_XCODEBUILD=<script>` with `RS_XCODE_SELECT` printing a path in a `.app`: Xcode not set up. Exit 69 until a
   file is there. Stop before the run goes on: with the real Steam the next step would fetch DLC.
@@ -210,7 +216,8 @@ highway above, with `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs
 probe_mod.dylib`, a line for each point the game hasn't, `[probe]` lines (`[probe] file sha256`: the file that ran), and
 `logs/netguard.log` its `mode=block` line. The screens are the script's own: the mod changes nothing. No mod without the guard:
 a copy of the app without `Contents/MacOS/libnetguard.dylib` logs `[rc] mods not loaded: no libnetguard.dylib beside the app`, and
-`LP_MODS_GUARD=1` (a restart that lost the guard) `the network guard did not load`; neither has a `[probe]` line. A test copy on
+`LP_MODS_GUARD=1` (a restart that lost the guard) `the network guard did not load`; neither has a `[probe]` line. With the game files on another APFS drive, `game-copy --dest` makes `game/` a link to that drive; `RS_GAME_COPY_DIR=home`
+makes a real copy at DEST, for a test home wholly on the startup disk. A test copy on
 another volume and `open`: a bundle without the permission stops in `open()` at its first look at that volume, until the
 question is answered (`sample` shows `rc_mods_count`, `scandir`, `__open_nocancel`). It is not a hang.
 
@@ -337,6 +344,38 @@ twice; Esc, Down, Return leaves), GUITARCADE, MULTIPLAYER (the second profile, C
 notices that each take Return, and a Return too many starts the next song. Esc from the main menu, Return on "Yes, quit",
 Esc on the title, Return on EXIT GAME: the game's own Exit.
 
+### Shaders of a run
+
+`LP_SHADER_LOG=DIR` tells what a run made. `python3 win-x86/shaders/record_programs.py DIR/log.tsv` adds its programs to
+`win-x86/shaders/programs.tsv`; a line in the list holds hashes and state keys only, but the rest of `DIR` is the game's, so it stays
+on this Mac. To see what the corpus missed, `RS_MSL_LOG=1` logs each program translated at run time, and with
+`RS_METAL_CACHE_STATS=1` the exit line's `lib_ms` is the time spent compiling: 7.8 ms for a first play after the warm-up.
+
+A first play with no shader cache, without touching the user's: give the test app a bundle identifier of its own (`CFBundleIdentifier`
+in `Info.plist`, then `codesign --force --sign -`), and before each run delete `$(getconf DARWIN_USER_CACHE_DIR)<that identifier>` and
+the test home's `Library/Caches/rs-rearmed`. Start the executable directly, with `HOME` and `CFFIXED_USER_HOME` at the test home: with
+`open`, a test bundle with its files on another drive waits for macOS's question about the volume, with no window to show for it (a
+process stuck in `dyld4::open`, no log), and nobody may answer it in an unattended run. Metal's cache is the same either way
+([METAL.md](../mac/METAL.md#safe-load)).
+
+Screens not in the other routes, by key from the main menu (2026-11-05, keyfifo, a test profile, no guitar; `key` is left out):
+
+- Space: Tools. OPTIONS (down 3), VISUAL SETTINGS (down 2), VENUE MODE (down 7), Return, Return on On: from then on a song opens
+  a portal to a venue about 30 s in, with or without a guitar. Esc four times to the menu. With Venue Mode Off (the test profile's)
+  a song stays in the rehearsal room. The rooms of Session Mode are reverbs, not venues.
+- GUITARCADE: TECHNIQUE GAMES, Return on a game, then Calibration "Make some noise!" waits for a guitar; Esc goes back. So the games
+  need a guitar. SCORE ATTACK works without: Return on the song, Return on EASY, Skip Tuner, Return; three strikes end it ("Song
+  failed!") about 30 s in, Return goes back to the list.
+- MULTIPLAYER: Return on the second profile, Return on CONTINUE, Return on the mode and the first song, Return on Play Song, Skip
+  Tuner, Return: a split-screen song.
+- A song's Esc: RESUME, RESTART, TUNER, MIXER, EXIT, Space Riff Repeater. Esc, Down four times, Return leaves it for the song's page; Esc is
+  the list, Esc again clears its search. Down moves a row, Return on a row opens the song's page, Return there is Play Song.
+- Riff Repeater's speed (2026-11-05, `rr_speed_ratio` with a mod): in a song Esc, Space, Down twice to SPEED, Left once a second, each 1 off the
+  100; Delete (`key fwddelete`) resumes. The slider calls the point on each step, ACCELERATE on goes on calling it in the song.
+- Focus loss (`ui_event`): another app in front during a song (`open -a Finder`, as a player would); keyfifo's `front` comes back.
+- LESSONS, a lesson with practice: Bass 101 is the third Down from the first video one; Return twice, Skip Tuner, Return. Esc there is
+  a menu with RESUME LESSON, EXIT LESSON, RESTART LESSON, TUNER, TECHNIQUE GUIDE, MIXER.
+
 ### By hand and with computer use
 
 The keys and the way from the title to a song are in [INSTALL.md](INSTALL.md#playing). Keys reach the game
@@ -389,6 +428,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `LP_PROF_NEW=N` | indirect-call targets seen for the first time from profile round N on |
 | `LP_DUMP_WAITS=S` | each guest thread's pending wait, its handles and their state, every S seconds |
 | `RC32_LOG_RAISE=N` | the first N guest exceptions: code, C++ type, guest and host stack |
+| `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
 | `RS_GL_FRAMETIMES=FILE` | a line per Present |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
 | `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input |

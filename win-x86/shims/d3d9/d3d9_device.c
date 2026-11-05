@@ -2,10 +2,16 @@
 #include <dlfcn.h>
 #include <math.h>
 #include <mach/mach_time.h>
+#include <pthread.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <unistd.h>
 
+#include "d3d9_ffp_gen.h"
 #include "d3d9_internal.h"
 #include "rs_gfx.h"
 #include "win32_shims.h"
@@ -312,21 +318,6 @@ static void ensure_target(d3d9_device *d) {
 }
 
 // --- the blit program (Present, StretchRect) -------------------------------------------------
-static const char kBlitVS[] =
-    "#version 120\n"
-    "attribute vec2 rs_p;\n"
-    "uniform vec4 rs_b[2];\n"
-    "varying vec2 rs_uv;\n"
-    "void main() {\n"
-    "  rs_uv = mix(rs_b[1].xy, rs_b[1].zw, rs_p);\n"
-    "  gl_Position = vec4(mix(rs_b[0].xy, rs_b[0].zw, rs_p), 0.0, 1.0);\n"
-    "}\n";
-static const char kBlitFS[] =
-    "#version 120\n"
-    "uniform sampler2D rs_tex;\n"
-    "varying vec2 rs_uv;\n"
-    "void main() { gl_FragColor = texture2D(rs_tex, rs_uv); }\n";
-
 static GLuint compile(GLenum type, const char *src, char *log, size_t loglen) {
     GLuint s = glCreateShader(type);
     glShaderSource(s, 1, &src, 0);
@@ -363,6 +354,90 @@ GLuint d3d9_gl_link(const char *vs, const char *fs, void (*bind)(GLuint, void *)
     return p;
 }
 
+// LP_SHADER_LOG=<dir>: what a run makes, for finding where its programs come from
+// (docs/windows/TESTING.md "Shaders of a run"). <dir>/log.tsv has a line per shader created and per program
+// linked, with hashes of the bytecode and of the GLSL; <dir>/sm/<hash>.[vp]so is the bytecode and
+// <dir>/glsl/<hash>.(vert|frag) the GLSL. All of it comes from the game: keep it on this Mac.
+static const char *shader_log_dir(void) {
+    static const char *dir;
+    static int once;
+    if (!once) {
+        once = 1;
+        dir = getenv("LP_SHADER_LOG");
+        if (dir && !*dir) dir = 0;
+    }
+    return dir;
+}
+
+static uint64_t fnv64(const void *p, size_t n) {
+    const uint8_t *b = p;
+    uint64_t h = 0xcbf29ce484222325ull;
+    while (n--) h = (h ^ *b++) * 0x100000001b3ull;
+    return h;
+}
+
+static void shader_log_write(const char *dir, const char *sub, uint64_t h, const char *ext, const void *data, size_t n) {
+    char path[1024];
+    snprintf(path, sizeof path, "%s/%s", dir, sub);
+    mkdir(dir, 0755);
+    mkdir(path, 0755);
+    snprintf(path, sizeof path, "%s/%s/%016llx.%s", dir, sub, (unsigned long long)h, ext);
+    if (!access(path, F_OK)) return;
+    FILE *f = fopen(path, "wb");
+    if (f) { fwrite(data, 1, n, f); fclose(f); }
+}
+
+static void shader_log_line(const char *dir, const char *fmt, ...) {
+    static FILE *f;
+    static uint64_t t0;
+    static pthread_mutex_t m = PTHREAD_MUTEX_INITIALIZER;
+    pthread_mutex_lock(&m);
+    if (!f) {
+        char path[1024];
+        mkdir(dir, 0755);
+        snprintf(path, sizeof path, "%s/log.tsv", dir);
+        f = fopen(path, "a");
+        t0 = clock_gettime_nsec_np(CLOCK_MONOTONIC);
+    }
+    if (f) {
+        fprintf(f, "%.3f\t", (clock_gettime_nsec_np(CLOCK_MONOTONIC) - t0) / 1e9);
+        va_list a;
+        va_start(a, fmt);
+        vfprintf(f, fmt, a);
+        va_end(a);
+        fputc('\n', f);
+        fflush(f);
+    }
+    pthread_mutex_unlock(&m);
+}
+
+static uint64_t sm_log_hash(const d3d9_sm *sm) {
+    return sm ? fnv64(d3d9_sm_tokens(sm), d3d9_sm_get_info(sm)->ntokens * 4) : 0;
+}
+
+void d3d9_shader_log_created(const d3d9_sm *sm) {
+    const char *dir = shader_log_dir();
+    if (!dir) return;
+    const d3d9_sm_info *in = d3d9_sm_get_info(sm);
+    uint64_t h = sm_log_hash(sm);
+    shader_log_write(dir, "sm", h, in->is_ps ? "pso" : "vso", d3d9_sm_tokens(sm), in->ntokens * 4);
+    shader_log_line(dir, "shader\t%s_%d_%d\t%016llx", in->is_ps ? "ps" : "vs", in->major, in->minor, (unsigned long long)h);
+}
+
+void d3d9_shader_log_program(const char *kind, const d3d9_sm *vs, const d3d9_sm *ps, const void *key, size_t keylen,
+                             const char *vsrc, const char *fsrc) {
+    const char *dir = shader_log_dir();
+    if (!dir) return;
+    uint64_t hv = fnv64(vsrc, strlen(vsrc)), hf = fnv64(fsrc, strlen(fsrc));
+    shader_log_write(dir, "glsl", hv, "vert", vsrc, strlen(vsrc));
+    shader_log_write(dir, "glsl", hf, "frag", fsrc, strlen(fsrc));
+    char hex[1024] = "";
+    for (size_t k = 0; key && k < keylen && 2 * k + 2 < sizeof hex; k++)
+        snprintf(hex + 2 * k, 3, "%02x", ((const uint8_t *)key)[k]);
+    shader_log_line(dir, "program\t%s\t%016llx\t%016llx\t%016llx\t%016llx\t%s", kind, (unsigned long long)sm_log_hash(vs),
+                    (unsigned long long)sm_log_hash(ps), (unsigned long long)hv, (unsigned long long)hf, hex);
+}
+
 static void bind_blit(GLuint p, void *arg) { (void)arg; glBindAttribLocation(p, 0, "rs_p"); }
 
 static GLuint blit_quad_buf;
@@ -370,7 +445,8 @@ static GLuint blit_quad_buf;
 void d3d9_dev_blit(d3d9_device *d, GLuint tex, const float dst[4], const float src[4], int linear) {
     if (!d->blit_prog) {
         char log[1024] = "";
-        d->blit_prog = d3d9_gl_link(kBlitVS, kBlitFS, bind_blit, 0, log, sizeof log);
+        d3d9_shader_log_program("blit", 0, 0, 0, 0, d3d9_blit_vs, d3d9_blit_fs);
+        d->blit_prog = d3d9_gl_link(d3d9_blit_vs, d3d9_blit_fs, bind_blit, 0, log, sizeof log);
         if (!d->blit_prog) { fprintf(stderr, "d3d9: blit program: %s\n", log); return; }
         d->blit_loc_rect = glGetUniformLocation(d->blit_prog, "rs_b");
         d->blit_loc_tex = glGetUniformLocation(d->blit_prog, "rs_tex");
@@ -472,6 +548,7 @@ static d3d9_program *get_program(d3d9_device *d, d3d9_shader *vs, d3d9_shader *p
     }
     char log[2048] = "";
     uint64_t t0 = LP_FRAME_ON() ? lp_frame_now() : 0;
+    d3d9_shader_log_program("pair", vs->sm, ps->sm, 0, 0, vsrc, ps->glsl);
     p->prog = d3d9_gl_link(vsrc, ps->glsl, bind_attrs, vs, log, sizeof log);
     if (t0) lp_frame_event(LPF_PROGRAM, lp_frame_now() - t0, 0);
     if (!p->prog) {

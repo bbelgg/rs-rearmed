@@ -89,6 +89,12 @@ The game draws OpenGL 2.1 with Cg programs (Gamebryo) and GLSL 1.20 (Scaleform).
 (`shims/cg`) translates the ARB programs to GLSL. Design, defaults, fallback and status:
 [METAL.md](METAL.md).
 
+### Shader corpus
+
+Made at build time from the game files and compiled by the install's warm-up: [METAL.md](METAL.md#shader-translation) and
+[METAL.md](METAL.md#safe-load). Every pair the shaders could form is in it. Learn & Play's shaders pair too freely for that:
+[its corpus](../windows/DESIGN.md#shader-corpus) has the programs seen in runs.
+
 ## Audio
 
 The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio override module

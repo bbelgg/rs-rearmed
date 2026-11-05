@@ -216,13 +216,44 @@ efficiency cores, which needs more CPU time for the same work (72% against 45%).
 
 ## Shader preparation
 
-Learn & Play has no install-time warm-up and no safe load (it never calls `rs_gfx_prepare`): its
-shaders compile as the game first uses them, and libRSOpenGL's Metal disk cache warms them on the
-compile pool at the next start ([the Mac edition's notes](../mac/METAL.md)). The installed app keeps
+The install compiles the game's Metal shaders, as the Mac's does ([DESIGN.md](DESIGN.md#shader-corpus) has how): the build makes a
+corpus of 281 programs from the user's game files, and the app's `--warm-shaders` compiles it into the system's Metal cache, in 16.5 s on
+the M2 with that cache cold and in a second when it is warm. The Mac's corpus of 3880 takes 270-375 s: every pair its shaders could form
+is in it, where Learn & Play's has the pairs the game was seen using. There is no safe load: it is for a fast-load `cache.psarc`
+and a busy CPU, and the measurements below show no need for one.
+
+libRSOpenGL's Metal disk cache also warms what earlier runs used on the compile pool at the next start
+([the Mac edition's notes](../mac/METAL.md)). The installed app keeps
 that cache in `~/Library/Caches/rs-rearmed/learn-play/metal` (`RS_METAL_CACHE_DIR` overrides it), beside
 the Mac edition's `~/Library/Caches/rs-rearmed/metal`. With one shared cache each edition compiled the
 other's shaders at every start, and eight runs of one dropped the other's from the manifest. A build run
 from `out/` has no disk cache, as a Mac build outside an app has none.
+
+Measured on 2026-11-05 the way the table in [Final pass](#final-pass-for-140) was, same machine, screen and song: the same keys, frames over
+33 ms and the time they took, frame times over 150 s of the song, one run of each. The test app had a bundle identifier of its own, so
+"no shader cache" touched nothing of the user's: the app's cache and the system's Metal cache for that identifier were deleted, and
+the app was started directly rather than with `open` ([TESTING.md](TESTING.md#shaders-of-a-run)).
+
+| | First, no warm-up | First, after the warm-up | Second |
+|---|---|---|---|
+| Start to the main menu | 54, 15.9 s, worst 3.1 s | 56, 4.9 s, worst 1.4 s | 55, 4.2 s, worst 1.4 s |
+| Song list | 6, 2.0 s, worst 0.7 s | 5, 0.3 s | 3, 0.2 s |
+| Play Song to the highway | 15, 8.7 s, worst 3.5 s | 10, 0.6 s, worst 0.15 s | 3, 0.2 s |
+| 150 s of the song | 4, 1.2 s, each about 0.3 s | none | none |
+| First frame | 4.4 s | 0.5 s | 0.4 s |
+| Title up | 16.5 s ([Final pass](#final-pass-for-140)) | 7.8 s | 6.9, 7.3 s ([Final pass](#final-pass-for-140)) |
+| Title takes keys | by 20.5 s (the same) | by 10.9 s | by 10.0-10.4 s (the same) |
+| `lib_ms`: compiling libraries | 25,480 ms | 7.8 ms | 1.4 ms |
+| `pipe_ms`: building pipelines | 1,040 ms | 1,064 ms | 0 |
+
+So the first play after an install has about 1.2 s more of frames over 33 ms up to the highway than the second, against
+about 22 s without the warm-up. What is left is pipelines: the corpus has libraries, and the pipelines need draw state
+it doesn't have, as on the Mac; the disk cache has them from the second play on. All 98 programs of the run came out of the corpus.
+The worst frame of 1.4 s, 3 s after the start, is in every run and has nothing to do with shaders. In the Final pass it was 0.7 s: these runs
+started the app directly and without `open`, the only difference found, and it was not looked into further.
+
+A program the corpus doesn't have costs what it did before, a stall of about 0.25 s the first time. After a macOS update the system's
+cache and the disk cache are both new, and so is the first play: the warm-up has to be run again ([INSTALL.md](INSTALL.md#known-issues)).
 
 ## Memory order
 
@@ -291,8 +322,8 @@ follow the size of the picture.
 | Quit from inside a song | 0.3-0.5 s | 0.3-0.5 s |
 
 The first play after an install against the second, one run of each, with no shader cache at all: the app's cache emptied and
-the system's Metal cache for the bundle moved aside for the runs and put back after. Learn & Play has nothing to prepare at
-install; the Mac edition's Preparing shaders ran first and took about 330 and 390 s. Frames over 33 ms, and the time they took:
+the system's Metal cache for the bundle moved aside for the runs and put back after. Learn & Play had nothing to prepare at
+install then ([it has now](#shader-preparation)); the Mac edition's Preparing shaders ran first and took about 330 and 390 s. Frames over 33 ms, and the time they took:
 
 | | Mac, first | Mac, second | Learn & Play, first | Learn & Play, second |
 |---|---|---|---|---|
@@ -304,8 +335,9 @@ install; the Mac edition's Preparing shaders ran first and took about 330 and 39
 | Title takes keys | by 9.6 s | | by 20.5 s | |
 
 So with the shaders prepared at install the Mac's first play has one 0.6 s stall at Play Song and none in the song. Learn &
-Play's first play is what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
-in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first.
+Play's first play was what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
+in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first. Learn & Play
+prepares its shaders now, and [Shader preparation](#shader-preparation) has its first play with that.
 
 Against the numbers above: 48% of a core at 60 fps (8.0 ms a frame, another song, no memory order) is now 63% at 75 fps (8.4 ms
 a frame). The "13% more than the Mac build" of [Against the Mac build](#against-the-mac-build) is out of date: on the same song

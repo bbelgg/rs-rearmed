@@ -469,7 +469,7 @@ final class BuildRunner {
         }
         // The Metal shaders only for Metal: an OpenGL install needs none (a later switch to Metal
         // prepares them on its first start).
-        if renderer == "metal" && game == "mac" && !refreshOnly {
+        if (renderer == "metal" || game == "learnplay") && !refreshOnly {
             steps.append(("Preparing shaders", Steps.prepareShaders))
         }
         if !embeddedInRepo && cleanupAfterInstall && game == "mac" && !refreshOnly {
@@ -781,18 +781,26 @@ enum Steps {
     // with "Preparing shaders… N of M" move the bar. Never fails the install: without it the game
     // prepares them on its first Metal start.
     static func prepareShaders(_ r: BuildRunner) async throws {
-        r.appendLog("Compiling the game's Metal shaders, so its first start with Metal is quick. "
-            + "The first time this takes a few minutes; after an update usually seconds.")
+        guard r.lpStopped.isEmpty else { return }
+        let lp = r.game == "learnplay"
+        // Learn & Play compiles what isn't ready while it plays; the Mac game prepares it on a first start.
+        let later = lp ? "the game compiles them while it plays." : "the game prepares them on its first start with Metal."
+        r.appendLog(lp
+            ? "Compiling the game's Metal shaders, so its first play doesn't stall on them. "
+                + "The first time this takes under a minute; after an update usually seconds."
+            : "Compiling the game's Metal shaders, so its first start with Metal is quick. "
+                + "The first time this takes a few minutes; after an update usually seconds.")
         r.shadersSkipped = false
+        r.shadersReady = false  // Build Again: not what the run before found
         do {
-            let out = try await r.shell("tools/play-native/warm-shaders.sh")
+            let out = try await r.shell("tools/play-native/warm-shaders.sh"
+                + (r.game == "learnplay" ? " \(shq(lpApp))" : ""))
             r.shadersReady = out.contains("shader libraries ready")
         } catch {
-            // Skipped (Skip stops it) or failed: the game prepares the rest on its first Metal start.
+            // Skipped (Skip stops it) or failed: not a failed install.
             r.appendLog(r.shadersSkipped
-                ? "Shader preparation skipped: the game prepares the rest on its first start with Metal."
-                : "Shader preparation stopped (\(error.localizedDescription)); the game prepares them on its "
-                    + "first start with Metal.")
+                ? "Shader preparation skipped: \(later)"
+                : "Shader preparation stopped (\(error.localizedDescription)); \(later)")
         }
     }
 
@@ -1804,7 +1812,12 @@ class InstallerWindow: NSWindow {
                     Its own copy of the game files, your settings, saves and logs are in \
                     ~/Library/Application Support/RS Re-ARMed/learn-play: the game no longer needs Steam's \
                     download folder. After new DLC in Steam, click Refresh Game Files. To uninstall, delete the \
-                    app and that folder.\(gameCopyElsewhereNote("learnplay"))\(runner.notes.isEmpty ? "" : "\n\n" + runner.notes.joined(separator: "\n"))
+                    app and that folder.\(gameCopyElsewhereNote("learnplay"))\(runner.shadersReady ? "" : """
+
+
+                    The game's Metal shaders are not prepared: the first play stalls while it compiles them. \
+                    Build & Install again prepares them.
+                    """)\(runner.notes.isEmpty ? "" : "\n\n" + runner.notes.joined(separator: "\n"))
 
                     The installer log is in \(logPath).
                     """,

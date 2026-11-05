@@ -19,6 +19,7 @@
 #include <unistd.h>
 
 #include "../src/rsp_present.h"
+#include "../../opengl/src/rs_gfx.h"
 #include "msl_internal.h"  // the corpus writer (rsmsl, linked into this test)
 
 static int g_pass, g_fail;
@@ -195,11 +196,11 @@ int main(int argc, char **argv) {
 
   // The line format.
   char line[160];
-  double f = rsp_mtl_warm_line(line, sizeof line, 3, 12, 0);
+  double f = rs_gfx_warm_line(line, sizeof line, 3, 12, 0);
   CHECK(f == 0.25 && !strcmp(line, "progress 0.250 Preparing shaders… 3 of 12"), "line: %s", line);
-  f = rsp_mtl_warm_line(line, sizeof line, 3, 24, 0.25);  // the total grew: F stays
+  f = rs_gfx_warm_line(line, sizeof line, 3, 24, 0.25);  // the total grew: F stays
   CHECK(f == 0.25 && !strcmp(line, "progress 0.250 Preparing shaders… 3 of 24"), "line after growth: %s", line);
-  f = rsp_mtl_warm_line(line, sizeof line, 0, 0, 0);
+  f = rs_gfx_warm_line(line, sizeof line, 0, 0, 0);
   CHECK(f == 1.0 && strstr(line, "nothing to compile"), "line with nothing: %s", line);
 
   char first_env[300];  // two compile threads: long enough for several progress lines

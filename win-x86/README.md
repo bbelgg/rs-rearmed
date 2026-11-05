@@ -40,6 +40,8 @@ Win32 seam by name (`shims/win32_dispatch.c`).
   ole32, shell32, winmm, setupapi, rpcrt4, dinput8, xinput1_3, gdi32, bink2w32), `win32_d3d9.c`
   and `d3d9/` (Direct3D 9 on libRSOpenGL), `steam/` (offline steam_api), `audio/` (WASAPI and
   winmm on CoreAudio)
+- `shaders/` — the Metal shader corpus's sources: the list of programs the game links (`programs.tsv`, hashes only),
+  `lp_shaders.c`, which makes their GLSL from the user's game files, and `record_programs.py`, which adds a run to the list
 - `online/` — the offline online layer: RSConnect's vtables patched at start-up (`online32.c`)
 - `app/` — `lp_main.c`: load, bind, start, run
 - `harvest/` — the one-time capture tool for a Windows PC (prebuilt, with its source)

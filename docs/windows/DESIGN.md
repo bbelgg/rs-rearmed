@@ -165,9 +165,10 @@ OpenGL path, so `RS_GL_BACKEND=gl` runs offscreen (the D3D9 tests use it on both
   reads (`LP_D3D9_EAGER=1` uploads at `Unlock`). The game locks its 1 MB dynamic vertex buffer whole about
   2,900 times a second.
 - **Shaders**: SM2/SM3 bytecode is translated to GLSL 1.20 (`d3d9_shader.c`), the dialect the GLSL to MSL
-  path takes; all 414 shaders in the game translate. Gamebryo compiles its materials' shaders at run time
-  with `D3DXCompileShader`. The Windows build has no build-time shader corpus yet, so Metal compiles each
-  program the first time it is used and keeps it in its disk cache.
+  path takes; all 1,226 shaders in the game's files translate. No shader of a game run has come from
+  `D3DXCompileShader`, though the game can use it: a material's shader is found in the Gamebryo caches of `static.psarc`.
+  The build's shader corpus and the install's warm-up compile the programs ahead ([Shader corpus](#shader-corpus)); one
+  they don't know is compiled by Metal the first time it is used, and is in the disk cache from then on.
 - **Fixed function** (`d3d9_ffp.c`): Gamebryo sets fixed-function state every frame and keeps a
   fixed-function shader for meshes without one. A draw with no vertex shader, no pixel shader or neither
   gets a generated program, cached by everything it depends on: `XYZ`/`XYZW`/`XYZRHW` positions, world x
@@ -175,6 +176,40 @@ OpenGL path, so `RS_GL_BACKEND=gl` runs offscreen (the D3D9 tests use it on both
   texture coordinates by `TEXCOORDINDEX` with generation and transforms, vertex and table fog, up to 8
   texture stages with every operation but `PREMODULATE` and the bump-map ones. Logged once and not
   implemented: vertex blending, sphere maps, bump mapping, user clip planes, point sprites.
+
+### Shader corpus
+
+As on the Mac ([METAL.md](../mac/METAL.md#shader-translation)): MSL made at build time from the user's game files, in the
+app (`Contents/Resources/rsmsl-corpus.bin`), found by `rsmsl_translate` and compiled by the install's warm-up. What differs is
+where the shaders come from and how they pair.
+
+**Where a program comes from**, from `LP_SHADER_LOG` runs of the game's modes: 1,039 shaders created at every start, all of them
+bytecode in the game's files; the 1,226 there are in the image (Scaleform's), in the Gamebryo caches `shaders/generated/*.cache`
+(the standard material's), in `shaders/dx9/*.vso`, `*.pso` and in the effects `*.fxo` of `static.psarc`. None
+was compiled at run time and no fixed-function program was linked. A first play to the highway links 98 programs.
+
+**Pairs**: a vertex shader's GLSL depends on the pixel shader it is linked with, so a program is a pair, and any pair could happen.
+By their semantics 103,012 pairs could; the game has used 119 in every mode we could reach.
+For effects the files tell: every effect program seen is the vertex and pixel shader of one `.fxo`, or a `.vso` and `.pso` of one
+name, so those pairs are all made (208, where the pixel shader's inputs are among the vertex shader's outputs). For Scaleform's and
+the standard material's shaders nothing in the files says which: their cache keys are per stage. Those pairs come from runs:
+`win-x86/shaders/programs.tsv` lists each program seen as `pair VS PS`, hashes of the bytecode, or `ffp VS PS KEY` with the
+fixed-function state key. No shader text or bytecode, so it can be in the repository; `record_programs.py` adds a run's
+`LP_SHADER_LOG` to it. Runs: menus, Learn a Song, Score Attack, Session Mode, a video and a practice lesson, Tone Designer,
+split-screen Multiplayer, Riff Repeater, Venue Mode (one venue), and the game's quality settings, which added none. The Guitarcade's games need a
+guitar to get past calibration, so only their effects are in.
+
+**The build**: `tools/metal/make-corpus.sh --learn-play` takes the shaders of `static.psarc`, and `win-x86/shaders/lp_shaders.c` looks
+through them and the image for bytecode (at any byte offset) and writes the GLSL of each listed program, by the layer's own
+`d3d9_sm_glsl` and `d3d9_ffp_sources` (`d3d9_ffp_gen.c`, which depends on the state key alone), plus the layer's blit. Then the Mac's
+steps: `build-msl-corpus.sh --pairs`, `msl_verify --translate-only`, `merge_corpus.py`. A list line whose shader isn't found is
+skipped. A failed corpus doesn't fail the build.
+
+**The warm-up**: `--warm-shaders` in `lp_main.c`, before anything of the game is loaded, calls `rs_gfx_warm_only`, the loop the Mac
+app runs ([METAL.md](../mac/METAL.md#safe-load)). There is no safe load: its reason on the Mac is the loading screen's race with a
+fast-load `cache.psarc` and a busy CPU, and after the warm-up nothing here keeps the CPU busy while the game loads
+([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)). A program the list doesn't have is compiled when the game first draws with
+it, and warmed from the manifest at the next start.
 
 ### D3DX
 
@@ -420,7 +455,7 @@ What the Windows build has instead are native replacements of single game functi
 ```
 choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, app → install → warm shaders → launcher
                  └─ Learn & Play → free space → Steam downloads the depot and the DLC → game-copy → Microsoft DLLs
-                                    → code image → lp_install.py build → app-install → build-clean
+                                    → code image → lp_install.py build → app-install → build-clean → warm shaders
 ```
 
 `win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships):

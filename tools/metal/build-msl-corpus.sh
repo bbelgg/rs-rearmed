@@ -3,11 +3,13 @@
 # (docs/mac/METAL.md "Shader translation"). Runs on the user's machine at build time: the dumps
 # come from their game and are never committed.
 #
-#   build-msl-corpus.sh --verify <msl_verify> --out <dir> [--scaleform <dir>] [--cg <dir>] [--jobs <n>]
-#                       [--translate-only] [--progress]
+#   build-msl-corpus.sh --verify <msl_verify> --out <dir> [--scaleform <dir>] [--cg <dir>] [--pairs <file>]
+#                       [--jobs <n>] [--translate-only] [--progress]
 #
 #   --scaleform  RS_GL_DUMP_SHADERS output (<seq>_<id>_<vs|fs>.glsl), or tools/metal/extract_scaleform.py's
 #   --cg         cg_corpus_load --dump-glsl output (<key>.<bits>.vert, <key>.frag)
+#   --pairs      the programs as a ready list (pair_shaders.py's format), instead of --scaleform and --cg:
+#                Learn & Play's (win-x86/shaders/lp_shaders.c)
 #   --translate-only  no check against GL (msl_verify --translate-only): seconds instead of minutes;
 #                the corpus is the same, its entries are not flagged verified (a user's build:
 #                tools/metal/make-corpus.sh)
@@ -19,13 +21,14 @@
 # 77 no dumps found.
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
-verify= out= sf= cg= jobs= xonly= progress=0
+verify= out= sf= cg= pairs= jobs= xonly= progress=0
 while [ $# -gt 0 ]; do
   case $1 in
     --verify) verify=$2; shift 2 ;;
     --out) out=$2; shift 2 ;;
     --scaleform) sf=$2; shift 2 ;;
     --cg) cg=$2; shift 2 ;;
+    --pairs) pairs=$2; shift 2 ;;
     --jobs) jobs=$2; shift 2 ;;
     --translate-only) xonly=--translate-only; shift ;;
     --progress) progress=1; shift ;;
@@ -40,11 +43,15 @@ work="$out/work"
 rm -rf "$work"
 mkdir -p "$work"
 
-set --
-[ -n "$sf" ] && [ -d "$sf" ] && set -- "$@" --scaleform "$sf"
-[ -n "$cg" ] && [ -d "$cg" ] && set -- "$@" --cg "$cg"
-if [ $# -eq 0 ]; then echo "no shader dumps found (scaleform: ${sf:-unset}, cg: ${cg:-unset}); skipping"; exit 77; fi
-python3 "$here/pair_shaders.py" "$@" > "$work/pairs.tsv"
+if [ -n "$pairs" ]; then
+  cp "$pairs" "$work/pairs.tsv"
+else
+  set --
+  [ -n "$sf" ] && [ -d "$sf" ] && set -- "$@" --scaleform "$sf"
+  [ -n "$cg" ] && [ -d "$cg" ] && set -- "$@" --cg "$cg"
+  if [ $# -eq 0 ]; then echo "no shader dumps found (scaleform: ${sf:-unset}, cg: ${cg:-unset}); skipping"; exit 77; fi
+  python3 "$here/pair_shaders.py" "$@" > "$work/pairs.tsv"
+fi
 total=$(wc -l < "$work/pairs.tsv" | tr -d ' ')
 if [ "$total" -eq 0 ]; then echo "no shader pairs found; skipping"; exit 77; fi
 

@@ -176,6 +176,12 @@ user's, with a test profile.
   band screen starts it, after the tuner. Esc from the main menu leads to "Are you sure you want to quit?", Return
   on it to the title, Esc there to EXIT GAME?, and Return on that is a normal quit, gone in 0.2 s. keyfifo's `quit` (the app
   menu's Quit item) also ends the game, from inside a song too, in 0.3-0.5 s.
+- **Riff Repeater's speed and the focus** (2026-11-05, `rr_speed_ratio` and `ui_event` with a mod): in a song Esc, Space, Down twice to
+  SPEED, Left once a second, each 1 off the 100, `key delete` resumes. The Mac game calls the point once here, where Learn & Play
+  calls it on every step. For `ui_event` the game must have had the focus: send `front` first, then another app in front (`open -a
+  Finder`); started from a shell it never has it, and with `RS_KEY_DIRECT=1` nothing shows that.
+- **A copy with the whole `dlc` folder** (2,400 files): the main menu is up about 85 s after the profile rather than 26 s, and a
+  Return before that is lost, with the rest of a counted script going astray. Look at a snapshot before the first key after the profile.
 - **The installed app by `open`** (2026-11-04, the launcher in a test home): the launcher hands the game only what it
   lists, so a test copy of its `Contents/Resources/launch.sh` adds keyfifo, `HOME`, `CFFIXED_USER_HOME` and the lines of a
   file to `open`'s `--env`s; without `HOME` the game writes to the real `~/Library/Caches`. A home with no Steam account
@@ -198,6 +204,12 @@ user's, with a test profile.
   default output during a run only adds a mute listener; the sink stays on its device. Unplugging the device moves
   the output to another by the HAL; replugging reopens the input only.
 - Before reporting a game bug, check whether it also happens in the original game under Rosetta.
+
+### Shaders of a run
+
+`RS_GL_DUMP_SHADERS=DIR` writes the GLSL a run links, `RS_MSL_LOG=1` logs each program translated at run time because the corpus doesn't
+have it, and `RS_METAL_CACHE_STATS=1` prints the compile times at exit. For a first play with no shader cache that leaves the user's
+alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-run).
 
 ### The capture VM
 

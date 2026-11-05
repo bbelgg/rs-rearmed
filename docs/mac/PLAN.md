@@ -12,7 +12,7 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   full screen, Retina; the built-in fixes; mods loaded at startup with name-keyed hook points; the GUI
   installer. Gameplay CPU is about that of the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md)).
 - **Score Attack, the Guitarcade and the microphone** (2026-11-05): work, by the maintainer's own check.
-- **Guitar input channel and gain** (on `main` after 1.5.1, not in a release yet; 2026-11-05, a test home, started directly): an HX Stomp, 8 channels, the dry guitar
+- **Guitar input channel and gain** (new in 1.6.0; 2026-11-05, a test home, started directly): an HX Stomp, 8 channels, the dry guitar
   on channel 5 at 0 dB, through Direct Connect and the game's calibration, heard right by the maintainer; peaks up to
   -14.1 dBFS, nothing clipped. Before, the game opened it with its 8 channels mixed up. The UR22 and the other
   inputs opened as before. Not in this pass: a gain above 0 dB in a run, an install by the installer app.
@@ -26,7 +26,7 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   screens; DIRECT CONNECT offered, and a guitar through a UR22mkII heard by the maintainer; official and custom songs, a video lesson,
   Session Mode and Nonstop Play; Enumerate and Refresh Game Files; OpenGL boots and plays a song; Quit and Exit gone in 0.5 s or
   less. The figures are in [PERFORMANCE.md](PERFORMANCE.md).
-- **Every channel in the input list, and calibration that can boost** (on `main` after 1.5.1, not in a release yet; 2026-11-05, by
+- **Every channel in the input list, and calibration that can boost** (new in 1.6.0; 2026-11-05, by
   the maintainer, a test install): an HX Stomp's 8 channels and a UR22's 2 listed, all heard, a choice kept over a restart;
   calibration settled at +5.6 dB with the meter at the top. Not in this pass: the Real Tone cable with this build.
 - **RSMods' library** (2026-11-05): the same `rearmed-mods.dylib` 0.3.0 as Learn & Play's, all its mods on, a test home, to the note highway and
@@ -106,13 +106,29 @@ Nothing here is meant to change how this edition plays. What changed is shared w
   not compared with 0.2.2's. Changed here on purpose: hotkeys stay off in the song search after Return with
   no match, and after a click, until Esc or the next screen.
 
+## Built in for 1.6.0
+
+Goes with the same section of the [Windows plan](../windows/PLAN.md#built-in-for-160):
+
+- **Every channel in the input list**: under Direct Connect each channel of an audio interface is an input of its own, with the
+  game's level bar. The game shows 10 inputs at most and the list doesn't scroll, so they go in priority order
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `RS_AUDIO_CHANNEL_ENTRIES=0` turns it off.
+- **Calibration that can boost**: the level it sets is a gain of ours, up to +24 dB, and it no longer changes the volume of the
+  player's interface. A level saved before counts once calibration has run. `RS_AUDIO_INPUT_LEVEL=0` turns it off. The Real Tone
+  cable keeps its own path.
+- **Guitar input channel and gain**: `guitar-input.ini`, which came after 1.5.1, is in this release too.
+- **The installer**: a Learn & Play build stops on a game image that isn't the pinned one, and an image kept from an earlier
+  version is made again; the Mac edition decrypts on every run. Its shader messages say what the game does.
+
 ## Next work
 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **Two guitars on one interface**: the game opens one stream per device, so a second player on another channel of it
-  would need a device of its own, made up by the audio layer.
+- **Multiplayer with any input**: the game asks for two Real Tone cables. The audio layer has what two players on other inputs
+  need, as each channel of an interface is an input of its own since 1.6.0. What's left is the game's own rule and letting each
+  player take any input: two channels of one interface, two interfaces, or a cable and an interface. Not tried yet, in either
+  edition.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)
   already serve the Windows port; hook points and the mods folder are shared now, and the rest of its
   parity work is in the [Windows plan](../windows/PLAN.md#next-work).

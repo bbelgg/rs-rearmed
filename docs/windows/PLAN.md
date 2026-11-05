@@ -5,13 +5,13 @@
 
 ## Status
 
-Guitar input channel and gain (on `main` after 1.5.1, not in a release yet; 2026-11-05, a build by hand, a test home): an HX Stomp's channel 5 at 0 dB through Direct
+Guitar input channel and gain (new in 1.6.0; 2026-11-05, a build by hand, a test home): an HX Stomp's channel 5 at 0 dB through Direct
 Connect, heard right by the maintainer in a short run; peaks up to -16.4 dBFS, nothing clipped. Not in this pass: a gain
 above 0 dB in a run, a whole song, an install by the installer.
 
 Other interfaces through Direct Connect (2026-11-05): work, by the maintainer's own check.
 
-Every channel in the input list, and calibration that can boost (on `main` after 1.5.1, not in a release yet; 2026-11-05, by the
+Every channel in the input list, and calibration that can boost (new in 1.6.0; 2026-11-05, by the
 maintainer, a test home): an HX Stomp's 8 channels and a UR22's 2 listed, a guitar through a channel, a choice kept over a restart;
 calibration settled at +6.1 dB with the meter at the top. Not in this pass: the Real Tone cable with this build.
 
@@ -209,6 +209,20 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   Not exercised here: the lyrics mod's hiding (the test song has no lyric steps; its key ran), a score screen (a Disconnected song has none: a
   screenshot was taken by a test build, not on that screen), and the input volume, which is Core Audio in both.
 
+## Built in for 1.6.0
+
+Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-160):
+
+- **Every channel in the input list**: under Direct Connect each channel of an audio interface is an input of its own, with the
+  game's level bar. The game shows 10 inputs at most and the list doesn't scroll, so they go in priority order
+  ([DESIGN.md](DESIGN.md#audio)). `RS_AUDIO_CHANNEL_ENTRIES=0` turns it off.
+- **Calibration that can boost**: the level it sets is a gain of ours, up to +24 dB, and it no longer changes the volume of the
+  player's interface. A level saved before counts once calibration has run. `RS_AUDIO_INPUT_LEVEL=0` turns it off. The Real Tone
+  cable keeps its own path.
+- **Guitar input channel and gain**: `guitar-input.ini`, which came after 1.5.1, is in this release too.
+- **The installer**: a Learn & Play build stops on a game image that isn't the pinned one, and an image kept from an earlier
+  version is made again; the Mac edition decrypts on every run. Its shader messages say what the game does.
+
 ## Next work
 
 **Parity (P4):**
@@ -217,7 +231,7 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   worse than the gap.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
-**Guitar input:** two guitars on one interface, as in the [Mac plan](../mac/PLAN.md#next-work).
+**Guitar input:** multiplayer with any input, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
 the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of

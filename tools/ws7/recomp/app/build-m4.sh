@@ -39,7 +39,7 @@ export RC_LTO_CACHE=${RC_LTO_CACHE:-$out/lto-cache} RC_PGO_DIR=${RC_PGO_DIR:-$ou
 export RC_TARGET=${RC_TARGET:-mac-x64}
 echo "build: ${RC_OPT:--O2}${RC_LTO:+ lto=$RC_LTO}${RC_PGO:+ pgo=$RC_PGO}${RC_O1:+ o1=$RC_O1} target=$RC_TARGET"
 # The target's names and tables: rc_target_names.h, rc_target.c and the skip lists (OUTDIR/target/skip)
-"${RC_PY:-$root/analysis/venv/bin/python}" -I "$root/tools/targets/targets.py" gen "$out/target" > "$out/target.log" 2>&1 ||
+"${RC_PY:-${RS_BUILD_DIR:-$root/build}/venv/bin/python}" -I "$root/tools/targets/targets.py" gen "$out/target" > "$out/target.log" 2>&1 ||
   { cat "$out/target.log"; exit 1; }
 export RC_TARGET_DIR=$out/target
 

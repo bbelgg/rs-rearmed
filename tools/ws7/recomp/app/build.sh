@@ -7,11 +7,11 @@
 #            linked as abort stubs (rc_fail), exactly as tools/ws7/recomp/build/build.sh does.
 #   --stub   no translated library: the shell runs with the platform stub hooks (a layout/link check).
 # env:  RC_OBJ_DIR     libgame_rc.a directory     (default analysis/ws7/recomp/obj)
-#       RC_IMAGE       plain x86_64 image         (default analysis/cg/Rocksmith2014_x64_plain)
+#       RC_IMAGE       plain x86_64 image         (default build/steamless/Rocksmith2014_x64_decrypted)
 #       RC_THUNKS      pre-generated thunks.c     (default: generated into OUTDIR/work)
 #       RC_OVERRIDES   extra .c/.o/.a linked before libgame_rc.a (native overrides; optional;
 #                      default: tools/ws7/recomp/overrides/build/liboverrides.a if it exists)
-#       RC_PY          python with capstone       (default analysis/venv/bin/python)
+#       RC_PY          python with capstone       (default $RS_BUILD_DIR/venv/bin/python, RS_BUILD_DIR default build)
 #       SHIM_STEAM / SHIM_BINK / SHIM_CG   arm64 dylibs to bundle (defaults: first arm64 build found)
 #       SHIM_OPENGL    libRSOpenGL.dylib (shims/opengl; default build/shims/opengl/libRSOpenGL.dylib):
 #                      the app links it instead of OpenGL.framework (it re-exports the framework) and
@@ -45,8 +45,8 @@ done
 rt=$root/tools/ws7/recomp/runtime
 plat=$root/shims/platform
 obj=${RC_OBJ_DIR:-$root/analysis/ws7/recomp/obj}
-img=${RC_IMAGE:-$root/analysis/cg/Rocksmith2014_x64_plain}
-py=${RC_PY:-$root/analysis/venv/bin/python}
+img=${RC_IMAGE:-$root/build/steamless/Rocksmith2014_x64_decrypted}
+py=${RC_PY:-${RS_BUILD_DIR:-$root/build}/venv/bin/python}
 work=$out/work
 . "$root/tools/ws7/recomp/build/optflags.sh"
 app=$out/Rocksmith2014.app

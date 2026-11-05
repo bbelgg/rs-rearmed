@@ -2,7 +2,7 @@
 // the mapped game image (shims/game/harness/rsimage.c, compiled in read-only),
 // against the rewrites in shims/platform/src. x86_64 only (Rosetta).
 //
-//   rsp_platform_difftest <analysis/cg/Rocksmith2014_x64_plain>
+//   rsp_platform_difftest <decrypted game image>
 //
 // Compared:
 //   paths      SetGameRoot 0x1002a5cf0 (four globals, return value, cwd, Tmp/),

@@ -1,7 +1,7 @@
 // rsimage: run original x86_64 Rocksmith 2014 functions in-process.
 //
 // rsimage_load() maps every segment of the decrypted game executable
-// (analysis/cg/Rocksmith2014_x64_plain) at its preferred address, binds its
+// (tools/steamless's output) at its preferred address, binds its
 // imports against libSystem, libstdc++ and CoreFoundation in this process, and
 // points every other import at a PROT_NONE trap page so a call into OpenGL,
 // Steam, Bink etc. is reported instead of crashing at random.

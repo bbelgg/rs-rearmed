@@ -7,7 +7,7 @@
 #   `ADDR drop` = not generated and not in rc_table
 # env:  RC_GEN_DIR   generated C + build.ninja (default analysis/ws7/recomp/gen)
 #       RC_OBJ_DIR   objects + libgame_rc.a    (default analysis/ws7/recomp/obj)
-#       RC_IMAGE     plain x86_64 image        (default analysis/cg/Rocksmith2014_x64_plain)
+#       RC_IMAGE     plain x86_64 image        (default build/steamless/Rocksmith2014_x64_decrypted)
 #       RC_CFLAGS    extra flags for every TU  (default "-w -DRC_ABI_TRUST"; set to "-w" for the
 #                    exact, slower-to-compile register traffic)
 #       RC_OPT       optimisation level        (default -O2; --o1 TUs stay at -O1)
@@ -16,7 +16,7 @@
 #                    second whole-image ThinLTO link)
 #       RC_TSO       tso-ranges file, lo-hi    (default: the whole image, 100000000-110000000;
 #                    TUs in a range are compiled with -DRC_MO_TSO)
-#       RC_PY        python with capstone      (default analysis/venv/bin/python)
+#       RC_PY        python with capstone      (default $RS_BUILD_DIR/venv/bin/python, RS_BUILD_DIR default build)
 #       RS_NINJA     ninja                     (default the one next to RC_PY, from requirements.txt;
 #                    else ninja on PATH)
 # Output: $RC_OBJ_DIR/libgame_rc.a, $RC_OBJ_DIR/smoke (run result printed).
@@ -25,8 +25,8 @@ here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../../.." && pwd)
 gen=${RC_GEN_DIR:-$root/analysis/ws7/recomp/gen}
 obj=${RC_OBJ_DIR:-$root/analysis/ws7/recomp/obj}
-img=${RC_IMAGE:-$root/analysis/cg/Rocksmith2014_x64_plain}
-py=${RC_PY:-$root/analysis/venv/bin/python}
+img=${RC_IMAGE:-$root/build/steamless/Rocksmith2014_x64_decrypted}
+py=${RC_PY:-${RS_BUILD_DIR:-$root/build}/venv/bin/python}
 cflags=${RC_CFLAGS--w -DRC_ABI_TRUST}
 opt=${RC_OPT:--O2}
 jobs=$(sysctl -n hw.ncpu)

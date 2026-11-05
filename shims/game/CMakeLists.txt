@@ -3,8 +3,8 @@
 # original code under Rosetta.
 
 set(rsg_dir "${CMAKE_CURRENT_SOURCE_DIR}")
-set(RS_GAME_PLAIN "${CMAKE_SOURCE_DIR}/analysis/cg/Rocksmith2014_x64_plain"
-  CACHE FILEPATH "Decrypted x86_64 game executable (tools/steamless)")
+# No default: the install's image is in build/steamless, and its CMake run must not turn on these Rosetta tests.
+set(RS_GAME_PLAIN "" CACHE FILEPATH "Decrypted x86_64 game executable (tools/steamless), for the differential tests")
 
 # Rewritten modules. arm64 is the target; x86_64 so the harness can link them.
 add_library(rs_game STATIC src/ak_hash.c src/efd_log.c src/efd_id.c src/efd_util.c
@@ -99,5 +99,5 @@ if(EXISTS "${RS_GAME_PLAIN}")
     FIXTURES_REQUIRED rsg_golden
     PASS_REGULAR_EXPRESSION "[0-9]+ passed, 0 failed")
 else()
-  message(STATUS "shims/game: ${RS_GAME_PLAIN} not found, differential tests disabled")
+  message(STATUS "shims/game: no file at RS_GAME_PLAIN (\"${RS_GAME_PLAIN}\"), differential tests disabled")
 endif()

@@ -11,8 +11,7 @@ set(CMAKE_OSX_DEPLOYMENT_TARGET 11.0 CACHE STRING "")
 set(CMAKE_C_STANDARD 11)
 set(rsp_archs "arm64;x86_64")
 get_filename_component(rsp_repo "${CMAKE_CURRENT_SOURCE_DIR}/../.." ABSOLUTE)
-set(RS_GAME_PLAIN "${rsp_repo}/analysis/cg/Rocksmith2014_x64_plain"
-  CACHE FILEPATH "Decrypted x86_64 game executable (for the diff test)")
+set(RS_GAME_PLAIN "" CACHE FILEPATH "Decrypted x86_64 game executable (tools/steamless), for the differential tests")
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter -O2)
 

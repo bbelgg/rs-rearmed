@@ -145,7 +145,7 @@ if [[ -n $harvest ]]; then
     # captured by you. (A folder, i.e. unzipped rs-harvest.)
     [[ -d $harvest ]] || rs_die "no harvest folder at $harvest (unzip rs-harvest.zip and pass the folder)"
     "$py" -c 'import capstone' 2>/dev/null \
-        || rs_die "lp_image.py needs the build's Python environment: python3 -m venv build/venv && build/venv/bin/pip install -r requirements.txt"
+        || rs_die "lp_image.py needs the build's Python environment: pip install -r win-x86/install/requirements.txt"
     ref=()
     [[ -n ${LP_HARVEST_V1:-} ]] && ref=(--reference "$LP_HARVEST_V1")
     "$py" "$root/win-x86/image/lp_image.py" "$harvest" "$img" ${ref[@]+"${ref[@]}"} \

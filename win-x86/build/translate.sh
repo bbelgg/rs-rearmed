@@ -25,8 +25,8 @@ jobs=${LP_JOBS:-$(sysctl -n hw.ncpu)}
 # Find python with capstone
 if [ -n "${LP_PY:-}" ]; then
   py=$LP_PY
-elif [ -x "$root/analysis/venv/bin/python" ]; then
-  py=$root/analysis/venv/bin/python
+elif [ -x "${RS_BUILD_DIR:-$root/build}/venv/bin/python" ]; then
+  py=${RS_BUILD_DIR:-$root/build}/venv/bin/python
 else
   py=python3
 fi
@@ -40,7 +40,7 @@ fi
 
 mkdir -p "$gen" "$obj"
 
-# Skip file: addresses the override/shim modules define (none yet)
+# Skip file: addresses the override/shim modules define
 skip=
 [ -f "$here/skip.txt" ] && skip="--skip $here/skip.txt"
 

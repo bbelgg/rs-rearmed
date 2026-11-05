@@ -19,7 +19,8 @@
 # What it cannot know: shaders made at run time from anything but these sources (none seen in game
 # runs so far); a program missing from the corpus is translated when the game links it, as before.
 #
-# env: RC_IMAGE        the x86_64 game image (default analysis/cg/Rocksmith2014_x64_plain)
+# env: RC_IMAGE        the game image (default build/steamless/Rocksmith2014_x64_decrypted; required
+#                      with --learn-play)
 #      RS_GAME_DIR     the game folder (default: the Steam library's)
 #      MSL_VERIFY      msl_verify       (default build/shims/opengl/msl_verify)
 #      CG_CORPUS_LOAD  cg_corpus_load   (default build/shims/cg/cg_corpus_load)
@@ -33,7 +34,11 @@ root=$(cd "$here/../.." && pwd)
 learn_play=0
 if [ "${1:-}" = --learn-play ]; then learn_play=1; shift; fi
 out=${1:?usage: make-corpus.sh [--learn-play] OUTDIR}
-img=${RC_IMAGE:-$root/analysis/cg/Rocksmith2014_x64_plain}
+if [ "$learn_play" = 1 ]; then
+  img=${RC_IMAGE:?set RC_IMAGE to the Windows game image}
+else
+  img=${RC_IMAGE:-$root/build/steamless/Rocksmith2014_x64_decrypted}
+fi
 game=${RS_GAME_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014}
 verify=${MSL_VERIFY:-$root/build/shims/opengl/msl_verify}
 cgload=${CG_CORPUS_LOAD:-$root/build/shims/cg/cg_corpus_load}

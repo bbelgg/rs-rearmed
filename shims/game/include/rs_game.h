@@ -1,7 +1,7 @@
 // Arm64 rewrites of Rocksmith 2014 game-binary functions.
 //
 // Each function documents the original's address in the decrypted x86_64
-// binary (analysis/cg/Rocksmith2014_x64_plain). Every rewrite has a
+// binary (tools/steamless's output). Every rewrite has a
 // differential test that runs the original under Rosetta via
 // harness/rsimage.c and compares outputs. The RS_ORIG_* defines name the
 // originals for those tests: RC_ADDR(name) is the address in the target's

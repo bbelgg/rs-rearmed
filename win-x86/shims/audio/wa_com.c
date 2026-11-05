@@ -23,6 +23,7 @@
 
 #include "audio.h"
 #include "rs_audio_host.h"
+#include "rs_audio_input.h"
 #include "wa_engine.h"
 #include "win32_guestobj.h"
 
@@ -163,6 +164,7 @@ typedef struct {
   char key[200];  // flow + uid
   _Atomic float scalar;
   _Atomic int mute;
+  int level;  // an input's level, which can boost it (rs_audio_input.h)
 } wa_volume;
 static wa_volume g_vols[64];
 static int g_nvols;
@@ -178,7 +180,8 @@ static wa_volume *volume_of(const wa_endpoint *ep) {
   if (!v && g_nvols < 64) {
     v = &g_vols[g_nvols++];
     snprintf(v->key, sizeof v->key, "%s", key);
-    atomic_store(&v->scalar, 1.f);
+    v->level = ep->flow == WA_CAPTURE && rs_audio_level_on() && !rs_audio_is_cable(ep->dev);
+    atomic_store(&v->scalar, v->level ? RS_AUDIO_LEVEL_UNITY : 1.f);
   }
   pthread_mutex_unlock(&g_vol_mu);
   return v;
@@ -186,6 +189,8 @@ static wa_volume *volume_of(const wa_endpoint *ep) {
 
 static float volume_gain(wa_volume *v) {
   if (!v) return 1.f;
+  if (v->level && !atomic_load_explicit(&v->mute, memory_order_relaxed))
+    return rs_audio_level_applied(atomic_load_explicit(&v->scalar, memory_order_relaxed));
   return atomic_load_explicit(&v->mute, memory_order_relaxed) ? 0.f
                                                               : atomic_load_explicit(&v->scalar, memory_order_relaxed);
 }
@@ -197,6 +202,10 @@ float wa_endpoint_volume(const wa_endpoint *ep) {
 void wa_endpoint_set_volume(const wa_endpoint *ep, float scalar) {
   wa_volume *v = volume_of(ep);
   if (v) atomic_store(&v->scalar, scalar < 0.f ? 0.f : scalar > 1.f ? 1.f : scalar);
+  if (v && v->level) {
+    rs_audio_level_set((uintptr_t)v, scalar);
+    rs_audio_log("input level: \"%s\" to %.4f (mixer)", ep->name, scalar);
+  }
 }
 int wa_endpoint_mute(const wa_endpoint *ep) {
   wa_volume *v = volume_of(ep);
@@ -1098,6 +1107,10 @@ static void vol_set(wa_obj *v, float s) {
   if (s < 0.f) s = 0.f;
   if (s > 1.f) s = 1.f;
   atomic_store(&v->vol->scalar, s);
+  if (v->vol->level) {
+    rs_audio_level_set((uintptr_t)v->vol, s);
+    rs_audio_log("input level: \"%s\" to %.4f, gain %.1f dB", v->ep.name, s, 20.0 * log10(rs_audio_level_applied(s)));
+  }
 }
 static float vol_get(wa_obj *v) { return v && v->vol ? atomic_load(&v->vol->scalar) : 1.f; }
 // SetMasterVolumeLevel(float dB, LPCGUID) / SetMasterVolumeLevelScalar(float, LPCGUID)

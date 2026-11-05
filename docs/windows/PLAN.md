@@ -11,6 +11,10 @@ above 0 dB in a run, a whole song, an install by the installer.
 
 Other interfaces through Direct Connect (2026-11-05): work, by the maintainer's own check.
 
+Every channel in the input list, and calibration that can boost (on `main` after 1.5.1, not in a release yet; 2026-11-05, by the
+maintainer, a test home): an HX Stomp's 8 channels and a UR22's 2 listed, a guitar through a channel, a choice kept over a restart;
+calibration settled at +6.1 dB with the meter at the top. Not in this pass: the Real Tone cable with this build.
+
 Checked by hand on an Apple Silicon Mac (2026-11-01):
 
 - the game boots offline, with the Uplay screens skipped;
@@ -113,6 +117,9 @@ inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`)
 
 ## Open issues
 
+- The list of inputs and the level, not checked yet: unplugging an interface while the game runs, a Real Tone cable with this
+  build, and the level with a second profile, which counts as calibrated with the first.
+- winmm's device names stop at 31 characters, so on that fallback path a long interface name can lose its channel.
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address
   0x0`), a fault at guest address 0x168 before it. Neither reproduced on demand yet; neither came back in the
   runs of 2026-11-04 (about ten tuner skips, on builds with x86 memory ordering and one without).
@@ -210,7 +217,7 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   worse than the gap.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
-**Guitar input:** a picker in the installer app, and two guitars on one interface, as in the [Mac plan](../mac/PLAN.md#next-work).
+**Guitar input:** two guitars on one interface, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
 the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of

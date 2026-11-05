@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <unistd.h>
 #include <xlocale.h>
 
 #include "rs_audio_host.h"
@@ -172,6 +173,140 @@ uint32_t rs_audio_input_take(const AudioBufferList *list, uint32_t channel, floa
   }
   return 0;
 }
+
+// ------------------------------------------------------------------------------------------------
+// Entries
+// ------------------------------------------------------------------------------------------------
+#define MAX_ENTRY_DEVS 64
+
+int rs_audio_entries_budget(void) {
+  if (!rs_audio_env_on("RS_AUDIO_INPUT", 1)) return 0;
+  const char *e = getenv("RS_AUDIO_CHANNEL_ENTRIES");
+  return e && *e ? atoi(e) : RS_AUDIO_LIST_DEFAULT;
+}
+
+int rs_audio_level_on(void) { return rs_audio_env_on("RS_AUDIO_INPUT", 1) && rs_audio_env_on("RS_AUDIO_INPUT_LEVEL", 1); }
+
+float rs_audio_level_gain(float level) {
+  if (level < 0) level = 0;
+  if (level > 1) level = 1;
+  return powf(10.0f, (level - RS_AUDIO_LEVEL_UNITY) / (1.0f - RS_AUDIO_LEVEL_UNITY) * RS_AUDIO_LEVEL_MAX_DB / 20.0f);
+}
+
+int rs_audio_is_cable(AudioObjectID dev) {
+  char name[128], model[192] = "";
+  CFStringRef s = NULL;
+  rs_audio_dev_name(dev, name, sizeof name);
+  if (rs_audio_dev_get(dev, kAudioDevicePropertyModelUID, &s, sizeof s) && s) {
+    CFStringGetCString(s, model, sizeof model, kCFStringEncodingUTF8);
+    CFRelease(s);
+  }
+  // The model UID is "<product>:<VID>:<PID>" in hex: 12BA is a vendor of other game hardware too.
+  const char *vid = strcasestr(model, ":12BA:");
+  return strstr(name, "Rocksmith USB Guitar Adapter") || (vid && strtoul(vid + 6, NULL, 16) == 0xff);
+}
+
+static int input_rank(AudioObjectID dev) {
+  UInt32 transport = 0;
+  if (rs_audio_is_cable(dev)) return RS_AUDIO_RANK_CABLE;
+  rs_audio_dev_get(dev, kAudioDevicePropertyTransportType, &transport, sizeof transport);
+  if (transport == kAudioDeviceTransportTypeVirtual || transport == kAudioDeviceTransportTypeAggregate)
+    return RS_AUDIO_RANK_VIRTUAL;
+  if (transport == kAudioDeviceTransportTypeBuiltIn) return RS_AUDIO_RANK_BUILT_IN;
+  return rs_audio_has_output(dev) ? RS_AUDIO_RANK_INTERFACE : RS_AUDIO_RANK_OTHER;
+}
+
+static int entries_wanted(AudioObjectID dev, int channels) {
+  char name[128];
+  rs_audio_input in;
+  rs_audio_dev_name(dev, name, sizeof name);
+  rs_audio_input_for(name, &in);
+  return in.channel >= 0 || channels < 2 ? 1 : channels;
+}
+
+void rs_audio_entry_counts(const int *rank, const int *want, int m, int budget, int *got) {
+  int left = budget;
+  for (int i = 0; i < m; i++) {
+    got[i] = 1;
+    if (rank[i] <= RS_AUDIO_RANK_INTERFACE) left--;
+  }
+  for (int more = 1; more && left > 0;) {
+    more = 0;
+    for (int i = 0; i < m && left > 0; i++)
+      if (rank[i] == RS_AUDIO_RANK_INTERFACE && got[i] < want[i]) {
+        got[i]++;
+        left--;
+        more = 1;
+      }
+  }
+}
+
+int rs_audio_input_entries(const AudioObjectID *devs, int n, int budget, rs_audio_entry *out, int max) {
+  AudioObjectID dev[MAX_ENTRY_DEVS];
+  int rank[MAX_ENTRY_DEVS], want[MAX_ENTRY_DEVS], got[MAX_ENTRY_DEVS], m = 0, k = 0;
+  for (int i = 0; i < n && m < MAX_ENTRY_DEVS; i++) {
+    int ch = rs_audio_channels(devs[i], kAudioObjectPropertyScopeInput);
+    if (ch <= 0) continue;
+    dev[m] = devs[i];
+    rank[m] = input_rank(devs[i]);
+    want[m] = rank[m] == RS_AUDIO_RANK_INTERFACE ? entries_wanted(devs[i], ch) : 1;
+    m++;
+  }
+  rs_audio_entry_counts(rank, want, m, budget, got);
+  for (int r = 0; r < RS_AUDIO_RANKS; r++)
+    for (int i = 0; i < m; i++) {
+      if (rank[i] != r) continue;
+      for (int c = 0; c < got[i] && k < max; c++, k++) out[k] = (rs_audio_entry){dev[i], got[i] < 2 ? -1 : c};
+    }
+  return k;
+}
+
+// ------------------------------------------------------------------------------------------------
+// Level
+// ------------------------------------------------------------------------------------------------
+static _Atomic int g_calibrated = -1;
+static rs_audio_level_watch g_watch;
+
+// The edition's folder: Learn & Play's and the Mac's have saves of their own.
+static void marker_path(char *buf, size_t n) {
+  const char *h = getenv("LP_HOME");
+  if (!h || !*h) h = getenv("LP_USER_DIR");  // a build run by hand has no LP_HOME
+  if (!h || !*h) h = getenv("RS_NATIVE_HOME");
+  if (h && *h) snprintf(buf, n, "%s/input-level-calibrated", h);
+  else snprintf(buf, n, "%s/Library/Application Support/RS Re-ARMed/input-level-calibrated", getenv("HOME") ? getenv("HOME") : "");
+}
+
+static int calibrated(void) {
+  int c = atomic_load_explicit(&g_calibrated, memory_order_relaxed);
+  if (c >= 0) return c;
+  char path[1024];
+  marker_path(path, sizeof path);
+  c = access(path, F_OK) == 0;
+  atomic_store(&g_calibrated, c);
+  return c;
+}
+
+int rs_audio_level_watch_note(rs_audio_level_watch *w, uintptr_t who, float level) {
+  w->run = who == w->who && level != w->level ? w->run + 1 : 0;
+  w->who = who;
+  w->level = level;
+  return w->run >= RS_AUDIO_LEVEL_RUN;
+}
+
+void rs_audio_level_set(uintptr_t who, float level) {
+  if (calibrated() || !rs_audio_level_watch_note(&g_watch, who, level)) return;
+  atomic_store(&g_calibrated, 1);
+  char path[1024];
+  marker_path(path, sizeof path);
+  FILE *f = fopen(path, "w");
+  if (f) {
+    fputs("The game's calibration has run with RS Re-ARMed's input level: saved levels count.\n", f);
+    fclose(f);
+  }
+  rs_audio_log("input level: calibration seen, levels count from now on");
+}
+
+float rs_audio_level_applied(float level) { return calibrated() ? rs_audio_level_gain(level) : 1.0f; }
 
 void rs_audio_input_report(rs_audio_input_stats *st, uint32_t every, const char *name) {
   if (!rs_audio_log_on() || atomic_load_explicit(&st->frames, memory_order_relaxed) < every) return;

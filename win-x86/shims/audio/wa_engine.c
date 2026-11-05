@@ -198,6 +198,7 @@ static int fill_endpoint(AudioObjectID dev, int flow, wa_endpoint *ep) {
   memset(ep, 0, sizeof *ep);
   ep->dev = dev;
   ep->flow = flow;
+  ep->in_ch = -1;
   ep->channels = (uint16_t)(ch > MAX_CH ? MAX_CH : ch);
   rs_audio_dev_name(dev, ep->name, sizeof ep->name);
   dev_string(dev, kAudioDevicePropertyDeviceUID, ep->uid, sizeof ep->uid);
@@ -216,16 +217,46 @@ static int device_list(AudioObjectID *devs, int max) {
   return (int)(sz / sizeof *devs);
 }
 
-int wa_endpoints(int flow, wa_endpoint *out, int max) {
+// The list of inputs (rs_audio_input.h): the capture devices in order, an interface as one mono entry per channel.
+static int capture_entries(const AudioObjectID *devs, int n, int budget, wa_endpoint *out, int max) {
+  rs_audio_entry es[MAX_DEVS * 2];
+  int m = rs_audio_input_entries(devs, n, budget, es, MAX_DEVS * 2), k = 0;
+  for (int i = 0; i < m && k < max; i++) {
+    if (!fill_endpoint(es[i].dev, WA_CAPTURE, &out[k])) continue;
+    if (es[i].channel >= 0) {
+      wa_endpoint *ep = &out[k];
+      char name[sizeof ep->name], uid[sizeof ep->uid];
+      size_t len = strlen(ep->name);
+      while (len && ep->name[len - 1] == ' ') ep->name[--len] = 0;
+      snprintf(name, sizeof name, "%s", ep->name);
+      snprintf(uid, sizeof uid, "%s", ep->uid);
+      ep->in_ch = es[i].channel;
+      ep->channels = 1;
+      snprintf(ep->name, sizeof ep->name, "%.110s channel %d", name, es[i].channel + 1);
+      snprintf(ep->uid, sizeof ep->uid, "%.180s#%d", uid, es[i].channel + 1);
+    }
+    k++;
+  }
+  return k;
+}
+
+static int endpoints(int flow, wa_endpoint *out, int max, int expand) {
   AudioObjectID devs[MAX_DEVS];
   int n = device_list(devs, MAX_DEVS), k = 0;
+  int budget = expand ? rs_audio_entries_budget() : 0;
   for (int pass = WA_CAPTURE; pass >= WA_RENDER; pass--) {
     if (flow != WA_ALL && flow != pass) continue;
+    if (pass == WA_CAPTURE && budget > 0) {
+      k += capture_entries(devs, n, budget, out, max);
+      continue;
+    }
     for (int i = 0; i < n && k < max; i++)
       if (fill_endpoint(devs[i], pass, &out[k])) k++;
   }
   return k;
 }
+
+int wa_endpoints(int flow, wa_endpoint *out, int max) { return endpoints(flow, out, max, 1); }
 
 int wa_default_endpoint(int flow, wa_endpoint *out) {
   AudioObjectPropertyAddress a = {flow == WA_CAPTURE ? kAudioHardwarePropertyDefaultInputDevice
@@ -259,13 +290,16 @@ void wa_endpoint_id(const wa_endpoint *ep, char *buf, size_t n) {
 
 int wa_endpoint_by_id(const char *id, wa_endpoint *out) {
   wa_endpoint eps[MAX_DEVS * 2];
-  int n = wa_endpoints(WA_ALL, eps, MAX_DEVS * 2);
   char buf[256];
-  for (int i = 0; i < n; i++) {
-    wa_endpoint_id(&eps[i], buf, sizeof buf);
-    if (!strcmp(buf, id)) {
-      *out = eps[i];
-      return 1;
+  // The whole device too: the default endpoint keeps its own id when the list has its channels.
+  for (int expand = 1; expand >= 0; expand--) {
+    int n = endpoints(WA_ALL, eps, MAX_DEVS * 2, expand);
+    for (int i = 0; i < n; i++) {
+      wa_endpoint_id(&eps[i], buf, sizeof buf);
+      if (!strcmp(buf, id)) {
+        *out = eps[i];
+        return 1;
+      }
     }
   }
   return 0;
@@ -368,7 +402,7 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
   uint32_t ch = s->fmt.channels, dch = s->dev_ch;
   uint64_t w = atomic_load_explicit(&s->w, memory_order_relaxed);
   uint64_t r = atomic_load_explicit(&s->r, memory_order_acquire);
-  float frame[MAX_CH], peak = 0;
+  float frame[MAX_CH], peak = 0, gain = s->in_gain * atomic_load_explicit(&s->gain, memory_order_relaxed);
   uint32_t pushed = 0, dropped = 0, clips = 0;
   for (uint32_t i = 0; i < frames;) {
     // one output frame: at phase between last (i - 1) and in_buf[i]
@@ -376,7 +410,7 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
     for (uint32_t c = 0; c < ch; c++) {
       uint32_t sc = s->in_ch >= 0 ? (uint32_t)s->in_ch : c < dch ? c : 0;
       float a = s->last[sc], b = cur[sc];
-      frame[c] = rs_audio_input_apply(s->step == 1.0 ? b : a + (float)s->phase * (b - a), s->in_gain, &peak, &clips);
+      frame[c] = rs_audio_input_apply(s->step == 1.0 ? b : a + (float)s->phase * (b - a), gain, &peak, &clips);
     }
     if ((uint32_t)(w - r) + pushed < s->ring_frames) {
       ring_write(s, w + pushed, frame, 1);
@@ -488,6 +522,7 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
     rs_audio_dev_name(ep->dev, s->in_name, sizeof s->in_name);
     rs_audio_input_for(s->in_name, &in);
     s->in_ch = rs_audio_input_channel(&in, s->dev_ch, s->in_name);
+    if (ep->in_ch >= 0 && ep->in_ch < s->dev_ch) s->in_ch = ep->in_ch;
     s->in_gain = in.gain;
     c.mSampleRate = s->dev_rate;  // the input side of a HAL unit does not convert rates
     c.mChannelsPerFrame = s->dev_ch;
@@ -647,7 +682,7 @@ uint32_t wa_capture_peek(wa_stream *s, void *dst, uint32_t frames) {
   if (frames > s->ring_frames) frames = s->ring_frames;
   if (!frames) return 0;
   ring_read(s, r, s->conv, frames);
-  wa_from_float(&s->fmt, s->conv, dst, frames, atomic_load_explicit(&s->gain, memory_order_relaxed));
+  wa_from_float(&s->fmt, s->conv, dst, frames, 1.f);  // the gain is in the ring already (input_cb)
   return frames;
 }
 

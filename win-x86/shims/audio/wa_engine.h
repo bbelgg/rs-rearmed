@@ -54,6 +54,7 @@ typedef struct {
   double rate;           // the device's nominal rate
   char name[128];        // UTF-8
   char uid[192];         // kAudioDevicePropertyDeviceUID
+  int in_ch;             // a channel of the list of inputs (rs_audio_input.h), from 0; -1: the device
 } wa_endpoint;
 
 // The endpoint name the game is given, in place: the Real Tone cable (12BA:00FF) is "Rocksmith USB

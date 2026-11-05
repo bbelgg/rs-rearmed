@@ -1338,7 +1338,7 @@ def build(cfg, a, progress):
     if problem:
         progress.say("Note: %s, as a capture's image can be." % problem)
     work = os.path.abspath(a.work)
-    need =cfg["build_disk_bytes"] - lp_build.du(work) if os.path.isdir(work) else cfg["build_disk_bytes"]
+    need = cfg["build_disk_bytes"] - lp_build.du(work) if os.path.isdir(work) else cfg["build_disk_bytes"]
     free = free_bytes(work)
     if free < need:
         raise Failure("not enough free space for the build in %s: %s free, about %s needed. Free some space, or "

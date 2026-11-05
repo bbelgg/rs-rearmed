@@ -42,7 +42,10 @@ VMProtect-packed: the real `.text`, `.rdata` and `.data` exist only in memory wh
 The released installer carries a seed, a small piece of VMProtect's state with no game code in it. With it
 `win-x86/unpack/lp_unpack.py` runs the exe's own decompression in Unicorn on the Mac, and `lp_image.py` makes the
 game image from the result, with nothing from the user ([win-x86/unpack](../../win-x86/unpack/README.md)). A build
-without a seed starts from a capture, which is also where the facts below were first read:
+without a seed starts from a capture, which is also where the facts below were first read. `lp_install.py build` stops
+on an image other than the pinned one, as a capture with pages missing has the right `.text`, builds and crashes at the
+start, and a capture's image, which can differ, goes through with `--unpinned`. `learn-play.sh` and the installer make an
+image that isn't the pinned one again from the seed:
 
 - The user runs the game once on a Windows PC where they own it, with the harvester
   ([win-x86/harvest](../../win-x86/harvest/README.md)): a 32-bit .NET Framework 4.8 program that reads the
@@ -267,6 +270,13 @@ build at `LatencyBuffer=2`.
 the device's channels and gives the game the one `guitar-input.ini` sets, whatever number of channels the game opened,
 with the gain and a clip at full scale ([INSTALL.md](INSTALL.md#guitar-input)). The Mac port does this in a hook on the
 game's own input; here the stream is ours, so it needs no hook point (`si_io` is `unsupported`).
+
+**The list of inputs and an input's level** (the same shared code; [Mac design](../mac/DESIGN.md#built-in-fixes-and-mods) says
+why). `wa_engine.c` lists an interface's channels as mono endpoints, with the channel in the endpoint, in the priority
+order the game's limit of 10 needs. The game sets the level through `IAudioEndpointVolume` and the winmm mixer, which share
+one value per endpoint (`wa_com.c`), and calibration steps it as on the Mac. For any input but the cable that value is
+the shared level, applied in the capture callback with the clip and the peak report. Here the value started as a volume
+of up to 1.0, so it could only cut.
 
 **Cable detection.** On the PortAudio path the game accepts an input whose USB IDs are in its table
 (vendor/product 12BA/00FF is the Real Tone cable), read from the endpoint's device instance id; on the

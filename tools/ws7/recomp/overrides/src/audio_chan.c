@@ -64,14 +64,15 @@ static int before_open(rc_ctx *c, void *user) {
 
 // What the opened device gets; called with the slot off (dev 0), so the I/O thread doesn't read it.
 static void apply_settings(uint8_t *self, input *in) {
-  uint32_t dev = *(uint32_t *)(self + RC_OFF(si_dev) + 4);
+  uint32_t id = *(uint32_t *)(self + RC_OFF(si_dev) + 4), dev = rs_audio_real_dev(id);
   int channels = rs_audio_channels(dev, kAudioObjectPropertyScopeInput);
   rs_audio_input set;
   rs_audio_dev_name(dev, in->name, sizeof in->name);
   rs_audio_input_for(in->name, &set);
   int channel = rs_audio_input_channel(&set, (uint32_t)channels, in->name);
+  if (rs_audio_entry_channel(id) >= 0 && rs_audio_entry_channel(id) < channels) channel = rs_audio_entry_channel(id);
   if (channel < 0) {
-    if (channels <= 2 && set.gain == 1.0f) return;
+    if (channels <= 2 && set.gain == 1.0f && (!rs_audio_level_on() || rs_audio_is_cable(dev))) return;
     // The gain alone keeps the channel the game would listen to.
     channel = channels == 2 && *(uint32_t *)RC_GA(audio_mono_to_stereo) == 1 ? 1 : 0;
   }
@@ -102,12 +103,16 @@ static int before_io(rc_ctx *c, void *user) {
   uint8_t *self = OV_PTR(a, uint8_t);
   uint32_t dev = (uint32_t)OV_U64(a);
   const AudioBufferList *list = OV_PTR(a, const AudioBufferList);
+  // The game compares the device with its own id, which for a channel isn't the system's.
+  uint32_t id = *(uint32_t *)(self + RC_OFF(si_dev) + 4);
+  if (id != dev && rs_audio_real_dev(id) == dev) c->r[6] = id;  // rsi, the second argument
   input *in = slot_of(self, 0);
   if (!in || !list || atomic_load_explicit(&in->dev, memory_order_acquire) != dev) return 0;
   if (*(uint32_t *)(self + RC_OFF(si_state)) != SI_LISTENING) return 0;
   uint8_t *state = *(uint8_t **)(self + RC_OFF(si_io_state));
   if (!state) return 0;
-  uint32_t frames = rs_audio_input_take(list, in->channel, in->gain, in->mono, MAX_FRAMES, &in->stats);
+  uint32_t frames = rs_audio_input_take(list, in->channel, in->gain * rs_audio_soft_gain(id), in->mono, MAX_FRAMES,
+                                        &in->stats);
   if (!frames) return 0;
   in->list.mBuffers[0].mDataByteSize = frames * (uint32_t)sizeof(float);
   *(uint32_t *)(self + RC_OFF(si_channels)) = 1;

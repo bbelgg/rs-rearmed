@@ -305,6 +305,7 @@ same in its own copy ([Windows INSTALL](../windows/INSTALL.md#the-title-logo)).
 | `…/mods/` | mods loaded at startup |
 | `…/renderer`, `…/renderer-fallback.txt` | `metal` or `opengl`, and why a fallback changed it ([Renderer](#renderer)) |
 | `…/guitar-input.ini` | if you made one: the guitar input's channel and gain ([Guitar input](#guitar-input)) |
+| `…/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
 On the first launch your Steam saves are copied once into `steam/`, without `crd` (stored Ubisoft
 credentials). The native build never writes your Steam saves.
@@ -372,20 +373,31 @@ The setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer in s
 
 ### Guitar input
 
-Which channel of an interface the game listens to, and a gain before the game hears it, are set per device in
-`~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (Learn & Play reads the same file):
+The game's list of inputs under Direct Connect (Path/Input, DIRECT CONNECT, then Available Inputs) shows each channel of
+an audio interface: `HX Stomp channel 1` to `channel 8`, `Steinberg UR22mkII channel 1` and `channel 2`. The bar beside
+each moves with its signal, so play and pick the one that moves. The game stops at 10 inputs and the list doesn't
+scroll, so they go in order: the Real Tone cable, interfaces, the built-in microphone, others such as a webcam, then
+virtual devices. Every interface keeps at least one entry, and with too many channels they share the room.
+
+The game's calibration sets the input's level, and can boost it by up to 24 dB, so a quiet interface reaches the top of
+its meter. It no longer changes the volume of your interface in the system. Run calibration once after an update: until
+then the level saved in your profile is left out and the input stays as it is. The Real Tone cable works as before.
+
+Both can also be set per device, in `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (Learn & Play reads the same
+file):
 
 ```ini
 [HX Stomp]
 Channel=5
 ```
 
-The section is the device's name in Audio MIDI Setup. `Channel` counts from 1. For a quiet interface add a gain, such
-as `GainDb=6`: -24 to 36, default 0 (an HX Stomp needs none); above full scale the signal clips, as in an interface. The file is read when an input opens, so restart the game
-after a change and calibrate again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device),
-`RS_AUDIO_INPUT_FILE` (another file) and `RS_AUDIO_INPUT=0` (none of this) are switches. A device of up to two
-channels with nothing set runs as the game has it, `MonoToStereoChannel` included. With `RS_AUDIO_LOG=1` the log has
-the channel, and every few seconds the peak and the samples clipped.
+The section is the device's name in Audio MIDI Setup. `Channel` counts from 1, and such a device has one entry in the
+list. `GainDb=6` adds a fixed gain to the level: -24 to 36, default 0 (an HX Stomp needs none); above full scale the
+signal clips, as in an interface. The file is read when an input opens, so restart the game after a change and calibrate
+again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `RS_AUDIO_INPUT_FILE` (another file) and
+`RS_AUDIO_CHANNEL_ENTRIES=N` (the list's length; 0: one entry per device, in the system's order) are switches, and
+`RS_AUDIO_INPUT_LEVEL=0` leaves the level to the device's own volume. `RS_AUDIO_INPUT=0` turns all of this off. With
+`RS_AUDIO_LOG=1` the log has the channel, each level set, and every few seconds the peak and the samples clipped.
 
 ## Settings and switches
 
@@ -419,6 +431,10 @@ Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loa
 
 ## Known issues
 
+- The game lists 10 inputs at most. Two interfaces can fill that, as an 8-channel and a 2-channel one do, and then the built-in
+  microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which leaves room
+  ([Guitar input](#guitar-input)).
+- Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - No online features: Ubisoft services are not available.
 - Progress made in the native build is not copied back to your Steam saves.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.

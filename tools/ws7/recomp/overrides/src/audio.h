@@ -47,6 +47,20 @@ void rs_audio_output_graph(void *graph);
 // object's device list (kAudioHardwarePropertyDevices) input devices first (audio_devs.c).
 int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t *size, void *data);
+// The list of inputs (audio_devs.c): the real device of an id the game has, the channel of a channel's id (-1:
+// none), and the size of the list the game gets. The import thunks of the calls that take a device use the first.
+uint32_t rs_audio_real_dev(uint32_t id);
+int rs_audio_entry_channel(uint32_t id);
+uint32_t rs_audio_entry_list_size(void);
+// AudioDeviceCreateIOProcID for an id the game has, and the I/O id to use for one in its place (audio_devs.c).
+int32_t rs_audio_io_create(uint32_t id, void *proc, void *client, void *out);
+void *rs_audio_io_id(uint32_t id, void *given);
+int32_t rs_audio_io_destroy(uint32_t id, void *given);
+// An input's level (audio_devs.c): AudioObjectHasProperty, and a write the input volume takes (1: it did).
+int32_t rs_audio_has_property(uint32_t obj, const void *addr);
+int rs_audio_soft_volume_set(uint32_t obj, const void *addr, uint32_t size, const void *data);
+// The input's level as a linear gain, 1 when the game has set none. For the I/O thread.
+float rs_audio_soft_gain(uint32_t id);
 // The same for AudioObjectGetPropertyDataSize and AudioObjectSetPropertyData (audio_trace.c).
 int32_t rs_audio_get_property_data_size(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                         uint32_t *size);

@@ -109,6 +109,14 @@ user's, with a test profile.
   one). The log should have `listening to channel N of M` at the start, and a peak every five seconds while the game
   listens: for a person, the INPUT setting to DIRECT CONNECT, the interface, the calibration, then play. An input of more
   than two channels without the setting is the case to compare with: scrambled and quiet on a build before this.
+- **The list of inputs and the level** (2026-11-05, by hand, a test install, an HX Stomp and a UR22mkII): Ctrl, Down to
+  INPUT, Right to DIRECT CONNECT, Down, Return lists the inputs; Return takes one, and Path/Input shows it as CURRENT INPUT.
+  All ten channels played, and the choice came back after the game's own Exit and a new start. Calibration settled at
+  +5.6 dB with the meter at the top. `RS_AUDIO_LOG=1` has `input level:` for each level set, and `listening to channel N
+  of M` for each entry. If only a device's first channel is heard, its I/O isn't started (the I/O id, [DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). An aggregate
+  device (`AudioHardwareCreateAggregateDevice`, or Audio MIDI Setup) makes a device of many channels from what is connected,
+  with nothing to install, and is a virtual device to the list. keyfifo's keys didn't get past the title in the one run
+  of this, with `RS_KEY_DIRECT=1` and `front`.
   A new launcher in a test home on an external drive stops at macOS's prompt for that drive; start the game's executable
   directly, as above.
 - **First play of a song stutters** with Metal after an install: Metal builds pipelines the first time they
@@ -241,7 +249,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | Switch | What |
 |---|---|
 | `RS_MODS_LOG=1` | what the built-in fixes apply |
-| `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each input's channel and its peak and clips every few seconds |
+| `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each level set, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
 | `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_VERBOSE=1` | GL calls, errors after each call, counts, the load and every first error |
 | `RS_GL_TRACE_DIR=DIR`, `RS_GL_TRACE_START=S`, `RS_GL_TRACE_KEY=1\|PATH`, `RS_GL_TRACE_FRAMES=N` | a trace of N frames (default 30), from the second frame, S seconds after the first, or when `DIR/go` or PATH appears |

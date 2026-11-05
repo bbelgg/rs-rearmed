@@ -102,6 +102,27 @@ HOOKS = {
         "if (rs_audio_set_property_data) { "
         "c->r[0] = (uint64_t)(uint32_t)rs_audio_set_property_data(%s, %s, %s, %s, %s, %s); return; }" % tuple(p)],
 }
+# A channel of an interface is a device of its own to the game (overrides/src/audio_devs.c): these calls take the
+# real device, and the input volume is the audio module's.
+HOOKS["AudioObjectHasProperty"] = lambda p: [
+    "extern int32_t rs_audio_has_property(uint32_t, const void *) __attribute__((weak_import));",
+    "if (rs_audio_has_property) { c->r[0] = (uint64_t)(uint32_t)rs_audio_has_property(%s, %s); return; }" % tuple(p)]
+for _name in ("AudioObjectAddPropertyListener", "AudioObjectRemovePropertyListener"):
+    HOOKS[_name] = lambda p: [
+        "extern uint32_t rs_audio_real_dev(uint32_t) __attribute__((weak_import));",
+        "if (rs_audio_real_dev) %s = rs_audio_real_dev(%s);" % (p[0], p[0])]
+HOOKS["AudioDeviceCreateIOProcID"] = lambda p: [
+    "extern int32_t rs_audio_io_create(uint32_t, void *, void *, void *) __attribute__((weak_import));",
+    "if (rs_audio_io_create) { c->r[0] = (uint64_t)(uint32_t)rs_audio_io_create(%s, %s, %s, %s); return; }" % tuple(p)]
+HOOKS["AudioDeviceDestroyIOProcID"] = lambda p: [
+    "extern int32_t rs_audio_io_destroy(uint32_t, void *) __attribute__((weak_import));",
+    "if (rs_audio_io_destroy) { c->r[0] = (uint64_t)(uint32_t)rs_audio_io_destroy(%s, %s); return; }" % tuple(p)]
+for _name in ("AudioDeviceStart", "AudioDeviceStop"):
+    HOOKS[_name] = lambda p: [
+        "extern void *rs_audio_io_id(uint32_t, void *) __attribute__((weak_import));",
+        "extern uint32_t rs_audio_real_dev(uint32_t) __attribute__((weak_import));",
+        "if (rs_audio_io_id) %s = rs_audio_io_id(%s, %s);" % (p[1], p[0], p[1]),
+        "if (rs_audio_real_dev) %s = rs_audio_real_dev(%s);" % (p[0], p[0])]
 # Steam (the stub shim calls back into these natively):
 #   SteamInternal_ContextInit(data): data->pFn(ctx) is a guest function
 #   SteamAPI_RegisterCallback/RegisterCallResult(CCallbackBase *): its 3 virtuals

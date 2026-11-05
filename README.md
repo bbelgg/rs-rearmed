@@ -76,6 +76,8 @@ port.
 | ENUMERATE in the main menu: new songs without a restart | ✅ | ✅ |
 | Lower guitar latency (buffers, real-time audio thread) | ✅ | ⚠️ |
 | Guitar input channel and gain (`guitar-input.ini`) | ✅ | ✅ |
+| Each channel of an interface in the list of inputs | ✅ | ✅ |
+| Calibration can boost an input, and leaves the interface's volume alone | ✅ | ✅ |
 | Bink videos with sound | ✅ | ✅ intro video, lessons |
 | Window and full screen | ✅ | ✅ |
 | Retina rendering (`RS_METAL_RETINA=1`) | ✅ | ✅ |
@@ -134,6 +136,8 @@ These are compiled into the Mac app. Learn & Play has those marked "Both edition
 | **Frame rate**: the game renders at the display's refresh rate (a 75 Hz or 120 Hz display gets 75 or 120 fps). A fixed rate can be set instead, with vsync off, for example 30 to save power | display | `RS_FPS=N` |
 | **Lower guitar latency**: a smaller output buffer (see the FAQ), a real-time audio thread, and stale guitar audio dropped instead of played late | on | `RS_AUDIO_FRAMES=N` sets the output buffer (e.g. 128; 0 leaves the system's), `RS_LATENCY_BUFFER=N` the game's (1-16). `RS_AUDIO_RT=0` and `RS_AUDIO_INPUT_TRIM=0` turn off the other two. `RS_AUDIO_LOG=1` logs the audio setup |
 | **Guitar input channel and gain**: which channel of an interface the game listens to, and a boost or cut before the game hears it, per device (see the FAQ). An interface of more than two channels is heard on its first channel, where the Mac game alone would mix its channels up. Both editions | first channel, 0 dB | `guitar-input.ini`; `RS_AUDIO_INPUT_CHANNEL=N` and `RS_AUDIO_INPUT_GAIN_DB=N` for every device; `RS_AUDIO_INPUT=0` turns it off |
+| **Every channel in the input list**: under Direct Connect each channel of an interface is an input of its own, with its level bar, up to the 10 the game shows. Interfaces come first, so none goes missing. Both editions | on | `RS_AUDIO_CHANNEL_ENTRIES=0` |
+| **Calibration that can boost**: the game's calibration sets a level of RS Re-ARMed's, up to +24 dB, so a quiet interface reaches the top of the meter, and it leaves your interface's own volume alone. Run it once after updating. Both editions | on | `RS_AUDIO_INPUT_LEVEL=0` |
 | **All guitar interfaces listed**: an interface no longer goes missing from Direct Connect because another device, such as a webcam, failed to open | on | `RS_AUDIO_STABLE_UIDS=0` and `RS_AUDIO_INPUTS_FIRST=0` turn them off |
 | **Renderer**: Metal, or Apple's OpenGL (see [Renderer](#renderer-metal-or-opengl)) | Metal | the `renderer` file, the installer, or `RS_GL_BACKEND=gl` |
 | **Retina** (Metal only): the game renders at the screen's full resolution on a Retina screen | off | `RS_METAL_RETINA=1` |
@@ -345,18 +349,22 @@ small; the rest of its audio engine runs as at 2, double-buffered, which adds no
 (`RS_AUDIO_RING_SPLIT=0` turns that off). Both are read when the game starts.
 
 **My interface has several inputs, or the guitar is too quiet. What can I do?**
-Create `~/Library/Application Support/RS Re-ARMed/guitar-input.ini`, with one section per interface, named as in
-Audio MIDI Setup:
+Set INPUT to DIRECT CONNECT in Path/Input and open Available Inputs: each channel of an interface is listed, with a level
+bar. Play and pick the channel that moves; on an HX Stomp the dry guitar is on channels 5 and 6. Then run the game's
+calibration, which boosts a quiet input by as much as it needs, up to 24 dB. Your interface's own volume isn't changed.
+
+The list stops at 10 inputs, so with a lot of channels connected a channel may not show. Then set it in
+`~/Library/Application Support/RS Re-ARMed/guitar-input.ini`, with one section per interface, named as in Audio MIDI
+Setup:
 
 ```ini
 [HX Stomp]
 Channel=5
 ```
 
-`Channel` counts from 1; on an HX Stomp the dry guitar is on USB channels 5 and 6. For a quiet interface, add a line
-such as `GainDb=6`, which boosts the signal before the game hears it (-24 to 36, default 0). Try it without a gain
-first: an HX Stomp needs none, too much clips the signal, and `RS_AUDIO_LOG=1` logs the peak and what was clipped. Both editions read this file when an input opens, so
-restart the game after a change, then calibrate again in the game. Pick the interface under Direct Connect.
+`Channel` counts from 1, and such an interface takes one place in the list. `GainDb=6` adds a fixed gain (-24 to 36,
+default 0). Both editions read this file when an input opens, so restart the game after a change and calibrate again.
+`RS_AUDIO_LOG=1` logs the peak and what was clipped.
 
 **Where do I report bugs?**
 In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check that the bug doesn't also happen in the original game

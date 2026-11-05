@@ -153,6 +153,12 @@ other variable.
 `RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log has `guitar input "<device>": channel N, gain G dB` when the capture
 stream opens, and a peak for each open input every five seconds, the microphones among them.
 
+**The list of inputs and the level** (2026-11-05, by hand and with `LP_INPUT_SCRIPT`, an HX Stomp and a UR22mkII): on
+Path/Input, Down to INPUT, Right to DIRECT CONNECT, Down, Return lists the inputs; Return takes one, and CURRENT INPUT shows
+it. The list shows 10 rows and no more, with no scrolling. The choice reaches the profile only when the game saves it, so
+quit with the game's own Exit: a kill loses it. Calibration settled at +6.1 dB with the meter at the top. `RS_AUDIO_LOG=1` has
+`input level:` for each level set.
+
 **No intro screens** (`RS_MODS_INTRO`, as on the Mac, [Mac TESTING](../mac/TESTING.md#game-runs)): the
 game should reach the title without the logos and legal screens, and with `RS_MODS_INTRO=0` play them. The
 failure to look for is the title never coming (an empty screen after the loading screen). The scripts
@@ -452,7 +458,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
 | `RS_GL_FRAMETIMES=FILE` | a line per Present |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
-| `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each input's peak and clips every few seconds |
+| `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each level set, each input's peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the Steam face's calls (`[steam-shim]`) |
 | `RS_MODS_LOG=1` | the built-in fixes: the open-file limit, the DLC mounting's end (archives, frames, time, and the path cache's and number hash's counts), each song-file signature skip, each DLC preview job that fails offline |
 | `RS_MODS_FIXES=0`, `RS_MODS_BUDGET_MS=N`, `RS_MODS_BYPASS=0` | the built-in fixes off, the DLC mounting's time per frame (0: one archive a frame), the song-file signature check on |

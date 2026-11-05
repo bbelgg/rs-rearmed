@@ -17,6 +17,7 @@
 #include <unistd.h>
 
 #include "audio.h"
+#include "rs_audio_input.h"
 #include "wa_engine.h"
 #include "win32_guestobj.h"
 #include "win32_shims.h"
@@ -376,7 +377,9 @@ static void test_capture(uint32_t en) {
   CHECK_HR(vcall(vol, 9, 1, (uint32_t[]){pvol}));  // GetMasterVolumeLevelScalar
   float f;
   memcpy(&f, RC32_H(pvol), 4);
-  CHECK(f == 1.f);
+  wa_endpoint in;
+  CHECK(wa_default_endpoint(WA_CAPTURE, &in));
+  CHECK(f == (rs_audio_level_on() && !rs_audio_is_cable(in.dev) ? RS_AUDIO_LEVEL_UNITY : 1.f));  // an input's level
   float half = 0.5f, one = 1.f;
   uint32_t hw, ow;
   memcpy(&hw, &half, 4);
@@ -504,7 +507,8 @@ static void test_wavein(void) {
   w32_wr32(det + 8, 1);
   w32_wr32(det + 16, 4);
   w32_wr32(det + 20, val);
-  CHECK(wcall("mixerGetControlDetailsA", 3, (uint32_t[]){mx, det, 0}) == 0 && rd(val) == 65535);
+  CHECK(wcall("mixerGetControlDetailsA", 3, (uint32_t[]){mx, det, 0}) == 0);
+  CHECK(rd(val) == 65535 || rd(val) == (uint32_t)lrintf(RS_AUDIO_LEVEL_UNITY * 65535.f));  // the cable's, an input's level
   w32_wr32(val, 32768);
   CHECK(wcall("mixerSetControlDetails", 3, (uint32_t[]){mx, det, 0}) == 0);
   w32_wr32(val, 0);

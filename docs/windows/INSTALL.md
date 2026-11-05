@@ -168,6 +168,7 @@ The steps one at a time: `python3 win-x86/install/lp_install.py --help`.
 | `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
 | `…/learn-play/mods/` | mods loaded at startup |
 | `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
+| `~/Library/Application Support/RS Re-ARMed/learn-play/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
 On the first start, profiles in your Steam cloud folder for the game, if Steam has one on this Mac, are
 copied into `steam/` (without `crd`).
@@ -286,19 +287,31 @@ Mac port.
 
 ### Guitar input
 
-Which channel of an interface the game listens to, and a gain before the game hears it, are set per device in
-`~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (the Mac edition reads the same file):
+The game's list of inputs under Direct Connect (Path/Input, DIRECT CONNECT, then Available Inputs) shows each channel of
+an audio interface: `HX Stomp channel 1` to `channel 8`, `Steinberg UR22mkII channel 1` and `channel 2`. The bar beside
+each moves with its signal, so play and pick the one that moves. The game stops at 10 inputs and the list doesn't
+scroll, so they go in order: the Real Tone cable, interfaces, the built-in microphone, others such as a webcam, then
+virtual devices. Every interface keeps at least one entry, and with too many channels they share the room.
+
+The game's calibration sets the input's level, and can boost it by up to 24 dB, so a quiet interface reaches the top of
+its meter. It no longer changes the volume of your interface in the system. Run calibration once after an update: until
+then the level saved in your profile is left out and the input stays as it is. The Real Tone cable works as before.
+
+Both can also be set per device, in `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (the Mac edition reads the same
+file):
 
 ```ini
 [HX Stomp]
 Channel=5
 ```
 
-The section is the device's name in Audio MIDI Setup. `Channel` counts from 1. For a quiet interface add a gain, such
-as `GainDb=6`: -24 to 36, default 0 (an HX Stomp needs none); above full scale the signal clips, as in an interface. The file is read when an input opens, so restart the game
-after a change and calibrate again. With nothing set the game hears the first channel. `RS_AUDIO_INPUT_CHANNEL`,
-`RS_AUDIO_INPUT_GAIN_DB` (for every device), `RS_AUDIO_INPUT_FILE` (another file) and `RS_AUDIO_INPUT=0` (none of this)
-are switches. With `RS_AUDIO_LOG=1` the log has the channel, and every few seconds the peak and the samples clipped.
+The section is the device's name in Audio MIDI Setup. `Channel` counts from 1, and such a device has one entry in the
+list. `GainDb=6` adds a fixed gain to the level: -24 to 36, default 0 (an HX Stomp needs none); above full scale the
+signal clips, as in an interface. The file is read when an input opens, so restart the game after a change and calibrate
+again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `RS_AUDIO_INPUT_FILE` (another file) and
+`RS_AUDIO_CHANNEL_ENTRIES=N` (the list's length; 0: one entry per device, in the system's order) are switches, and
+`RS_AUDIO_INPUT_LEVEL=0` leaves the level to the device's own volume. `RS_AUDIO_INPUT=0` turns all of this off. With
+`RS_AUDIO_LOG=1` the log has the channel, each level set, and every few seconds the peak and the samples clipped.
 
 ## Settings and switches
 
@@ -316,6 +329,8 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_SET_RATE=0` | on | the real-time audio thread, the stale-input trim, switching devices to 48 kHz |
 | `RS_AUDIO_INPUT_CHANNEL=N`, `RS_AUDIO_INPUT_GAIN_DB=N` | `guitar-input.ini` | the guitar input's channel and gain, for every device |
+| `RS_AUDIO_CHANNEL_ENTRIES=N` | 10 | the inputs the game lists; 0: one per device, in the system's order |
+| `RS_AUDIO_INPUT_LEVEL=0` | on | the game's level stays a volume of up to 100%, with no boost |
 | `RS_AUDIO_INPUT_FILE=PATH`, `RS_AUDIO_INPUT=0` | `guitar-input.ini`, on | another settings file; none of this |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed |
@@ -355,6 +370,10 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
 
 ## Known issues
 
+- The game lists 10 inputs at most. Two interfaces can fill that, as an 8-channel and a 2-channel one do, and then the built-in
+  microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which leaves room
+  ([Guitar input](#guitar-input)).
+- Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - Experimental: it has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
   beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
 - Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 14 of the 15 hook

@@ -218,12 +218,79 @@ static void test_clip(void) {
   CHECK(atomic_load(&st.frames) == 4 && atomic_load(&st.clips) == 1);
 }
 
+static void test_entry_counts(void) {
+  enum { I = RS_AUDIO_RANK_INTERFACE, O = RS_AUDIO_RANK_OTHER, V = RS_AUDIO_RANK_VIRTUAL, C = RS_AUDIO_RANK_CABLE };
+  int got[8];
+  // an HX Stomp and a UR22: all ten channels fit
+  rs_audio_entry_counts((int[]){I, I}, (int[]){8, 2}, 2, 10, got);
+  CHECK(got[0] == 8 && got[1] == 2);
+  // the small one keeps its channels when two big ones share what is left
+  rs_audio_entry_counts((int[]){I, I, I}, (int[]){8, 8, 2}, 3, 10, got);
+  CHECK(got[0] == 4 && got[1] == 4 && got[2] == 2);
+  // a cable counts, and what comes after interfaces takes no room from them
+  rs_audio_entry_counts((int[]){C, I, O, V}, (int[]){1, 16, 1, 1}, 4, 10, got);
+  CHECK(got[0] == 1 && got[1] == 9 && got[2] == 1 && got[3] == 1);
+  // too many interfaces: each keeps one
+  rs_audio_entry_counts((int[]){I, I, I}, (int[]){8, 8, 8}, 3, 2, got);
+  CHECK(got[0] == 1 && got[1] == 1 && got[2] == 1);
+  // a channel set in the file: one entry
+  rs_audio_entry_counts((int[]){I, I}, (int[]){1, 2}, 2, 10, got);
+  CHECK(got[0] == 1 && got[1] == 2);
+}
+
+static void test_switches(void) {
+  CHECK(rs_audio_entries_budget() == RS_AUDIO_LIST_DEFAULT && rs_audio_level_on());
+  setenv("RS_AUDIO_CHANNEL_ENTRIES", "0", 1);
+  setenv("RS_AUDIO_INPUT_LEVEL", "0", 1);
+  CHECK(rs_audio_entries_budget() == 0 && !rs_audio_level_on());
+  unsetenv("RS_AUDIO_CHANNEL_ENTRIES");
+  unsetenv("RS_AUDIO_INPUT_LEVEL");
+  setenv("RS_AUDIO_INPUT", "0", 1);  // the Mac's channels need the input hook
+  CHECK(rs_audio_entries_budget() == 0 && !rs_audio_level_on());
+  unsetenv("RS_AUDIO_INPUT");
+}
+
+static void test_level(void) {
+  CHECK(NEAR(rs_audio_level_gain(RS_AUDIO_LEVEL_UNITY), 1.0f));
+  CHECK(NEAR(rs_audio_level_gain(1.0f), powf(10.0f, RS_AUDIO_LEVEL_MAX_DB / 20.0f)));
+  CHECK(rs_audio_level_gain(0.0f) < 1.0f && rs_audio_level_gain(2.0f) == rs_audio_level_gain(1.0f));
+
+  // a start sets every input: not calibration, whatever the levels
+  rs_audio_level_watch w = {0};
+  for (uintptr_t i = 1; i <= 10; i++) CHECK(!rs_audio_level_watch_note(&w, i, 0.375f));
+  for (uintptr_t i = 1; i <= 10; i++) CHECK(!rs_audio_level_watch_note(&w, i, 0.6858f));
+  // one input, set again to the same level: not either
+  for (int i = 0; i < 10; i++) CHECK(!rs_audio_level_watch_note(&w, 5, 0.5f));
+  // steps on one input: calibration
+  int seen = 0;
+  for (int i = 0; i < 8; i++) seen |= rs_audio_level_watch_note(&w, 5, 0.4f + 0.01f * (float)i);
+  CHECK(seen);
+
+  // an old saved level is unity until calibration has run, and stays counted after a start
+  char dir[] = "/tmp/rs-audio-level-XXXXXX";
+  CHECK(mkdtemp(dir));
+  setenv("RS_NATIVE_HOME", dir, 1);
+  unsetenv("LP_HOME");
+  unsetenv("LP_USER_DIR");
+  CHECK(rs_audio_level_applied(0.6858f) == 1.0f && rs_audio_level_applied(0.17f) == 1.0f);
+  for (int i = 0; i < 8; i++) rs_audio_level_set(5, 0.4f + 0.01f * (float)i);
+  CHECK(NEAR(rs_audio_level_applied(0.6858f), rs_audio_level_gain(0.6858f)));
+  char marker[256];
+  snprintf(marker, sizeof marker, "%s/input-level-calibrated", dir);
+  CHECK(access(marker, F_OK) == 0);
+  unlink(marker);
+  rmdir(dir);
+  unsetenv("RS_NATIVE_HOME");
+}
+
 int main(void) {
   setenv("RS_AUDIO_LOG", "1", 1);
   unsetenv("RS_AUDIO_INPUT");
   unsetenv("RS_AUDIO_INPUT_FILE");
   unsetenv("RS_AUDIO_INPUT_CHANNEL");
   unsetenv("RS_AUDIO_INPUT_GAIN_DB");
+  unsetenv("RS_AUDIO_CHANNEL_ENTRIES");
+  unsetenv("RS_AUDIO_INPUT_LEVEL");
   test_parse();
   test_locale();
   test_for();
@@ -231,6 +298,9 @@ int main(void) {
   test_channel();
   test_take();
   test_clip();
+  test_entry_counts();
+  test_switches();
+  test_level();
   puts("rs_audio_input: ok");
   return 0;
 }

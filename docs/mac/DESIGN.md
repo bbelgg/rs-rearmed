@@ -26,6 +26,8 @@ bound to the bundled replacements.
 
 ## Getting the game image
 
+The installer decrypts on every run, in seconds, so an image kept from an earlier version can't be used by mistake.
+
 The Steam copy is encrypted by Valve's SteamStub DRM, which decrypts `__text` in memory at start: a repeating
 8-byte XOR. `tools/steamless/decrypt.py` undoes it on the file, with the key it finds in your own binary (nothing
 ships, and it prints nothing of it), and checks the result against the pin. The result is the input of every build.
@@ -109,11 +111,24 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 - the guitar input's channel and gain: the game's I/O function handles one channel, or picks one of two, and of a
   device of more channels it queues the start of the buffer as it is, so 8 channels give 16 frames of mixed-up audio
   per 128. A hook (`si_io`, `audio_chan.c`) gives it a mono buffer of the chosen channel with the gain instead, and the
-  game's mono path does the rest. The game can only change a level through the device's input volume, which most
-  interfaces don't have, so the gain comes before the game. Settings: `guitar-input.ini`
-  ([INSTALL.md](INSTALL.md#guitar-input));
+  game's mono path does the rest. Settings: `guitar-input.ini` ([INSTALL.md](INSTALL.md#guitar-input));
+- each channel of an interface is an input of its own (`shims/coreaudio/rs_audio_input.c`, `audio_devs.c`). The game opens
+  a device per slot, 10 at most, and lists what it opened, so a channel is a device to it: the list it reads has ids that
+  hold the real device and the channel, the import thunks of the calls that take a device reach the real one, and only
+  the name and UID differ. The list is in priority order, as the game stops at 10. Two habits of the game had to be met:
+  it compares the device its I/O function gets with its own id, so `audio_chan.c` gives it that id, and it starts and
+  stops its I/O by the function's address, which is the id only for a function's first registration on a device, so a
+  channel's real id is kept and used in its place;
+- an input's level. Calibration is a loop: from about 0.4 it raises the level in small steps until its meter reaches
+  the top. It reaches a device through `volm`, which most interfaces lack, so it pegged at 1 and never finished, and
+  which on the others is the player's own setting. So every input but the cable reports a volume of ours (`audio_devs.c`),
+  and the level is a gain in the `si_io` hook: 0.375, where the game starts a device, is unity, and 1 is +24 dB. A level
+  saved before counts for nothing until calibration has run once, seen as a run of changes on one input, as a start sets
+  them all; `input-level-calibrated` in the folder keeps that. The cable keeps its hardware level and the game's own path.
+  The game reads the list about 26 times at the start and not again in play, so its device reads cost nothing there;
 - devices get stable identifiers, so an interface is not dropped from Direct Connect after another device
-  fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`, `RS_AUDIO_INPUTS_FIRST`).
+  fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`; `RS_AUDIO_INPUTS_FIRST` applies with the
+  list of inputs off, as the list has its own order).
 
 The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the
 input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which the Windows port shares. `RS_AUDIO_LOG=1` logs the setup.

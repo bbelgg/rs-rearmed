@@ -26,6 +26,9 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   screens; DIRECT CONNECT offered, and a guitar through a UR22mkII heard by the maintainer; official and custom songs, a video lesson,
   Session Mode and Nonstop Play; Enumerate and Refresh Game Files; OpenGL boots and plays a song; Quit and Exit gone in 0.5 s or
   less. The figures are in [PERFORMANCE.md](PERFORMANCE.md).
+- **Every channel in the input list, and calibration that can boost** (on `main` after 1.5.1, not in a release yet; 2026-11-05, by
+  the maintainer, a test install): an HX Stomp's 8 channels and a UR22's 2 listed, all heard, a choice kept over a restart;
+  calibration settled at +5.6 dB with the meter at the top. Not in this pass: the Real Tone cable with this build.
 - **RSMods' library** (2026-11-05): the same `rearmed-mods.dylib` 0.3.0 as Learn & Play's, all its mods on, a test home, to the note highway and
   a quit ([Fixed in 1.5.1](#fixed-in-151)).
 - **Mods on both editions**: a mod built with `rc_mod.h` is one dylib for this app and Learn & Play ([Windows plan](../windows/PLAN.md#status)).
@@ -43,6 +46,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 ## Open issues
 
+- The list of inputs and the level, not checked yet: unplugging an interface while the game runs (the game's property listeners get the real device, not a channel's id), a Real Tone cable with this
+  build, and the level with a second profile, which counts as calibrated with the first.
 - With the legacy fast-load `cache.psarc`, a start can stay on the white loading screen now and then (a
   race in the game). Metal's safe load avoids the stall shader compiles would add; on OpenGL quit and start
   again.
@@ -106,8 +111,6 @@ Nothing here is meant to change how this edition plays. What changed is shared w
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **A picker for the guitar input**: a section of the installer app with the device, channel, gain and a live meter
-  per channel, for both editions. Today it is `guitar-input.ini`.
 - **Two guitars on one interface**: the game opens one stream per device, so a second player on another channel of it
   would need a device of its own, made up by the audio layer.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

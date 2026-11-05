@@ -16,6 +16,7 @@
 
 #include "audio.h"
 #include "rc_hook.h"
+#include "rs_audio_input.h"
 
 #define SI_STATE RC_OFF(si_state)  // u32: 2 = closed, to be opened
 #define SI_DEV RC_OFF(si_dev)      // u8 selected, u32 AudioObjectID at +4 (0x10133ab30)
@@ -124,7 +125,7 @@ static void after_open(rc_ctx *c, void *user) {
   t_open.active = 0;
   int ok = (uint8_t)c->r[0] != 0;
   uint8_t *self = t_open.self;
-  uint32_t dev = self[SI_DEV] ? *(uint32_t *)(self + SI_DEV + 4) : 0;
+  uint32_t dev = self[SI_DEV] ? rs_audio_real_dev(*(uint32_t *)(self + SI_DEV + 4)) : 0;
   uint32_t slot = t_open.slot;
   if (g_entry[slot].dev == dev && g_entry[slot].result == ok) return;
   g_entry[slot].dev = dev;
@@ -146,14 +147,21 @@ __attribute__((constructor)) static void trace_init(void) {
 
 int32_t rs_audio_get_property_data_size(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                         uint32_t *size) {
-  OSStatus st = AudioObjectGetPropertyDataSize(obj, addr, qsize, qdata, size);
+  const AudioObjectPropertyAddress *a = addr;
+  if (obj == kAudioObjectSystemObject && a && a->mSelector == kAudioHardwarePropertyDevices && size &&
+      rs_audio_entries_budget() > 0) {
+    *size = rs_audio_entry_list_size();
+    return noErr;
+  }
+  OSStatus st = AudioObjectGetPropertyDataSize(rs_audio_real_dev(obj), addr, qsize, qdata, size);
   if (t_open.active) trace('#', obj, addr, st, size ? *size : 0, NULL);
   return st;
 }
 
 int32_t rs_audio_set_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t size, const void *data) {
-  OSStatus st = AudioObjectSetPropertyData(obj, addr, qsize, qdata, size, data);
+  if (rs_audio_soft_volume_set(obj, addr, size, data)) return noErr;
+  OSStatus st = AudioObjectSetPropertyData(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
   if (t_open.active) trace('s', obj, addr, st, size, data);
   return st;
 }

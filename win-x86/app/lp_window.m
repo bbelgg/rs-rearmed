@@ -202,6 +202,7 @@ static void window_script(void);
 // LP_QUIT_WAIT seconds.
 #define LP_QUIT_WAIT 8
 void wa_default_changed(void);  // the system's default output changed (wa_com.c)
+void d3d9_set_hidden_period(uint64_t ns);  // d3d9_device.c
 void w32_input_release_all(void);
 void w32_input_focus(int active);
 void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp);
@@ -237,6 +238,16 @@ void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp);
   w32_input_focus(0);
 }
 - (void)windowDidBecomeKey:(NSNotification *)n { w32_input_focus(1); }
+// Hidden (another app in front of the full-screen window, which hides on deactivate; minimised;
+// covered) the layer paces nothing, so Present keeps to the display's rate itself.
+- (void)windowDidChangeOcclusionState:(NSNotification *)n {
+  static NSInteger hz = 60;  // a hidden window can have no screen: the rate it last showed on
+  NSInteger now = g_win.screen.maximumFramesPerSecond;
+  if (now > 0) hz = now;
+  int shown = (g_win.occlusionState & NSWindowOcclusionStateVisible) != 0;
+  d3d9_set_hidden_period(shown ? 0 : 1000000000ull / (uint64_t)hz);
+  fprintf(stderr, "lp: the window is %s\n", shown ? "visible" : "hidden");
+}
 - (void)windowDidEnterFullScreen:(NSNotification *)n { log_mode("macOS"); }
 - (void)windowDidExitFullScreen:(NSNotification *)n { log_mode("macOS"); }
 - (void)windowDidEndLiveResize:(NSNotification *)n { log_mode("resized"); }

@@ -4,6 +4,7 @@
 #include <mach/mach_time.h>
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -927,6 +928,28 @@ static d3d9_ft_mark_t d3d9_ft_mark(void) {
     return fn;
 }
 
+// A hidden window's layer stops pacing: nextDrawable answers at once and the game runs free, at about
+// 120 fps on a 75 Hz display. While the window can't be seen Present keeps to the display's rate itself,
+// as the Mac edition's display link does, outside the device lock so other threads aren't held up.
+static _Atomic uint64_t d3d9_hidden_period;  // ns between frames while hidden; 0 while the window shows
+void d3d9_set_hidden_period(uint64_t ns) { atomic_store(&d3d9_hidden_period, ns); }
+static void d3d9_hidden_wait(void) {
+    static uint64_t next;  // only the presenting thread comes here
+    uint64_t period = atomic_load(&d3d9_hidden_period);
+    if (!period) {
+        next = 0;
+        return;
+    }
+    uint64_t now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+    if (now < next) {
+        uint64_t left = next - now;
+        nanosleep(&(struct timespec){.tv_sec = (time_t)(left / 1000000000u), .tv_nsec = (long)(left % 1000000000u)}, NULL);
+        next += period;
+    } else {
+        next = now + period;  // the first hidden frame, or one that took longer than the period
+    }
+}
+
 uint32_t d3d9_dev_present(d3d9_device *d) {
     d3d9_ft_mark_t ft = d3d9_ft_mark();
     uint64_t ft0 = ft ? mach_absolute_time() : 0;
@@ -944,6 +967,7 @@ uint32_t d3d9_dev_present(d3d9_device *d) {
     d3d9_dev_unlock(d);
     if (t0) lp_frame_event(LPF_PRESENT, lp_frame_now() - t0, 0);
     if (ft) ft('F', ft0, mach_absolute_time(), 0, 0);
+    d3d9_hidden_wait();
     return D3D_OK;
 }
 

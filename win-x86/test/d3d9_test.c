@@ -16,6 +16,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 #include "d3d9_internal.h"
 #include "rs_gfx.h"
@@ -297,6 +298,19 @@ int main(int argc, char **argv) {
                 if (v != texel(x, H - 1 - y)) fbad++;
             }
         check(fbad == 0, "Present: window framebuffer is the back buffer, upright (%d wrong)", fbad);
+    }
+
+    // 2b. A hidden window: Present keeps the period itself, and stops as soon as the window shows
+    {
+        uint64_t t0 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        d3d9_set_hidden_period(20000000);
+        for (int i = 0; i < 4; i++) com(dev, DEV_Present, 4, 0, 0, 0, 0);
+        uint64_t t1 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        d3d9_set_hidden_period(0);
+        for (int i = 0; i < 4; i++) com(dev, DEV_Present, 4, 0, 0, 0, 0);
+        uint64_t t2 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        check(t1 - t0 >= 60000000, "Present: hidden, 4 frames take 3 periods (%llu ms)", (unsigned long long)((t1 - t0) / 1000000));
+        check(t2 - t1 < 60000000, "Present: shown again, no wait (%llu ms)", (unsigned long long)((t2 - t1) / 1000000));
     }
 
     // 3. vs_3_0 / ps_3_0 with constants, DrawIndexedPrimitive with a base vertex, into a

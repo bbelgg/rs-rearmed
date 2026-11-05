@@ -234,6 +234,7 @@ int d3d9_format_is_block(uint32_t fmt);
 uint32_t d3d9_device_create(uint32_t d3d, const uint32_t *a, uint32_t pp_guest, uint32_t *out);
 void d3d9_dev_lock(d3d9_device *d);    // takes the lock and makes the context current
 void d3d9_dev_unlock(d3d9_device *d);
+void d3d9_set_hidden_period(uint64_t ns);  // the window can't be seen: at most a Present per ns; 0 when it can
 void d3d9_dev_unbind(d3d9_device *d, d3d9_obj *o);  // drop every binding of a resource
 // draw a texture into the current framebuffer: rect = dst in NDC (x0 y0 x1 y1), src texcoords
 void d3d9_dev_blit(d3d9_device *d, GLuint tex, const float dst[4], const float src[4], int linear);

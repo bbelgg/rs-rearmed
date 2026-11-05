@@ -20,7 +20,7 @@
 # it; docs/mac/INSTALL.md "Renderer"); without RS_RENDERER an existing setting is kept, else metal.
 # With Metal it then compiles the game's Metal shaders (tools/play-native/warm-shaders.sh: a few
 # minutes the first time; RS_WARM_SHADERS=0 skips it). With OpenGL there is nothing to prepare (a
-# later switch to Metal prepares them on its first Metal start, or run warm-shaders.sh then).
+# later switch to Metal compiles them as the game uses them, or run warm-shaders.sh then).
 # Re-run it after a new build to update the game. Saves in steam/ are kept. Never touches the
 # install or the real Steam folder. RS_NATIVE_HOME / RS_NATIVE_LAUNCHER override the two paths.
 #

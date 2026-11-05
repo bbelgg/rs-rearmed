@@ -3,8 +3,8 @@
 #
 # The install's shader warm-up (docs/mac/METAL.md "Safe load"): compiles the Metal shader libraries
 # the game will need (the disk cache's manifest and the app's bundled shader corpus) once, now, so
-# the first Metal start does not spend minutes on "Preparing shaders" (or, with a fast-load
-# cache.psarc and no warm-up at all, stall on the loading screen). Runs APP's own executable with
+# the game does not compile them as it uses them (or, with a modified cache.psarc, spend minutes on
+# "Preparing shaders" at its first Metal start). Runs APP's own executable with
 # --warm-shaders (default: the installed app, $RS_NATIVE_HOME/game/Rocksmith2014.app; Learn & Play's
 # installer passes its app, docs/windows/PERFORMANCE.md "Shader preparation"): no window, no
 # game. Metal's shader cache belongs to an app (its bundle identifier and bundle path), so only the
@@ -13,8 +13,8 @@
 # everything is compiled already. RS_WARM_SHADERS=0 skips it.
 #
 # stdout: "progress F Preparing shaders… N of M" lines (F: 0..1; the installer's progress bar), on a
-# terminal one updating line instead. Never fails the install: without the warm-up the game warms
-# up on its first Metal start ("Preparing shaders" on the black window).
+# terminal one updating line instead. Never fails the install: without the warm-up the game compiles
+# the shaders as it uses them.
 set -uo pipefail
 home=${RS_NATIVE_HOME:-"$HOME/Library/Application Support/RS Re-ARMed"}
 app=${1:-"$home/game/Rocksmith2014.app"}

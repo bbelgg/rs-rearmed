@@ -467,8 +467,8 @@ final class BuildRunner {
                 ("Packaging",                     Steps.packageApp),
             ]
         }
-        // The Metal shaders only for Metal: an OpenGL install needs none (a later switch to Metal
-        // prepares them on its first start).
+        // The Metal shaders only for Metal: an OpenGL install needs none (after a later switch to Metal
+        // the game compiles them as it uses them).
         if (renderer == "metal" || game == "learnplay") && !refreshOnly {
             steps.append(("Preparing shaders", Steps.prepareShaders))
         }
@@ -777,18 +777,17 @@ enum Steps {
     }
 
     // The installed game compiles its Metal shaders once (warm-shaders.sh runs its executable with
-    // --warm-shaders: no window), so its first start with Metal does not have to; "progress" lines
+    // --warm-shaders: no window), so it does not have to as it plays; "progress" lines
     // with "Preparing shaders… N of M" move the bar. Never fails the install: without it the game
-    // prepares them on its first Metal start.
+    // compiles them as it uses them.
     static func prepareShaders(_ r: BuildRunner) async throws {
         guard r.lpStopped.isEmpty else { return }
         let lp = r.game == "learnplay"
-        // Learn & Play compiles what isn't ready while it plays; the Mac game prepares it on a first start.
-        let later = lp ? "the game compiles them while it plays." : "the game prepares them on its first start with Metal."
+        let later = "the game compiles them while it plays."
         r.appendLog(lp
             ? "Compiling the game's Metal shaders, so its first play doesn't stall on them. "
                 + "The first time this takes under a minute; after an update usually seconds."
-            : "Compiling the game's Metal shaders, so its first start with Metal is quick. "
+            : "Compiling the game's Metal shaders, so its first play doesn't stall on them. "
                 + "The first time this takes a few minutes; after an update usually seconds.")
         r.shadersSkipped = false
         r.shadersReady = false  // Build Again: not what the run before found
@@ -1842,8 +1841,8 @@ class InstallerWindow: NSWindow {
                     (keep the folder learn-play in there if you have Learn & Play).\(gameCopyElsewhereNote("mac"))\(runner.renderer != "metal" || runner.shadersReady ? "" : """
 
 
-                    The game's Metal shaders are not prepared yet: its first start with Metal shows \
-                    "Preparing shaders" for a few minutes.
+                    The game's Metal shaders are not prepared: the first play stalls while it compiles them. \
+                    Build & Install again prepares them.
                     """)
 
                     The installer log is in \(logPath).

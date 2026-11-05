@@ -139,6 +139,7 @@ ensure_venv
 echo "== Code image"
 mkdir -p "$build/image"
 img="$build/image/Rocksmith2014.exe"
+unpinned=()
 if [[ -n $harvest ]]; then
     # A capture of YOUR OWN game (rs-harvest), made once on a Windows PC with the one-step harvester shipped
     # in win-x86/harvest (harvest-game.bat). Re-ARMed ships no game code -- this is your own game's data,
@@ -150,11 +151,15 @@ if [[ -n $harvest ]]; then
     [[ -n ${LP_HARVEST_V1:-} ]] && ref=(--reference "$LP_HARVEST_V1")
     "$py" "$root/win-x86/image/lp_image.py" "$harvest" "$img" ${ref[@]+"${ref[@]}"} \
         --report "$build/image/report.txt"
-elif [[ -f $img ]]; then
+    unpinned=(--unpinned)
+elif [[ -f $img ]] && lpi image-check "$img" >/dev/null; then
     echo "(made by an earlier run; delete it to make it again)"
 elif lpi seed-check >/dev/null; then
-    # Nothing needed from the user: their own exe, unpacked offline with the seed.
+    # Nothing needed from the user: their own exe, unpacked offline with the seed, over an image that isn't the pinned one.
     lpi game-image "$game" "$img" --py "$py" --report "$build/image/report.txt"
+elif [[ -f $img ]]; then
+    echo "(from an earlier capture: not the image this version is made for, which a capture's can be; delete it to make it again)"
+    unpinned=(--unpinned)
 else
     # No seed here (a clone of the repository; the released installer has one) and no capture yet: build the
     # harvester folder here and open it, so the user can copy it to a Windows PC. The capture is a one-time
@@ -181,7 +186,8 @@ fi
 echo "code image: $img"
 
 echo "== Building the game (translating it the first time takes most of the time; a stopped run continues)"
-lpi build "$build/lp" --image "$img" --dlls "$build/dlls" --game "$game" --py "$py" ${LP_JOBS:+--jobs "$LP_JOBS"}
+lpi build "$build/lp" --image "$img" ${unpinned[@]+"${unpinned[@]}"} --dlls "$build/dlls" --game "$game" --py "$py" \
+    ${LP_JOBS:+--jobs "$LP_JOBS"}
 
 echo "== Installing"
 lpi app-install "$build/lp" --game "$game" ${LP_NATIVE_APP:+--app "$LP_NATIVE_APP"}

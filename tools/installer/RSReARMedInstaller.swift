@@ -217,6 +217,7 @@ final class BuildRunner {
     var lastError = ""  // the last "error: ..." line of a command: what the failure alert says
     var notes: [String] = []  // "note: ..." lines of a command: said again when the run is done
     var lpStopped = ""  // Learn & Play: why the run stopped before the build (no code image yet), "" if it did not
+    var lpUnpinned = false  // Learn & Play: the code image is a capture's, which can differ from the pin
     var lpGameFolder = ""  // the Windows game folder lp_install.py found
     var logFileURL: URL?
     // The command shell() is running, so Skip and Quit can stop it (with what it started).
@@ -701,11 +702,7 @@ enum Steps {
     // The recompiler's input, from the Steam binary on disk: nothing runs, and no Steam, Rosetta or account is
     // involved (tools/steamless/decrypt.py checks it against the pin).
     static func obtainGameImage(_ r: BuildRunner) async throws {
-        let imagePath = r.repoRoot + "/build/steamless/Rocksmith2014_x64_decrypted"
-        if FileManager.default.fileExists(atPath: imagePath) {
-            r.appendLog("Game image already exists at \(imagePath), skipping decryption.")
-            return
-        }
+        // Every run, as it takes seconds: an image kept from an earlier version may not be this version's.
         try await r.shell("python3 -I tools/steamless/decrypt.py --game \(shq(r.gameDir))")
     }
 
@@ -960,13 +957,15 @@ enum Steps {
         try await r.shell("\(lpInstall) --progress-lines redist \(lpDLLDir)")
     }
 
-    // The code image: kept from an earlier run; else with nothing from the user, the exe unpacked offline with
-    // the seed the release's app bundle has; else (a build of the repository without one) from a harvest folder
-    // (harvester v2, run once on a Windows PC), and without that the run stops here (lpStopped), as learn-play.sh
-    // does.
+    // The code image: kept from an earlier run when it is the pinned one; else with nothing from the user, the exe
+    // unpacked offline with the seed the release's app bundle has; else (a build of the repository without one) an
+    // earlier capture's, or one from a harvest folder (harvester v2, run once on a Windows PC), and without that the
+    // run stops here (lpStopped), as learn-play.sh does.
     static func windowsCodeImage(_ r: BuildRunner) async throws {
         r.lpStopped = ""
-        if FileManager.default.fileExists(atPath: r.repoRoot + "/" + lpImage) {
+        r.lpUnpinned = false
+        let earlier = FileManager.default.fileExists(atPath: r.repoRoot + "/" + lpImage)
+        if earlier, await r.status("\(lpInstall) image-check \(lpImage)") == 0 {
             r.appendLog("Code image from an earlier run: \(lpImage)")
             return
         }
@@ -974,6 +973,11 @@ enum Steps {
             try await setupVenvWindows(r)
             try await r.shell("\(lpInstall) --progress-lines game-image \(shq(gameCopy("learnplay"))) \(lpImage) "
                 + "--py build/venv/bin/python --report build/win-x86/image/report.txt", env: bundledSeed())
+            return
+        }
+        if earlier {
+            r.appendLog("Code image from an earlier capture: \(lpImage)")
+            r.lpUnpinned = true
             return
         }
         let choice = showAlert(
@@ -1001,6 +1005,7 @@ enum Steps {
         try await setupVenvWindows(r)  // lp_image.py and the translator need capstone
         try await r.shell("mkdir -p build/win-x86/image && build/venv/bin/python win-x86/image/lp_image.py "
             + "\(shq(url.path)) \(lpImage) --report build/win-x86/image/report.txt")
+        r.lpUnpinned = true
     }
 
     // Translate, compile and link (lp_install.py build: resumable, each translation keyed by its inputs).
@@ -1009,7 +1014,8 @@ enum Steps {
         if !FileManager.default.fileExists(atPath: r.repoRoot + "/build/venv/bin/python") { try await setupVenvWindows(r) }
         if r.lpGameFolder.isEmpty { r.lpGameFolder = gameCopy("learnplay") }  // the copy (windowsCopy)
         r.appendLog(try await r.shell("\(lpInstall) build-estimate"))
-        try await r.shell("\(lpInstall) --progress-lines build \(lpWork) --image \(lpImage) --dlls \(lpDLLDir) "
+        try await r.shell("\(lpInstall) --progress-lines build \(lpWork) --image \(lpImage)"
+            + "\(r.lpUnpinned ? " --unpinned" : "") --dlls \(lpDLLDir) "
             + "--game \(shq(r.lpGameFolder)) --py build/venv/bin/python")
     }
 

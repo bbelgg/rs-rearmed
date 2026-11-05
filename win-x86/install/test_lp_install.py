@@ -919,6 +919,48 @@ class TestDownload(WaitBase):
         self.assertFalse(lp_install.download_running(self.fx.steam, 221683))
 
 
+class TestImagePin(Base):
+    def setUp(self):
+        Base.setUp(self)
+        self.image = os.path.join(self.top, "image.exe")
+        write(self.image, b"the image")
+        self.cfg = dict(self.fx.cfg, image_sha256=hashlib.sha256(b"the image").hexdigest())
+
+    def build(self, cfg, unpinned=False):
+        a = argparse.Namespace(work=os.path.join(self.top, "work"), image=self.image, dlls=self.top, game=self.top,
+                               py=sys.executable, jobs=0, unpinned=unpinned)
+        with mock.patch.object(lp_install.lp_build, "Builder") as builder, \
+                mock.patch.object(lp_install, "title_logo"):
+            builder.return_value.run.return_value = 60
+            try:
+                lp_install.build(cfg, a, quiet())
+            except Failure as e:
+                return builder, str(e)
+        return builder, None
+
+    def test_the_pinned_image_builds(self):
+        self.assertIsNone(lp_install.image_problem(self.cfg, self.image))
+        builder, failure = self.build(self.cfg)
+        self.assertIsNone(failure)
+        builder.assert_called_once()
+
+    def test_another_image_stops_before_the_build(self):
+        write(self.image, b"a capture with pages missing")
+        self.assertIn("not the image", lp_install.image_problem(self.cfg, self.image))
+        builder, failure = self.build(self.cfg)
+        self.assertIn("--unpinned", failure)
+        builder.assert_not_called()
+
+    def test_a_capture_says_so(self):
+        write(self.image, b"a capture")
+        builder, failure = self.build(self.cfg, unpinned=True)
+        self.assertIsNone(failure)
+        builder.assert_called_once()
+
+    def test_no_image_is_a_problem(self):
+        self.assertIn("no game image", lp_install.image_problem(self.cfg, self.image + ".gone"))
+
+
 class TestSeed(Base):
     def setUp(self):
         Base.setUp(self)
@@ -1336,7 +1378,8 @@ class TestBuild(BuildBase):
     def test_not_enough_space(self):
         cfg = lp_install.load_config()
         cfg["build_disk_bytes"] = 1 << 60
-        a = argparse.Namespace(work=self.work, image=self.image, dlls=self.dlls, game=self.game, py=sys.executable, jobs=1)
+        a = argparse.Namespace(work=self.work, image=self.image, unpinned=True, dlls=self.dlls, game=self.game,
+                               py=sys.executable, jobs=1)
         with self.assertRaises(Failure) as e:
             lp_install.build(cfg, a, quiet())
         self.assertIn("not enough free space", str(e.exception))

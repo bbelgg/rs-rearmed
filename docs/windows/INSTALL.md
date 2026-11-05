@@ -129,6 +129,11 @@ it needs nothing else. `CAPTURE` is an unzipped capture folder (or `LP_HARVEST`)
 the first run prepares the capture folder, opens it and stops, and you run it again with the folder. Re-run it to
 update. `tools/play-native/learn-play.sh --refresh` only refreshes the game files.
 
+The code image of an earlier run is kept only if it is the one this version is made for (`image_sha256` in
+`tools/targets/win-x86/target.toml`). Otherwise it is made again from the seed, and without a seed an earlier capture's
+image is used as it is, as a capture's can differ. `lp_install.py build` stops before building on any other image
+unless it has `--unpinned`, and `lp_install.py image-check EXE` says whether an image is the right one.
+
 | Variable | Meaning |
 |---|---|
 | `RS_BUILD_DIR` | the build folder (default `build/` in the repository; no spaces in its path). The build goes to `$RS_BUILD_DIR/win-x86/lp`, the DLLs to `…/win-x86/dlls`, the image to `…/win-x86/image` |

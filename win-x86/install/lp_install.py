@@ -55,7 +55,8 @@
         Refresh Game Files.
     lp_install.py build-estimate
         how long the build takes and the space it needs (target.toml's measurements).
-    lp_install.py build WORK --image EXE --dlls DIR --game DIR [--py PYTHON] [--jobs N]
+    lp_install.py image-check EXE
+    lp_install.py build WORK --image EXE [--unpinned] --dlls DIR --game DIR [--py PYTHON] [--jobs N]
         translate, compile and link the game into WORK/out/rs2014_lp (lp_build.py); resumable, each
         translation keyed by the SHA-256 of its input and of the translator. --py: a Python with capstone.
     lp_install.py app-install WORK --game DIR [--app APP]
@@ -1187,10 +1188,13 @@ def main(argv=None):
     p = sub.add_parser("build")
     p.add_argument("work")
     p.add_argument("--image", required=True)
+    p.add_argument("--unpinned", action="store_true")
     p.add_argument("--dlls", required=True)
     p.add_argument("--game", required=True)
     p.add_argument("--py", default=sys.executable)
     p.add_argument("--jobs", type=int, default=0)
+    p = sub.add_parser("image-check")
+    p.add_argument("image")
     p = sub.add_parser("app-install")
     p.add_argument("work")
     p.add_argument("--game", required=True)
@@ -1270,6 +1274,10 @@ def main(argv=None):
             print(build_estimate(cfg))
         elif a.cmd == "build":
             build(cfg, a, progress)
+        elif a.cmd == "image-check":
+            problem = image_problem(cfg, a.image)
+            print(problem or "the image is the one this version is made for")
+            return 1 if problem else 0
         elif a.cmd == "app-install":
             app, home = lp_build.install_app(os.path.abspath(a.work), os.path.abspath(a.game), a.app,
                                              say=progress.say)
@@ -1308,9 +1316,29 @@ def build_estimate(cfg):
     return text
 
 
+def image_problem(cfg, path):
+    """Why the image at path is not the one the tables were made for; None when it is. The whole file counts: a
+    capture with pages missing has the right .text, builds for half an hour and crashes at the start."""
+    want = cfg.get("image_sha256")
+    if not want:
+        return None
+    if not os.path.isfile(path):
+        return "no game image at %s" % path
+    got = sha256(path)
+    if got == want:
+        return None
+    return "%s is not the image this version is made for (SHA-256 %s, expected %s)" % (path, got, want)
+
+
 def build(cfg, a, progress):
+    problem = image_problem(cfg, a.image) if os.path.isfile(a.image) else None
+    if problem and not a.unpinned:
+        raise Failure("%s. Delete it and run the install again, or make it with game-image; a capture's image, which "
+                      "differs on purpose, takes --unpinned." % problem)
+    if problem:
+        progress.say("Note: %s, as a capture's image can be." % problem)
     work = os.path.abspath(a.work)
-    need = cfg["build_disk_bytes"] - lp_build.du(work) if os.path.isdir(work) else cfg["build_disk_bytes"]
+    need =cfg["build_disk_bytes"] - lp_build.du(work) if os.path.isdir(work) else cfg["build_disk_bytes"]
     free = free_bytes(work)
     if free < need:
         raise Failure("not enough free space for the build in %s: %s free, about %s needed. Free some space, or "

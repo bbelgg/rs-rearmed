@@ -173,6 +173,22 @@ def hook_table(hooks, native, conv):
          "  return pops[index];", "}", ""]
 
 
+def check_image(target, image):
+    """As gen_image.py's check: the install stops on another image, a hand build gets this warning."""
+    sys.path.insert(0, os.path.join(RECOMP, "..", "..", "targets"))
+    import hashlib
+    import targets
+    want = targets.Target(target).info.get("image_sha256")
+    if not want:
+        return
+    with open(image, "rb") as f:
+        got = hashlib.sha256(f.read()).hexdigest()
+    if got != want:
+        print("gen_image_pe.py: warning: %s is not the image target %s was made for (SHA-256 %s, expected %s). "
+              "A capture's image can differ; one with pages missing builds and crashes at the start."
+              % (image, target, got, want), file=sys.stderr)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("image")
@@ -191,6 +207,8 @@ def main():
     if args.module is not None and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", args.module):
         ap.error("--module: a C identifier")
     P = args.module + "_" if args.module else ""
+    if args.target and not args.module:
+        check_image(args.target, args.image)
     # the chunker declares what each TU calls: the thunks carry the prefix
     G.SYM_RE = re.compile(r"\b((?:%s)?[FI]_[0-9a-f]+)\(c\)" % re.escape(P))
     args.cflags = ("-DRC_GUEST32 " + args.cflags).strip()

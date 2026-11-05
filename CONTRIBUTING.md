@@ -16,7 +16,8 @@ If a change needs something from the game, read it from the user's install at bu
 ## Code
 
 - Follow the style of the surrounding code.
-- Keep each commit to one change, with a message that says what it does and why.
+- Keep each commit to one change, with a message that says what it does and why. A pull request is squashed
+  into one commit when it's merged, so its title and description should sum up the whole of it.
 - Before reporting a bug in the port, check that it does not also happen in the original game: under
   Rosetta for the Mac port, on Windows for the Learn & Play port.
 - How each port works and how it is tested: [docs/mac](docs/mac/README.md), [docs/windows](docs/windows/README.md),

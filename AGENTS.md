@@ -78,11 +78,15 @@ either edition's docs.
 
 - Follow the style of the surrounding code: comment density, naming, idiom. C for the runtime and shims,
   Python for the tooling, Swift for the installer app, shell for the build and install scripts.
-- One change per commit. The subject starts with the area, then says what is now true, e.g.
+- On a branch or in a pull request, one change per commit. The subject starts with the area, then says what is
+  now true, e.g.
   `Installer: each edition keeps the Steam account that owns it`, `Win-x86: …`, `Recompiler (32-bit): …`,
   `Docs: …`, `Shell: …`, `Metal: …`, `Audio: …`. The body says why, and notes what the other edition got
   or still needs.
-- Larger work goes on a branch and is merged into `main` with a `Merge …` commit.
+- `main` stays clean: larger work goes on a branch or pull request and lands as a squash merge, one commit per
+  piece of work, with the same kind of subject and a body that sums up the whole of it. What a branch needed on
+  the way (merges from other branches, work in progress, fix-ups, review fixes) stays out of `main`'s history.
+  Unrelated pieces land as separate commits. Before any push, check the unpushed history reads this way.
 
 ## Building
 

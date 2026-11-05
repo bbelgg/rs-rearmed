@@ -398,7 +398,7 @@ void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp) {
 }
 // The window gained or lost the keyboard: what Windows sends the application's window then. Posted:
 // the game's thread takes them from its message loop.
-void w32_input_focus(int active) {
+void w32_user_focus(int active) {
   w32_post_input(0x1c, (uint32_t)active, 0);  // WM_ACTIVATEAPP
   w32_post_input(0x06, (uint32_t)active, 0);  // WM_ACTIVATE: WA_ACTIVE or WA_INACTIVE
 }

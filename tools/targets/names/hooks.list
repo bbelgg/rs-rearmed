@@ -4,7 +4,7 @@
 # (rc_hook_add_name). A point without hooks costs one call. Add points here; removing or renaming one breaks
 # a mod that hooks it (and needs a new release).
 game_frame          # GameFrame() -> bool quit: once per frame on the game thread
-input_sink          # (int code, int a, int b): input events, code 0/1 = key down/up, a = key code
+input_sink          # (int code, int a, int b): input events: 1/2 key down/up (a macOS key code, b its character), 3 pointer (a, b = x, y from the bottom left), 4/5 button up/down (a button), 6 wheel (a 1 up, 0 down)
 ak_post_event_name  # AK::SoundEngine::PostEvent(const char *, ...)
 too_many_inputs     # (input manager) -> bool: a second guitar input is active; polled for the "two cables" popup, about once a frame on the title
 set_app_focus       # SetAppFocus(bool): focus gained / lost (pauses audio)

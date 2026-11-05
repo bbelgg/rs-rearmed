@@ -56,7 +56,10 @@ void w32_input_mouse_move(int32_t x, int32_t y, int32_t dx, int32_t dy);  // cli
 void w32_input_mouse_wheel(int32_t delta);
 void w32_input_mouse_button(int button, int down);
 void w32_input_release_all(void);  // focus lost: every key and button up
-void w32_input_focus(int active);  // the window gained or lost the keyboard: WM_ACTIVATEAPP, WM_ACTIVATE
+void w32_input_focus(int active);  // the window gained or lost the keyboard
+void w32_user_focus(int active);   // win32_user32.c: WM_ACTIVATEAPP, WM_ACTIVATE
+void w32_input_view_height(int32_t h);  // the back buffer's: input_sink has the Mac's y, from the bottom
+void w32_input_frame(void);  // the game thread, once a frame: what the mods' input_sink and set_app_focus hold back
 void w32_input_script(void);  // LP_INPUT_SCRIPT
 void w32_input_keyboard_state(uint32_t g, uint32_t cb);
 void w32_input_mouse_state(uint32_t g, uint32_t cb);

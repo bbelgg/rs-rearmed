@@ -1,7 +1,8 @@
 # Tests of the Win32 seam that need no game.
 #   make test    run tests/test_ksync (kernel32 waits from host threads), then again with LP_WAKE_ALL=1,
 #                tests/test_nofile (the open-file limit) and tests/test_close (CloseHandle against the
-#                other handle calls, under the address sanitizer), tests/test_kfile (paths and finds)
+#                other handle calls, under the address sanitizer), tests/test_kfile (paths and finds),
+#                tests/test_input (input_sink and set_app_focus, the hook points of the input layer)
 OUT      ?= build
 root     := ../../..
 runtime  := $(root)/tools/ws7/recomp/runtime
@@ -26,17 +27,20 @@ $(OUT)/win32_kfile.o: ../win32_kfile.c ../win32_handles.h ../win32_shims.h | $(O
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/test_kfile: test_kfile.c test_kfile_stubs.c $(OUT)/win32_kfile.o $(OUT)/win32_ksync.o $(OUT)/win32_guestobj.o $(RT:%=$(OUT)/rt_%.o)
 	$(CC) $(CFLAGS) $^ -o $@
+$(OUT)/test_input: test_input.c ../win32_input.c ../win32_shims.h $(RT:%=$(OUT)/rt_%.o)
+	$(CC) $(CFLAGS) -w test_input.c ../win32_input.c $(RT:%=$(OUT)/rt_%.o) -o $@
 $(OUT)/test_nofile: test_nofile.c $(runtime)/rc_nofile.h | $(OUT)
 	$(CC) $(CFLAGS) $< -o $@
 $(OUT):
 	mkdir -p $@
 
-test: $(OUT)/test_ksync $(OUT)/test_nofile $(OUT)/test_close $(OUT)/test_kfile
+test: $(OUT)/test_ksync $(OUT)/test_nofile $(OUT)/test_close $(OUT)/test_kfile $(OUT)/test_input
 	$(OUT)/test_ksync
 	$(OUT)/test_ksync herd
 	$(OUT)/test_nofile
 	$(OUT)/test_close
 	$(OUT)/test_kfile
+	$(OUT)/test_input
 
 clean:
 	rm -rf $(OUT)

@@ -85,14 +85,18 @@ needs it: 441 archives peak at 461 descriptors, over the 256 of an app started f
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
-Mods and hook points (2026-11-05): 11 of the 14 hook points, the `mods/` folder and one mod ABI
+Mods and hook points (2026-11-05): all 14 hook points since 1.5.1, the overlay API, the `mods/` folder and one mod ABI
 with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The same `probe_mod.dylib`, its SHA-256 in both logs, ran to the
-note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, nothing refused, all 11 points
+note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, nothing refused, the 11 points of 1.5.0
 reached with the arguments the Mac run shows, `game_frame`'s quit answered on both. No mod code runs without the guard (no
 `libnetguard.dylib`, or a restart that lost it) or from a library built without `rc_mod.h`. With no mod the table doesn't show on the
 game thread ([PERFORMANCE.md](PERFORMANCE.md#hook-points)). Started with `open`, from a test home on the internal disk, the app
 restarts with the guard, keeps what was already inserted, and plays a whole song with the mod; with an empty `mods/` folder it
 doesn't restart.
+
+RSMods' library (2026-11-05): `rearmed-mods.dylib` 0.3.0 loads and runs here as the same file as on the Mac, all 19 mods on, in a test home
+to the note highway and a quit ([Fixed in 1.5.1](#fixed-in-151) says what a run covered). The configurator installs it for the Mac edition
+only; `Mac/build.sh --install` puts it in both folders.
 
 Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
 source given by `RS_SOURCE_URL` and a stand-in Steam, through Preparing shaders; the image's SHA-256 is the pin in `target.toml`. With
@@ -202,6 +206,19 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   pacing presents, and the game ran at about 120 fps. `windowDidChangeOcclusionState` now sets a wait in Present, outside the device
   lock. On a 60 Hz display, 60 fps in front, behind Finder and in front again, against 60, 120 and 60 for an earlier build; the D3D9
   host test covers the wait. Goes with the same section of the [Mac plan](../mac/PLAN.md#fixed-in-151).
+- **Mods have what the Mac's have**: the last three hook points, the overlay API and `OV_VCALL`
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The probe mod ran in the game on 2026-11-05: its square on the frame, read back and on a
+  snapshot; `si_open` with slots 0 to 3 and true; keys with the Mac's codes; focus lost and gained; a reference count through
+  `OV_VCALL` going 2, 3, 2. A mod keeping an event from the game is covered by `test_input`, not by a run.
+- **RSMods' library runs here**: `rearmed-mods.dylib` 0.3.0, the same file as on the Mac, its SHA-256 the same in both logs (2026-11-05, test
+  homes, by keys, no guitar). For it: the tables have its names (`tools/targets/names`), `rc_call_name_f`, `rc_guest_alloc`, a mod's
+  call to `input_sink`, `set_app_focus`'s changed argument, and the game folder as the working directory with mods. Seen in the game, as on the
+  Mac: profile autoload, the menu, the song key, the timer, the volume and mute calls, loops, rewind, speed above 100%, the linear
+  slider, the loft, headstock, skyline, fretless, inlays, lane markers, the scene dump, enumeration, the focus loss kept from the game, and
+  no hotkey in the song search (Shift here, `/` on the Mac) or a text entry dialog. By the log and snapshots, not by ear: dropped previews,
+  volume, and audio in the background. Called, without its case coming up: the two-cable check (one cable).
+  Not exercised here: the lyrics mod's hiding (the test song has no lyric steps; its key ran), a score screen (a Disconnected song has none: a
+  screenshot was taken by a test build, not on that screen), and the input volume, which is Core Audio in both.
 
 ## Next work
 
@@ -209,7 +226,7 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
 
 - The `tools/targets/win-x86` target filled in: every name in `tools/targets/names` has an entry (`check.py`
   covers both targets), and `target.toml` has the image's `.text` and SHA-256 and, since it moved there,
-  the install pins. 957 of the 1,142 symbols and 57 of the 76 offsets are read from the Windows code; 12 of
+  the install pins. 965 of the 1,150 symbols and 74 of the 93 offsets are read from the Windows code; 12 of
   the 14 hook points are there (not `input_sink`: events are window messages, nor `set_app_focus`: inlined in
   the platform tick; the map names a place a hook can use for each). The 185 symbols left say why in the map:
   94 are inlined by LTCG (46 of them the Lua API), 32 are not needed here (the Mac's differential tests and
@@ -218,10 +235,7 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   plug-in DSP, small efd helpers): those have candidates in the map, and a wrong address would be worse than
   the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
   register arguments), which their overrides have to read by hand.
-- Hook points and mods, left to do: `si_open`, refused for
-  now: a run shows what looks like the slot as its first stack word and 0 for success, so an adapter looks possible; `input_sink` and
-  `set_app_focus`; the overlay API for mods that draw, and `OV_VCALL`, which the app doesn't export. `mods.c` and `audio_in.c`
-  are not built here, so their pointer-width layouts need no names per target.
+- Hook points and mods: `mods.c` and `audio_in.c` are not built here, so their pointer-width layouts need no names per target.
 - The checks the Mac port has had that are left: a guitar through Direct Connect, long sessions.
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:

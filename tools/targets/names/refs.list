@@ -391,3 +391,13 @@ engine_egf_begin
 engine_egf_end
 engine_nimain_begin
 engine_nimain_end
+
+# the mods library, one binary for both editions (RSMods, Mac/src: rc_mod.h looks these up when it runs)
+ak_initialized             # AK::SoundEngine's s_bInitialized: the mods' Wwise calls do nothing while it is clear
+ak_get_rtpc_name           # AK::SoundEngine::Query::GetRTPCValue(const char *, game object, float *, type *)
+ak_set_actor_mixer_effect  # AK::SoundEngine::SetActorMixerEffect(node, slot, effect)
+ak_seek_on_event_name      # AK::SoundEngine::SeekOnEvent(const char *, game object, int ms, bool)
+ak_query_objects_name      # AK::SoundEngine::Query::QueryAudioObjectIDs(const char *, unsigned *, AkObjectInfo *)
+ak_source_play_position    # AK::SoundEngine::GetSourcePlayPosition(playing id, int *, bool)
+ui_manager                 # the UI manager: its current menu has the menu's name
+nicamera_vtable            # NiCamera's vtable, as an object's first word holds it

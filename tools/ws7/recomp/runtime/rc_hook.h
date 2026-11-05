@@ -31,6 +31,7 @@
 #ifndef RC_HOOK_H
 #define RC_HOOK_H
 
+#include <stddef.h>
 #include <stdint.h>
 
 #include "rc.h"
@@ -59,6 +60,12 @@ uint64_t rc_addr(const char *name);  // unslid; the host address is RC_A(rc_addr
 // a host pointer. Returns eax / rax, as the guest has it (rc_mod.h: RC_HOST). 0 with a log line for a name
 // this target doesn't have, or a `custom` function.
 uint64_t rc_call_name(const char *name, const uint64_t *ints, int nint);
+// The same with floats among the arguments: bit k of `floats` says args[k] is a float's bits, which go where this
+// target's convention has them (xmm, or a word on the stack in its place).
+uint64_t rc_call_name_f(const char *name, const uint64_t *args, int nargs, uint32_t floats);
+// Memory the game can be given, never freed: a string or a result of a call into it. A mod's own memory is out of
+// a 32-bit guest's reach. A host pointer; 0 when there is none.
+void *rc_guest_alloc(size_t size);
 // Bytes of a guest pointer: 8, or 4 on a 32-bit guest
 extern const int rc_guest_ptr_size;
 
@@ -100,6 +107,13 @@ typedef struct {
   int64_t value;
   int cc;
 } rc_target_value;
+
+// A point of the target's table that has no function in this game, run by the platform layer instead (Learn &
+// Play's input_sink and set_app_focus, win32_input.c). 0 when the layer has taken the hooks.
+int rc_hook_add_seam(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user);
+// A call to such a point, as rc_call_name would make it (Learn & Play: input_sink feeds the input layer). 0 when
+// the layer has it.
+int rc_call_seam(const char *name, const uint64_t *ints, int nint);
 
 // The generated wrappers' entry
 void rc_hook_call(int index, rc_ctx *c, rc_fn orig);

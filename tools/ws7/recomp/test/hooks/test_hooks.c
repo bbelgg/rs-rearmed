@@ -11,6 +11,7 @@
 
 #ifdef RC_GUEST32
 #include "rc32.h"
+#include "rc32_hook.h"
 #include "rc32_x87.h"
 #include "rc_ov.h"
 #endif
@@ -291,7 +292,14 @@ static void put_args(int p, const uint64_t *v) {
 }
 static void check_popped(int p) { CHECK_EQ(ctx->r[4], (uint64_t)(uintptr_t)&stack_[9]); }
 uint64_t rc_slide;
+static uint64_t cg_fn, cg_ints[6], cg_dbl;
+static int cg_nint, cg_ndbl;
 uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64_t *dbls, int ndbl, uint64_t *xmm0) {
+  cg_fn = fn;
+  cg_nint = nint;
+  cg_ndbl = ndbl;
+  memcpy(cg_ints, ints, sizeof *ints * (size_t)(nint < 6 ? nint : 6));
+  if (ndbl) cg_dbl = dbls[0];
   return 0;
 }
 static uint64_t result_of(int p) {
@@ -420,6 +428,28 @@ static void adapted(void) {
   *action = 0;
 }
 
+#ifdef RC_GUEST32
+// `bool<zero>`: the Mac's bool is this function's error code being 0; what no hook changes stays the game's
+static void zero_result(void) {
+  static const rc_hook_name h = {.name = "zero", .ret = 'z'};
+  rc32_view w;
+  ctx->r[0] = 0;
+  rc32_view_result_in(&w, &h, ctx);
+  CHECK_EQ(w.ctx.r[0], 1);
+  w.ctx.r[0] = 0;  // a hook says it failed
+  rc32_view_result_out(&w, &h, ctx);
+  CHECK((uint32_t)ctx->r[0] != 0);
+  ctx->r[0] = 5;
+  rc32_view_result_in(&w, &h, ctx);
+  CHECK_EQ(w.ctx.r[0], 0);
+  rc32_view_result_out(&w, &h, ctx);
+  CHECK_EQ((uint32_t)ctx->r[0], 5);
+  w.ctx.r[0] = 1;  // a hook says it opened
+  rc32_view_result_out(&w, &h, ctx);
+  CHECK_EQ((uint32_t)ctx->r[0], 0);
+}
+#endif
+
 static void names(void) {
   CHECK_EQ(*off, 0x48);
   CHECK_EQ(*slot, 3);
@@ -472,7 +502,22 @@ static void order_of_hooks(void) {
   CHECK_EQ(*order, 12);
 }
 
-#ifdef RC_GUEST32
+#ifndef RC_GUEST32
+// A float among the arguments goes to xmm, the others stay in order
+static void by_name(void) {
+  uint64_t f[3] = {11, 0x40200000, 22};
+  rc_call_name_f("obj_thiscall", f, 3, 2);
+  CHECK_EQ(cg_fn, ADDR(OBJ));
+  CHECK_EQ(cg_nint, 2);
+  CHECK_EQ(cg_ints[1], 22);
+  CHECK_EQ(cg_ndbl, 1);
+  CHECK_EQ(cg_dbl, 0x40200000);
+  rc_call_name("obj_thiscall", f, 3);
+  CHECK_EQ(cg_nint, 3);
+  CHECK_EQ(cg_ndbl, 0);
+  CHECK(rc_guest_alloc(64));
+}
+#else
 // rc32_call and rc_call_name (no image registry here: the lookup is the test's)
 rc_fn rc32_lookup(uint32_t g) {
   return g == ADDR(OBJ) ? o_obj : 0;
@@ -496,6 +541,20 @@ static void by_name(void) {
   CHECK_EQ(got[1], 5);
   CHECK_EQ(got[2], 6);
   CHECK_EQ(rc_call_name("no_such_function", a, 3), 0);
+  // a float takes its place on the stack, a -1 stays a word, the mod's own memory reaches the game as null
+  static char mine[4];
+  uint64_t f[3] = {block_host(), 0x40200000, ~0ull};
+  rc_call_name_f("obj_thiscall", f, 3, 2);
+  CHECK_EQ(got[1], 0x40200000);
+  CHECK_EQ(got[2], 0xffffffff);
+  uint64_t m[3] = {block_host(), (uint64_t)(uintptr_t)mine, 1};
+  rc_call_name("obj_thiscall", m, 3);
+  CHECK_EQ(got[1], 0);
+  char *g = rc_guest_alloc(64);
+  CHECK(g);
+  uint64_t in[3] = {block_host(), (uint64_t)(uintptr_t)g, 1};
+  rc_call_name("obj_thiscall", in, 3);
+  CHECK_EQ((uint64_t)(uintptr_t)RC32_H((uint32_t)got[1]), (uint64_t)(uintptr_t)g);
 }
 
 // rc_args on the guest's own context, as an override reads it (OV_ARGS_CC; rc_hook.h shows the hooks SysV)
@@ -618,12 +677,15 @@ int main(int argc, char **argv) {
   SYM(off, "hm_off"); SYM(no_off, "hm_no_off"); SYM(slot, "hm_slot"); SYM(target, "hm_target");
   SYM(ptr_at, "hm_ptr_at"); SYM(host_of, "hm_host"); SYM(guest_of, "hm_guest"); SYM(missing, "hm_missing");
   names();
+#ifdef RC_GUEST32
+  zero_result();
+#endif
   every_convention();
   adapted();
   order_of_hooks();
   folder(argv[1]);
-#ifdef RC_GUEST32
   by_name();
+#ifdef RC_GUEST32
   guest_arguments();
   cost();
 #endif

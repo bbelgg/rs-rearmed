@@ -13,7 +13,7 @@ where you point them and never copied into the repository.
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md) |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
-| Kernel32 waits | `make -C win-x86/shims/tests test OUT=DIR` | events, mutexes, semaphores, wait-any and wait-all, timeouts; an idle waiter is not woken by other objects; a wait keeps objects whose handles are closed; `PulseEvent`; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); the open-file limit from 256 (`rc_nofile.h`, shared with the Mac port) |
+| Kernel32 waits, input hooks | `make -C win-x86/shims/tests test OUT=DIR` | `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game); events, mutexes, semaphores, wait-any and wait-all, timeouts; an idle waiter is not woken by other objects; a wait keeps objects whose handles are closed; `PulseEvent`; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); the open-file limit from 256 (`rc_nofile.h`, shared with the Mac port) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
 | Steam face | `make -C win-x86/shims/steam test OUT=DIR` | the guest ABI end to end: exports, interface vtables, `thiscall`, callbacks and call results |
 | Online layer | `make -C win-x86/online test OUT=DIR` | the three vtables in guest memory with fake game functions: every replaced slot, the posted events, a layout that does not match left alone |
@@ -213,7 +213,7 @@ window losing and regaining the keyboard, `audio` as the system's default output
 
 **Mods**: `make -C tools/ws7/recomp/test/hooks OUT=DIR`, `DIR/probe_mod.dylib` into `<LP_HOME>/mods/`, and the script to the note
 highway above, with `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:
-probe_mod.dylib`, a line for each point the game hasn't, `[probe]` lines (`[probe] file sha256`: the file that ran), and
+probe_mod.dylib`, `[probe]` lines for the overlay, `OV_VCALL`, `si_open`, each key and focus change; snapshots have its magenta square at the top left; other `[probe]` lines (`[probe] file sha256`: the file that ran), and
 `logs/netguard.log` its `mode=block` line. The screens are the script's own: the mod changes nothing. No mod without the guard:
 a copy of the app without `Contents/MacOS/libnetguard.dylib` logs `[rc] mods not loaded: no libnetguard.dylib beside the app`, and
 `LP_MODS_GUARD=1` (a restart that lost the guard) `the network guard did not load`; neither has a `[probe]` line. With the game files on another APFS drive, `game-copy --dest` makes `game/` a link to that drive; `RS_GAME_COPY_DIR=home`
@@ -327,6 +327,21 @@ calls `W_<addr>` and logs its arguments or result (filtered by the return addres
 what the game does for one song without changing it; one re-translation per set of probes. Ghidra's
 headless analyzer on a copy of the image without the packer's sections (`.UBX*`, `.lpreloc`) finishes in
 about 30 minutes and decompiles single functions after that.
+
+**RSMods' library** (`rearmed-mods.dylib` in `<LP_HOME>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): the same route as
+the [Mac's](../mac/TESTING.md#game-runs), by keyfifo, the next key waiting for the mods' own log. Its `menu:` lines say which screen it
+is, so a key that only makes sense on one screen is sent only there. The screens in this edition: with a profile, `ForceProfileLoad`
+reaches MainMenu by itself; Return is LearnASong_Songs; `lpshift` opens the search; Esc closes it, and Esc with it closed leaves the
+list; Return on a row is LearnASong_SongOptions; Return there, Return on TUNE UP! (SelectionListDialog, in a profile with no input),
+and LearnASong_Game. In the song: Esc, Space is LearnASong_RiffRepeater, with a notice the first time; Down twice, Left a few times moves
+SPEED; `key fwddelete` resumes. A Disconnected song ends on LearnASong_SongOptions: no score screen without an input.
+
+Hotkeys in the search, all quiet, then firing again after Esc: `lpshift`, then `i`, `l`, `5`, `f`; `lpshift`, `qq`, Return (no match: the box
+stays open), `i`; a click, `i`. In a text entry dialog (a new profile's name) too. `song timer`, `volume:`, `lyrics` and `enumeration:` lines are what firing looks like.
+
+**Keep a test profile**: without one, Return on ProfileSelect starts a new profile and every key after it goes through the first-time
+screens; and `fwddelete` on ProfileSelect deletes the profile. Copy `steam/` before a run, restore it after one that went astray, and let
+a route stop when the screen it expects doesn't come.
 
 To find a route rather than repeat one, `tools/ws8/keyfifo` takes keys one at a time while the game runs
 ([Mac testing](../mac/TESTING.md#game-runs)): start `Contents/MacOS/rs2014_lp` with

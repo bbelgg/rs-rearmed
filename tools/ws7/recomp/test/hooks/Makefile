@@ -9,7 +9,7 @@ recomp   := ../..
 runtime  := $(recomp)/runtime
 PY       ?= python3
 CC       := clang -arch arm64
-CFLAGS   := -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -I$(runtime) -I$(recomp)/overrides
+CFLAGS   := -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -I$(runtime) -I$(recomp)/overrides -I$(root)/shims/include
 MOD      := $(CC) -dynamiclib -undefined dynamic_lookup $(CFLAGS)
 
 all: $(OUT)/test_hooks64 $(OUT)/test_hooks32 $(OUT)/mods/hooks_mod.dylib $(OUT)/plain/plain_mod.dylib $(OUT)/probe_mod.dylib

@@ -204,7 +204,8 @@ def gen_header(t):
 # c an argument with one value that this target's code doesn't take (`int event=0x98`), x one the Mac's call
 # doesn't have, kept from the hook (`void *manager=hidden`). Results the Mac's call has in another form:
 # e the Mac's bool is a field of the first argument having a value (`bool<service_manager_state=7>`),
-# r the Mac's float is 100 / this one (`float<100/x>`).
+# r the Mac's float is 100 / this one (`float<100/x>`), z the Mac's bool is this function's answer being 0
+# (`bool<zero>`: an error code, 0 when all went well).
 KINDS = {"bool": "b", "char": "b", "int8_t": "b", "uint8_t": "b", "short": "h", "int16_t": "h", "uint16_t": "h",
          "int": "i", "long": "i", "unsigned": "i", "int32_t": "i", "uint32_t": "i", "size_t": "i",
          "int64_t": "q", "uint64_t": "q", "float": "f", "double": "d", "void": "v"}
@@ -238,13 +239,14 @@ def _hidden_reg(text):
 
 def parse_proto(proto, where):
     """`ret(args)` -> (return kind, [(kind, register or None), ...], True when it ends in `...`). A return in
-    another form than the Mac's, `bool<name=7>` or `float<100/x>`, is the kind e or r, with what follows it."""
+    another form than the Mac's, `bool<name=7>`, `float<100/x>` or `bool<zero>`, is the kind e, r or z, with what
+    follows it."""
     i = proto.find("(")
     if i < 0 or not proto.rstrip().endswith(")"):
         raise TargetError("%s: expected a prototype, got %r" % (where, proto))
     m = re.match(r"\s*(\w+)<(.*)>\s*$", proto[:i])
     if m:
-        ret = {"bool": "e", "float": "r"}[m.group(1)] + m.group(2)
+        ret = "z" if proto[:i].strip() == "bool<zero>" else {"bool": "e", "float": "r"}[m.group(1)] + m.group(2)
     else:
         ret = _kind(proto[:i], where)[0]
     body = proto[i + 1:proto.rstrip().rindex(")")].strip()
@@ -258,7 +260,7 @@ def _shape(ret, args, variadic):
     An integer's width is not part of it (a size or an id is pointer-sized); a bool is its own."""
     def cls(k):
         return "i" if k[0] in "hiq=" and k != "=hidden" else k[0]
-    return {"e": "b", "r": "f"}.get(ret[0], cls(ret)), [cls(k) for k, _ in args if k != "=hidden"], variadic
+    return {"e": "b", "z": "b", "r": "f"}.get(ret[0], cls(ret)), [cls(k) for k, _ in args if k != "=hidden"], variadic
 
 
 def hook_abi(t, name, mac=None):
@@ -279,7 +281,7 @@ def hook_abi(t, name, mac=None):
     ret, args, variadic = parse_proto(proto, where)
     if len(args) > MAX_HOOK_ARGS:
         raise TargetError("%s: more than %d arguments" % (where, MAX_HOOK_ARGS))
-    d["ret"] = ret[0] if ret[0] in "er" else ret
+    d["ret"] = ret[0] if ret[0] in "erz" else ret
     if ret[0] == "e":
         field, _, value = ret[1:].partition("=")
         if field not in t.offsets:

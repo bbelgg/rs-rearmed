@@ -302,6 +302,7 @@ void w32_input_key(int mac_keycode, int down, uint32_t ch);
 void w32_input_mouse_move(int32_t x, int32_t y, int32_t dx, int32_t dy);
 void w32_input_mouse_wheel(int32_t delta);
 void w32_input_mouse_button(int button, int down);
+void w32_input_view_height(int32_t h);
 void w32_input_script(void);
 
 // a point in the view (points, origin bottom left) -> back-buffer pixels, and the scale between
@@ -366,6 +367,7 @@ static void input_monitor(void) {
         int32_t x, y;
         CGFloat k;
         to_pixels(p, &x, &y, &k);
+        w32_input_view_height(g_bh);
         switch (e.type) {
           // a press on the title bar or the frame is the window's (move, resize), not the game's
           case NSEventTypeLeftMouseDown: if (inside) w32_input_mouse_button(0, 1); break;

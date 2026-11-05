@@ -27,6 +27,7 @@ void rc32_mem_guard(uint32_t g, uint32_t size);  // no access: a page-aligned ra
 // A guest heap block inside the window (bump allocator over a committed arena, 16-aligned;
 // never freed; it steps over the ranges of mapped images). 0 when the arena is full.
 uint32_t rc32_alloc(uint32_t size);
+extern uint64_t rc_img_lo, rc_img_hi;  // the game's image, host addresses: what a mod reads as on the Mac (rc_rt.h)
 uint32_t rc32_arena_used(void);  // bytes of the arena handed out so far (it never shrinks)
 // Keep [g, g + size) for an image: the arena will not hand it out. -1 when it overlaps another
 // image's range or arena memory already handed out.

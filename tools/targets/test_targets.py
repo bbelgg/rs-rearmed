@@ -47,7 +47,7 @@ class Repo(unittest.TestCase):
             # a name in common with the Mac is the Mac's call, adapted or refused
             self.assertIn("""{"game_frame", 0x1479df0ull, 0x10017a020ull, 0, 3, 'e', 0, 1, {{'x', -2, 0}}, 32, 7},""", c)
             self.assertIn("""{"rr_speed_ratio", 0xf89360ull, 0x1002ddd70ull, 0, 1, 'r', 0, 1, {{'f', 0, 0}}, 0, 0},""", c)
-            self.assertRegex(c, r'\{"si_open", 0x17c50a0ull, 0x10133bee0ull, "[^"]+", 5, ')
+            self.assertRegex(c, r"\{\"si_open\", 0x17c50a0ull, 0x10133bee0ull, 0, 5, 'z', ")
         finally:
             shutil.rmtree(d)
 
@@ -82,6 +82,8 @@ class HookAbi(unittest.TestCase):
         d = self.abi("cdecl", "float<100/x>(float p)", "float(float p)")
         self.assertEqual((d["ret"], d["args"]), ("r", [("f", 0, 0)]))
         self.assertIsNotNone(self.abi("stdcall", "void(void *m, int e=0x98)", "void(void *m, int e)")["args"])
+        d = self.abi("custom", "bool<zero>(void *m@edi, int s, int a=hidden)", "bool(void *m, int s)")
+        self.assertEqual((d["ret"], d["args"]), ("z", [("p", ~7, 0), ("i", 0, 0), ("x", 1, 0)]))
 
     def test_sysv_needs_nothing(self):
         self.assertIsNone(self.abi("sysv", "int(int)"))

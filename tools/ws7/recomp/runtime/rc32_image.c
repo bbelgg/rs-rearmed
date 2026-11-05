@@ -85,7 +85,11 @@ rc32_image *rc32_image_add(rc32_module *m, const char *path) {
   im->size = size;
   im->is_dll = (chars & 0x2000) != 0;  // IMAGE_FILE_DLL
   im->entry = rd32(opt + 16) ? base + rd32(opt + 16) : 0;
-  if (!im->is_dll) rc32_stack_default(rd32(opt + 72));  // SizeOfStackReserve: what Windows gives threads
+  if (!im->is_dll) {
+    rc32_stack_default(rd32(opt + 72));  // SizeOfStackReserve: what Windows gives threads
+    rc_img_lo = (uint64_t)(uintptr_t)(rc_mem + base);
+    rc_img_hi = rc_img_lo + size;
+  }
   if (ndirs > 0 && rd32(opt + 96)) {
     im->exp_dir = base + rd32(opt + 96);
     im->exp_size = rd32(opt + 100);

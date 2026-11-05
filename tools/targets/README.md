@@ -12,7 +12,7 @@ tools/targets/
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map yet); 957 symbols read, the rest `unsupported` with the reason
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map yet); 965 symbols read, the rest `unsupported` with the reason
   names/             shared by every target
     overrides/*.list the functions each override module replaces
     hooks.list       hook points (the names mods use with rc_hook_add_name)
@@ -62,11 +62,15 @@ ui_event            0x01163d50  stdcall   void(void *menu, int event=0x98, int a
 game_frame          0x01479df0  thiscall  bool<service_manager_state=7>(void *m=hidden) # not in the Mac's call; a bool
                                                                                         # that is a field having a value
 rr_speed_ratio      0x00f89360  cdecl     float<100/x>(float slider_percent)            # the Mac has 100 / this result
+si_open             0x017c50a0  custom    bool<zero>(void *self@edi, int slot, ...)     # the Mac's bool is this result being 0
 ```
+
+A map line `unsupported` on a point can still run: the platform layer takes it with `rc_hook_add_seam` (Learn & Play's
+`input_sink` and `set_app_focus`, `win-x86/shims/win32_input.c`).
 
 A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose stack
 arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments, so no check
-stands behind those prototypes: 6 of the 11 points on `win-x86`.
+stands behind those prototypes: 7 of the 12 points on `win-x86`.
 
 ## Adding a game function, global or field
 

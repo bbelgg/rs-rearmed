@@ -1144,3 +1144,12 @@ AudioService_class_info                                          0x101942578  da
 json_number_table                                                0x101949588  data  void *
 json_number_table_lock                                           0x101949590  data  pthread_mutex_t *
 app_focus                                                        0x10194b391  data  uint8_t
+# The mods library (names/refs.list)
+ak_initialized                                                   0x10195eac8  data  bool  # IsInitialized 0x100ab0a20 returns it; Init 0x100ab0a30 sets it, Term 0x100ab1300 clears it
+ak_get_rtpc_name                                                 0x100af0820  sysv  int(const char *, uint64_t, float *, int *)
+ak_set_actor_mixer_effect                                        0x100ab5ac0  sysv  int(uint32_t, uint32_t, uint32_t)
+ak_seek_on_event_name                                            0x100ab3160  sysv  int(const char *, uint64_t, int, bool)
+ak_query_objects_name                                            0x100af0960  sysv  int(const char *, uint32_t *, void *)
+ak_source_play_position                                          0x100ab33a0  sysv  int(uint32_t, int *, bool)
+ui_manager                                                       0x1018ef7c8  data  void *  # 0x100365e30 returns it
+nicamera_vtable                                                  0x101841d60  data  void *[]

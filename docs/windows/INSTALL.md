@@ -337,10 +337,10 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   [PLAN.md](PLAN.md#built-in-for-140)). The built-in fixes are the batched DLC mounting
   (`RS_MODS_BUDGET_MS=N`, default 50 ms a frame), the higher open-file limit, the song path cache and the
   number-table hash (`RS_MODS_FIXES=0` turns them off).
-- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log), and 11 of
-  the 14 hook points are there. A mod can't yet: hook `input_sink` or `set_app_focus` (the game has no such function) or `si_open`
-  (it takes other arguments here); draw with the overlay API; use what the Mac app exports beyond `rc_mod.h`, such as `OV_VCALL` and
-  `ov_fn` (the mod then fails to load, with the reason in the log); pass floating point arguments to `rc_call_guest`; call a
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). All 14 hook
+  points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
+  `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
+  event from the game); pass floating point arguments to `rc_call_guest`; call a
   function that takes its own registers by name; give the game a pointer to its own memory (the game gets null, with
   a line in the log); or quit by `game_frame`'s result, from a pre or a post hook (not taken, with a line in the log; a pre hook still skips the tick). A field this game
   doesn't have gives `RC_NO_OFF`: test `RC_HAS_OFF`.

@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "rc_mod.h"
+#include "rs_overlay.h"
 
 // The SHA-256 of this library's file, in the log: which build ran is then a fact of the run
 static void say_hash(void) {
@@ -53,6 +54,11 @@ static int before_boot(rc_ctx *c, void *user) {
   const char *boot = OV_PTR(a, const char);
   uint32_t phase = RC_LD(uint32_t, boot + RC_OFF(boot_phase));
   if (phase != last) fprintf(stderr, "[probe] boot phase %u\n", phase);
+  if (last == ~0u) {  // a virtual call: the service is an efd object, and these two leave its count as it was
+    OV_VCALL(boot, RC_SLOT(efd_inc_ref));
+    OV_VCALL(boot, RC_SLOT(efd_dec_ref));
+    fprintf(stderr, "[probe] OV_VCALL: IncRefCount and DecRefCount called\n");
+  }
   last = phase;
   return 0;
 }
@@ -104,6 +110,43 @@ static int before_rtpc(rc_ctx *c, void *user) {
   return 0;
 }
 
+// Input: the Mac's call on both, whatever carries it
+static int before_input(rc_ctx *c, void *user) {
+  static unsigned long n;
+  OV_ARGS(a, c);
+  int code = OV_I32(a), x = OV_I32(a), y = OV_I32(a);
+  if (code != 3 || often(&n)) fprintf(stderr, "[probe] input_sink: code %d, %d, 0x%x\n", code, x, y);
+  return 0;
+}
+static int before_focus(rc_ctx *c, void *user) {
+  OV_ARGS(a, c);
+  fprintf(stderr, "[probe] set_app_focus: %d\n", OV_I32(a) & 0xff);
+  return 0;
+}
+
+// The guitar input opening: a bool on both, an error code here
+static int si_slot;
+static int before_si(rc_ctx *c, void *user) {
+  OV_ARGS(a, c);
+  void *self = OV_PTR(a, void);
+  si_slot = OV_I32(a);
+  fprintf(stderr, "[probe] si_open: input %s, slot %d\n", self ? "set" : "null", si_slot);
+  return 0;
+}
+static void after_si(rc_ctx *c, void *user) {
+  fprintf(stderr, "[probe] si_open: slot %d -> %d\n", si_slot, (int)(c->r[0] & 0xff));
+}
+
+// The overlay: a square that shows, read back once
+static void overlay(rs_overlay_frame *f, void *user) {
+  static int said;
+  rs_overlay_fill_rect(f, 40, 40, 32, 32, 0xff00ffffu);
+  if (said++) return;
+  uint8_t px[4];
+  int r = rs_overlay_read_pixels(f, 50, 50, 1, 1, px);
+  fprintf(stderr, "[probe] overlay: %dx%d, read %d: %02x %02x %02x\n", f->width, f->height, r, px[0], px[1], px[2]);
+}
+
 static unsigned long frames;
 static void after_frame(rc_ctx *c, void *user) {  // the Mac's bool, on both: the game is ending
   static int said;
@@ -153,4 +196,8 @@ __attribute__((constructor)) static void init(void) {
   rc_hook_add_name("camera_set_frustum", before_camera, NULL, NULL);
   rc_hook_add_name("too_many_inputs", before_inputs, NULL, NULL);
   rc_hook_add_name("game_frame", before_frame, after_frame, NULL);
+  rc_hook_add_name("input_sink", before_input, NULL, NULL);
+  rc_hook_add_name("set_app_focus", before_focus, NULL, NULL);
+  rc_hook_add_name("si_open", before_si, after_si, NULL);
+  rs_overlay_register(overlay, NULL);
 }

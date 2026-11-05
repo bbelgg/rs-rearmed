@@ -77,7 +77,7 @@ clang -arch arm64 -O2 -g -Wall -I"$root/win-x86/shims/d3d9" "$root/win-x86/shade
   echo "no lp_shaders: this build has no shader corpus"
 
 echo "===== Link ====="
-clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$obj"/rt/*.o \
+clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$obj/rsp_overlay.o" "$obj"/rt/*.o \
   "$b/game/obj/libgame_rc.a" \
   "$b/modules/msvcr100/obj/libgame_rc.a" "$b/modules/msvcp100/obj/libgame_rc.a" \
   "$b/modules/d3dx9_42/obj/libgame_rc.a" $dcomp $bink \

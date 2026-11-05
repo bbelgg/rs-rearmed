@@ -54,6 +54,11 @@ int rc_hook_exists(uint64_t vmaddr) { return index_of(vmaddr) >= 0; }
 
 const char *rc_target(void) { return rc_target_id[0] ? rc_target_id : "unknown"; }
 
+__attribute__((weak)) int rc_hook_add_seam(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) {
+  (void)name; (void)pre; (void)post; (void)user;
+  return -1;
+}
+
 int rc_hook_add(uint64_t vmaddr, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) {
   int i = index_of(vmaddr);
   const rc_hook_name *h = rc_target_hooks, *found = 0;
@@ -61,6 +66,7 @@ int rc_hook_add(uint64_t vmaddr, rc_hook_pre_fn pre, rc_hook_post_fn post, void 
     if (h->vmaddr == vmaddr || h->mac_vmaddr == vmaddr) found = h;
   if (i < 0 && found) i = index_of(found->vmaddr);
   if (i < 0) {
+    if (found && !found->vmaddr && !rc_hook_add_seam(found->name, pre, post, user)) return 0;
     if (found && !found->vmaddr)
       fprintf(stderr, "[rc] hook %s: not on this game (%s): %s\n", found->name, rc_target(), found->why);
     else
@@ -95,6 +101,7 @@ int rc_hook_add_name(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post,
   for (const rc_hook_name *h = rc_target_hooks; name && h->name; h++)
     if (!strcmp(h->name, name)) {
       if (h->vmaddr) return rc_hook_add(h->vmaddr, pre, post, user);
+      if (!rc_hook_add_seam(name, pre, post, user)) return 0;
       fprintf(stderr, "[rc] hook %s: not on this game (%s): %s\n", name, rc_target(), h->why);
       return -1;
     }
@@ -173,15 +180,35 @@ uint64_t rc_addr(const char *name) {
   return 0;
 }
 
-uint64_t rc_call_name(const char *name, const uint64_t *ints, int nint) {
+__attribute__((weak)) int rc_call_seam(const char *name, const uint64_t *ints, int nint) {
+  (void)name; (void)ints; (void)nint;
+  return -1;
+}
+
+uint64_t rc_call_name_f(const char *name, const uint64_t *args, int nargs, uint32_t floats) {
   const rc_target_value *v = find_name(rc_target_symbols, name);
+  if (!v && !rc_call_seam(name, args, nargs)) return 0;
   if (!v || v->cc < 0) {
     fprintf(stderr, "[rc] call %s: no such function on this game (%s)\n", name ? name : "(null)", rc_target());
     return 0;
   }
 #ifdef RC_GUEST32
-  return rc32_call_cc((uint32_t)v->value, v->cc, name, ints, nint);
+  (void)floats;  // a float is a word on the stack like the others
+  return rc32_call_cc((uint32_t)v->value, v->cc, name, args, nargs);
 #else
-  return rc_call_guest(RC_A((uint64_t)v->value), ints, nint, 0, 0, 0);
+  if (!floats) return rc_call_guest(RC_A((uint64_t)v->value), args, nargs, 0, 0, 0);
+  uint64_t ints[16], dbls[8];
+  int ni = 0, nd = 0;
+  for (int k = 0; k < nargs; k++) {
+    if (floats >> k & 1 && nd < 8) dbls[nd++] = args[k];
+    else if (ni < 16) ints[ni++] = args[k];
+  }
+  return rc_call_guest(RC_A((uint64_t)v->value), ints, ni, dbls, nd, 0);
 #endif
 }
+
+uint64_t rc_call_name(const char *name, const uint64_t *ints, int nint) { return rc_call_name_f(name, ints, nint, 0); }
+
+#ifndef RC_GUEST32
+void *rc_guest_alloc(size_t size) { return malloc(size); }
+#endif

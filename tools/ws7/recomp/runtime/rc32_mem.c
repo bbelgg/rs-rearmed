@@ -20,6 +20,7 @@
 
 uint8_t *rc_mem;
 uint64_t rc_slide;  // the same base under the name a mod knows (RC_A)
+uint64_t rc_img_lo, rc_img_hi;  // the game's image, host addresses (rc32_image_add)
 static uint32_t arena_next = ARENA_LO, arena_committed = ARENA_LO;
 static pthread_mutex_t arena_mu = PTHREAD_MUTEX_INITIALIZER;
 // the images' ranges [lo, hi)

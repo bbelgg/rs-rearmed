@@ -161,6 +161,13 @@ user's, with a test profile.
   Return, 26 s later `fwddelete`, 6 s later Return: the highway about 20 s after that. `[probe]` lines in the log, `[probe] file
   sha256` the file that ran; the numbers to compare with Learn & Play's, whose first camera call is the same (-1 1 1 -1, near
   0.85, far 0). A mod on `steam_dlc_owned` sees 1 call here against 148 on Learn & Play: the built-in hook answers first here.
+- **RSMods' library** (`rearmed-mods.dylib` in `<home>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): by keyfifo, each key
+  waiting for the mods' own log, whose `menu:` lines say which screen it is. With a profile, `ForceProfileLoad` reaches MainMenu by
+  itself; Return is LearnASong_Songs; `/` opens the search; Return on a row is LearnASong_SongOptions; Return is LearnASong_PreSongTuner;
+  `fwddelete`, Return; LearnASong_Game. Hotkeys in the search, all quiet, then firing again after Esc: `/`, then `i`, `l`, `5`, `f`; `/`, `qq`,
+  Return (no match: the box stays open), `i`; a click, `i`. The same dylib ran the same route in Learn & Play ([Windows
+  testing](../windows/TESTING.md#unattended-runs)), with the same SHA-256 in both logs and the same results but for the lyrics (Learn & Play's test song has no lyric steps). Keep a copy of
+  `steam/`: Return on ProfileSelect with no profile starts the first-time screens, and `fwddelete` there deletes the profile.
 - **Keys and the focus**: without `RS_KEY_DIRECT=1` a key goes to the window only while the game has the focus, and
   any other app coming forward loses it quietly (`[rsmods] key down` is missing from the log). With it, keys arrive
   in front or not. Search text then still needs 1.5 s between letters.

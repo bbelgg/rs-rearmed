@@ -77,7 +77,7 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (957 of the Mac's 1,142 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,150 symbols read, an
 `unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
@@ -397,18 +397,36 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
   log line: built for the Mac alone, it would misread this game's memory.
 
-  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Eleven of the 14
-  are. Five of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Twelve of the 14
+  are functions of this game. Six of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
   its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
   Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /
   the game's percentage, which is where the Mac's same curve ends; `too_many_inputs` and `frontend_open_file` read
-  their registers. `input_sink` and `set_app_focus` have no such function here (`unsupported`), and `si_open`
-  (`InputOn`: other arguments, a `PaError` for the bool) is refused. Each gives -1 and a log line.
+  their registers; `si_open` is `InputOn`, the slot the first of its four stack arguments and its `PaError` the Mac's
+  bool (`bool<zero>`).
+
+  `input_sink` and `set_app_focus` have no such function here (`unsupported` in the tables): the game has window messages
+  and an inlined tick. `win32_input.c` runs them instead (`rc_hook_add_seam`), with the Mac's values: macOS key codes, the
+  character, the pointer from the bottom left. While a mod hooks either, events wait for the game thread, as the Mac's
+  queue waits for its flush (`w32_input_frame`, at the start of each Present), so they reach the game a frame later; a pre
+  hook that answers nonzero keeps the event from the game, and `set_app_focus`'s argument, changed by a pre hook, is what the
+  game hears; `input_sink`'s changed arguments are not taken. A mod's own call to `input_sink` (`OV_GUEST`, `rc_call_seam`) goes the
+  way of a key from the host. More than 1,023 events
+  waiting go past the hooks. With no such mod nothing waits. A modifier key is a down and an up here; the Mac
+  sends a down for both.
+
+  The overlay API is the Mac's `rsp_overlay.c`, run in `d3d9_dev_present` on the back buffer before it is shown, and
+  `OV_VCALL` is a thiscall through the guest's vtable (`rc32_hook.c`).
 
   Two things stay different with the call the same. A mod's hooks run around a built-in fix here, where on the Mac the fix
   is a pre hook of its own that can answer first: during DLC mounting a mod on `steam_dlc_owned` saw 148 calls here,
   answered 1, and one on the Mac (2026-11-04, the probe mod). And `game_frame` is a tick of the Run loop: 19,499 ticks against
   17,593 presents in a 240 s run, where the Mac has 15,909 against 15,893; where the extra ticks fall was not looked into.
+
+  RSMods' library (`rearmed-mods.dylib`, from 0.3.0) runs here as the same file as on the Mac. What it needs of the game
+  is in the tables ("the mods library" in `tools/targets/names`): Wwise by name, the UI manager, the DLC service, the Gamebryo
+  fields and the search key. A mod finds its settings in the game folder: with mods the installed app goes to `LP_GAME_DIR`,
+  the Mac's working directory, before it loads them. A mod's strings and results are memory from `rc_guest_alloc`.
 
   The network rule holds with mods in the folder. `win32_net.c` answers the game's own calls, but a mod is
   native code, so before anything else the app looks whether it has mods to load and, if so, starts itself again

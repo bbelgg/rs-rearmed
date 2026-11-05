@@ -21,8 +21,9 @@
 // C type (`*(void **)p`, a struct with pointers in it), c->r[...] other than through rc_args and ov_ret_*.
 // A guest pointer read by rc_mod_ptr, or a value from the game read by RC_LD at its own width, is the same on
 // both. A pointer given to the game must be its own memory (the view can't give it the mod's): the game gets
-// null, with a log line. OV_GUEST(name, ...) calls a game function by its convention; what it returns is
-// the guest's value: a pointer goes through RC_HOST.
+// null, with a log line: rc_guest_alloc gives memory the game can be given, on both. OV_GUEST(name, ...) calls a game
+// function by its convention, rc_call_name_f one with a float among its arguments; what they return is the guest's
+// value: a pointer goes through RC_HOST. rc_mod_set_arg changes an argument of the call a pre hook sees.
 //
 // The offline rules hold for a mod as for the game: the network guard is loaded before any mod in both editions.
 #ifndef RC_MOD_H
@@ -39,6 +40,12 @@ __attribute__((weak, used, visibility("default"))) const int rc_mod_abi = 1;
 static inline void *rc_mod_ptr(const void *p) {
   if (rc_guest_ptr_size == 8) return (void *)(uintptr_t)RC_LD(uint64_t, p);
   return RC_HOST(RC_LD(uint32_t, p));
+}
+
+// Integer or pointer argument k (from 0, up to 5) of the SysV call a pre hook sees (rc_hook.h)
+static inline void rc_mod_set_arg(rc_ctx *c, int k, uint64_t v) {
+  static const uint8_t order[6] = {7, 6, 2, 1, 8, 9};
+  c->r[order[k]] = v;
 }
 
 #endif

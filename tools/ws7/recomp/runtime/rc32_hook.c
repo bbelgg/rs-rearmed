@@ -159,6 +159,7 @@ void rc32_view_result_in(rc32_view *w, const rc_hook_name *h, rc_ctx *c) {
     case 'd': v = rc_u64f(ST(0)); break;
     case 'r': v = rc_u32f(100.0f / (float)ST(0)); break;
     case 'e': v = rd32((uint32_t)w->in[0] + (uint32_t)h->ret_off) == (uint32_t)h->ret_is; break;
+    case 'z': v = (uint32_t)c->r[0] == 0; break;
   }
   result_set(w, h->ret, v);
   w->result = v;
@@ -173,6 +174,7 @@ static void result_out(const rc32_view *w, const rc_hook_name *h, rc_ctx *c, int
     case 'b': case 'h': case 'i': c->r[0] = (uint32_t)v; break;
     case 'q': c->r[0] = (uint32_t)v; c->r[2] = v >> 32; break;
     case 'p': c->r[0] = to_guest(h->name, v); break;
+    case 'z': c->r[0] = v ? 0 : (uint32_t)-1; break;  // the game takes any other value as its call having failed
     case 'f': case 'd': case 'r': {
       double d = h->ret == 'f' ? (double)rc_f32((uint32_t)v) : h->ret == 'd' ? rc_f64(v)
                                                              : (double)(100.0f / rc_f32((uint32_t)v));
@@ -216,7 +218,14 @@ void rc32_trace_out(const char *name, int n, rc_ctx *c) {
 
 // --- native -> guest, for a mod ---------------------------------------------------------------------
 // An argument to the guest: a host pointer into its window as the guest's address, anything else cut to a word
-static uint32_t guest_word(uint64_t v) { return in_window(v) ? RC32_G((void *)(uintptr_t)v) : (uint32_t)v; }
+static uint32_t guest_word(uint64_t v) {
+  if (in_window(v)) return RC32_G((void *)(uintptr_t)v);
+  if (v >> 32 && v >> 32 != 0xffffffffu) {  // neither a word nor a negative one: a pointer to memory the guest can't see
+    fprintf(stderr, "[rc] call: 0x%llx is not in guest memory: the game gets a null pointer\n", (unsigned long long)v);
+    return 0;
+  }
+  return (uint32_t)v;
+}
 
 uint64_t rc32_call_cc(uint32_t g, int cc, const char *name, const uint64_t *ints, int nint) {
   uint32_t a[16], ecx = 0, edx = 0;
@@ -243,4 +252,15 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
   return ndbl ? 0 : rc32_call_cc(guest_word(fn), RC_CC_CDECL, "?", ints, nint);
 }
 
+// OV_VCALL (rc_ov.h): obj's virtual function in `slot`; args start with obj, which goes in ecx
+uint64_t ov_vcall_n(uint64_t obj, int slot, const uint64_t *args, int nargs) {
+  uint32_t fn = rd32(rd32(guest_word(obj)) + 4 * (uint32_t)slot);
+  return rc32_call_cc(fn, RC_CC_THISCALL, "OV_VCALL", args, nargs);
+}
+
 rc_ctx *rc_thread_ctx(void) { return rc32_thread_ctx(); }
+
+void *rc_guest_alloc(size_t size) {
+  uint32_t g = size < (1u << 31) ? rc32_alloc((uint32_t)size) : 0;
+  return g ? RC32_H(g) : NULL;
+}

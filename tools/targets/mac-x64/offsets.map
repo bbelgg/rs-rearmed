@@ -77,3 +77,21 @@ boot_intro_state                  0x78    # RSBootService: u32 intro state (swit
 boot_intro_playing                0x39    # RSBootService: u8 intro playing (set 0x1002b128d, cleared by the skip 0x1002aedda)
 boot_step                         0x34    # RSBootService: u32 phase 3 step counter (switch at 0x1002af72a)
 boot_phase3_steps                 0xa     # RSBootService: phase 3's step count (11-case switch on counter + 1)
+# The mods library (names/offsets.list)
+ui_current_menu                   0x48    # 0x100365eb0
+menu_name                         0xe0    # 0x1000e0330
+efd_str_size                      0x10    # 0x1000e0330: lea rcx,[rax+0xf0]; cmp [rax+0xf8],rcx
+efd_str_inline                    0x18
+connect_dlc_service               0x10    # set through connect_set_dlc_service_slot
+ni_name                           0x20
+ni_flags                          0x3c    # tested by the cull code 0x100e351a0
+ni_parent                         0x40
+ni_local_scale                    0xa8    # NiTransform (0x100f07c00) at +0x74: scale at +0x34
+ni_world_scale                    0xe0    # the world transform, at +0xac
+ni_step_name                      0x30    # 0x100ea8e20
+ni_step_active                    0x38    # 0x100ea8e20
+ni_get_rtti_slot                  0x3     # the two destructors, DeleteThis, GetRTTI
+ni_camera_frustum                 0x168   # NiCamera::SetViewFrustum 0x100e438c0
+ni_camera_far                     0x17c
+song_search_key                   0x2c    # `/`: this game's binding, seen in the song lists (docs/mac/TESTING.md)
+song_search_key2                  0x2c

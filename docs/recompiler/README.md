@@ -11,7 +11,7 @@ game runs. It has two front ends, one per game binary, and one back end:
 | Generator | `build/gen_image.py` | `build/gen_image_pe.py` |
 | Guest memory | the image at its slide in the host address space | a 4 GB window; guest address = `rc_mem + (uint32_t)addr` |
 | Runtime | `runtime/rc_*` | `runtime/rc_*` plus `runtime/rc32_*` (`-DRC_GUEST32`) |
-| Tables | `tools/targets/mac-x64` | `tools/targets/win-x86` (957 of 1,142 symbols read), `win-x86/imports` (import sites), `tools/targets/win-x86/target.toml` |
+| Tables | `tools/targets/mac-x64` | `tools/targets/win-x86` (965 of 1,150 symbols read), `win-x86/imports` (import sites), `tools/targets/win-x86/target.toml` |
 
 How each port uses it: [Mac design](../mac/DESIGN.md), [Windows design](../windows/DESIGN.md).
 
@@ -47,8 +47,8 @@ Everything tied to one binary (function addresses, calling conventions, struct o
 - `tools/targets/check.py` (ctest `targets.check`) fails when a name in `names/` has no entry in a target
   that does not mark it `unsupported`, or when native code uses a name no list has.
 
-`mac-x64` is a full target. `win-x86` has an entry for every name, `check.py` covers both: 957 of the 1,142
-symbols and 57 of the 76 offsets are read from the Windows code, and an `unsupported` line says why for the
+`mac-x64` is a full target. `win-x86` has an entry for every name, `check.py` covers both: 965 of the 1,150
+symbols and 74 of the 93 offsets are read from the Windows code, and an `unsupported` line says why for the
 rest (inlined by LTCG, Mac-only, not needed, or not proved). Its `target.toml` also holds the install pins.
 The Windows build uses it for the hook points (`gen_image_pe.py --target`) and for what a mod asks for by name;
 its built-in fixes still name addresses in `win32_overrides.c`.
@@ -85,7 +85,9 @@ its built-in fixes still name addresses in `win32_overrides.c`.
 - **Mods.** `runtime/rc_mod.h` is what a mod includes, one source and one arm64 dylib for both editions:
   `RC_OFF`, `RC_SLOT`, `RC_ADDR` and `RC_GA` look the name up when the mod runs (`rc_off`, `rc_addr`, from the
   tables in `rc_target.c`), a guest pointer is read with `rc_mod_ptr` and `RC_HOST`, and `OV_GUEST`
-  calls by the game's convention (`rc_call_name`). `runtime/rc_mods.c` is the `mods/` folder for both apps.
+  calls by the game's convention (`rc_call_name`; `rc_call_name_f` with a float among the arguments). What the game is
+  given has to be its own memory: `rc_guest_alloc`, malloc on the Mac, the guest's arena on a 32-bit guest; a pointer
+  it can't see reaches it as null, with a log line. `runtime/rc_mods.c` is the `mods/` folder for both apps.
   Learn & Play loads only a library that has `rc_mod_abi` (`rc_mod.h` defines it): one built without it has the
   Mac's offsets compiled in and reads a pointer as 8 bytes, so none of its code runs. The Mac loads both.
 - **Native code on the guest's own context** (the overrides): `OV_ARGS_OF(name, a, c)` reads by the name's

@@ -5,13 +5,20 @@
 //
 // The host calls in with macOS virtual key codes; each maps to a DirectInput scan code (DIK_*)
 // and a Windows virtual key. LP_INPUT_SCRIPT plays keys for unattended runs (w32_input_script).
+//
+// The hook points input_sink and set_app_focus are here: the Mac game has a function for each, this one has
+// window messages and an inlined tick. While a mod hooks either, events wait for the game thread
+// (w32_input_frame, as the Mac's queue waits for its flush) and go through the hooks first; a pre hook that
+// answers nonzero keeps the event from the game. With no such mod nothing waits.
 #include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
+#include "rc_hook.h"
 #include "win32_shims.h"
 
 // macOS key code -> DIK, VK (0: not mapped)
@@ -66,8 +73,150 @@ static void push_ev(di_event *r, uint32_t *t, uint32_t h, uint32_t ofs, uint32_t
 
 void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp);  // win32_user32.c
 
+// --- input_sink and set_app_focus ----------------------------------------------------------------
+#define SEAM_HOOKS 8
+typedef struct {
+  const char *name;
+  rc_hook_pre_fn pre[SEAM_HOOKS];
+  rc_hook_post_fn post[SEAM_HOOKS];
+  void *pre_user[SEAM_HOOKS], *post_user[SEAM_HOOKS];
+  int npre, npost;
+} seam_point;
+static seam_point p_input = {.name = "input_sink"}, p_focus = {.name = "set_app_focus"};
+static _Atomic int seam_on;
+static _Atomic int32_t view_h;
+
+enum { EV_KEY, EV_MOVE, EV_WHEEL, EV_BUTTON, EV_RELEASE, EV_FOCUS };
+typedef struct { int kind; int32_t a, b, c, d; } seam_ev;
+#define NSEAM 1024
+static seam_ev seam_q[NSEAM];
+static uint32_t seam_h, seam_t;
+static pthread_mutex_t seam_mu = PTHREAD_MUTEX_INITIALIZER;
+
+int rc_hook_add_seam(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) {
+  seam_point *p = !strcmp(name, p_input.name) ? &p_input : !strcmp(name, p_focus.name) ? &p_focus : NULL;
+  if (!p || (pre && p->npre == SEAM_HOOKS) || (post && p->npost == SEAM_HOOKS)) return -1;
+  if (pre) {
+    p->pre_user[p->npre] = user;
+    p->pre[p->npre++] = pre;
+  }
+  if (post) {
+    p->post_user[p->npost] = user;
+    p->post[p->npost++] = post;
+  }
+  atomic_store(&seam_on, 1);
+  return 0;
+}
+
+// Held for the game thread; 0 when no mod asks, or the queue is full (the event then goes past the hooks)
+static int seam_hold(int kind, int32_t a, int32_t b, int32_t c, int32_t d) {
+  if (!atomic_load(&seam_on)) return 0;
+  pthread_mutex_lock(&seam_mu);
+  int room = (seam_t + 1) % NSEAM != seam_h;
+  if (room) {
+    seam_q[seam_t] = (seam_ev){kind, a, b, c, d};
+    seam_t = (seam_t + 1) % NSEAM;
+  }
+  pthread_mutex_unlock(&seam_mu);
+  return room;
+}
+
+// A call as a hook sees one, the view of rc32_hook.c: SysV arguments. 1 when a pre hook kept the event.
+static int seam_pre(seam_point *p, rc_ctx *c, uint64_t *frame, uint32_t a0, uint32_t a1, uint32_t a2) {
+  memset(c, 0, sizeof *c);
+  frame[0] = 0;
+  c->r[4] = (uint64_t)(uintptr_t)frame;
+  c->r[7] = a0;
+  c->r[6] = a1;
+  c->r[2] = a2;
+  for (int i = 0; i < p->npre; i++)
+    if (p->pre[i](c, p->pre_user[i])) return 1;
+  c->r[4] = (uint64_t)(uintptr_t)&frame[1];  // the return address popped
+  return 0;
+}
+static void seam_post(seam_point *p, rc_ctx *c) {
+  for (int i = 0; i < p->npost; i++) p->post[i](c, p->post_user[i]);
+}
+
+static void key_apply(int mac, int down, uint32_t ch);
+static void move_apply(int32_t x, int32_t y, int32_t dx, int32_t dy);
+static void wheel_apply(int32_t delta);
+static void button_apply(int b, int down);
+
+// What input_sink has on the Mac (shims/platform: the event's type + 1; rsp_platform.h says what a and b are)
+static void seam_input(const seam_ev *e) {
+  uint32_t code, a = (uint32_t)e->a, b = 0;
+  switch (e->kind) {
+    case EV_KEY: {
+      code = e->b ? 1 : 2;
+      b = (uint32_t)e->c;
+      pthread_mutex_lock(&in_mu);
+      if (e->b && (in.dik[0xdb] | in.dik[0xdc]) & 0x80) b |= 0x80000000u;  // Command held
+      pthread_mutex_unlock(&in_mu);
+      break;
+    }
+    case EV_MOVE: code = 3; b = (uint32_t)(atomic_load(&view_h) - e->b); break;
+    case EV_BUTTON: code = e->b ? 5 : 4; break;
+    default: code = 6; a = e->a > 0; b = 1; break;  // EV_WHEEL
+  }
+  rc_ctx c;
+  uint64_t frame[8];
+  if (seam_pre(&p_input, &c, frame, code, a, b)) return;
+  switch (e->kind) {
+    case EV_KEY: key_apply(e->a, e->b, (uint32_t)e->c); break;
+    case EV_MOVE: move_apply(e->a, e->b, e->c, e->d); break;
+    case EV_BUTTON: button_apply(e->a, e->b); break;
+    default: wheel_apply(e->a); break;
+  }
+  seam_post(&p_input, &c);
+}
+
+static void release_held(void (*key)(int, int), void (*button)(int, int));
+static void held_key(int mac, int down) { seam_input(&(seam_ev){EV_KEY, mac, down, 0, 0}); }
+static void held_button(int b, int down) { seam_input(&(seam_ev){EV_BUTTON, b, down, 0, 0}); }
+
+void w32_input_view_height(int32_t h) { atomic_store(&view_h, h); }
+
+void w32_input_frame(void) {
+  if (!atomic_load(&seam_on)) return;
+  for (;;) {
+    pthread_mutex_lock(&seam_mu);
+    int got = seam_h != seam_t;
+    seam_ev e = got ? seam_q[seam_h] : (seam_ev){0};
+    if (got) seam_h = (seam_h + 1) % NSEAM;
+    pthread_mutex_unlock(&seam_mu);
+    if (!got) return;
+    if (e.kind == EV_RELEASE) {
+      release_held(held_key, held_button);
+    } else if (e.kind == EV_FOCUS) {
+      rc_ctx c;
+      uint64_t frame[8];
+      if (seam_pre(&p_focus, &c, frame, (uint32_t)e.a, 0, 0)) continue;
+      w32_user_focus((int)(c.r[7] & 0xff));  // a pre hook can change it (the Mac's bool)
+      seam_post(&p_focus, &c);
+    } else {
+      seam_input(&e);
+    }
+  }
+}
+
+// A mod's call to input_sink: the key goes in as the host's do, so it goes through the hooks and reaches the game as
+// a window message. The Mac's values: code 1 down, 2 up, a the key, b its character.
+int rc_call_seam(const char *name, const uint64_t *ints, int nint) {
+  if (!name || strcmp(name, p_input.name) || nint < 3 || (ints[0] != 1 && ints[0] != 2)) return -1;
+  w32_input_key((int)ints[1], ints[0] == 1, (uint32_t)ints[2]);
+  return 0;
+}
+
+void w32_input_focus(int active) {
+  if (!seam_hold(EV_FOCUS, active, 0, 0, 0)) w32_user_focus(active);
+}
+
 // A key from the host: macOS key code, down or up, and the character it types (0: none).
 void w32_input_key(int mac, int down, uint32_t ch) {
+  if (!seam_hold(EV_KEY, mac, down, (int32_t)ch, 0)) key_apply(mac, down, ch);
+}
+static void key_apply(int mac, int down, uint32_t ch) {
   if (mac < 0 || mac >= 128 || !mac_keys[mac][0]) return;
   uint8_t dik = mac_keys[mac][0], vk = mac_keys[mac][1];
   pthread_mutex_lock(&in_mu);
@@ -84,23 +233,30 @@ void w32_input_key(int mac, int down, uint32_t ch) {
 
 // The window lost the keyboard: every key and button held goes up, as nothing tells the game later
 // (a key released in another application never reaches this one).
-void w32_input_release_all(void) {
+static void release_held(void (*key)(int, int), void (*button)(int, int)) {
   for (int mac = 0; mac < 128; mac++) {
     pthread_mutex_lock(&in_mu);
     int down = mac_keys[mac][0] && (in.dik[mac_keys[mac][0]] & 0x80);
     pthread_mutex_unlock(&in_mu);
-    if (down) w32_input_key(mac, 0, 0);
+    if (down) key(mac, 0);
   }
   for (int b = 0; b < 3; b++) {
     pthread_mutex_lock(&in_mu);
     int down = in.mbtn[b] & 0x80;
     pthread_mutex_unlock(&in_mu);
-    if (down) w32_input_mouse_button(b, 0);
+    if (down) button(b, 0);
   }
+}
+static void plain_key(int mac, int down) { key_apply(mac, down, 0); }
+void w32_input_release_all(void) {
+  if (!seam_hold(EV_RELEASE, 0, 0, 0, 0)) release_held(plain_key, button_apply);
 }
 
 // The pointer from the host: position in client pixels, relative motion, wheel steps (120 each)
 void w32_input_mouse_move(int32_t x, int32_t y, int32_t dx, int32_t dy) {
+  if (!seam_hold(EV_MOVE, x, y, dx, dy)) move_apply(x, y, dx, dy);
+}
+static void move_apply(int32_t x, int32_t y, int32_t dx, int32_t dy) {
   pthread_mutex_lock(&in_mu);
   in.mx = x;
   in.my = y;
@@ -112,6 +268,9 @@ void w32_input_mouse_move(int32_t x, int32_t y, int32_t dx, int32_t dy) {
   w32_post_input(0x200, 0, (uint32_t)(x & 0xffff) | (uint32_t)y << 16);  // WM_MOUSEMOVE
 }
 void w32_input_mouse_wheel(int32_t delta) {
+  if (!seam_hold(EV_WHEEL, delta, 0, 0, 0)) wheel_apply(delta);
+}
+static void wheel_apply(int32_t delta) {
   pthread_mutex_lock(&in_mu);
   in.mdz += delta;
   push_ev(in.mev, &in.mt, in.mh, 8, (uint32_t)delta);  // DIMOFS_Z
@@ -121,6 +280,9 @@ void w32_input_mouse_wheel(int32_t delta) {
 }
 // button 0 left, 1 right, 2 middle
 void w32_input_mouse_button(int b, int down) {
+  if (!seam_hold(EV_BUTTON, b, down, 0, 0)) button_apply(b, down);
+}
+static void button_apply(int b, int down) {
   static const uint8_t vk[3] = {0x01, 0x02, 0x04};
   static const uint32_t msg[3] = {0x201, 0x204, 0x207};
   if (b < 0 || b > 2) return;

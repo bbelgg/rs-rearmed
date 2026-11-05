@@ -61,7 +61,8 @@ port, and several features are not there yet.
 | Multiplayer (local) | ⚠️ | ⚠️ |
 | DLC | ✅ | ✅ ¹ |
 | Custom songs (CDLC) | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 11 of the 14 hook points |
+| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; all 14 hook points and the overlay API |
+| RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods; see [the Windows plan](docs/windows/PLAN.md#fixed-in-151) for what a run covered |
 | Built-in fixes (rs-mac-fixes, RSBypass) | ✅ | ✅ |
 | Loading-screen fix (fast-load `cache.psarc` with Metal) | ✅ | ❌ |
 | "Re-ARMed" title logo | ✅ | ✅ |

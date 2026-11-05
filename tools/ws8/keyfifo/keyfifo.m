@@ -11,7 +11,8 @@
 //                      NAME: return esc delete fwddelete tab space up down left right shift ctrl alt cmd, one
 //                      letter or digit, or a macOS key code in hex (0x24)
 //   text STRING [MS]   each character of STRING, MS ms between them (default 1500: the song search drops faster ones)
-//   click X Y          a left click at X, Y in the window's content, in points from the top left
+//   click X Y          a left click at X, Y in the window's content, in points from the top left (into the event
+//                      queue, as keys; to the window with RS_KEY_DIRECT=1)
 //   quit               the app menu's Command-Q item, as a person chooses it
 //   front              the game's app and window in front (the engine takes keys only while it has the focus)
 // Lines are logged to stderr as "keyfifo: ...". Keys go into the game's own event queue, so nothing else on the
@@ -124,7 +125,8 @@ static void click(double x, double y) {
                                  modifierFlags:0 timestamp:[NSProcessInfo processInfo].systemUptime
                                   windowNumber:w.windowNumber context:nil eventNumber:0 clickCount:1
                                       pressure:i ? 0 : 1];
-      [w sendEvent:e];
+      if (getenv("RS_KEY_DIRECT")) [w sendEvent:e];
+      else [NSApp postEvent:e atStart:NO];  // Learn & Play reads its own queue
     });
     usleep(120000);
   }

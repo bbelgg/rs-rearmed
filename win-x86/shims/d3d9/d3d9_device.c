@@ -950,7 +950,15 @@ static void d3d9_hidden_wait(void) {
     }
 }
 
+// The app's strong definitions replace these (a test of this layer has neither): the mods' held input
+// (win32_input.c), and their overlays (rs_overlay.h, on libRSOpenGL as on the Mac: shims/platform/src/rsp_overlay.c)
+// on the frame about to be shown
+__attribute__((weak)) void w32_input_frame(void) {}
+__attribute__((weak)) int rsp_overlay_active(void) { return 0; }
+__attribute__((weak)) void rsp_overlay_run(int width, int height) { (void)width; (void)height; }
+
 uint32_t d3d9_dev_present(d3d9_device *d) {
+    w32_input_frame();
     d3d9_ft_mark_t ft = d3d9_ft_mark();
     uint64_t ft0 = ft ? mach_absolute_time() : 0;
     lp_frame_present();
@@ -961,6 +969,7 @@ uint32_t d3d9_dev_present(d3d9_device *d) {
     // back buffer row 0 is the top: draw it flipped onto framebuffer 0 (row 0 at the bottom)
     static const float dst[4] = {-1, -1, 1, 1}, src[4] = {0, 1, 1, 0};
     if (d->backbuffer) d3d9_dev_blit(d, d->backbuffer->tex, dst, src, 0);
+    if (rsp_overlay_active()) rsp_overlay_run((int)d->width, (int)d->height);
     rs_gfx_present(d->ctx);
     d->fbo_dirty = 1;
     d->dirty = D3D9D_ALL;

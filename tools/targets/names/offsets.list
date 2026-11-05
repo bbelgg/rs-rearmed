@@ -88,3 +88,22 @@ boot_intro_state                  # RSBootService: u32 intro state (0 load .. 3 
 boot_intro_playing                # RSBootService: u8 intro playing
 boot_step                         # RSBootService: u32 phase 3 step counter
 boot_phase3_steps                 # RSBootService: phase 3's step count (the counter's value once they are done)
+
+# the mods library, one binary for both editions (RSMods, Mac/src: rc_mod.h looks these up when it runs)
+ui_current_menu      # UI manager: the current menu
+menu_name            # menu: its name, an efd string
+efd_str_size         # efd string: the size word
+efd_str_inline       # efd string: the address of its size word when the text is inline, at its start; else its start points to the text
+connect_dlc_service  # connect service: the DLC service, the object dlc_pending and dlc_check_on are in
+ni_name              # NiObjectNET: the name, an NiFixedString (char *)
+ni_flags             # NiAVObject: flags, 16 bits; bit 0 = app culled
+ni_parent            # NiAVObject: parent
+ni_local_scale       # NiAVObject: local transform's scale
+ni_world_scale       # NiAVObject: world transform's scale
+ni_step_name         # NiRenderStep: the name
+ni_step_active       # NiRenderStep: active, a byte
+ni_get_rtti_slot     # NiObject vtable: GetRTTI, which returns the class's NiRTTI {name, base}
+ni_camera_frustum    # NiCamera: the view frustum: left, right, top, bottom, near, far
+ni_camera_far        # NiCamera: the frustum's far plane
+song_search_key      # a macOS key code: the key the game's song lists open their search with
+song_search_key2     # a macOS key code: the other key that does, or the same

@@ -10,6 +10,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   keys and snapshots): the image matches the pin; a song to the note highway and out, with a mod and without, no signal, nothing
   refused by the network guard; the shader warm-up. The game was started directly with the launcher's environment, not by `open`. All
   suites of [TESTING.md](TESTING.md) pass.
+- **RSMods' library** (2026-11-05): the same `rearmed-mods.dylib` 0.3.0 as Learn & Play's, all its mods on, a test home, to the note highway and
+  a quit ([Fixed in 1.5.1](#fixed-in-151)).
 - **Shader warm-up**: the loop is now in libRSOpenGL (`rs_gfx_warm_only`), which Learn & Play's install runs too; nothing changed
   here. `tools/metal/make-corpus.sh --learn-play` and `build-msl-corpus.sh --pairs` are that edition's way through the same tools.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with
@@ -31,8 +33,8 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   played. All suites of [TESTING.md](TESTING.md) pass; the figures are in [PERFORMANCE.md](PERFORMANCE.md).
 - **Full-screen shape**: on a 16:10 screen the 16:9 picture is stretched, as in the original under Rosetta. The Windows
   game's bars are its own code, which the Mac game does not have.
-- **Mods on both editions**: a mod built with `rc_mod.h` is one dylib for this app and Learn & Play, which has 11 of the
-  14 hook points ([Windows plan](../windows/PLAN.md#status)). This edition's own mod interface is as it was.
+- **Mods on both editions**: a mod built with `rc_mod.h` is one dylib for this app and Learn & Play, which has all 14
+  hook points and the overlay API since 1.5.1 ([Windows plan](../windows/PLAN.md#status)). This edition's own mod interface is as it was.
 - **Enumerate** (new in 1.4.0, both editions): SHOP is ENUMERATE, second in the main menu, and brings new songs in
   without a restart ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Changed and removed songs still need a refresh.
 
@@ -90,6 +92,11 @@ Nothing here is meant to change how this edition plays. What changed is shared w
   ([TESTING.md](TESTING.md#game-runs)).
 - **Learn & Play's hidden window** is that edition's fix ([Windows plan](../windows/PLAN.md#fixed-in-151)); this edition's
   display link already kept the rate.
+- **RSMods' library serves both editions**: `rearmed-mods.dylib` 0.3.0 is built with `rc_mod.h`, so this edition runs the same file as
+  Learn & Play, and it needs 1.5.1 for `rc_call_name_f` and `rc_guest_alloc`. The same route in test homes on 2026-11-05 gave the same results but for the lyrics, which only this edition's song showed ([Windows
+  plan](../windows/PLAN.md#fixed-in-151) has what it covered). A score screen and the input volume were not reached here either, and the run was
+  not compared with 0.2.2's. Changed here on purpose: hotkeys stay off in the song search after Return with
+  no match, and after a click, until Esc or the next screen.
 
 ## Next work
 

@@ -15,8 +15,8 @@
 game_bootstrap                                                   unsupported  no standalone LP function: WinMain (0x1309ad0) inlines it (set game root 0x1343c90, LoadConfig 'Rocksmith.ini' 0x149df40, VFS 'Global FS Backend' 0x101ab50)
 game_frame                                                       0x01479df0  thiscall  bool<service_manager_state=7>(void *service_manager=hidden)  # the frame: ServiceManager tick, slot 19 of the vtable 0x1d5f088 (the Mac game_frame ends in the same slot, 0x1002a98c0, and its quit check is here in the Run loop 0x1479da0); takes the manager, returns nothing
 game_shutdown                                                    unsupported  no standalone LP function found: WinMain's exit path (0x1309d6e..) runs the shutdown inline (vtable +0x3c, delete, 0x1309540, 0x101b830, 0x14a2b50)
-set_app_focus                                                    unsupported  inlined: the platform tick 0x149ed00 handles the posted 0x7e8 (gained) and 0x7e9 (lost) in the message loop; a hook can use the two calls it makes, 0x1a45490 (AK restore sink) and 0x1a45480 (AK release sink)
-input_sink                                                       unsupported  no counterpart: events reach the game as window messages. MainService_Win32's window procedure 0x130d790 (stdcall hwnd, msg, wparam, lparam) passes them to the Scaleform one, 0x17a1850, which builds the same events the Mac sink does (5/6 key, 0x1a char); a hook can use 0x17a1680 (queues one event, ecx = the event), which both paths end in
+set_app_focus                                                    unsupported  inlined: the platform tick 0x149ed00 handles the posted 0x7e8 (gained) and 0x7e9 (lost) in the message loop, so the point is in the input layer: win32_input.c runs it where the window's focus reaches the game (rc_hook_add_seam)
+input_sink                                                       unsupported  no counterpart: events reach the game as window messages (0x130d790, then Scaleform's 0x17a1850), so the point is in the input layer: win32_input.c runs it with the Mac's values before an event reaches the game (rc_hook_add_seam)
 set_resolution                                                   unsupported  inlined: callers read the settings (0x13afbd0, esi = the struct), change them and apply them (0x13afc50, eax = the struct)
 set_fullscreen                                                   0x013afd30  custom    void(uint8_t)  # edi = mode: reads the settings, returns when the mode is the same, sets the flags, applies (0x13afc50); F11 in the window procedure calls it (0x130d905)
 get_fullscreen                                                   0x013afdb0  cdecl     int(void)  # the mode from the settings flags, the same test set_fullscreen and the F11 handler make
@@ -41,7 +41,7 @@ rr_speed_ratio                                                   0x00f89360  cde
 ak_set_rtpc_name                                                 0x1a42400  cdecl     int(const char *, float, uint32_t, int, int)
 camera_set_frustum                                               0x01557f20  fastcall  void(void *camera, const void *frustum)  # ecx = camera, edx = frustum: the same fields in the same order as the Mac function (near clamp against +0x14c/+0x148 = Mac +0x1a0/+0x19c), 7 callers against 7, one of them the matched 0x134bc60
 ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
-si_open                                                          0x017c50a0  custom    int(void *self@edi, ...)  # SoundInputPortAudio::InputOn: edi = the input, 4 stack arguments (ret 0x10, not the Mac's slot), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
+si_open                                                          0x017c50a0  custom    bool<zero>(void *self@edi, int slot, int a=hidden, int b=hidden, void *c=hidden)  # SoundInputPortAudio::InputOn: edi = the input, the slot the first of 4 stack arguments (ret 0x10; a run has 0, 1, 2, 3), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
 
 # --- names/refs.list
 scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys
@@ -1184,3 +1184,12 @@ rsg_efd_msghelper_on_preinit                                     unsupported  no
 rsg_efd_msghelper_on_shutdown                                    unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
 rsg_pkgconfig_decrypt                                            0x0130aa80  cdecl     -  # the package config callback (the file on the stack, stored by 0x130ac70): decoder and verifier calls as the Mac's
 rsg_profile_encrypt                                              0x0134f270  fastcall  -  # key_profile through rsg_rijndael_key_setup_enc and rsg_rijndael_encrypt; one caller as on the Mac
+# The mods library (names/refs.list). Each read from the function it is used in; the Wwise functions are also RSMods' addresses for this build
+ak_initialized                                                   0x1ed280c  data  bool  # IsInitialized 0x1a40740 returns it
+ak_get_rtpc_name                                                 0x1a40280  cdecl  int(const char *, uint32_t, float *, int *)  # name to id by 0x1a422b0, 0xf (AK_IDNotFound) when not there, as ak_query_objects_name; a game object is 4 bytes here
+ak_set_actor_mixer_effect                                        0x1a41d40  cdecl  int(uint32_t, uint32_t, uint32_t)  # queues message 0x27 with the three arguments
+ak_seek_on_event_name                                            0x1a44a80  cdecl  int(const char *, uint32_t, int, bool)  # name to id, then four arguments to the id form 0x1a449e0
+ak_query_objects_name                                            0x1a406b0  cdecl  int(const char *, uint32_t *, void *)
+ak_source_play_position                                          0x1a41300  cdecl  int(uint32_t, int *, bool)  # 0x1f (AK_InvalidParameter) for a null position
+ui_manager                                                       0x1ee062c  data  void *  # +0x28 and +0x8c are read from it as the Mac's +0x48 and +0xe0 are (0xf85e78, 0x103cc81); RSMods' ptr_currentMenu
+nicamera_vtable                                                  0x1d69598  data  void *[]  # its constructor 0x1557da0; GetRTTI 0x15596c0 in slot 2 gives the NiRTTI 0x1e73280 "NiCamera"

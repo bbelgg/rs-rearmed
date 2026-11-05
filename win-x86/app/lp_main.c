@@ -483,6 +483,9 @@ int main(int argc, char **argv) {
   // The mods, with the images mapped and the game not started, as on the Mac: a mod's constructor registers
   // its hooks (rc_hook.h).
   if (mods_message) fprintf(stderr, "%s\n", mods_message);
+  // A mod finds its settings in the game folder, the working directory on the Mac
+  if (mods_folder && installed && chdir(getenv("LP_GAME_DIR")))
+    fprintf(stderr, "lp: cannot go to the game folder %s: %s\n", getenv("LP_GAME_DIR"), strerror(errno));
   if (mods_folder) rc_mods_load(mods_folder);
   rc_hook_trace_init();
   uint32_t base = rc32_image_base(0);

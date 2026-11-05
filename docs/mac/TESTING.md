@@ -213,7 +213,7 @@ user's, with a test profile.
 - **Following the default output** (2026-11-05, on the title and the profile screen, a test library answering another device as
   the default and calling the listeners, so the system's setting is not touched): `audio: the default output is now ...`; the
   output callbacks and the game's sound (peak 0.3) on the new device at its own buffer size, 128 frames on one with inputs, 256 on
-  the speakers, there and back, and a clean quit. Not run: a real change in Sound settings, or a song in progress.
+  the speakers, there and back, and a clean quit. On the installed app, the same day: a real change in Sound settings during a song, and the sound moved, heard by the maintainer.
 - Before reporting a game bug, check whether it also happens in the original game under Rosetta.
 
 ### Shaders of a run

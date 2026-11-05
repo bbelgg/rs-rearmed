@@ -10,6 +10,9 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   keys and snapshots): the image matches the pin; a song to the note highway and out, with a mod and without, no signal, nothing
   refused by the network guard; the shader warm-up. The game was started directly with the launcher's environment, not by `open`. All
   suites of [TESTING.md](TESTING.md) pass.
+- **Checked for 1.5.1** (2026-11-05, the app from `install.sh` over an existing install): the default output changed in Sound settings during
+  a song and the sound moved, heard by the maintainer. All suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the
+  installer app, a guitar.
 - **RSMods' library** (2026-11-05): the same `rearmed-mods.dylib` 0.3.0 as Learn & Play's, all its mods on, a test home, to the note highway and
   a quit ([Fixed in 1.5.1](#fixed-in-151)).
 - **Shader warm-up**: the loop is now in libRSOpenGL (`rs_gfx_warm_only`), which Learn & Play's install runs too; nothing changed

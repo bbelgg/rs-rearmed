@@ -98,6 +98,11 @@ RSMods' library (2026-11-05): `rearmed-mods.dylib` 0.3.0 loads and runs here as 
 to the note highway and a quit ([Fixed in 1.5.1](#fixed-in-151) says what a run covered). The configurator installs it for the Mac edition
 only; `Mac/build.sh --install` puts it in both folders.
 
+Final pass for 1.5.1 (2026-11-05, the final code, `learn-play.sh`, a test home): a song to the note highway and a quit with RSMods' library, the
+same route and results as before the last fixes; a start and a clean quit without mods; nothing refused by the network guard. The 32-bit
+difftest shows only its two known mismatches, and all suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the installer app,
+a real Steam download, a guitar.
+
 Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
 source given by `RS_SOURCE_URL` and a stand-in Steam, through Preparing shaders; the image's SHA-256 is the pin in `target.toml`. With
 the system's cache cold, the warm-up and then a first play started with `open` gave the figures of

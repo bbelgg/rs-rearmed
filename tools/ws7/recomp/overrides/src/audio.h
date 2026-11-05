@@ -38,6 +38,10 @@ extern _Atomic uint32_t rs_audio_out_frames;
 // Called from the AudioUnitSetProperty import thunk (thunks/gen_thunks.py) when the game sets an output
 // unit's current device (kAudioOutputUnitProperty_CurrentDevice), before the call.
 void rs_audio_output_device(uint32_t device);
+// The same thunk, after that: the unit itself. And the AUGraphStart and AUGraphStop thunks: the sink's graph
+// while it runs, NULL once the game stops it. With both known the sink follows the default output.
+void rs_audio_output_unit(void *unit);
+void rs_audio_output_graph(void *graph);
 
 // Called from the AudioObjectGetPropertyData import thunk in place of the call: the same call, with the system
 // object's device list (kAudioHardwarePropertyDevices) input devices first (audio_devs.c).

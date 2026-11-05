@@ -89,7 +89,7 @@ objs="$objs $(cc_obj "$here/seam_platform.c" -I"$tgt")"
 objs="$objs $(cc_obj "$tgt/rc_target.c" -w)"  # the target's name tables for the runtime (rc_hook_add_name)
 for s in "$rt"/rc_*.c; do objs="$objs $(cc_obj "$s" -w)"; done
 for s in "$rt"/rc_*.S; do objs="$objs $(cc_obj "$s")"; done
-FW="-framework AppKit $shim_opengl -framework CoreVideo -framework IOKit -framework CoreAudio -framework Metal -framework QuartzCore -framework Foundation -framework CoreFoundation -lobjc -lz"
+FW="-framework AppKit $shim_opengl -framework CoreVideo -framework IOKit -framework CoreAudio -framework AudioToolbox -framework Metal -framework QuartzCore -framework Foundation -framework CoreFoundation -lobjc -lz"
 exe=$app/Contents/MacOS/Rocksmith2014
 # rc_main.o names the profile file of a gen build (the image TUs carry the counters only)
 pgo_main=$(rc_pgo_main "$out/pgo")

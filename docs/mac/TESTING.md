@@ -201,8 +201,12 @@ user's, with a test profile.
   `front` before them.
 - **The output device** (2026-11-04, a test library logging the buffer sets, UR22 as output and input): the
   sink sets 256 frames at about 1 s, the input scan sets 128 on the same device at 3-4 s and stays. Changing the
-  default output during a run only adds a mute listener; the sink stays on its device. Unplugging the device moves
-  the output to another by the HAL; replugging reopens the input only.
+  default output during a run only adds a mute listener in the game, and the override moves the sink. Unplugging the
+  device moves the output to another by the HAL; replugging reopens the input only.
+- **Following the default output** (2026-11-05, on the title and the profile screen, a test library answering another device as
+  the default and calling the listeners, so the system's setting is not touched): `audio: the default output is now ...`; the
+  output callbacks and the game's sound (peak 0.3) on the new device at its own buffer size, 128 frames on one with inputs, 256 on
+  the speakers, there and back, and a clean quit. Not run: a real change in Sound settings, or a song in progress.
 - Before reporting a game bug, check whether it also happens in the original game under Rosetta.
 
 ### Shaders of a run

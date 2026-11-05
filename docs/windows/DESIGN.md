@@ -270,8 +270,8 @@ A player's input mode picks the slot: a Real Tone slot only in Real Tone mode, a
 Microphone mode, any other input in Microphone or Other Cable mode.
 
 The system's default output changing reaches the game's `IMMNotificationClient`s (`wa_com.c`): Wwise's acts only on
-`OnDefaultDeviceChanged(eRender, eMultimedia)`, and then makes a new sink on the new default. Other device changes
-are seen at the game's next scan. Not done: exclusive mode accepts any format and converts it.
+`OnDefaultDeviceChanged(eRender, eMultimedia)`, and then makes a new sink on the new default, which is what the Mac
+edition's override does by hand. Other device changes are seen at the game's next scan. Not done: exclusive mode accepts any format and converts it.
 
 ## Video (Bink)
 

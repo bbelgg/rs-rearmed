@@ -13,6 +13,11 @@
 // interface that also has inputs: the guitar input needs 128 there (rs_audio_set_device_buffer). The sink is
 // rebuilt on a device change, which calls this again.
 //
+// Following the default output: the sink opens the default device once and the game never moves it, so a
+// change in Sound settings used to leave the sound where it was. Learn & Play follows the change, because
+// its game reopens the stream when told. Here the graph is stopped, its AUHAL moved to the new device
+// (48 kHz, its buffer, the LEngine thread's workgroup: all the sink's setup does for a device) and started.
+//
 // F_100b049b0, the LEngine thread entry (the thread Wwise renders on, 256 frames per block, woken by the
 // HAL callback through a mach semaphore): the original is
 //   g_lengine_thread = pthread_self(); g_start_time = time(0);
@@ -22,9 +27,12 @@
 // the scheduler treats a render as part of the device's I/O cycle. With a small ring there is little slack:
 // a block must be ready within one HAL period of the wake-up.
 // RS_AUDIO_RT=0 runs the thread as the original does.
+#include <AudioToolbox/AudioToolbox.h>
 #include <CoreAudio/CoreAudio.h>
+#include <dispatch/dispatch.h>
 #include <mach/semaphore.h>
 #include <pthread.h>
+#include <stdio.h>
 #include <time.h>
 
 #include "audio.h"
@@ -52,6 +60,72 @@ void rs_audio_output_device(uint32_t dev) {
                  applied, ring);
   atomic_store(&g_out_dev, dev);
   atomic_fetch_add(&g_out_gen, 1);
+}
+
+// ------------------------------------------------------------------------------------------------
+// Following the default output
+// ------------------------------------------------------------------------------------------------
+static pthread_mutex_t g_follow_mu = PTHREAD_MUTEX_INITIALIZER;  // the game's AUGraphStop waits for a move
+static AudioUnit g_out_unit;
+static AUGraph g_out_graph;
+
+static void follow_default(void *arg) {
+  (void)arg;
+  AudioObjectPropertyAddress a = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
+                                  kAudioObjectPropertyElementMain};
+  AudioObjectID dev = kAudioObjectUnknown;
+  UInt32 size = sizeof dev;
+  if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &size, &dev) != noErr ||
+      dev == kAudioObjectUnknown)
+    return;
+  pthread_mutex_lock(&g_follow_mu);
+  if (g_out_graph && g_out_unit && dev != atomic_load(&g_out_dev)) {
+    char name[128];
+    rs_audio_dev_name(dev, name, sizeof name);
+    fprintf(stderr, "audio: the default output is now \"%s\"\n", name);
+    AUGraphStop(g_out_graph);
+    AudioObjectPropertyAddress r = {kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal,
+                                    kAudioObjectPropertyElementMain};
+    Float64 rate = SAMPLE_RATE;
+    AudioObjectSetPropertyData(dev, &r, 0, NULL, sizeof rate, &rate);
+    OSStatus st = AudioUnitSetProperty(g_out_unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0,
+                                       &dev, sizeof dev);
+    if (st == noErr)
+      rs_audio_output_device(dev);
+    else
+      rs_audio_log("output device %u: the sink could not move there (%d)", dev, (int)st);
+    AUGraphStart(g_out_graph);
+  }
+  pthread_mutex_unlock(&g_follow_mu);
+}
+
+// On the HAL's notification thread, which stopping the graph must not hold up.
+static OSStatus default_changed(AudioObjectID obj, UInt32 n, const AudioObjectPropertyAddress *a, void *arg) {
+  (void)obj; (void)n; (void)a; (void)arg;
+  static dispatch_queue_t q;
+  static dispatch_once_t once;
+  dispatch_once(&once, ^{ q = dispatch_queue_create("rs audio default output", DISPATCH_QUEUE_SERIAL); });
+  dispatch_async_f(q, NULL, follow_default);
+  return noErr;
+}
+
+void rs_audio_output_unit(void *unit) {
+  pthread_mutex_lock(&g_follow_mu);
+  g_out_unit = (AudioUnit)unit;
+  pthread_mutex_unlock(&g_follow_mu);
+}
+
+void rs_audio_output_graph(void *graph) {
+  static int watching;
+  pthread_mutex_lock(&g_follow_mu);
+  g_out_graph = (AUGraph)graph;
+  if (graph && !watching) {
+    watching = 1;
+    AudioObjectPropertyAddress a = {kAudioHardwarePropertyDefaultOutputDevice, kAudioObjectPropertyScopeGlobal,
+                                    kAudioObjectPropertyElementMain};
+    AudioObjectAddPropertyListener(kAudioObjectSystemObject, &a, default_changed, NULL);
+  }
+  pthread_mutex_unlock(&g_follow_mu);
 }
 
 // ------------------------------------------------------------------------------------------------

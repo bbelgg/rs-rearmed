@@ -105,6 +105,8 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
   shares and needs at 128), and the game's ring is split so `LatencyBuffer=1` does not crackle
   (`RS_AUDIO_RING_SPLIT`);
 - the Wwise thread is a real-time thread in the output device's audio workgroup (`RS_AUDIO_RT`);
+- the sink follows the default output: the game opens it once and never moves it, so when the default changes the override
+  stops the game's audio graph, gives its output unit the new device with the sink's 48 kHz and buffer, and starts it again;
 - stale guitar audio queued from the cable is dropped instead of played late (`RS_AUDIO_INPUT_TRIM`);
 - devices get stable identifiers, so an interface is not dropped from Direct Connect after another device
   fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`, `RS_AUDIO_INPUTS_FIRST`).

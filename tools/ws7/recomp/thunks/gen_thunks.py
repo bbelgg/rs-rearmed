@@ -66,11 +66,22 @@ HOOKS = {
     # without that module still links).
     "AudioUnitSetProperty": lambda p: [
         "extern void rs_audio_output_device(uint32_t) __attribute__((weak_import));",
-        "if (%s == 2000 && %s && %s == 4 && rs_audio_output_device) rs_audio_output_device(*(const uint32_t *)%s);"
-        % (p[1], p[4], p[5], p[4]),
+        "extern void rs_audio_output_unit(void *) __attribute__((weak_import));",
+        "if (%s == 2000 && %s && %s == 4 && rs_audio_output_device) { rs_audio_output_device(*(const uint32_t *)%s); "
+        "if (rs_audio_output_unit) rs_audio_output_unit((void *)%s); }"
+        % (p[1], p[4], p[5], p[4], p[0]),
         "uint64_t cb_tmp[2];",
         "if ((%s == 23 || %s == 2005) && %s && %s == 16) { memcpy(cb_tmp, %s, 16); "
         "cb_tmp[0] = (uint64_t)rc_tramp_get(cb_tmp[0]); %s = cb_tmp; }" % (p[1], p[1], p[4], p[5], p[4], p[4])],
+    # The sink's graph, so the audio override module can move it to a new default output
+    # (overrides/src/audio_out.c): running from AUGraphStart until the game's AUGraphStop, which waits for a move
+    # under way, so the graph is never touched after the game has begun tearing it down.
+    "AUGraphStart": lambda p: [
+        "extern void rs_audio_output_graph(void *) __attribute__((weak_import));",
+        "if (rs_audio_output_graph) rs_audio_output_graph((void *)%s);" % p[0]],
+    "AUGraphStop": lambda p: [
+        "extern void rs_audio_output_graph(void *) __attribute__((weak_import));",
+        "if (rs_audio_output_graph) rs_audio_output_graph(NULL);"],
     # The audio override module makes these calls: for kAudioHardwarePropertyDevices ('dev#') of the system
     # object it puts the input devices first (overrides/src/audio_devs.c), and gives each device one UID string;
     # with RS_AUDIO_LOG=1 it records the calls made while an input device opens

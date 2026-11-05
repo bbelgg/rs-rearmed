@@ -216,7 +216,7 @@ manifest; the corpus too while the manifest is small). Our own disk cache is per
 warms the other's shaders at start or ages them out of the manifest. Cost on an M2, cold: 3880 libraries in
 270 s (8 threads, nothing else running); again: 0.2 s.
 Pipelines are built on the drawing thread (warming: on the pool), archive adds on one serial utility
-queue. With the original `cache.psarc` nothing of this applies. GL: `rs_gfx_prepare` is a no-op.
+queue. With the original `cache.psarc` safe load is off, so nothing waits at the start. GL: `rs_gfx_prepare` is a no-op.
 
 ## Shader translation
 

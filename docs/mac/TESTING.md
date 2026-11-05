@@ -14,7 +14,7 @@ ctest --test-dir build --output-on-failure            # or -R <name> for some of
 ```
 
 Tests that need a game file skip or are left out when it is not there: the decrypted image
-(`RS_GAME_PLAIN`, default `analysis/cg/Rocksmith2014_x64_plain`), the installed game (`RS_GAME_APP`,
+(`cmake -DRS_GAME_PLAIN=<the image>`, no default: its differential tests need Rosetta), the installed game (`RS_GAME_APP`,
 `RS_GAME_DIR`), or extracted videos and shader dumps under `analysis/`. Nothing derived from the game is
 in the repository.
 
@@ -41,7 +41,7 @@ Outside CTest:
   `make -C shims/steam test` (vtable slots and ABI tests, arm64 and x86_64; the x86_64 run needs Rosetta).
 - **Network guard**: `tools/ws8/netguard/build.sh --test` builds `netguard_test` and runs it on both
   architectures.
-- **App build**: `build-m4.sh` starts the new app once with `--init-only` (maps the image, binds the shims,
+- **App build**: `tools/ws7/recomp/app/build-m4.sh` starts the new app once with `--init-only` (maps the image, binds the shims,
   then exits) and fails if that does not print its `init-only:` line. `tools/ws7/recomp/build/build.sh`
   links a smoke test of the translated image and checks zlib's `adler32`/`crc32` against the system's.
 - **Seam unit test**: `tools/ws7/recomp/app/test/build.sh OUTDIR` (or `RC_UNIT_TEST=1` for `app/build.sh`): the
@@ -205,7 +205,7 @@ user's, with a test profile.
   a song puts the cursor on the entry last used, so look before pressing Down to EXIT.
 - **Guitarcade**: Down five times to GUITARCADE, Return, Return on TECHNIQUE GAMES, a game, Return, Return. A game has a tuner
   with no Skip Tuner: Return starts Calibration (Esc cancels) and only a tuned instrument gets past it. So the menus and
-  the list of games are what keys reach. A virtual cable next to a Loopback device of the same name gives "Two
+  the list of games are what keys reach; the games themselves are a check by hand (the maintainer's, 2026-11-05). A virtual cable next to a Loopback device of the same name gives "Two
   Rocksmith Real Tone Cables have been detected"; with the input on the microphone the wave doesn't reach it at all.
 - **Without a guitar**: DISCONNECTED plays songs ("TUNE UP!" then the note highway) but greys out Session Mode,
   Lessons, Guitarcade, Multiplayer and the Tone Designer. Exactly one device named "Rocksmith USB Guitar Adapter"
@@ -231,7 +231,7 @@ alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-run).
 
 ### The capture VM
 
-Not applicable: the Mac edition's game is not packed. See [the Windows port's notes](../windows/TESTING.md).
+Not applicable: the Mac edition's game is not packed. See [the Windows port's notes](../windows/TESTING.md#the-capture-vm).
 
 ## Diagnostics
 
@@ -243,7 +243,8 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_MODS_LOG=1` | what the built-in fixes apply |
 | `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
-| `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_TRACE_DIR` | GL calls, errors after each call, counts, traces |
+| `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_VERBOSE=1` | GL calls, errors after each call, counts, the load and every first error |
+| `RS_GL_TRACE_DIR=DIR`, `RS_GL_TRACE_START=S`, `RS_GL_TRACE_KEY=1\|PATH`, `RS_GL_TRACE_FRAMES=N` | a trace of N frames (default 30), from the second frame, S seconds after the first, or when `DIR/go` or PATH appears |
 | `RS_MSL_LOG=1`, `RS_MTL_DUMP_MSL` | shaders translated at run time, the MSL of slow compiles |
 | `RS_GL_DUMP_SHADERS` | the GLSL the game compiles |
 | `RS_GL_SNAPSHOT_DIR`, `RS_GL_SNAPSHOT_SECS` | frame snapshots |
@@ -251,6 +252,10 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `--renderer-check` | the renderer a start would use, without starting the game |
 | `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
 | `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |
+| `RS_METAL_CACHE=0`, `RS_MTL_COMPILE_THREADS=N`, `RS_METAL_DRAWABLES=2\|3` | no disk cache, the compile pool's size, the drawable count |
+| `RS_FPS=N`, `RS_NO_VSYNC=1\|0`, `RS_NO_VSYNC_AFTER=S`, `RS_RENDER_THREAD=0` | a fixed frame rate; swap interval 0 or not, from S seconds on (default 30); the original's frame in the display link's callback |
+| `RS_LUA_TRACE=1` | Lua chunk loads, failed calls and errors |
+| `RC_LOG_UNRESOLVED=1`, `RC_TRACE_INITS=1` | every unresolved bind, each initializer before it runs |
 
 ## Offline checks
 

@@ -17,13 +17,16 @@ RS Re-ARMed builds a native arm64 Mac app from either of two games:
 
 Shared by both: the recompiler (`tools/ws7/recomp`, 64-bit and 32-bit PE front ends,
 [docs/recompiler](docs/recompiler/README.md)), the renderer (`shims/opengl`, libRSOpenGL with its Metal
-backend; Learn & Play's D3D9 layer draws through it), CoreAudio (`shims/coreaudio`), the offline Steam
-behaviour, the installer app (`tools/installer`), the game-file copy (`tools/play-native/gamefiles.py`) and
-the per-game tables (`tools/targets`).
+backend; Learn & Play's D3D9 layer draws through it), the shader corpus tools (`tools/metal`), CoreAudio
+(`shims/coreaudio`), the offline Steam behaviour, the mod loader and its ABI
+(`tools/ws7/recomp/runtime/rc_mods.c`, `rc_mod.h`), the installer app (`tools/installer`), the game-file copy
+(`tools/play-native/gamefiles.py`) and the per-game tables (`tools/targets`).
 
 The network guard is the same rule in two forms: the Mac edition loads `tools/ws8/netguard` into the game on
 every launch; Learn & Play has no host socket to guard (no `socket`, `connect` or name lookup is linked into
-it), and its Win32 seam refuses the same things at the game's own calls (`win-x86/shims/win32_net.c`).
+it), and its Win32 seam refuses the same things at the game's own calls (`win-x86/shims/win32_net.c`). A mod is
+native code and could make a socket, so Learn & Play loads mods only with the same guard in the process
+(`win-x86/app/lp_main.c`).
 
 **The aim is to keep the two editions as consistent as possible.** A player should get the same
 features, switches, folders, messages and behaviour from either app, and a developer should find the same

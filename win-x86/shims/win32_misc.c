@@ -2,7 +2,7 @@
 // shell32 (folders; nothing is launched), winmm (time; waveIn and the mixers are the audio
 // layer's, win-x86/shims/audio, and these only answer what it lacks),
 // setupapi (no devices), rpcrt4, dinput8 (the system keyboard and mouse), xinput1_3 (no controller), gdi32 (the
-// few calls D3DX's font makes), bink2w32 (no videos yet).
+// few calls D3DX's font makes), bink2w32 (stubs for a build without the translated DLL).
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -467,7 +467,7 @@ static void g_GetDeviceCaps(rc_ctx *c) {
 static const w32_export gdi[] = {E(g, CreateCompatibleDC), E(g, DeleteDC), E(g, DeleteObject), E(g, SelectObject), E(g, GetDeviceCaps)};
 W32_DLL(w32_dll_gdi32, "gdi32.dll", gdi, 0);
 
-// --- bink2w32: no video opens yet (the game goes on without its movies) --------------------------
+// --- bink2w32 stubs, for a build without the translated DLL: no video opens ----------------------
 static void b_BinkOpen(rc_ctx *c) {
   fprintf(stderr, "w32: BinkOpen(\"%s\", 0x%x): no video player\n", w32_cstr(w32_arg(c, 0)) ? w32_cstr(w32_arg(c, 0)) : "", w32_arg(c, 1));
   w32_ret(c, 0, 2);

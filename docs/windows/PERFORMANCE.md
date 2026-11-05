@@ -1,22 +1,19 @@
 # Performance of the Windows port (Learn & Play)
 
-Measured on 2026-11-01/02 on the build as merged (the installer's build path, default settings),
-then with the three changes this measurement led to. Machine: Apple M2 (4 performance + 4
-efficiency cores), 16 GB, built-in display at 1470x956 points and 60 Hz, macOS 27, Apple clang 21.
+Machine: Apple M2 (4 performance + 4 efficiency cores), 16 GB, macOS 27, Apple clang 21. The current figures are in
+[Final pass](#final-pass-for-140), [Shader preparation](#shader-preparation), [Hook points](#hook-points) and
+[The build](#the-build-memory-and-time). The sections from [Baseline](#baseline-as-merged) to [Under load](#under-load) are
+from 2026-11-01/02, on the built-in display at 1470x956 points and 60 Hz, and tell how the seam's two big costs were found: there "final"
+is the build of 2026-11-02, before the memory order and the intro skip, so compare within those sections only.
 
 ## Summary
 
-On a quiet machine the song plays at a locked 60 fps (the display's rate) with no
-frame over 33 ms. As merged it used 69% of one core in a song; most of the difference to the Mac
-build was not translated code but two costs in the Win32 / D3D9 seam: every SetEvent woke every
-waiting guest thread (a fifth of a core of system time), and the game's whole-buffer vertex
-buffer locks were each uploaded whole (2.7 GB/s of copying). With both fixed it uses 48% of a
-core, against the Mac build's 42% on the same machine. Load times are short and paced by the
-game itself (logos, fades), not by the translation.
-
-Those numbers are from before the translated code kept x86's memory order. That cost about 10 to 15 points of a
-core in a song at 120 fps and changed no frame times ([Memory order](#memory-order)). On the final code, the same song on both
-editions at 75 fps: 63% of a core against the Mac build's 44%, no frame over 33 ms ([Final pass](#final-pass-for-140)).
+A song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 33 ms, at 63% of a core against the Mac build's 44% on the same
+song and screen, and 1.3 GB against 0.8 GB ([Final pass](#final-pass-for-140)). Most of the first gap to the Mac build was not translated
+code but two costs in the Win32 / D3D9 seam: every SetEvent woke every waiting guest thread (a fifth of a core of system time), and the game's
+whole-buffer vertex buffer locks were each uploaded whole (2.7 GB/s of copying). Fixing both took a song from 69% to 48% of a core at 60 fps.
+Keeping x86's memory order then cost about 10 to 15 points of a core at 120 fps and changed no frame times ([Memory order](#memory-order)).
+Load times are short and paced by the game itself, not by the translation.
 
 ## Method
 
@@ -32,7 +29,7 @@ editions at 75 fps: 63% of a core against the Mac build's 44%, no frame over 33 
 - **Frame times**: `RS_GL_FRAMETIMES` (one event per Present; the Mac build's format, so the Mac
   port's tools read both), intervals between consecutive Presents.
 - **CPU**: the process' cumulated CPU time (`ps`, every 2 s) over the window, in % of one core;
-  per thread `LP_THREAD_CPU=10` (new: each thread's CPU with its name, the guest's threads named
+  per thread `LP_THREAD_CPU=10` (each thread's CPU with its name, the guest's threads named
   by their start address); memory `footprint` (phys_footprint) every 10 s; GPU the
   IOAccelerator "Device Utilization %" (`ioreg`, no root needed) every 2 s.
 - **Hot spots**: `sample` 10 s at a time during the song, aggregated by self samples per
@@ -183,8 +180,7 @@ thread), `rc32_icall` (3%) and the x87 matrix code `F_ff80f0` / `F_ff81e0` (3% a
 | `LP_QOS=0` | 47.0 | 65% | same | a quiet machine does not need it |
 
 Compiler options (the game's generated C recompiled with ninja, 8 jobs, everything else the same;
-the CPU column is two or three runs, game thread in brackets). The whole installer build took 22
-minutes: the five DLLs about 5, the game's translation about 11, its compile about 5:
+the CPU column is two or three runs, game thread in brackets):
 
 | `RC_OPT` | CPU | compile of the game (8 jobs) | binary |
 |---|---|---|---|
@@ -218,7 +214,7 @@ efficiency cores, which needs more CPU time for the same work (72% against 45%).
 
 The install compiles the game's Metal shaders, as the Mac's does ([DESIGN.md](DESIGN.md#shader-corpus) has how): the build makes a
 corpus of 281 programs from the user's game files, and the app's `--warm-shaders` compiles it into the system's Metal cache, in 16.5 s on
-the M2 with that cache cold and in a second when it is warm. The Mac's corpus of 3880 takes 270-375 s: every pair its shaders could form
+the M2 with that cache cold and in a second when it is warm. The Mac's corpus of 3880 takes 270-390 s: every pair its shaders could form
 is in it, where Learn & Play's has the pairs the game was seen using. There is no safe load: it is for a fast-load `cache.psarc`
 and a busy CPU, and the measurements below show no need for one.
 
@@ -272,12 +268,13 @@ generated C compiled both ways, the same song (Cherub Rock, Lead, no guitar), 13
 | fenced (snapshots every 2 s) | 89.5 | | | | p99 10.1 ms, none > 33 ms |
 
 All of these ran at 120 fps, twice the rate of the runs above, on a machine with two displays in use, so the
-absolute numbers and the noise are higher than in the rest of this page: compare within this table only. The
-reason for 120 fps was not looked into; a run earlier the same day, the same way, showed 60 fps at 60% of a core.
+absolute numbers and the noise are higher than in the rest of this page: compare within this table only. A run earlier
+the same day, the same way, showed 60 fps at 60% of a core. These runs were not looked into again; 1.5.1 found that a hidden full-screen window ran at
+about 120 fps ([plan](PLAN.md#fixed-in-151)), which may be why.
 
 So the fences cost 10 to 15 points of a core, about 17%, spread over all threads; frames do not change. Their cost at
 the display's rate was not measured: a build without them for the same song at 75 fps was started on 2026-11-04 and
-stopped before it was done, so the only figure for the final build is with them ([Final pass](#final-pass-for-140)), and what
+stopped before it was done, so the only figure for the current build is with them ([Final pass](#final-pass-for-140)), and what
 of the 19 points over the Mac build is fences is not known. The
 binary grows from 97 to 106 MB. Of the guest loads the translator emits, 834,000 are fenced, 563,000 are on the
 stack and 23,000 read constants (`RC_LDC`).
@@ -342,8 +339,7 @@ in the song. The second play is clean on both. A player's first run may differ: 
 prepares its shaders now, and [Shader preparation](#shader-preparation) has its first play with that.
 
 Against the numbers above: 48% of a core at 60 fps (8.0 ms a frame, another song, no memory order) is now 63% at 75 fps (8.4 ms
-a frame). The "13% more than the Mac build" of [Against the Mac build](#against-the-mac-build) is out of date: on the same song
-it is 43%. Footprint is 1.28-1.36 GB against 1.05 GB before, at a larger picture and with the memory order. Not done: the
+a frame). Footprint is 1.28-1.36 GB against 1.05 GB before, at a larger picture and with the memory order. Not done: the
 memory order's cost at this frame rate ([Memory order](#memory-order)).
 
 ## Hook points
@@ -400,25 +396,10 @@ worked out from the numbers above, not run on an 8 GB Mac.
 
 ## Against the Mac build
 
-The Mac build's test install on the same machine, the same day: Peace of Mind (Boston), Lead, in
-its 1280x720 window, the virtual Real Tone cable playing a WAV of plucks (so note detection had
-input, which the Learn & Play runs had not), snapshots every 3 s for the input script:
-
-| Song, 110 s on the highway | Mac build | Learn & Play final, 1280x720 window | Learn & Play as merged, full screen |
-|---|---|---|---|
-| CPU (% of one core) | 42.2 | 47.7 | 69.4 |
-| GPU | 41% | 38% | 65% |
-| footprint | 0.81 GB | 1.05 GB | 1.05 GB |
-| frames | 60 fps, p99 19.5 ms, none > 33 ms | 60 fps, p99 17.5 ms, none > 33 ms | 60 fps, p99 17.5 ms |
-| title takes keys | 15-18 s (3 s snapshots) | 27.4 s | 27.4 s |
-
-The songs differ, so the comparison is of magnitude, and it is from before the memory order ([Final pass](#final-pass-for-140)
-has the same song on both): the Windows build then cost about 13% more
-CPU than the Mac build, and 0.25 GB more memory (likely the DLLs' images in the guest window and
-the D3D9 layer's guest copies of resources next to the Metal ones). Its frames are as
-smooth. The Windows build reaches the title about 10 s later: it shows the studio logo video,
-the ESRB notice and the licence logos (snapshots at 2-26 s), while the Mac run's snapshots show a
-black window until about 10 s and then the title fading in.
+The figures to use are in [Final pass](#final-pass-for-140): the same song on both, 43% more CPU and 0.5 GB more memory. An earlier
+comparison on 2026-11-02, with other songs, in the 1280x720 window and before the memory order: the Mac build at 42.2% of a core and 0.81 GB,
+Learn & Play at 47.7% and 1.05 GB, both at 60 fps with no frame over 33 ms. The extra memory is likely the DLLs' images in the guest window and
+the D3D9 layer's guest copies of resources next to the Metal ones.
 
 ## Opportunities, by expected payoff
 
@@ -444,14 +425,10 @@ black window until about 10 s and then the title fading in.
 5. **`-mno-outline` for the generated C**: 4% of the game thread for 15% more binary size, the
    same compile time. Cheap (`--opt` in `TRANSLATE_OPTS`, which rebuilds every cache);
    worth taking with the next translator change that invalidates the caches anyway.
-6. **Memory**: 0.25 GB over the Mac build. Every D3D9 buffer keeps its guest copy for its whole
+6. **Memory**: 0.5 GB over the Mac build. Every D3D9 buffer keeps its guest copy for its whole
    life (`w32_galloc`); dropping it for write-only static buffers after the upload (and
    re-reading from Metal on the rare readback) would return some of that. Medium; measure the
    split first (`footprint -v`, the guest window against the Metal heaps).
-7. **Boot**: done with the intro skip: the title is up about 9 s after the start and took Return by 12 s
-   (one run, 2026-11-04, warm shader cache). As measured before it: 27 s to the title against the Mac build's
-   15-18 s, all of it the logo video and notice screens at 30 fps with the CPU mostly idle.
-
 Not worth pursuing now: the indirect-call lookup (5% of the samples with its cache, little left
 to take), the import thunks (8% inclusive, mostly the D3D9 work behind them), `-O3`, a native
 `memcpy` override, QoS changes.

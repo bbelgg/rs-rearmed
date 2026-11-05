@@ -46,19 +46,13 @@ Done — you have a working arm64 Learn & Play build.
 
 Once per Steam build, by a maintainer. The seed lets `lp_unpack.py` decompress the exe on any Mac without Windows. It ships in the
 released installer app (about 190 KB, no game code), never in git, and with it the installer and
-`learn-play.sh` make the game image by themselves. It is made once per Steam build of the game, by a
-maintainer. A player with the released installer needs neither path.
+`learn-play.sh` make the game image by themselves.
 
 The seed captures VMProtect's VM state mid-decompression — before the anti-debug verdict,
-at the point where it starts writing to `.text`. This requires either:
-
-- A **QEMU VM** running Windows with a GDB stub (the tooling is ready in `win-x86/unpack/`:
-  `qemu_vm.sh` + `qemu_capture.py` + `make_seed.py --from-gdb`), or
-- A **real Windows PC** with a debugger that can hide from VMProtect (x32dbg + ScyllaHide,
-  hardware write breakpoint on `.text`).
-
-The QEMU route is documented in [win-x86/unpack/README.md](../../win-x86/unpack/README.md), and
-is how the seed for the current build was made. It needs a 32-bit Windows ISO for the VM.
+at the point where it starts writing to `.text`. It is made in a **QEMU VM** running Windows with a GDB stub
+(`qemu_vm.sh`, `qemu_capture.py` and `make_seed.py --from-gdb` in `win-x86/unpack/`), which needs a 32-bit Windows ISO.
+The steps are in [win-x86/unpack/README.md](../../win-x86/unpack/README.md); the seed for the current build was made
+that way.
 
 To put a seed into a release, see [Shipping the seed](../../win-x86/unpack/README.md#shipping-the-seed).
 To try one from a clone:

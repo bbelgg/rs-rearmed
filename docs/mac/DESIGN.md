@@ -29,9 +29,7 @@ bound to the bundled replacements.
 The Steam copy is encrypted by Valve's SteamStub DRM, which decrypts `__text` in memory at start: a repeating
 8-byte XOR. `tools/steamless/decrypt.py` undoes it on the file, with the key it finds in your own binary (nothing
 ships, and it prints nothing of it), and checks the result against the pin. The result is the input of every build.
-The game is not started, the Steam copy isn't changed, and no Rosetta or Steam account is involved. Earlier
-versions dumped `__text` from a game started through Steam; the maintainer chose this route for 1.4.0, as Rosetta is
-going away and a first-time user shouldn't have to launch anything. See
+The game is not started, the Steam copy isn't changed, and no Rosetta or Steam account is involved. See
 [tools/steamless/README.md](../../tools/steamless/README.md).
 
 ## Translation

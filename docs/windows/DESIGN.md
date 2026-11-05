@@ -77,7 +77,7 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,150 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,152 symbols read, an
 `unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
@@ -146,6 +146,10 @@ plain C in `win-x86/app/lp_screen.c`.
 The screen saver and display sleep stay off while the game is open, in a window or full screen: `lp_window.m`
 takes a display-sleep assertion when it makes the window and holds it until the process ends, as the Mac game's
 view does. An offscreen run (`LP_OFFSCREEN=1`) makes no window and takes none.
+
+A hidden window (another app in front of the full-screen one, minimised, covered) has no layer pacing its presents, so
+`windowDidChangeOcclusionState` in `lp_window.m` gives the D3D9 layer the display's period, and Present keeps to it
+(`d3d9_hidden_wait`).
 
 ## Renderer
 
@@ -276,7 +280,8 @@ Microphone mode, any other input in Microphone or Other Cable mode.
 
 The system's default output changing reaches the game's `IMMNotificationClient`s (`wa_com.c`): Wwise's acts only on
 `OnDefaultDeviceChanged(eRender, eMultimedia)`, and then makes a new sink on the new default, which is what the Mac
-edition's override does by hand. Other device changes are seen at the game's next scan. Not done: exclusive mode accepts any format and converts it.
+edition's override does by hand. Other device changes are seen at the game's next scan. Exclusive mode takes any format
+the HAL unit can convert, not only the device's own.
 
 ## Video (Bink)
 
@@ -329,7 +334,7 @@ calling thread, as on the Mac: the manager's queue functions `0x144bc80` and `0x
 are native (`win32_overrides.c`).
 
 The Win32 seam is offline too: ws2_32, iphlpapi and wininet refuse every connection (`win32_net.c`), and
-`ShellExecuteA` opens nothing. The Mac port's network guard is not loaded, and has nothing to guard: no
+`ShellExecuteA` opens nothing. Without mods the Mac port's network guard is not loaded, and has nothing to guard: no
 host socket call is linked into the binary (`nm -u` shows no `socket`, `connect` or `getaddrinfo`).
 
 ## Input
@@ -390,7 +395,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   three functions it is inlined into. As on the Mac the hash is the value's bits with -0 made +0; the table masks
   it rather than taking a prime modulus, so the bits are mixed down first.
 
-`RS_MODS_LOG=1` logs them. The loading-screen fix isn't here (Metal's safe load lives in the Mac shell).
+`RS_MODS_LOG=1` logs them. The Mac's loading-screen fix isn't needed here ([Shader corpus](#shader-corpus)).
 
 - **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared, called from `win-x86/app/lp_main.c`): every `.dylib` in
   `<home>/mods/` is loaded at startup, before the game runs, with the Mac's switches and log lines. A mod is a
@@ -402,7 +407,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
   log line: built for the Mac alone, it would misread this game's memory.
 
-  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Twelve of the 14
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Twelve of the 15
   are functions of this game. Six of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
   its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
   Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /
@@ -410,7 +415,8 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   their registers; `si_open` is `InputOn`, the slot the first of its four stack arguments and its `PaError` the Mac's
   bool (`bool<zero>`).
 
-  `input_sink` and `set_app_focus` have no such function here (`unsupported` in the tables): the game has window messages
+  `si_io` is the Mac game's CoreAudio input and has no counterpart ([Audio](#audio)). `input_sink` and `set_app_focus` have
+  no such function here either (`unsupported` in the tables): the game has window messages
   and an inlined tick. `win32_input.c` runs them instead (`rc_hook_add_seam`), with the Mac's values: macOS key codes, the
   character, the pointer from the bottom left. While a mod hooks either, events wait for the game thread, as the Mac's
   queue waits for its flush (`w32_input_frame`, at the start of each Present), so they reach the game a frame later; a pre
@@ -439,8 +445,8 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   how the Mac edition always runs. Without the guard no mods load. Without mods there is no guard, and nothing
   to guard.
 
-What the Windows build has instead are native replacements of single game functions by address
-(`win-x86/build/skip.txt`, `win-x86/shims/win32_overrides.c`). Among them:
+More native replacements of single game functions by address (`win-x86/build/skip.txt`,
+`win-x86/shims/win32_overrides.c`):
 
 - **Direct Connect choice.** The same overlay as the Mac's ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)):
   `tools/play-native/cache_overlay.py` makes `game/Update/patcharchives.psarc` from the copy's own
@@ -546,8 +552,10 @@ choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, a
 6. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link. It refuses anything that does not look like a build
    folder.
+7. **The shaders** (`tools/play-native/warm-shaders.sh`, the Mac's): the installed app's `--warm-shaders`
+   ([Shader corpus](#shader-corpus)).
 
 `tools/play-native/learn-play.sh` runs all of it in a terminal; `RS Re-ARMed Installer.app` runs the same
 commands with its own steps ("Downloading the Windows game", "Downloading your DLC", "Copying the game files", "Getting Microsoft
-libraries", "Code image", "Building the game", "Installing") and its Refresh Game Files button runs the
+libraries", "Code image", "Building the game", "Installing", "Preparing shaders") and its Refresh Game Files button runs the
 installed `gamefiles.py refresh`. Neither touches the Mac game install or its saves.

@@ -117,10 +117,10 @@ points.
 **Learn & Play.** arm64 macOS leaves the low 4 GB unmapped, so reserve one 4 GB window and address all guest
 memory as `base + (uint32_t)addr`; everything the guest points at lives inside it. Then:
 
-- Translate the Microsoft DLLs the game loads (msvcr100, msvcp100, d3dx9_42, D3DCompiler_42, bink2w32) rather
-  than reimplementing them — the game relies on their exact data layouts. Take them from the user's own Steam
-  redistributables or Microsoft's installers. Load each at a fixed base, rebasing any that collide, and run
-  `DllMain` in dependency order.
+- Translate the DLLs the game loads (msvcr100, msvcp100, d3dx9_42, D3DCompiler_42, bink2w32) rather than
+  reimplementing them — the game relies on their exact data layouts. Take Microsoft's from the user's own Steam
+  redistributables or Microsoft's installers, and `bink2w32.dll` from the game folder. Load each at a fixed
+  base, rebasing any that collide, and run `DllMain` in dependency order.
 - Implement the slice of Win32 the game and those DLLs actually call (kernel32, user32, gdi32, ole32,
   dinput8, avrt and a handful more) on POSIX and Cocoa, with unknown imports routed to a by-name dispatcher
   that logs and fails. Report Windows 6.x. COM objects are guest vtables of host function cells. The game

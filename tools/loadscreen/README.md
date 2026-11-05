@@ -6,15 +6,11 @@ Optional: at each start the Mac launcher (`tools/play-native/launch.sh`) and the
 there (`RS_REARMED=0` for the original logo). The install's own `static.psarc` is never changed. The two
 editions have the same logo textures.
 
-```bash
-tools/loadscreen/build.sh "$GAME_DIR/static.psarc.rearmed"   # GAME_DIR: the Rocksmith2014 folder
-```
-
-Both write it straight to the copy, never to Steam's folder: on the Mac `install.sh`, for Learn & Play
-`lp_install.py build`:
+Both installs write it straight to the copy, never to Steam's folder: on the Mac `install.sh`, for Learn & Play
+`lp_install.py build`. By hand:
 
 ```bash
-RS_GAME_DIR="$COPY" tools/loadscreen/build.sh "$COPY/static.psarc.rearmed"   # COPY: .../learn-play/game
+RS_GAME_DIR="$COPY" tools/loadscreen/build.sh "$COPY/static.psarc.rearmed"   # COPY: .../RS Re-ARMed/game or .../learn-play/game
 ```
 
 | File | What it does |

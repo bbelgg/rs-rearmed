@@ -6,7 +6,9 @@ and [docs/windows/INSTALL.md](../../docs/windows/INSTALL.md) for Learn & Play.
 ```bash
 tools/play-native/install.sh [APP]       # after a build (tools/ws7/recomp/app/build-m4.sh); re-run to update
 tools/play-native/install.sh --refresh-game   # sync the install's copy of the game files (new DLC, CDLC)
+tools/play-native/warm-shaders.sh [APP]       # compile the Metal shaders again (after a macOS update)
 python3 tools/play-native/test_gamefiles.py   # the copy's tests
+python3 tools/play-native/test_cache_overlay.py   # the Direct Connect overlay's tests
 ```
 
 `APP` defaults to the build-m4.sh output under `$RS_BUILD_DIR` (default `build/` in the repo). Then start
@@ -20,22 +22,21 @@ copied from the user's install at install time (`RS2014.icns`); so does the runn
 | `…/game-source`, `…/gamefiles.py` | where the copy comes from, and the tool for `install.sh --refresh-game` |
 | `…/steam/<account>/221680/remote/` | **your profiles and progress for the native build**: on the first launch a copy of the real `Steam/userdata/<account>/221680/remote` (`*_PRFLDB`, `LocalProfiles.json`), without `crd` |
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
+| `…/mods/` | mods loaded at startup |
 
 How it runs, every launch:
 - **Offline.** Steam shim in stub mode (no Steam client, no Steam Cloud), `[Net] AutoLogin=0`,
   `[Renderer.MacOS] DisableBrowser=1`, and libnetguard refusing every non-local connection. Enter on
-  the title goes straight to the profile list: no Uplay login is shown (override of `0x100a13950`).
+  the title goes straight to the profile list: no Uplay login is shown (`signin_start_no_uplay`).
 - **Your saves, copied once.** The real Steam folder is only read, on the first launch, and never
   written; native progress stays in `…/steam`. `crd` (stored Ubisoft credentials) is not copied, and
   any `crd` in the copy is deleted before each launch. Copying native progress back to the real saves
   is not planned (do it by hand, with a backup, only if you go back to playing under Rosetta).
-- If a boot sticks on the white loading screen (with a fast-load `cache.psarc` mod, now and then when the
-  Mac is busy), quit and start again.
 - **Your audio settings.** The `Rocksmith.ini` copy is made from the install's on every launch, but
   `[Audio] LatencyBuffer` (the audio engine setting in the game's Audio settings, which the game saves
   to the copy) is kept; `RS_LATENCY_BUFFER=N` (1-16, `launchctl setenv`) overrides it. See the latency
   FAQ in the main README.
-- **Your mods and assets.** The install's `cache.psarc` (e.g. a fast-load mod: title in ~11 s) and the
+- **Your mods and assets.** The install's `cache.psarc` and the
   RS Re-ARMed title logo (`static.psarc.rearmed`, `tools/loadscreen`; `RS_REARMED=0` for the
   original) are used; the real Real Tone cable as usual.
 - **The game's own files.** The game reads only the copy in `game/`, so a Steam update, uninstall or
@@ -53,9 +54,9 @@ tools/play-native/learn-play.sh [HARVEST]   # or install.sh --learn-play; re-run
 tools/play-native/learn-play.sh --refresh   # sync the app's copy of the game files (new DLC)
 ```
 
-One run: the game (Steam downloads it, nothing to paste), the Microsoft DLLs, the code image, the build (about 26 minutes
-the first time on an M2, about 2 GB free; resumable) and the install. Then start **RS Re-ARMed Learn &
-Play** from `~/Applications`.
+One run: the game and your DLC (Steam downloads them, nothing to paste), the Microsoft DLLs, the code image, the build
+(about 25 minutes the first time on an M2, about 2 GB free; resumable), the install and the Metal shaders. Then start
+**RS Re-ARMed Learn & Play** from `~/Applications`.
 
 | Where | What |
 |---|---|
@@ -64,8 +65,10 @@ Play** from `~/Applications`.
 | `…/learn-play/game-dir` | the game folder the app reads (one line): `game/` |
 | `…/learn-play/userdata/` | the game's writes: `game/Rocksmith.ini` (your audio and display settings) |
 | `…/learn-play/steam/` | **your profiles and progress** (the offline Steam layer's saves) |
-| `…/learn-play/logs/` | `last-run.log`, `previous-run.log` |
+| `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
+| `…/learn-play/mods/` | mods loaded at startup |
 | `$RS_BUILD_DIR/win-x86/lp/` | the build; afterwards only the translated libraries, a cache for the next run (`LP_KEEP_BUILD=1` keeps everything, `0` nothing) |
 
 Uninstall: delete the app and `~/Library/Application Support/RS Re-ARMed/learn-play` (back up `steam/`
-first to keep your progress); that removes the copy of the game files too.
+first to keep your progress); that removes the copy of the game files too, unless the game is on another drive
+([INSTALL.md](../../docs/windows/INSTALL.md#update-and-uninstall)).

@@ -2,7 +2,7 @@
 
 Translates the 32-bit Windows "Learn & Play" build of Rocksmith 2014 to an arm64 macOS binary with
 the ws7 recompiler's 32-bit front end (`tools/ws7/recomp`, PE mode). Experimental: playable (Learn a Song,
-Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons, window or full screen, the Real Tone cable). The docs are in
+Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons, window or full screen, the Real Tone cable, Direct Connect). The docs are in
 [docs/windows](../docs/windows/README.md): install and play ([INSTALL.md](../docs/windows/INSTALL.md)), how it
 works ([DESIGN.md](../docs/windows/DESIGN.md)), status and open work ([PLAN.md](../docs/windows/PLAN.md)),
 tests and diagnostics ([TESTING.md](../docs/windows/TESTING.md)).
@@ -61,13 +61,14 @@ binaries is committed.
 
 ```sh
 export LP_BUILD=<build root> LP_PY=<python with capstone>
+export LP_GAME_DIR=<the Windows game folder>       # the build reads bink2w32.dll from it (or LP_BINK2W32)
 export LP_IMAGE=<lp_game.exe from image/lp_image.py>
 export LP_MSVCR100=<msvcr100.dll> LP_MSVCP100=<msvcp100.dll> LP_D3DX9=<d3dx9_42.dll> LP_D3DCOMPILER=<D3DCompiler_42.dll>
 export LP_CMAKE_DIR=<cmake build dir with libRSOpenGL (cmake --build DIR --target opengl)>
 #   or, without CMake: OUT_DIR=<dir> win-x86/build/build_gl.sh; export LP_GL_DIR=<dir>
 LP_TRANSLATE=1 LP_MODULES_BUILD=1 win-x86/build/build.sh
 
-LP_GAME_DIR=<the Windows game folder> $LP_BUILD/out/rs2014_lp
+$LP_BUILD/out/rs2014_lp
 ```
 
 Run-time and diagnostics variables (all read with `getenv` in `app/`, `shims/` and the runtime) are

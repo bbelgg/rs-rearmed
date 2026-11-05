@@ -8,7 +8,7 @@ Mac port ([PLAN.md](PLAN.md#status)).
 | Document | For | What |
 |---|---|---|
 | [INSTALL.md](INSTALL.md) | players | requirements, the installer, the capture for a build without the seed, `learn-play.sh`, keys, window modes, switches, known issues, troubleshooting |
-| [CAPTURE.md](CAPTURE.md) | players | getting the game image: the harvest on a Windows PC, and the seed capture for Mac-only users |
+| [CAPTURE.md](CAPTURE.md) | builders | getting the game image without the released installer: the harvest on a Windows PC, and the seed capture for a release |
 | [DESIGN.md](DESIGN.md) | developers | how the port works: the game image, the multi-image runtime and 4 GB window, the Win32 seam, D3D9 and D3DX, the CRT, audio, Bink, Steam, online, input, the installer |
 | [PERFORMANCE.md](PERFORMANCE.md) | both | frame times, CPU per thread, hot spots, what was changed, options, the Mac port on the same Mac |
 | [PLAN.md](PLAN.md) | developers | status, open issues, next work, risks, decisions |

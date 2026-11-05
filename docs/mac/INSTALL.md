@@ -84,8 +84,8 @@ folder. (Learn & Play has a step for it, as its download comes without Steam's i
   [Renderer](#renderer)). It starts on the renderer your install uses (OpenGL after a fallback), else on
   the one chosen last time.
 - With Metal the last step, **Preparing shaders**, compiles the game's Metal shaders once: a few minutes on
-  a first install, seconds after an update. **Skip** ends it early; the game then prepares the rest on its
-  first start.
+  a first install, seconds after an update. **Skip** ends it early; the game then compiles the rest as it
+  first uses them.
 - **Build folder**: `~/Library/Caches/rs-rearmed-build` unless you choose another (the installer makes a
   `rs-rearmed-build` folder inside the one you pick and remembers it). Its path must not contain spaces.
   **Delete build files after install** removes them when it is done. For a folder on an external drive,
@@ -127,8 +127,8 @@ export PATH="$PWD/build/venv/bin:$PATH"     # the venv's cmake and ninja for ste
 
 The app build (step 5) runs the `ninja` next to `RC_PY` (`RS_NINJA` names another one).
 
-The title logo (`tools/loadscreen`) reads `RS_PY` instead; set it to the same Python, or leave it unset and
-the logo script makes its own environment.
+The title logo (`tools/loadscreen`) reads `RS_PY` instead. Without it `install.sh` uses this environment, and
+if there is none the logo script makes its own.
 
 ### 3. The game image
 
@@ -177,9 +177,9 @@ Variables the build reads:
 | Variable | Default | Meaning |
 |---|---|---|
 | `RS_BUILD_DIR` | `build` in the repository | where the app build goes when no output directory is given |
-| `RC_IMAGE` | `analysis/cg/Rocksmith2014_x64_plain` | the game image (step 3) |
+| `RC_IMAGE` | `build/steamless/Rocksmith2014_x64_decrypted` | the game image (step 3) |
 | `RC_TARGET` | `mac-x64` | the per-game tables in `tools/targets/<target>` |
-| `RC_PY` | `analysis/venv/bin/python` | Python with Capstone (step 2) |
+| `RC_PY` | `venv/bin/python` in `RS_BUILD_DIR` | Python with Capstone (step 2) |
 | `RS_GAME_DIR` | the default Steam library | the game folder; the app's icon is copied from it |
 | `SHIM_STEAM`, `SHIM_BINK`, `SHIM_CG` | the builds from step 4 | other arm64 builds of those shims |
 | `SHIMS_BUILD` | `build/shims/game` | where the game libraries from step 4 are |
@@ -303,7 +303,8 @@ same in its own copy ([Windows INSTALL](../windows/INSTALL.md#the-title-logo)).
 | `…/steam/<account>/221680/remote/` | your profiles and progress for the native build |
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
 | `…/mods/` | mods loaded at startup |
-| `…/renderer` | `metal` or `opengl` |
+| `…/renderer`, `…/renderer-fallback.txt` | `metal` or `opengl`, and why a fallback changed it ([Renderer](#renderer)) |
+| `…/guitar-input.ini` | if you made one: the guitar input's channel and gain ([Guitar input](#guitar-input)) |
 
 On the first launch your Steam saves are copied once into `steam/`, without `crd` (stored Ubisoft
 credentials). The native build never writes your Steam saves.
@@ -413,24 +414,19 @@ Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loa
   have it). That removes the copy of the game files too, unless the game is on another drive: then
   `…/RS Re-ARMed/game` is only a link, and the copy is on that drive, in `RS Re-ARMed/game` at its top (or
   in the folder `ls -l ~/Library/Application\ Support/RS\ Re-ARMed/game` shows): delete that `RS Re-ARMed`
-  folder too (it also holds Learn & Play's `learn-play/game`, if you have it there). If you built the title
-  logo, also delete `static.psarc.rearmed` from your game folder, if an earlier version put it there.
+  folder too (it also holds Learn & Play's `learn-play/game`, if you have it there). An earlier version may have
+  left `static.psarc.rearmed` in your Steam game folder; you can delete it.
 
 ## Known issues
 
 - No online features: Ubisoft services are not available.
 - Progress made in the native build is not copied back to your Steam saves.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.
-- With the legacy fast-load mod (a modified `cache.psarc`), a start can now and then stay on the white
-  loading screen, more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares
-  its shaders before the game loads when it sees such a mod, which avoids the stall it would otherwise
-  cause.
 - With Metal, the first time a song, venue or mode is played, a few short stutters (up to about half a
   second) can show in its first half-minute while Metal compiles what it draws for the first time. Later
   plays are smooth.
-- Mods for both editions: a mod built with `rc_mod.h` runs on Learn & Play too, within what that game has
-  ([Windows install](../windows/INSTALL.md#known-issues)). Here it can do all a mod could; a mod built without it is for
-  this edition alone.
+- After a macOS update every shader is compiled again as the game uses it; run `tools/play-native/warm-shaders.sh` or
+  click Build & Install again to have it done first.
 - Mods that draw with OpenGL themselves show nothing with Metal; the rest of the mod works. Use a version
   that draws through the overlay API (`shims/include/rs_overlay.h`), or the OpenGL renderer.
 
@@ -455,7 +451,7 @@ Logs: `~/Library/Application Support/RS Re-ARMed/logs/` (`last-run.log`, `previo
 | `not enough free space for the game files` | The game is on another volume that cannot clone (not APFS), so the copy is a real one: free the space it names on the disk of your home folder, then run it again (what is copied is kept), or set `RS_GAME_COPY_DIR` to a folder on a drive with room. |
 | `... is not the game's folder` | `RS_GAME_DIR` (or the installer's game folder) must be the folder with `static.psarc` and `songs.psarc`. A refresh says this when the game was uninstalled in Steam or its library is not mounted: the copy is left as it is and keeps working. |
 | `shader corpus: not made ...` | Check that step 4 built `build/shims/opengl/msl_verify` and `build/shims/cg/cg_corpus_load`, and that `RC_IMAGE` and `RS_GAME_DIR` are right; details in `<output>/shaders.log`. The app works without it. |
-| `warm-shaders: failed ...` or `timed out` | Not fatal: the game prepares its shaders on its first start with Metal. Run `tools/play-native/warm-shaders.sh` to try again. |
+| `warm-shaders: failed ...` or `timed out` | Not fatal: the game compiles its shaders as it first uses them. Run `tools/play-native/warm-shaders.sh` to try again. |
 | The game now starts with OpenGL, `renderer-fallback.txt` | Metal ended abnormally twice in a row (see [Renderer](#renderer)). Write `metal` into `renderer` to try again; if it keeps crashing, open an issue with `last-run.log` and `previous-run.log`. |
 | Launcher: "The native build is not installed" | Run step 6. |
 | Launcher: "libnetguard.dylib is missing" | Run the last command of step 4, then step 6. The game never starts without the network guard. |
@@ -466,3 +462,5 @@ Logs: `~/Library/Application Support/RS Re-ARMed/logs/` (`last-run.log`, `previo
 | Launcher: "Rocksmith 2014 is already running" | Quit the running game (native or Rosetta) first. |
 | Rocksmith 1 DLC songs you own are missing (e.g. The Final Countdown), or the refresh says "Rocksmith 1 DLC: not checked" | Only Steam knows which of them you own, and a refresh can ask it only while the account RS Re-ARMed plays as is logged in: log in to that account in Steam, then **Refresh Game Files** (or `install.sh --refresh-game`). The answer is kept, so Steam can be closed afterwards. The same songs in the Steam version need that account logged in too. |
 | Songs missing after switching Steam accounts (the base game's and the Rocksmith 1 import songs gone, your profiles not listed) | The game played as the account now logged in to Steam, with that account's profiles. **Refresh Game Files** (or `install.sh --refresh-game`) records the account whose license has the Mac game in `game/.rearmed/steam.env`; the launcher uses it from then on. Set `RS_STEAM_ID` to choose another (see [Game files](#game-files)). |
+| No guitar sound | Check the INPUT setting in the game (Real Tone cable, microphone, DIRECT CONNECT) and that macOS allowed microphone access. |
+| The game crashes | Open an issue with `last-run.log` and `previous-run.log`. |

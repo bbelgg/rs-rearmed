@@ -49,10 +49,10 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
     custom songs carry (the toolkit's default). The game hides every song
     whose archive's AppID is not owned: with only the base app owned, the
     native build listed far fewer songs than the Steam version. When the
-    game folder is a stage of symlinks (the native launcher's), the
-    appmanifest is found next to the real install through the stage's
-    `static.psarc` link, in whichever Steam library that is (e.g. one on an
-    external drive). `RS_STEAM_DLC` / `dlc`: `installed` (default), `all`
+    game folder is a folder of symlinks, the appmanifest is found next to
+    the real install through its `steam_appid.txt` or `static.psarc` link,
+    in whichever Steam library that is (e.g. one on an external drive).
+    `RS_STEAM_DLC` / `dlc`: `installed` (default), `all`
     (opt-in: every app id is owned, so every archive shows up whatever its
     AppID), `none`, or a comma-separated list of app ids (only those). The
     install passes such a list (`game/.rearmed/steam.env`, written by

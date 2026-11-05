@@ -22,6 +22,8 @@ If a change needs something from the game, read it from the user's install at bu
   Rosetta for the Mac port, on Windows for the Learn & Play port.
 - How each port works and how it is tested: [docs/mac](docs/mac/README.md), [docs/windows](docs/windows/README.md),
   [docs/recompiler](docs/recompiler/README.md).
+- A change to one port usually has a counterpart in the other: [AGENTS.md](AGENTS.md) says how to handle that, and
+  which tests to run.
 
 ## Licence
 

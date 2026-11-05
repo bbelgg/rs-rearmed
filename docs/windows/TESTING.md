@@ -160,7 +160,7 @@ below wait for the title on a log line, so they need no change.
 
 **Title logo** (`RS_REARMED`, as on the Mac): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026"
 tag across REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. No keys are needed: with
-`RS_GL_SNAPSHOT_SECS=3` the title is in the snapshots from about 30 s on, on a busy Mac too. `static.psarc` in
+`RS_GL_SNAPSHOT_SECS=3` the title is in the snapshots by about 30 s, on a busy Mac too. `static.psarc` in
 the copy shows which one the app linked (`ls -l`).
 
 ### Unattended runs
@@ -288,7 +288,7 @@ types `amor` (1 Match, The Bee), selects it and skips the tuner; `mods: CDLC: so
 skipped` is logged as the song loads. With `RS_MODS_BYPASS=0` the same search finds nothing. Checked on
 2026-11-03; the empty search then counts 201 songs with the 150-archive `dlc/` (three of them CDLC).
 
-The combined pre-release check (2026-11-03, all five overrides in one build): make the test copy with
+All the song overrides in one build (2026-11-03): make the test copy with
 the install code, `gamefiles.Copier("learn-play", SRC, DEST, dlc_from=[]).run()`, from a clone of the game
 folder without its `.rearmed/` (the depot's original `cache.psarc`, the `dlc/` with the CDLC), so
 `steam.env` and `Update/patcharchives.psarc` come from the real code path. Then one run per check, each
@@ -481,4 +481,7 @@ libRSOpenGL's `RS_GL_*`, `RS_MTL_*` and `RS_METAL_*` switches apply as on the Ma
   (`win-x86/shims/win32_net.c`, `win32_misc.c`); with `LP_LOG=1` the log shows each attempt.
 - The Steam face never loads Valve's library and refuses the Ubisoft and Valve DLLs by name.
 - The online layer never reads `crd`; with `LP_LOG_FILES=1`, no `open "crd"` should appear in a run.
-- The Mac port's network guard is not loaded into this build; these checks are the seam's own.
+- Without mods the Mac port's network guard is not loaded; these checks are the seam's own.
+- With a mod in `mods/` the app restarts with `libnetguard.dylib` inserted, and no mod runs without it
+  ([Mods](#unattended-runs)); `logs/netguard.log` then lists every refused attempt.
+  `tools/ws8/netguard/build.sh --test` tests the guard, as on the Mac.

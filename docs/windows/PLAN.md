@@ -5,9 +5,11 @@
 
 ## Status
 
-Guitar input channel and gain (2026-11-05, a build by hand, a test home): an HX Stomp's channel 5 at 0 dB through Direct
+Guitar input channel and gain (on `main` after 1.5.1, not in a release yet; 2026-11-05, a build by hand, a test home): an HX Stomp's channel 5 at 0 dB through Direct
 Connect, heard right by the maintainer in a short run; peaks up to -16.4 dBFS, nothing clipped. Not in this pass: a gain
 above 0 dB in a run, a whole song, an install by the installer.
+
+Other interfaces through Direct Connect (2026-11-05): work, by the maintainer's own check.
 
 Checked by hand on an Apple Silicon Mac (2026-11-01):
 
@@ -23,69 +25,48 @@ port's 44% on the same song and screen ([PERFORMANCE.md](PERFORMANCE.md#final-pa
 the first play after it has about 1.2 s more of frames over 33 ms up to the highway than the second, and none in the
 song ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
 
-Checked in the app installed by the installer, started with `open` (2026-11-04, a build of `main` with the memory
-ordering, a test home, by keys and snapshots, [TESTING.md](TESTING.md#unattended-runs)): songs to their end and back to back, a
-Session Mode session, Nonstop Play and its playlist, a video lesson, the Tone Designer's Edit Tone, the Learn a Song
-list, the Multiplayer menus, DIRECT CONNECT with an audio interface listed and chosen, Steam profiles copied in once
-(without `crd`), the Metal cache in its own folder, the game's own Exit and the app's Quit (gone in 0.3 s), 74.9 fps on
-a 75 Hz display. The Real Tone cable is seen; a guitar through it was not played in these runs. The default output
-changed during a song: the render stream reopens on the new device (`audio: the default output is now ...`) and the
-sound follows, there and back; the Mac edition does the same since 1.5.1 ([Mac testing](../mac/TESTING.md#game-runs)).
-`RS_METAL_RETINA=1` on the built-in screen: a 2940x1912 back buffer and frames of that size, the menu and a song on the
-highway at 60 fps, 54% of a core.
+Checked in the app installed by the installer, started with `open` (2026-11-04, a test home, by keys and snapshots,
+[TESTING.md](TESTING.md#unattended-runs)): songs to their end and back to back, a Session Mode session, Nonstop Play and its
+playlist, a video lesson, the Tone Designer's Edit Tone, the Learn a Song list, the Multiplayer menus, DIRECT CONNECT with an
+audio interface listed and chosen, Steam profiles copied in once (without `crd`), the Metal cache in its own folder, the game's
+own Exit and the app's Quit, 74.9 fps on a 75 Hz display. `RS_METAL_RETINA=1` on the built-in screen: a 2940x1912 back buffer, the
+menu and a song on the highway at 60 fps, 54% of a core.
 
-Final pass for 1.4.0 (2026-11-04, the app the installer built with the seed, nothing from a capture, started with `open` in
-a test home, by keys and snapshots, no guitar): an official song to the note highway; a custom song added during the run
-with Enumerate, found and played there, for the first time on an installed app; Refresh Game Files keeps it, and after a
-restart it plays from the copy; Quit from inside a song and the game's own Exit, gone in 0.3 s; no signal, no `pipeline:` or
-`shader writes to depth` line. All suites of [TESTING.md](TESTING.md) pass on that code.
+Final pass for 1.5.1 (2026-11-05, the final code, `learn-play.sh`, a test home): a song to the note highway and a quit with RSMods' library, the
+same route and results as before the last fixes; a start and a clean quit without mods; nothing refused by the network guard. The 32-bit
+difftest shows only its two known mismatches, and all suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the installer app,
+a real Steam download, a guitar.
 
-Enumerate, as on the Mac: SHOP is ENUMERATE, second in the main menu, and a song added during a run is in the list
-and plays without a restart ([TESTING.md](TESTING.md#unattended-runs)). The Shop itself never opens offline: the
-game checks the Steam overlay first and shows a notice.
+Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
+source given by `RS_SOURCE_URL` and a stand-in Steam, through Preparing shaders; the image's SHA-256 is the pin in `target.toml`. The warm-up
+and `open` share the system's cache ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)). Not in these runs: a real Steam download, a guitar.
 
-Present but not tested: a multiplayer song (the tuner asks for Player 2's cable, and this Mac has one), the Workshop's
-other screens, the DLC preview, a whole song through Direct Connect and other inputs, and the prebuilt harvester
-(`win-x86/harvest/rsharvest2.exe`: the capture used so far was made with an earlier build of the same tool).
+Enumerate, as on the Mac: SHOP is ENUMERATE, second in the main menu, and a song added during a run is in the list and plays without a
+restart; on the installed app (2026-11-04) Refresh Game Files keeps it, and after a restart it plays from the copy
+([TESTING.md](TESTING.md#unattended-runs)). The Shop itself never opens offline: the game checks the Steam overlay first and shows a notice.
 
-Built in, as on the Mac: DLC archives mounted in batches within a frame budget and the song-file signature skip
-(RSBypass's behaviour; an official song still plays to the highway with it), the song path cache and the
-number-table hash (both defects are in this build too; [DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). With all
-of them 147 archives mount in 5 frames, 0.27-0.29 s (two runs on 2026-11-04; 13-30 frames, 0.8-2.1 s with only
-the batches, in a build without the x86 memory ordering either); of about 56,100 paths, 13,200 came from the
-cache, and 34,300 numbers were hashed. The two were not timed apart: `RS_MODS_FIXES=0` stops the batches too.
+Present but not tested: a multiplayer song played by two (by keys it reaches a split-screen song, [TESTING.md](TESTING.md#shaders-of-a-run)), the
+Workshop's other screens, the DLC preview, and the prebuilt harvester (`win-x86/harvest/rsharvest2.exe`: the capture used so far was made with
+an earlier build of the same tool).
 
-With the intro skip the title is up about 9 s after the start and took Return by 12 s, in a run pressing Return
-every 1.5 s (2026-11-04, one run, warm shader cache, quiet Mac), so the slow title is gone. The 27 s of the first
-measurements was the logo video, and the 15-35 s since then was not seen again. The first run after an install has the title up at 7.8 s too, with the shaders prepared
-([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)); with them cold it was 16.5 s.
+Built in, as on the Mac: DLC archives mounted in batches within a frame budget and the song-file signature skip (RSBypass's behaviour), the song
+path cache and the number-table hash ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)); song archives listed whatever AppID they carry, custom
+songs, no intro screens and the "Re-ARMed" title logo ([Built in for 1.4.0](#built-in-for-140)). With all of them 147 archives mount in 5 frames,
+0.27-0.29 s (two runs on 2026-11-04). The open-file limit goes up at the start (`RS_MODS_FIXES=0` leaves it): 441 archives peak at 461 descriptors,
+over the 256 of an app started from Finder.
 
-The system's default output changing reaches the game: Wwise then makes a new sink, and the sound follows, there and
-back. Checked through the window script's `audio` step and by switching a real device during a song (2026-11-04). The
-Mac edition follows too since 1.5.1 ([Mac testing](../mac/TESTING.md#game-runs)).
+With the intro skip the title is up in 7-9 s and takes Return by 12 s, on a first run too with the shaders prepared
+([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
 
-Command-Q and the close button quit through the game's own shutdown (`WM_CLOSE`), and losing the keyboard lets go
-of held keys and tells the game; checked on 2026-11-04 (the quit ended in `ExitProcess(0)` 0.4-0.5 s after
-the key, from the New profile, path and Calibration screens, and in 0.3-0.5 s from inside a song).
+The system's default output changing reaches the game: the render stream reopens on the new device (`audio: the default output is now ...`) and
+the sound follows, there and back. Checked through the window script's `audio` step and by switching a real device during a song (2026-11-04).
+The Mac edition follows too since 1.5.1 ([Mac testing](../mac/TESTING.md#game-runs)).
 
-Built in with the Mac edition: song archives listed whatever AppID they carry (the install reports every
-`dlc/` archive's AppID owned; [Built in for 1.4.0](#built-in-for-140)), and no intro screens.
-
-The "Re-ARMed" title logo, as on the Mac ([INSTALL.md](INSTALL.md#the-title-logo)). Checked on 2026-11-04 in the
-installed app: the install code makes `static.psarc.rearmed` (only the two logo textures differ), `title_logo()` links
-it, the title shows the tag, and with `RS_REARMED=0` the link goes back and the title shows the game's own logo.
-
-Custom songs: listed and played (the signature skip, the AppID ownership and the song-key table skip;
-[Built in for 1.4.0](#built-in-for-140)).
+Command-Q and the close button quit through the game's own shutdown (`WM_CLOSE`), in 0.3-0.5 s, and losing the keyboard lets go of held keys and
+tells the game (2026-11-04).
 
 Rocksmith 1 DLC songs: `RS_STEAM_OWNED` reaches the face as on the Mac and `test_steam32` covers it, but no game run
 yet: the test account owns none of those DLC. Open: one run with an account that does, or with the variable set.
-
-All of these together, in one build with an install copy made by `gamefiles.py`, were checked in the game on
-2026-11-03 ([Built in for 1.4.0](#built-in-for-140)): every pre-release item is done.
-
-The open-file limit goes up at the start, as on the Mac (`RS_MODS_FIXES=0` leaves it). The batched mounting is what
-needs it: 441 archives peak at 461 descriptors, over the 256 of an app started from Finder.
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
@@ -102,18 +83,12 @@ RSMods' library (2026-11-05): `rearmed-mods.dylib` 0.3.0 loads and runs here as 
 to the note highway and a quit ([Fixed in 1.5.1](#fixed-in-151) says what a run covered). The configurator installs it for the Mac edition
 only; `Mac/build.sh --install` puts it in both folders.
 
-Final pass for 1.5.1 (2026-11-05, the final code, `learn-play.sh`, a test home): a song to the note highway and a quit with RSMods' library, the
-same route and results as before the last fixes; a start and a clean quit without mods; nothing refused by the network guard. The 32-bit
-difftest shows only its two known mismatches, and all suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the installer app,
-a real Steam download, a guitar.
-
-Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
-source given by `RS_SOURCE_URL` and a stand-in Steam, through Preparing shaders; the image's SHA-256 is the pin in `target.toml`. With
-the system's cache cold, the warm-up and then a first play started with `open` gave the figures of
-[PERFORMANCE.md](PERFORMANCE.md#shader-preparation) (7.7 ms of compiling, no frame over 33 ms in the song), so the warm-up and `open`
-share the cache. Not in these runs: a real Steam download, a guitar. All suites of [TESTING.md](TESTING.md) pass on that code.
-
-Not there yet: the loading-screen fix, the OpenGL renderer (no window path).
+The tables (`tools/targets/win-x86`): every name in `tools/targets/names` has an entry (`check.py` covers both targets), and `target.toml` has the
+image's `.text`, its SHA-256 and the install pins. 965 of the 1,152 symbols and 74 of the 95 offsets are read from the Windows code; 12 of the 15
+hook points are there, `input_sink` and `set_app_focus`, which have no function here, are served from the seam
+([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)), and `si_io` has no counterpart. The 187 symbols left say why in the map: 32 are not needed here, 24 are Mac-only, 30 are not
+proved, and the rest are inlined by LTCG or have no counterpart of the Mac's shape (48 of them the Lua API). 19 of the 21 offsets left are Mac-only.
+88 names have `custom` conventions (LTCG register arguments), which their overrides have to read by hand.
 
 Where it stands against the plan's phases:
 
@@ -123,7 +98,7 @@ Where it stands against the plan's phases:
 | P1 | the game image | done: unpacked on the Mac from the release's seed; a capture on a Windows PC for a build without one ([DESIGN.md](DESIGN.md#getting-the-game-image)) |
 | P2 | the 32-bit front end | done: the game, msvcr100, msvcp100, d3dx9_42, D3DCompiler_42 and bink2w32 translate |
 | P3 | boot to the menu | done, and past it: songs play |
-| P4 | parity with the Mac port | in progress: audio, Bink, songs, the main modes and the window modes work; the rest below |
+| P4 | parity with the Mac port | the game, audio, Bink, mods and the window modes work; left are the checks in [Next work](#next-work) |
 | P5 | the installer | done in the shell (`learn-play.sh`) and in the installer app ([TESTING.md](TESTING.md#the-installer-app) says what was driven) |
 
 The game image comes from the user's own exe, unpacked on the Mac with the release's seed; a capture is the fallback
@@ -133,10 +108,8 @@ copy of the game for its relocation sites, which nothing reads out of the captur
 The download needs no paste: the running Steam takes the depot command on its command line, and `game-download`
 leads the user through what only they can do, in the same words as the Mac edition's Steam steps.
 
-Exceptions and memory order are done (2026-11-04): every image is compiled with x86's memory order, as the
-Mac image always was; a caught C++ exception, an unwind through inner frames and `longjmp` work and are tested on
-the real CRT (`crt_probe -eh`); a guest stack has the size asked for and a guard. The Mac edition had all of these
-already, or has no need of them.
+Every image is compiled with x86's memory order, as the Mac image always was; a caught C++ exception, an unwind through
+inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`); a guest stack has the size asked for and a guard.
 
 ## Open issues
 
@@ -233,36 +206,24 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
 
 **Parity (P4):**
 
-- The `tools/targets/win-x86` target filled in: every name in `tools/targets/names` has an entry (`check.py`
-  covers both targets), and `target.toml` has the image's `.text` and SHA-256 and, since it moved there,
-  the install pins. 965 of the 1,150 symbols and 74 of the 93 offsets are read from the Windows code; 12 of
-  the 14 hook points are there (not `input_sink`: events are window messages, nor `set_app_focus`: inlined in
-  the platform tick; the map names a place a hook can use for each). The 185 symbols left say why in the map:
-  94 are inlined by LTCG (46 of them the Lua API), 32 are not needed here (the Mac's differential tests and
-  rebuilt online factory), 22 are Mac-only (CoreAudio, the keyboard stand-in, pthread), 7 have no counterpart
-  of the Mac's shape (CRITICAL_SECTION locks, QueryInterfaces nothing calls), and 30 are not proved (the Wwise
-  plug-in DSP, small efd helpers): those have candidates in the map, and a wrong address would be worse than
-  the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
-  register arguments), which their overrides have to read by hand.
-- Hook points and mods: `mods.c` and `audio_in.c` are not built here, so their pointer-width layouts need no names per target.
-- The checks the Mac port has had that are left: a whole song with a guitar through Direct Connect (a short run is done), long sessions.
+- The 30 symbols not proved (the Wwise plug-in DSP, small efd helpers): they have candidates in the map, and a wrong address would be
+  worse than the gap.
+- The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** a picker in the installer app, and two guitars on one interface, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
 the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of
-the draw-time upload; zero-copy dynamic buffers; `-mno-outline` for the generated C (4% of the game thread,
+the draw-time upload; zero-copy dynamic buffers; the relaxed audio kernels; `-mno-outline` for the generated C (4% of the game thread,
 15% larger binary; on the Mac build it changes nothing, [Mac performance](../mac/PERFORMANCE.md#build-options)); memory (guest copies of D3D9 buffers).
 
 ## Risks
 
 1. **Renderer fidelity**: D3D9 semantics through GL to Metal. The menus, the stages and the note highway
    render; scenes not played yet may show gaps.
-2. **Volume of the name matching** for the second binary: bounded by the names the Mac build uses (about
-   1,500 table lines, most of them library functions that match by their code).
-3. **Steam updating the Windows build**: the pinned manifest keeps installs working; a new build means a new
+2. **Steam updating the Windows build**: the pinned manifest keeps installs working; a new build means a new
    seed, new import tables and a new `target.toml`.
-4. **The seed**: the release's installer carries it, and a new exe build needs a new one, from a loaded copy of the game
+3. **The seed**: the release's installer carries it, and a new exe build needs a new one, from a loaded copy of the game
    ([Status](#status)). Without a seed a user needs a Windows PC once.
 
 ## Decisions
@@ -272,6 +233,7 @@ the draw-time upload; zero-copy dynamic buffers; `-mno-outline` for the generate
 - Microsoft's DLLs translated, not rewritten; native overrides only for leaf functions with plain contracts
   (the math exports so far).
 - Direct3D 9 implemented on `libRSOpenGL`, so the Metal core and its caches are shared.
+- Metal only: every Mac this edition runs on has Metal, so no OpenGL renderer or fallback is planned here.
 - One pinned Windows build (depot 221683, manifest 8918188356915973501), downloaded by the Mac Steam
   client; no steamcmd.
 - No Rosetta, no Homebrew, no .NET in the install: native arm64 and tools macOS ships. The Microsoft DLLs are

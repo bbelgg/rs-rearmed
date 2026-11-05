@@ -10,9 +10,9 @@ included.
 | libpng | 1.5.13 (altered) | https://github.com/pnggroup/libpng, tag v1.5.13 | libpng licence | `shims/game/third_party/libpng-1.5.13` |
 | libjpeg | IJG 8d (15-Jan-2012) | https://www.ijg.org/files/jpegsrc.v8d.tar.gz | IJG licence | `shims/game/third_party/jpeg-8d` |
 | FFmpeg + Bink 2 decoder patch | FFmpeg 7.1.2 | https://ffmpeg.org/releases/ffmpeg-7.1.2.tar.xz (downloaded at build time) | LGPL-2.1-or-later | `shims/bink/build-ffmpeg.sh`, `shims/bink/third_party/ffmpeg-bink2.patch` |
-| rs-mac-fixes (behaviour only) | commit `2a05c31` | https://github.com/glebb/rs-mac-fixes | MIT; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c` |
-| RSMods (behaviour only: the Enumerate menu entry) | — | https://github.com/Lovrom8/RSMods | upstream has no licence file; no upstream code or resources are included | `tools/play-native/cache_overlay.py`, `shims/steam/src/enumerate.h` |
-| RSBypass (behaviour only) | — | https://github.com/aik002/RSBypass | upstream has no licence file; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c` |
+| rs-mac-fixes (behaviour only) | commit `2a05c31` | https://github.com/glebb/rs-mac-fixes | MIT; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c`, `win-x86/shims/win32_overrides.c` |
+| RSMods (behaviour only: the Direct Connect and Enumerate menu entries) | — | https://github.com/Lovrom8/RSMods | upstream has no licence file; no upstream code or resources are included | `tools/play-native/cache_overlay.py`, `shims/steam/src/enumerate.h` |
+| RSBypass (behaviour only) | — | https://github.com/aik002/RSBypass | upstream has no licence file; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c`, `win-x86/shims/win32_overrides.c` |
 
 ## Lua 5.1.4 + LNUM
 
@@ -57,18 +57,21 @@ https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html.
 
 FFmpeg is linked only into the Bink shim, `libBink2Macx64.dylib`, a separate dynamic library. You
 can rebuild it against a modified FFmpeg (edit `build-ffmpeg.sh` or the patch, then rebuild the
-`bink2` target) and replace the dylib; nothing else links FFmpeg.
+`bink2` target) and replace the dylib; nothing else links FFmpeg. Learn & Play doesn't use it: that edition
+translates the game's own `bink2w32.dll`.
 
 ## rs-mac-fixes
 
 https://github.com/glebb/rs-mac-fixes (MIT, commit `2a05c31`). Its fixes are reimplemented as native
-overrides in `tools/ws7/recomp/overrides/mods/mods.c`; no upstream code is included. Credit for the
-original goes to its authors.
+overrides in `tools/ws7/recomp/overrides/mods/mods.c`, and for Learn & Play in
+`win-x86/shims/win32_overrides.c`; no upstream code is included. Credit for the original goes to its
+authors.
 
 ## RSBypass
 
-The RSBypass part of `tools/ws7/recomp/overrides/mods/mods.c` is an independent reimplementation of the
-behaviour of RSBypass by aik002 (https://github.com/aik002/RSBypass), which lets custom songs load.
+The RSBypass parts of `tools/ws7/recomp/overrides/mods/mods.c` and `win-x86/shims/win32_overrides.c` are an
+independent reimplementation of the behaviour of RSBypass by aik002 (https://github.com/aik002/RSBypass), which
+lets custom songs load.
 Credit for the original goes to aik002. Upstream has no licence file, and no upstream code is
 included. It is on by default (`RS_MODS_BYPASS=0` turns it off).
 
@@ -77,6 +80,9 @@ included. It is on by default (`RS_MODS_BYPASS=0` turns it off).
 Installed from PyPI into the build's own virtualenv, and not part of what is built: Capstone (the recompiler), CMake
 and Ninja (the Mac build), Pillow, numpy and etcpak (`tools/loadscreen`), Unicorn and pefile (Learn & Play's offline
 unpacker).
+
+Read from the user's own files at build time, and never stored here: Microsoft's DLLs (Learn & Play) and the game's
+`bink2w32.dll`.
 
 ## Trademarks
 

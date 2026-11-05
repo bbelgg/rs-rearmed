@@ -6,10 +6,10 @@ external display and the built-in 60 Hz Retina screen. The Windows port's measur
 
 ## Summary
 
-In gameplay the native build uses about the same CPU as the original game under Rosetta, a little less on
-average: about half a core at 60 fps, measured over a scripted song. It renders at the display's refresh
-rate, so a 75 Hz or 120 Hz display gets 75 or 120 fps (`RS_FPS=N` fixes a rate). Metal uses about 5% less
-CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little.
+In a song the native build holds the display's rate at 44% of a core (74.9 fps on a 75 Hz display,
+[Final pass](#final-pass-for-140)), about the same CPU as the original game under Rosetta. It renders at the
+display's refresh rate, so a 75 Hz or 120 Hz display gets 75 or 120 fps (`RS_FPS=N` fixes a rate). Metal uses about 5%
+less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little.
 
 ## Method
 
@@ -62,18 +62,17 @@ frame over 20 ms on each.
 
 ### Shader preparation
 
-The Metal shader corpus (3880 distinct programs) compiles in about 270-375 s on a cold system cache
+The Metal shader corpus (3880 distinct programs) compiles in about 270-390 s on a cold system cache
 (install-time warm-up, 8 threads), and in about 0.2 s when the system cache is warm. The first play of a
-song after an install has a few 0.3-0.8 s stalls in its first half-minute while pipelines are built for
-the first time; the second play has none. Learn & Play's corpus is 281 programs, from a list of what the game was seen linking:
+song after an install can stall for up to about 0.8 s while pipelines are built for the first time; in the
+[Final pass](#final-pass-for-140) that was one 0.6 s stall at Play Song and none in the song. The second play has none.
+Learn & Play's corpus is 281 programs, from a list of what the game was seen linking:
 [its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
 
 ### Against the Windows port
 
-Same Mac, same day, the 1280x720 window: 42.2% of a core in a song, GPU 41%, footprint 0.81 GB, 60 fps with
-p99 19.5 ms and no frame over 33 ms; the title takes keys after 15-18 s. Table and conditions:
-[Windows performance](../windows/PERFORMANCE.md#against-the-mac-build). Those are from before the memory order and the
-intro skip; the same song on both at 75 fps: [Final pass](#final-pass-for-140).
+The same song on both at 75 fps: [Final pass](#final-pass-for-140). An earlier comparison, with other songs and before
+the memory order and the intro skip, is in [Windows performance](../windows/PERFORMANCE.md#against-the-mac-build).
 
 ## Final pass for 1.4.0
 

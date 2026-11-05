@@ -55,16 +55,7 @@ The relocation sites come from comparing the output with a copy of the game load
 (`make_seed.py --loaded`). For this build that was the v2 harvest. VMProtect's own table stays packed.
 The installer and `learn-play.sh` use this route whenever a seed is there (`lp_install.py game-image`).
 
-The older build (0d42e2, 11.6 MB, `.UBX1`-based) had a Qiling route. It never worked on the depot build:
-
-| | Older build (0d42e2) | Depot build (bb0569) |
-|---|---|---|
-| Size | 11.6 MB | 24.5 MB |
-| Payload section | `.UBX1` | `.UBX2` |
-| Entry RVA | `0x199039c` | `0x2022c8b` |
-| OEP (WinMainCRTStartup) | `0xb5af84` | `0xb5b8f4` |
-| SEH int3 trick | yes (1 int3) | **no** |
-| Qiling emulation | reached decompression | env fidelity faults, never reached |
+An older build (0d42e2) had a Qiling route, which `make_seed.py` still reads. It never worked on the depot build.
 
 ## Making a seed: the QEMU capture
 

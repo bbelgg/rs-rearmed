@@ -14,7 +14,7 @@
 #   LP_OUT        output directory (default $LP_BUILD/out): rs2014_lp, lp_game.exe, dlls/,
 #                 libRSOpenGL.dylib, libnetguard.dylib
 #   LP_IMAGE      the game image (lp_image.py), copied to the output
-#   LP_TRANSLATE  1: run translate.sh first (about 50 minutes), else use game/obj as it is
+#   LP_TRANSLATE  1: run translate.sh first (15-25 minutes), else use game/obj as it is
 #   LP_MODULES_BUILD  1: run build_modules.sh first (needs its LP_* DLL paths)
 #   LP_GL_DIR     a directory with libRSOpenGL.dylib (build_gl.sh, no CMake: the installer's), or
 #   LP_CMAKE_DIR  a cmake build dir with libRSOpenGL built (cmake --build DIR --target opengl);

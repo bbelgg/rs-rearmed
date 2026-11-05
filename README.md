@@ -45,15 +45,15 @@ This project does not include any game code or assets; you need your own copy of
 ## Mac and Windows compared
 
 The **Windows (Learn & Play) port is experimental**: it plays, but has had far less testing than the Mac
-port, and several features are not there yet.
+port.
 
 ✅ works (tested) · ⚠️ present, not tested · ❌ not implemented · — not applicable
 
 | Feature | Mac | Windows (Learn & Play) |
 |---|---|---|
 | Learn a Song (songs to the end, scoring) | ✅ | ✅ |
-| Score Attack | ⚠️ | ✅ |
-| Guitarcade | ⚠️ menus only; no game played yet | ✅ |
+| Score Attack | ✅ | ✅ |
+| Guitarcade | ✅ | ✅ |
 | Session Mode | ✅ | ✅ |
 | Nonstop Play | ✅ | ✅ |
 | Lessons and their videos | ✅ | ✅ |
@@ -64,15 +64,14 @@ port, and several features are not there yet.
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 14 of the 15 hook points (not `si_io`, the Mac game's CoreAudio input) and the overlay API |
 | RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods; see [the Windows plan](docs/windows/PLAN.md#fixed-in-151) for what a run covered |
 | Built-in fixes (rs-mac-fixes, RSBypass) | ✅ | ✅ |
-| Loading-screen fix (fast-load `cache.psarc` with Metal) | ✅ | ❌ |
 | "Re-ARMed" title logo | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, Uplay screens skipped | ✅ | ✅ |
 | No intro screens (`RS_MODS_INTRO=0` plays them) | ✅ | ✅ |
 | Your Steam profiles copied in once | ✅ | ✅ |
 | Audio output, backing track in time | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
-| Microphone | ⚠️ | ✅ |
-| Other interfaces, Direct Connect | ✅ | ⚠️ |
+| Microphone | ✅ | ✅ |
+| Other interfaces, Direct Connect | ✅ | ✅ |
 | DIRECT CONNECT in the INPUT setting (overlay of your own `cache.psarc`) | ✅ | ✅ |
 | ENUMERATE in the main menu: new songs without a restart | ✅ | ✅ |
 | Lower guitar latency (buffers, real-time audio thread) | ✅ | ⚠️ |
@@ -82,7 +81,7 @@ port, and several features are not there yet.
 | Retina rendering (`RS_METAL_RETINA=1`) | ✅ | ✅ |
 | Frame rate follows the display (75/120 Hz) | ✅ | ✅ 75 Hz |
 | Metal renderer | ✅ | ✅ |
-| OpenGL renderer and automatic fallback | ✅ | ❌ |
+| OpenGL renderer and automatic fallback | ✅ | ❌ Metal only, none planned |
 | Shaders prepared at install | ✅ | ✅ |
 | Installer app and install script | ✅ | ✅ |
 | Game image made on the Mac, with nothing from the user | ✅ | ✅ |
@@ -172,10 +171,9 @@ OpenGL, which Apple deprecated.
   OpenGL, sets the `renderer` file to `opengl` and says so in `renderer-fallback.txt` in the same
   folder. Write `metal` into the file to try Metal again, or choose Metal in the installer.
 - **Shaders:** Metal compiles the game's shaders once. The installer does this in its "Preparing
-  shaders" step (a few minutes the first time; Skip leaves it to the game's first start). After a macOS
-  update the game recompiles them on its
-  next start, showing "Preparing shaders… N of M" on a black screen before it loads. Learn & Play has the same step, in
-  about 20 seconds; after a macOS update run the installer again.
+  shaders" step (a few minutes the first time; with Skip the game compiles them as it first uses them). After a
+  macOS update they are compiled again as the game uses them, unless you run the installer again. Learn & Play has
+  the same step, in about 20 seconds.
 
 ### The title logo
 
@@ -195,7 +193,7 @@ there. Learn & Play does the same in its own copy of the game files
 
 ### Mods loaded at startup
 
-From 1.2.0 the game loads every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` at startup, so
+The game loads every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` at startup, so
 mods can change how it works without a rebuild; Learn & Play does the same from `.../RS Re-ARMed/learn-play/mods/`. A
 reinstall keeps that folder. The build gives them **hook points**, game functions they can run code before and
 after (`tools/targets/names/hooks.list`, `tools/ws7/recomp/runtime/rc_hook.h`), and the game executable exports
@@ -220,7 +218,7 @@ small one. Learn & Play leaves out a library built without `rc_mod.h`, with a li
 
 Legacy mods, the ones made for the original game that change its files, might work as before. Verified:
 
-- A modified `cache.psarc` in your install (for example the fast-load mod) is used as-is.
+- A modified `cache.psarc` in your install is used as-is.
 - Custom songs (CDLC) in your game's `dlc` folder load as they are; the CDLC bypass they need is built in.
 
 ## How to Install
@@ -273,10 +271,6 @@ For the Mac port; the Windows port's are in [docs/windows/INSTALL.md](docs/windo
 - Progress made in the native build is kept separately and is not copied back to your Steam saves
   automatically.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.
-- With the legacy fast-load mod (a modified `cache.psarc`), a start can now and then stay on the white
-  loading screen, more often when the Mac is busy. Quit and start again. With Metal, RS Re-ARMed prepares
-  its shaders before the game loads when it sees such a mod, which avoids the stall it would otherwise
-  cause.
 - With Metal, the first time a song, venue or mode is played, a few short stutters (up
   to about half a second) can show in its first half-minute while Metal compiles what it draws for the
   first time. It keeps the result, so later plays are smooth.
@@ -289,8 +283,8 @@ For the Mac port; the Windows port's are in [docs/windows/INSTALL.md](docs/windo
 Being looked into for future releases, with no promise of if or when:
 
 - **RSMods:** more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (the hook points left, the OpenGL
-  renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
+- **The Windows game:** bringing the Learn & Play port to parity with the Mac port (guitar latency, long
+  sessions). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
 
 ## FAQ
 
@@ -301,8 +295,7 @@ into an arm64 app. Nothing is translated while you play.
 **Does it change my Steam install?**
 No. `install.sh` copies the app and the game files into its own folder (APFS clones when the game is on
 the same disk, which take no extra space), and the game reads only that copy. Your install and your Steam
-folder are only read, never written. (Earlier versions left `static.psarc.rearmed` in the game folder; you can
-delete it.)
+folder are only read, never written.
 
 **Where are my saves?**
 In `~/Library/Application Support/RS Re-ARMed/steam/<account>/221680/remote/`. The logs are in
@@ -375,6 +368,7 @@ In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check tha
 |---|---|---|
 | Index | [docs/mac](docs/mac/README.md) | [docs/windows](docs/windows/README.md) |
 | Install, build, play | [INSTALL.md](docs/mac/INSTALL.md) | [INSTALL.md](docs/windows/INSTALL.md) |
+| Getting the game image | [CAPTURE.md](docs/mac/CAPTURE.md) | [CAPTURE.md](docs/windows/CAPTURE.md) |
 | How it works | [DESIGN.md](docs/mac/DESIGN.md), [METAL.md](docs/mac/METAL.md) | [DESIGN.md](docs/windows/DESIGN.md) |
 | Performance | [PERFORMANCE.md](docs/mac/PERFORMANCE.md) | [PERFORMANCE.md](docs/windows/PERFORMANCE.md) |
 | Status and plan | [PLAN.md](docs/mac/PLAN.md) | [PLAN.md](docs/windows/PLAN.md) |

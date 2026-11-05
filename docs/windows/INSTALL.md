@@ -162,6 +162,7 @@ The steps one at a time: `python3 win-x86/install/lp_install.py --help`.
 | `…/learn-play/steam/` | your profiles and progress |
 | `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
 | `…/learn-play/mods/` | mods loaded at startup |
+| `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 
 On the first start, profiles in your Steam cloud folder for the game, if Steam has one on this Mac, are
 copied into `steam/` (without `crd`).
@@ -265,8 +266,7 @@ Exit all quit through the game's shutdown. The display mode never changes.
 
 ### Renderer
 
-Metal only. The OpenGL renderer has no window path in this build, so there is no choice and no fallback
-([Known issues](#known-issues)).
+Metal only, so there is no choice and no fallback ([Known issues](#known-issues)).
 
 ### Audio latency
 
@@ -276,7 +276,8 @@ Metal only. The OpenGL renderer has no window path in this build, so there is no
    processing).
 
 The setting is `[Audio] LatencyBuffer` in `userdata/game/Rocksmith.ini`. The output device's buffer is
-`RS_AUDIO_FRAMES` (default 256). The delay has not been measured against the Mac port.
+`RS_AUDIO_FRAMES` (default 256; 128 on an interface that also has inputs). The delay has not been measured against the
+Mac port.
 
 ### Guitar input
 
@@ -290,7 +291,9 @@ Channel=5
 
 The section is the device's name in Audio MIDI Setup. `Channel` counts from 1. For a quiet interface add a gain, such
 as `GainDb=6`: -24 to 36, default 0 (an HX Stomp needs none); above full scale the signal clips, as in an interface. The file is read when an input opens, so restart the game
-after a change and calibrate again. With nothing set the game hears the first channel.
+after a change and calibrate again. With nothing set the game hears the first channel. `RS_AUDIO_INPUT_CHANNEL`,
+`RS_AUDIO_INPUT_GAIN_DB` (for every device), `RS_AUDIO_INPUT_FILE` (another file) and `RS_AUDIO_INPUT=0` (none of this)
+are switches. With `RS_AUDIO_LOG=1` the log has the channel, and every few seconds the peak and the samples clipped.
 
 ## Settings and switches
 
@@ -304,7 +307,8 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 |---|---|---|
 | `RS_FULLSCREEN=1\|0` | the game's setting | force full screen, or a window |
 | `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen |
-| `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames |
+| `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames (0 leaves the device's) |
+| `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_SET_RATE=0` | on | the real-time audio thread, the stale-input trim, switching devices to 48 kHz |
 | `RS_AUDIO_INPUT_CHANNEL=N`, `RS_AUDIO_INPUT_GAIN_DB=N` | `guitar-input.ini` | the guitar input's channel and gain, for every device |
 | `RS_AUDIO_INPUT_FILE=PATH`, `RS_AUDIO_INPUT=0` | `guitar-input.ini`, on | another settings file; none of this |
@@ -339,26 +343,21 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   `steam/` first to keep your progress); that removes the copy of the game files too, unless the game is on
   another drive: then `learn-play/game` is only a link, and the copy is on that drive, in
   `RS Re-ARMed/learn-play/game` at its top (or the folder `ls -l` of that link shows): delete it too. The
-  Windows game
-  Steam downloaded stays in Steam's download folder
+  Windows game Steam downloaded stays in Steam's download folder
   (`~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamapps/content/app_221680`,
   or where you redirected it); delete it there if you want the space back (the app no longer needs it).
+  `guitar-input.ini` stays too, as the Mac edition reads it.
 
 ## Known issues
 
 - Experimental: it has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
-  beyond the tone designer, the DLC preview, and playing through Direct Connect ([PLAN.md](PLAN.md#status)).
-- Custom songs (CDLC, the `_p.psarc` versions) are listed and play: the song-file signature check and
-  the Windows game's list of known song keys are skipped (`RS_MODS_BYPASS=0` turns both back on;
-  [PLAN.md](PLAN.md#built-in-for-140)). The built-in fixes are the batched DLC mounting
-  (`RS_MODS_BUDGET_MS=N`, default 50 ms a frame), the higher open-file limit, the song path cache and the
-  number-table hash (`RS_MODS_FIXES=0` turns them off).
+  beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
 - Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 14 of the 15 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
   `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
-  event from the game); pass floating point arguments to `rc_call_guest`; call a
-  function that takes its own registers by name; give the game a pointer to its own memory (the game gets null, with
-  a line in the log); or quit by `game_frame`'s result, from a pre or a post hook (not taken, with a line in the log; a pre hook still skips the tick). A field this game
+  event from the game); pass floating point arguments to `rc_call_guest` (`rc_call_name_f` can); call a
+  function that takes its own registers by name; give the game a pointer to the mod's own memory (the game gets null, with
+  a line in the log; `rc_guest_alloc` gives memory it can have); or quit by `game_frame`'s result, from a pre or a post hook (not taken, with a line in the log; a pre hook still skips the tick). A field this game
   doesn't have gives `RC_NO_OFF`: test `RC_HAS_OFF`.
 - Song archives: the Windows game reads the PC files, `*_p.psarc`, not the Mac `*_m.psarc`. Custom songs
   will need the `_p.psarc` (PC) version; a Mac-only collection does not load. Official DLC has both: each DLC's
@@ -366,12 +365,10 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
 - Two crashes have been seen once each and not reproduced yet.
 - A shader the install's list doesn't have is compiled the first time it is used: a short stall, once. That goes for the
   Guitarcade's games, which nobody could reach without a guitar when the list was made, and may for some venues. After a macOS update every
-  shader is compiled again; run `tools/play-native/warm-shaders.sh "$HOME/Applications/RS Re-ARMed Learn & Play.app"` or
-  click Build & Install again. Unlike the Mac edition, the game doesn't do this by itself at its next start.
-- With another app in front, the hidden full-screen game runs at about 120 fps. It does no harm, but uses more
-  power than it needs.
-- Metal only: the OpenGL renderer has no window path in this build (`RS_GL_BACKEND=gl` draws offscreen),
-  so there is no OpenGL choice or fallback.
+  shader is compiled again as the game uses it; run `tools/play-native/warm-shaders.sh "$HOME/Applications/RS Re-ARMed Learn & Play.app"` or
+  click Build & Install again to have it done first.
+- Metal only: there is no OpenGL choice or fallback, and none is planned (`RS_GL_BACKEND=gl` draws offscreen,
+  for the tests).
 - Only the one pinned build of the Windows game is supported.
 
 ## Troubleshooting

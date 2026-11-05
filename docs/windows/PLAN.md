@@ -177,15 +177,17 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
 
 **Parity (P4):**
 
-- The `tools/targets/win-x86` target filled in: it has an entry for every name in `tools/targets/names`
-  (`check.py` covers both targets). 919 of the 1,142 symbols are matched against the Mac image (most of
-  them class_info / QueryInterface pairs, then libpng, libjpeg, zlib, rijndael, Wwise exports and a few
-  Lua and game functions). Still `unsupported`: the seam (WinMain inlines
-  the bootstrap, frame and shutdown; the input, display-settings and UI functions have no string anchor),
-  most of the Lua API (inlined by LTCG), the DLC worker functions, the efd DataStream and CryptoPP
-  helpers, the Wwise plug-in DSP, and 53 of the 75 offsets (64-bit layouts not yet read in the Windows
-  code). 14 overridden functions take LTCG register arguments (`custom`), which their overrides will
-  have to read by hand. Then the image's `.text` range and SHA-256; `win-x86/target.toml` moves there.
+- The `tools/targets/win-x86` target filled in: every name in `tools/targets/names` has an entry (`check.py`
+  covers both targets), and `target.toml` has the image's `.text` and SHA-256 and, since it moved there,
+  the install pins. 957 of the 1,142 symbols and 56 of the 75 offsets are read from the Windows code; 12 of
+  the 14 hook points are there (not `input_sink`: events are window messages, nor `set_app_focus`: inlined in
+  the platform tick; the map names a place a hook can use for each). The 185 symbols left say why in the map:
+  94 are inlined by LTCG (46 of them the Lua API), 32 are not needed here (the Mac's differential tests and
+  rebuilt online factory), 22 are Mac-only (CoreAudio, the keyboard stand-in, pthread), 7 have no counterpart
+  of the Mac's shape (CRITICAL_SECTION locks, QueryInterfaces nothing calls), and 30 are not proved (the Wwise
+  plug-in DSP, small efd helpers): those have candidates in the map, and a wrong address would be worse than
+  the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
+  register arguments), which their overrides have to read by hand.
 - With it: the hook points (a mod built for the Mac then runs on both when it uses only hook points,
   `rc_args`/`ov_ret_*` and `RC_OFF`) and the `mods/` folder (the built-in fixes are in, or not needed: the keys and End key
   are the Mac game's own table, thread priorities are `LP_QOS`).

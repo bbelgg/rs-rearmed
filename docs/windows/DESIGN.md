@@ -36,7 +36,7 @@ looks like the PC game, drawn through the same Metal renderer.
 
 ## Getting the game image
 
-The exe on disk (24,514,584 bytes, SHA-256 `bb056959…2778eb`, pinned in `win-x86/target.toml`) is
+The exe on disk (24,514,584 bytes, SHA-256 `bb056959…2778eb`, pinned in `tools/targets/win-x86/target.toml`) is
 VMProtect-packed: the real `.text`, `.rdata` and `.data` exist only in memory while the game runs.
 
 The released installer carries a seed, a small piece of VMProtect's state with no game code in it. With it
@@ -77,13 +77,11 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (919 of the Mac's 1,142 symbols matched, the
-rest `unsupported`), but the build does not use it yet. Its pins are in
-`win-x86/target.toml` (the depot, manifest, exe and DLL hashes, build figures; the same TOML subset as
-`tools/targets/*/target.toml`, so it can move there). Addresses it needs are in `win-x86/imports/*.tsv`
+`tools/targets/win-x86` has the Learn & Play image's names (957 of the Mac's 1,142 symbols read, an
+`unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
+and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
-counterparts). Hook points, the built-in fixes and the Mac overrides have no Windows names yet
-([PLAN.md](PLAN.md#next-work)).
+counterparts). What the names are still to be used for is in [PLAN.md](PLAN.md#next-work).
 
 ## Runtime
 

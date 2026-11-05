@@ -5,49 +5,50 @@
 # address inside a function). PROTOTYPE: the Mac's, as far as it is known (- = not recorded); the
 # convention, not the prototype, says how the arguments arrive.
 # Matched against the Mac image by class_info / QueryInterface pairs, library call order, exports, unique
-# strings, name tables and vtable shape; a `# medium` or `# low confidence` comment marks the weaker matches.
+# strings, name tables, vtable shape and the Windows code that reads them; a `# medium` or `# low confidence`
+# comment marks the weaker matches.
 # MSVC folds QueryInterface and QueryInterface_const, so both names share one address (two names may).
 # `NAME unsupported REASON` = no counterpart in this image, or not matched yet. One name per line, grouped
 # by the list in names/ that has it first.
 
 # --- names/seam.list
 game_bootstrap                                                   unsupported  no standalone LP function: WinMain (0x1309ad0) inlines it (set game root 0x1343c90, LoadConfig 'Rocksmith.ini' 0x149df40, VFS 'Global FS Backend' 0x101ab50)
-game_frame                                                       unsupported  no standalone LP function: WinMain hands the frame loop to MainService_Win32 (main_service 0x1eef048, vtable +0x40)
+game_frame                                                       0x01479df0  thiscall  void(void *service_manager)  # the frame: ServiceManager tick, slot 19 of the vtable 0x1d5f088 (the Mac game_frame ends in the same slot, 0x1002a98c0, and its quit check is here in the Run loop 0x1479da0); takes the manager, returns nothing
 game_shutdown                                                    unsupported  no standalone LP function found: WinMain's exit path (0x1309d6e..) runs the shutdown inline (vtable +0x3c, delete, 0x1309540, 0x101b830, 0x14a2b50)
-set_app_focus                                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-input_sink                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-set_resolution                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-set_fullscreen                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-get_fullscreen                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-get_resolution                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-set_visual_quality                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-service_manager                                                  0x0133cfc0  cdecl     void *(void)  # medium confidence; LP reads [0x1ee0bfc]+4
-ui_current                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ui_menu                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ui_accepts                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ui_event                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-efd_set_path_hooks                                               unsupported  not found; likely inlined into WinMain next to the set-game-root call (LTCG)
-app_focus                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-main_service                                                     0x1eef048  data      void *  # medium confidence
-lua_owner                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+set_app_focus                                                    unsupported  inlined: the platform tick 0x149ed00 handles the posted 0x7e8 (gained) and 0x7e9 (lost) in the message loop; a hook can use the two calls it makes, 0x1a45490 (AK restore sink) and 0x1a45480 (AK release sink)
+input_sink                                                       unsupported  no counterpart: events reach the game as window messages. MainService_Win32's window procedure 0x130d790 (stdcall hwnd, msg, wparam, lparam) passes them to the Scaleform one, 0x17a1850, which builds the same events the Mac sink does (5/6 key, 0x1a char); a hook can use 0x17a1680 (queues one event, ecx = the event), which both paths end in
+set_resolution                                                   unsupported  inlined: callers read the settings (0x13afbd0, esi = the struct), change them and apply them (0x13afc50, eax = the struct)
+set_fullscreen                                                   0x013afd30  custom    void(uint8_t)  # edi = mode: reads the settings, returns when the mode is the same, sets the flags, applies (0x13afc50); F11 in the window procedure calls it (0x130d905)
+get_fullscreen                                                   0x013afdb0  cdecl     int(void)  # the mode from the settings flags, the same test set_fullscreen and the F11 handler make
+get_resolution                                                   unsupported  inlined: callers read the settings through 0x13afbd0 (esi = the struct)
+set_visual_quality                                               0x013aff50  custom    void(int)  # edi = quality: the same three levels with the same constants (0x13afe90), renderer slot 46 (= Mac 47), then the apply 0x13afc50; 0x1181da0 and 0x140e0f0 call the inner pair
+service_manager                                                  0x0133cfc0  cdecl     void *(void)  # reads [0x1ee0bfc]+4, the holder and field every function here uses; the Mac's reads main_service+0x18, the same manager
+ui_current                                                       unsupported  inlined: the global *0x1ee062c, read directly (0x130d806)
+ui_menu                                                          unsupported  inlined: the field +0x24 of *0x1ee062c, read directly (0x130d813)
+ui_accepts                                                       0x01163e70  custom    bool(void *menu)  # esi = menu; same loop as too_many_inputs, slot 25 (= Mac 26); the two call sites are the Mac function's (0x130d81e, 0x1341b66)
+ui_event                                                         0x01163d50  stdcall   void(void *menu)  # LTCG folded the event and arg: every caller sends (0x98, 0), the Mac's two callers too, so only the menu is on the stack (ret 4)
+efd_set_path_hooks                                               unsupported  inlined into WinMain: it writes the six hooks itself (0x1309c7b..0x1309c9b, 0x1ee18f0..0x1ee1904)
+app_focus                                                        unsupported  no such global: focus is the byte +0x149 of the app object (*0x1ee0bfc), 1 = lost, set in the platform tick 0x149ed00
+main_service                                                     0x1eef048  data      void *  # WinMain stores MainService_Win32 (vtable 0x1d4c9d0) here and calls through it
+lua_owner                                                        unsupported  no global: WinMain keeps the object in a local (0x1309c63) and frees it on the way out
 gl_context                                                       unsupported  Mac-only (NSOpenGLContext); LP draws through D3D9
-game_config                                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+game_config                                                      0x1f0bbf0  data      rsp_config  # the static block the config getter 0x1161260 returns; 0x20 bytes more in front than the Mac's (ScreenWidth +0x30 against +0x10 in the ini writer 0x149d610)
 
 # --- names/hooks.list
 ak_post_event_name                                               0x1a44870  cdecl     uint32_t(const char *event, uint64_t game_object, ...)
-too_many_inputs                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rr_speed_ratio                                                   0x00f89360  cdecl     float(float slider_percent)  # medium confidence; LP returns the percentage (Mac returns 100/percentage); callers divide
+too_many_inputs                                                  0x01163ed0  custom    bool(void *input_manager)  # esi = input manager; called from the "TooManyGuitarInputs" popup (0x1341670 = Mac 0x1000e11a0); same loop over the list at +0x138, slot 24 (= Mac 25)
+rr_speed_ratio                                                   0x00f89360  cdecl     float(float slider_percent)  # the same curve with the same constants (25, 100, 400); it returns the percentage, the Mac 100 / percentage: the callers divide
 ak_set_rtpc_name                                                 0x1a42400  cdecl     int(const char *, float, uint64_t, int, int)
-camera_set_frustum                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+camera_set_frustum                                               0x01557f20  fastcall  void(void *camera, const void *frustum)  # ecx = camera, edx = frustum: the same fields in the same order as the Mac function (near clamp against +0x14c/+0x148 = Mac +0x1a0/+0x19c), 7 callers against 7, one of them the matched 0x134bc60
 ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
-si_open                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+si_open                                                          0x017c50a0  custom    int(void *self, ...)  # SoundInputPortAudio::InputOn: edi = the input, 4 stack arguments (ret 0x10, not the Mac's slot), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
 
 # --- names/refs.list
 scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys
-game_char_to_key                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-game_key_state                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-thread_priority_table                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-path_table_lock                                                  unsupported  a CRITICAL_SECTION here (*0x1ed915c), not a pthread_mutex_t
+game_char_to_key                                                 unsupported  Mac-only: the table of the Mac keyboard stand-in (key_down)
+game_key_state                                                   unsupported  Mac-only: the table of the Mac keyboard stand-in (key_down)
+thread_priority_table                                            unsupported  no table: the Windows priorities are constants at each inlined site (thread_set_priority)
+path_table_lock                                                  unsupported  a CRITICAL_SECTION here (*0x1ed915c, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply
 path_table                                                       0x1ed9158  data      void *  # std::map of MD5 -> object, read by path_intern
 path_intern                                                      0x0141c130  custom    void *(const char *s, int len)  # ecx = len, stack = s; the Mac path_md5 wrapper is inlined into its callers
 path_release                                                     0x0141c3c0  custom    int(void *obj)  # edi = obj
@@ -57,40 +58,40 @@ dlc_enum_check                                                   0x014493a0  cus
 dlc_update_tail                                                  0x01449660  stdcall   void(void *coord)
 std_tree_destroy                                                 0x00f964a0  thiscall  void(void *tree, void *root)
 json_number_table                                                0x1ee14c8  data      void *  # a Dinkumware hash_map here
-json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154), not a pthread_mutex_t
+json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply
 json_number_vtable                                               0x1d5a130  data      void *[]  # 0x1400040
-const_two_pow_63                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-hashtable_prime_sizes                                            0x1d1e010  data      uint32_t[28]  # medium confidence; inside MSVC's list from 0x1d1e008 (7, 23, ...)
-efd_alloc                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-json_number_base_ctor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-json_number_base_dtor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-sng_load_verify_ret                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ak_platform_settings                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+const_two_pow_63                                                 unsupported  not needed: only the Mac's inlined hash reads it; the Windows hash is a function of its own (0x1400650)
+hashtable_prime_sizes                                            0x1d1e010  data      uint32_t[28]  # the same primes from 53; MSVC's list starts two entries earlier (0x1d1e008, read by 0xf96960)
+efd_alloc                                                        0x014791e0  cdecl     void *(size_t size, int hint)  # same shape: hint | 0x400, the allocator's slot 1 with alignment 0x10; WinMain and num_intern call it as (size, 0)
+json_number_base_ctor                                            unsupported  inlined into num_intern (0x1400040), which writes the vtable and fields itself
+json_number_base_dtor                                            unsupported  inlined into num_dtor (0x13fff60), which writes the base vtable 0x1d5a358
+sng_load_verify_ret                                              0x010d96f7  code      -  # the return of the verifier's call at 0x10d96f2 in the SNG check 0x10d96a0; its only other caller is the package config, 0x130aaed
+ak_platform_settings                                             0x1ed2860  data      AkPlatformInitSettings  # Wwise's own copy: the 0xd0 bytes 0x1a4a5a0 copies from the argument, or fills through the defaults 0x1a454c0; the game's is 0x1f089e8
 ak_sink_ring_alloc                                               unsupported  Mac-only: the CoreAudio sink; the Windows Wwise build has its own sink
 ak_lengine_thread_id                                             unsupported  Mac-only type (pthread_t); the Windows LEngine thread is a Win32 thread
-ak_lengine_start_time                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ak_render_loop                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ak_render_engine                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_lengine_start_time                                            unsupported  Mac-only: the wake-up loop of the CoreAudio sink; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)
+ak_render_loop                                                   unsupported  Mac-only: the wake-up loop of the CoreAudio sink; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)
+ak_render_engine                                                 unsupported  Mac-only: the wake-up loop of the CoreAudio sink; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)
 la_vcosf                                                         unsupported  Mac-only (Accelerate vForce import pointer)
-dsp_two_pi                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_two                                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_ramp0                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_half4                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_four4                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_k046                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_k054                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_one4                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-efd_malloc                                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dsp_two_pi                                                       unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_two                                                          unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_ramp0                                                        unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_half4                                                        unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_four4                                                        unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_k046                                                         unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_k054                                                         unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+dsp_one4                                                         unsupported  not needed: a constant of the Mac DSP kernels (overrides/src), with their functions unproved here
+efd_malloc                                                       0x0147aa80  custom    void *(size_t size, int hint)  # eax = size, one cdecl argument: the allocator's slot 1 with 5 where efd_alloc has 1, as on the Mac; win32_overrides.c runs it
 psarc_key_iv                                                     unsupported  no global in LP: the IV is built from immediates on the stack (0x19be16b: mov [ebp-0x2c], 0x1aa15e9 ...)
-property_object_ctor                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-game_interface_helper_new                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rs_steam_service_ctor                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rs_connect_service_steam_ctor                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rs_dlc_service_steam_ctor                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rs_profile_service_ctor                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+property_object_ctor                                             unsupported  not needed: only the Mac's rebuilt online factory calls it; the Windows online layer keeps rsconnect_factory (win-x86/online)
+game_interface_helper_new                                        unsupported  inlined into rsconnect_factory: efd_alloc, then the vtable 0x1d2d590 (0x143c9db)
+rs_steam_service_ctor                                            0x014474e0  stdcall   void(void *obj)  # rsconnect_factory: alloc 0xd0, this on the stack, returns this, stored and passed on as the Mac factory does
+rs_connect_service_steam_ctor                                    unsupported  inlined into rsconnect_factory (0x143c9a0): base constructor 0x1438550, then the vtable 0x1d5d3dc
+rs_dlc_service_steam_ctor                                        unsupported  inlined into rsconnect_factory: base constructor 0x14461d0, then the vtable 0x1d5d814
+rs_profile_service_ctor                                          unsupported  inlined into rsconnect_factory: base constructor 0x143e6d0, then the vtable 0x1d5d894
 rs_connect_service                                               0x1ef5e90  data      void *
 rs_connect_game_interface                                        0x1ef5e94  data      void *
-service_manager_holder                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+service_manager_holder                                           unsupported  inlined: the global *0x1ee0bfc, read directly in about 1,100 functions; the manager is +4 (service_manager reads it)
 GRCamera_class_info                                              0x1ef2090  data      efd::ClassInfo
 GRCameraBackground_class_info                                    0x1ef22d0  data      efd::ClassInfo
 GRCameraBGBehavior_Animated_class_info                           0x1ef2510  data      efd::ClassInfo
@@ -354,24 +355,24 @@ mach_header                                                      unsupported  Ma
 objc_classref_MessageBox                                         unsupported  Mac-only (Objective-C class reference)
 
 # --- names/relaxed.list
-roomverb_fdn                                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-roomverb_fdn_lr                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-roomverb_early_reflections                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-roomverb_allpass                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-parametric_eq_biquad                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-peak_limiter_follower                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-expander_gain                                                    unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-meter_peak_rms                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-ak_buffer_zero_pad                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-vorbis_codebook_decode_vq                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-vorbis_huffman_decode                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-vorbis_bits_look                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-vorbis_bits_adv                                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-dsp_analysis_window                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+roomverb_fdn                                                     unsupported  not proved: Wwise plug-in code without strings; 0x1a3d420, 0x1a3d8a0, 0x1a3dd90 share one constant
+roomverb_fdn_lr                                                  unsupported  not proved: Wwise plug-in code without strings; 0x1a3d420, 0x1a3d8a0, 0x1a3dd90 share one constant
+roomverb_early_reflections                                       unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+roomverb_allpass                                                 unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+parametric_eq_biquad                                             unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+peak_limiter_follower                                            unsupported  not proved: Wwise plug-in code without strings; 0x1a01550, 0x1a01850, 0x1a08300 share its constants
+expander_gain                                                    unsupported  not proved: Wwise plug-in code without strings; 0x1a01550, 0x1a01850, 0x1a08300 share its constants
+meter_peak_rms                                                   unsupported  not proved: Wwise plug-in code without strings; 0x1a1fb50 shares two constants
+ak_buffer_zero_pad                                               unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+vorbis_codebook_decode_vq                                        unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+vorbis_huffman_decode                                            unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+vorbis_bits_look                                                 unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+vorbis_bits_adv                                                  unsupported  not proved: Wwise plug-in code without strings; no candidate yet
+dsp_analysis_window                                              unsupported  not proved: Wwise plug-in code without strings; 0x1a14780 shares two constants
 
 # --- names/overrides/audio.list
-ak_lengine_thread                                                unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-input_queue_read                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+ak_lengine_thread                                                unsupported  Mac-only: the thread that waits on the CoreAudio sink's mach semaphore; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)
+input_queue_read                                                 unsupported  no counterpart: the Windows input keeps a linear 0x4000-byte buffer (+0x40, fill +0x4040, CRITICAL_SECTION +0x404c, written by the PortAudio callback 0x17c4f20), not the Mac's 5-slot queue
 ak_sink_ring_init                                                unsupported  Mac-only: the CoreAudio sink; the Windows Wwise build has its own sink
 
 # --- names/overrides/crypto.list
@@ -379,44 +380,44 @@ rsg_rijndael_key_setup_enc                                       0x142c6c0  cust
 rsg_rijndael_key_setup_dec                                       0x142c960  custom    int(uint32_t *, const uint8_t *, int)  # register args (LTCG)
 rsg_rijndael_encrypt                                             0x142cba0  custom    void(const uint32_t *, int, const uint8_t *, uint8_t *)  # register args eax,ecx (LTCG)
 rsg_rijndael_decrypt                                             0x142dc80  custom    void(const uint32_t *, int, const uint8_t *, uint8_t *)  # register args eax,ecx (LTCG)
-rsg_bpe_expand                                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_cryptopp_aes_ctr_decrypt                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_bpe_expand                                                   0x010d9730  custom    -  # ecx = encoded, edx = length, cdecl out: the only caller of both key blobs' decode
+rsg_cryptopp_aes_ctr_decrypt                                     0x019bd950  custom    -  # Crypto++ with a dynamically aligned frame (ebx = the arguments): the SNG loader 0x10d9f80 is its only caller, as on the Mac
 rsg_cryptopp_dsa_sha1_verify                                     0x019bfeb0  cdecl     _Bool(const uint8_t *, uint32_t, const char *)
-rsg_cryptopp_aes_cfb_decrypt                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_cryptopp_aes_cfb_decrypt                                     0x019be040  custom    -  # Crypto++ with a dynamically aligned frame (ebx = the arguments): builds the PSARC IV from immediates (0x19be16b), the table of contents reader 0x1422d10 is its only caller
 
 # --- names/overrides/efd.list
 rsg_ak_get_id_from_string                                        0x1a422b0  cdecl     uint32_t(const char *)
 rsg_efd_msghelper_on_init                                        0x0fc70c0  cdecl     int(void *)  # medium confidence
-rsg_efd_msghelper_on_tick                                        unsupported  medium-confidence match was an unrelated getter
+rsg_efd_msghelper_on_tick                                        unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
 rsg_efd_msghelper_display_name                                   0x1479310  cdecl     const char *(void *)  # medium confidence
-rsg_efd_category_init_u0                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_category_init_u2                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_path_standardize                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-efd_sqrt_table_new                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_id_set_type                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_id_set_usage                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_id_set_shard                                             unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_id_set_net_id                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_id_set_base_id                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8_units_at                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8_units                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8_tail_missing                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8string_length                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8string_to_upper                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_utf8string_to_lower                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-efd_snprintf                                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_category_init_u0                                         unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_category_init_u2                                         unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_path_standardize                                         0x014827c0  custom    bool(char *)  # edi = the path: the same loop, with the Windows separator: '/' becomes '\', double separators go, then tolower
+efd_sqrt_table_new                                               unsupported  not proved: 0x149c9b0 shares the masks but is much larger (inlined into start-up?)
+rsg_efd_id_set_type                                              unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_id_set_usage                                             unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_id_set_shard                                             unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_id_set_net_id                                            unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_id_set_base_id                                           unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_utf8_units_at                                            unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+rsg_efd_utf8_units                                               unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+rsg_efd_utf8_tail_missing                                        unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+rsg_efd_utf8string_length                                        unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+rsg_efd_utf8string_to_upper                                      unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+rsg_efd_utf8string_to_lower                                      unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
+efd_snprintf                                                     0x0149c110  custom    int(char *, size_t, const char *, ...)  # eax = buffer, ecx = size, stack = format, ...: forwards to the vsnprintf 0x149c140 with count -1
 
 # --- names/overrides/efd_ds.list
-rsg_efd_datastream_init                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_init_copy                                     unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_destroy                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_read                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_write                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_seek                                          unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_write_stream                                  unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_read_stream                                   unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_write_id                                      unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-rsg_efd_datastream_read_id                                       unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+rsg_efd_datastream_init                                          0x0147bec0  custom    -  # esi = this: vtable 0x1d5f134, a 0x400-byte buffer, the shared flags object
+rsg_efd_datastream_init_copy                                     0x0147bf80  custom    -  # esi = this, eax = source: the buffer copied, 17 callers as on the Mac
+rsg_efd_datastream_destroy                                       0x0147c010  thiscall  -  # frees the buffer when it owns it (+0x1d) and drops the flags object
+rsg_efd_datastream_read                                          unsupported  inlined by LTCG: sized copies at the call sites (0xf8fa70 is the 4-byte one); no general function
+rsg_efd_datastream_write                                         0x0147c090  custom    -  # edi = this, stack = (data, size), ret 8: refuses a read-only stream (+0x1c), grows by 0x400 as on the Mac
+rsg_efd_datastream_seek                                          unsupported  inlined by LTCG at the call sites
+rsg_efd_datastream_write_stream                                  0x0147c120  custom    -  # edi = this (in eax), esi = the source: the size swapped per the flags, then the bytes
+rsg_efd_datastream_read_stream                                   0x0147c190  custom    -  # esi = this, ret 4: the size swapped per the flags, then the bytes
+rsg_efd_datastream_write_id                                      unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_datastream_read_id                                       unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
 
 # --- names/overrides/efd_qi.list
 GRCamera_QueryInterface                                          0x13b46e0  thiscall  -
@@ -1063,10 +1064,10 @@ num_dtor                                                         0x013fff60  thi
 num_intern                                                       0x01400040  custom    -  # edi = out, stack = the double
 num_rehash                                                       unsupported  no counterpart: Dinkumware rehashes inside insert; the hash is a function of its own (0x1400650, F_1400650 in win32_overrides.c)
 path_md5                                                         unsupported  inlined into its callers: the override wraps path_intern (F_141c130 in win32_overrides.c)
-dlc_update                                                       0x1449310  thiscall  -  # medium confidence
-key_down                                                         unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-key_up                                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-thread_set_priority                                              unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dlc_update                                                       0x01449310  thiscall  -  # the per-frame update: win32_overrides.c replaces it, the batched mount runs on it
+key_down                                                         unsupported  Mac-only: the Mac game's stand-in for the keyboard device; Windows reads DirectInput and the window messages
+key_up                                                           unsupported  Mac-only: the Mac game's stand-in for the keyboard device; Windows reads DirectInput and the window messages
+thread_set_priority                                              unsupported  inlined at each thread's start (LTCG): `if thread+0x14 != N: SetThreadPriority(thread+0x20, ...)`, e.g. 0x106b4eb, 0x163cc0e; LP_QOS does the job here
 sng_verify                                                       0x019bfeb0  cdecl     _Bool(const uint8_t *, uint32_t, const char *)  # same function as rsg_cryptopp_dsa_sha1_verify, as on the Mac
 
 # --- names/overrides/online.list
@@ -1077,8 +1078,8 @@ dlc_worker_flush                                                 0x0144bbd0  cus
 dlc_job_preview                                                  0x0144bc80  thiscall  -
 dlc_job_request                                                  0x0144bdb0  thiscall  -
 open_uplay_url                                                   0x143c680  custom    -  # register args eax (LTCG)
-dlc_connection_changed                                           unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-autologin                                                        unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+dlc_connection_changed                                           unsupported  not needed (win-x86/online/names.tsv): it reads the extension's manager, which the Windows build keeps at +8 as the game's
+autologin                                                        unsupported  no function (win-x86/online/names.tsv): the one reader of AutoLogin is 0x144a7aa, in the profile tick, which the sign-in wrapper keeps out of
 
 # --- names/overrides/png.list
 png_set_sig_bytes                                                0x1986f20  cdecl     void(png_structp, int)
@@ -1119,39 +1120,39 @@ inflateEnd                                                       0x19b2170  cdec
 uncompress                                                       0x19b0790  cdecl     int(Bytef *, uLongf *, const Bytef *, uLong)
 
 # --- names added after the initial fill (addr-migrate brought them in)
-RSConnectExtension_RDV_ctor                                      unsupported  not yet matched
-RSConnectExtension_RDV_vtable                                    unsupported  not yet matched
-adler32                                                          unsupported  not yet matched
+RSConnectExtension_RDV_ctor                                      0x0144b3e0  stdcall   void(void *obj)  # win-x86/online/names.tsv: this on the stack, ret 4; the factory's only call, as on the Mac
+RSConnectExtension_RDV_vtable                                    0x1d5d934  data      void *[]  # win-x86/online/names.tsv: MSVC RTTI
+adler32                                                          0x019b4b10  cdecl     unsigned long(unsigned long, const uint8_t *, unsigned)  # zlib: the 65521 loop, called by the matched inflate and deflate family; the other copy, 0x1b0e6f0, is another library's
 boot_intro_update                                                0x01126950  stdcall   bool(void *boot)
-efd_free                                                         unsupported  not yet matched
+efd_free                                                         unsupported  inlined by LTCG: the allocator (0x149e770) and its slot 2 at each caller
 efd_ibase_get_class_id                                           0x00f81300  thiscall  uint32_t(const void *)
-efd_init                                                         unsupported  not yet matched
-efd_logger_singleton                                             unsupported  not yet matched
-efd_shutdown                                                     unsupported  not yet matched
-efd_sqrt_table                                                   unsupported  not yet matched
-efd_string_table                                                 unsupported  not yet matched
-efd_string_table_collisions                                      unsupported  not yet matched
-efd_string_table_count                                           unsupported  not yet matched
-engine_efd_begin                                                 unsupported  not yet matched
-engine_efd_end                                                   unsupported  not yet matched
-engine_egf_begin                                                 unsupported  not yet matched
-engine_egf_end                                                   unsupported  not yet matched
-engine_nimain_begin                                              unsupported  not yet matched
-engine_nimain_end                                                unsupported  not yet matched
+efd_init                                                         unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+efd_logger_singleton                                             unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+efd_shutdown                                                     unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+efd_sqrt_table                                                   unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+efd_string_table                                                 0x1ee1928  data      void *  # read by the add 0x149b430 and the remove 0x149b760; its lock is +0x180c (Mac +0x3018)
+efd_string_table_collisions                                      unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+efd_string_table_count                                           unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)
+engine_efd_begin                                                 unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+engine_efd_end                                                   unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+engine_egf_begin                                                 unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+engine_egf_end                                                   unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+engine_nimain_begin                                              unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+engine_nimain_end                                                unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
 frontend_open_file                                               0x0101ba80  custom    void **(void **out, const char *path)
 steam_dlc_owned                                                  0x01448b10  thiscall  bool(void *steam, int app)  # slot 47 of the Steam wrapper; matched by its place in InstallContentPackage (0x1449d58)
-key_pkg_aes                                                      unsupported  not yet matched
-key_pkg_dsa_blob                                                 unsupported  not yet matched
-key_pkg_dsa_blob_len                                             unsupported  not yet matched
-key_preview                                                      unsupported  not yet matched
-key_profile                                                      unsupported  not yet matched
-key_psarc_hex                                                    unsupported  not yet matched
-key_sng_aes_blob                                                 unsupported  not yet matched
-key_sng_aes_blob_len                                             unsupported  not yet matched
-key_sng_dsa_blob                                                 unsupported  not yet matched
-key_sng_dsa_blob_len                                             unsupported  not yet matched
-lib_cryptopp_begin                                               unsupported  not yet matched
-lib_cryptopp_end                                                 unsupported  not yet matched
+key_pkg_aes                                                      unsupported  no global: built from immediates on the stack at 0x130ab34 (not the Mac's bytes)
+key_pkg_dsa_blob                                                 0x1e6ade0  data      uint8_t[]  # passed to the decoder 0x10d9730 by the package config 0x130aa80
+key_pkg_dsa_blob_len                                             unsupported  no global: the immediate 0x4e6 at the call (0x130aadb)
+key_preview                                                      unsupported  no global: built from immediates on the stack (0x1443ae4), the same bytes as the Mac's
+key_profile                                                      0x1e6a2fc  data      uint8_t[32]  # the same 32 bytes as the Mac's
+key_psarc_hex                                                    0x1d5b1e8  data      char[65]  # the same 64 bytes as the Mac's
+key_sng_aes_blob                                                 0x1e6e9c0  data      uint8_t[]  # read by the SNG loader 0x10d9f80 only
+key_sng_aes_blob_len                                             unsupported  no global: the loader 0x10d9f80 has the length as an immediate
+key_sng_dsa_blob                                                 0x1e6ea08  data      uint8_t[]  # passed to the decoder 0x10d9730 by the SNG check 0x10d96a0 (win32_overrides.c runs it)
+key_sng_dsa_blob_len                                             unsupported  no global: the immediate 0x4e7 at the call
+lib_cryptopp_begin                                               unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
+lib_cryptopp_end                                                 unsupported  not needed: component ranges of the Mac image for its differential tests (rsimage_run_inits); LTCG mixes the components here
 luaopen_base                                                     0x0151b660  cdecl     int(lua_State *)
 luaopen_debug                                                    0x015159c0  cdecl     int(lua_State *)
 luaopen_math                                                     0x01516410  cdecl     int(lua_State *)
@@ -1159,27 +1160,27 @@ luaopen_os                                                       0x0151ddd0  cde
 luaopen_package                                                  0x0151f470  cdecl     int(lua_State *)
 luaopen_string                                                   0x01518ef0  cdecl     int(lua_State *)
 luaopen_table                                                    0x01520bd0  cdecl     int(lua_State *)
-profile_load                                                     unsupported  not yet matched
-rs_connect_ext_call_slot21                                       unsupported  not yet matched
-rs_connect_ext_call_slot22                                       unsupported  not yet matched
-rs_connect_ext_call_slot23                                       unsupported  not yet matched
-rs_connect_ext_call_slot25                                       unsupported  not yet matched
-rs_connect_ext_call_slot28                                       unsupported  not yet matched
-rs_connect_ext_call_slot29                                       unsupported  not yet matched
-rs_connect_ext_call_slot36                                       unsupported  not yet matched
-rsg_efd_category_init_svc                                        unsupported  not yet matched
-rsg_efd_fixedstring_assign                                       unsupported  not yet matched
-rsg_efd_fixedstring_c_str                                        unsupported  not yet matched
-rsg_efd_fixedstring_equals                                       unsupported  not yet matched
-rsg_efd_fixedstring_exists                                       unsupported  not yet matched
-rsg_efd_fixedstring_init                                         unsupported  not yet matched
-rsg_efd_fixedstring_init_copy                                    unsupported  not yet matched
-rsg_efd_fixedstring_init_cstr                                    unsupported  not yet matched
-rsg_efd_fixedstring_length                                       unsupported  not yet matched
-rsg_efd_fixedstring_release                                      unsupported  not yet matched
-rsg_efd_msghelper_init                                           unsupported  not yet matched
-rsg_efd_msghelper_on_net_id                                      unsupported  not yet matched
-rsg_efd_msghelper_on_preinit                                     unsupported  not yet matched
-rsg_efd_msghelper_on_shutdown                                    unsupported  not yet matched
-rsg_pkgconfig_decrypt                                            unsupported  not yet matched
-rsg_profile_encrypt                                              unsupported  not yet matched
+profile_load                                                     0x0134ee60  custom    -  # ecx + stack: the "EVAS" magic, the decrypt 0x134f370 with key_profile, two callers as on the Mac
+rs_connect_ext_call_slot21                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot22                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot23                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot25                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot28                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot29                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rs_connect_ext_call_slot36                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
+rsg_efd_category_init_svc                                        unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_fixedstring_assign                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_c_str                                        unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_equals                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_exists                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_init                                         unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_init_copy                                    unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_init_cstr                                    unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_length                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_fixedstring_release                                      unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
+rsg_efd_msghelper_init                                           unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_msghelper_on_net_id                                      unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_msghelper_on_preinit                                     unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_msghelper_on_shutdown                                    unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_pkgconfig_decrypt                                            0x0130aa80  cdecl     -  # the package config callback (the file on the stack, stored by 0x130ac70): decoder and verifier calls as the Mac's
+rsg_profile_encrypt                                              0x0134f270  fastcall  -  # key_profile through rsg_rijndael_key_setup_enc and rsg_rijndael_encrypt; one caller as on the Mac

@@ -6,7 +6,7 @@
 # The Windows game (Rocksmith 2014 Learn & Play, a purchased edition that Steam offers for Windows only) on a Mac,
 # EXPERIMENTAL. One run goes from your game files to an installed app:
 #   1. The game: found in Steam's depot download folder (or $LP_GAME_DIR, e.g. a folder copied from a
-#      Windows PC) and checked against win-x86/target.toml. If it is not there, Steam is opened if it isn't
+#      Windows PC) and checked against tools/targets/win-x86/target.toml. If it is not there, Steam is opened if it isn't
 #      and told to download it (lp_install.py game-download): nothing to paste. This says what is left for you
 #      to do, if anything (install Steam, sign in, the right account), and goes on by itself. Only if Steam
 #      ignores the command does its console open with the command on the clipboard.

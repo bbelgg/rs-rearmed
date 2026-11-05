@@ -5,62 +5,62 @@
 # a Mac value is taken only where the Windows code was read (win-x86/online/names.tsv) or for a vtable
 # slot before the destructor. `NAME unsupported REASON` = no counterpart in this game, or not matched yet.
 
-UIMenu_LAS_SongsList_qi_this_adj  unsupported  not matched yet (the Mac value is a 64-bit layout)
-UIMenu_ShopSongs_qi_this_adj      unsupported  not matched yet (the Mac value is a 64-bit layout)
-UIMenu_ShopGear_qi_this_adj       unsupported  not matched yet (the Mac value is a 64-bit layout)
-UIMenu_ShopPacks_qi_this_adj      unsupported  not matched yet (the Mac value is a 64-bit layout)
-service_manager_quit              unsupported  not matched yet (the Mac value is a 64-bit layout)
-game_config_vsync                 unsupported  not matched yet (the Mac value is a 64-bit layout)
-input_sink_full_char              unsupported  not matched yet (the Mac value is a 64-bit layout)
-thread_priority_index             unsupported  not matched yet (the Mac value is a 64-bit layout)
-thread_pthread                    unsupported  Mac-only (pthread_t; the Windows engine thread is a Win32 thread)
+UIMenu_LAS_SongsList_qi_this_adj  -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
+UIMenu_ShopSongs_qi_this_adj      -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
+UIMenu_ShopGear_qi_this_adj       -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
+UIMenu_ShopPacks_qi_this_adj      -0x2c0  # read in its QueryInterface: lea eax, [eax + ecx - 0x2c0]
+service_manager_quit              unsupported  Mac-only: the shell's request flag; here WM_QUIT goes straight to the manager's slot 21 (0x149edb6)
+game_config_vsync                 unsupported  not located: no code here reads the field as vsync; only the Mac shell needs it
+input_sink_full_char              unsupported  Mac-only: a slot of the Mac input_sink's frame
+thread_priority_index             0x14    # engine thread: int32 priority index (read at the inlined sites, 0x106b4eb, 0x163cc0e)
+thread_pthread                    unsupported  Mac-only (pthread_t); the Windows thread handle is +0x20, read at the inlined sites of thread_set_priority
 path_obj_refs                     0x1c    # interned path object: int refcount
-rmutex_owner                      unsupported  Mac-only (the pthread recursive mutex)
-rmutex_depth                      unsupported  Mac-only (the pthread recursive mutex)
-dlc_installing                    unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_pending                       unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_check_on                      unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_first_done                    unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_tail_done                     unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_clear_map                     unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_map                           unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_map_root                      unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_map_begin                     unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_map_end                       unsupported  not matched yet (the Mac value is a 64-bit layout)
-dlc_map_size                      unsupported  not matched yet (the Mac value is a 64-bit layout)
+rmutex_owner                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its owner at +0x18
+rmutex_depth                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its depth at +0x1c
+dlc_installing                    0x6     # DLC coordinator: the batched mount runs on these (win32_overrides.c, 0x1449310)
+dlc_pending                       0x4     # DLC coordinator: u8
+dlc_check_on                      0x5     # DLC coordinator: u8
+dlc_first_done                    0xdc    # DLC coordinator: u8
+dlc_tail_done                     0xdd    # DLC coordinator: u8
+dlc_clear_map                     0x68    # DLC coordinator: u8
+dlc_map                           0x30    # DLC coordinator: std::map
+dlc_map_root                      0x34    # DLC coordinator: map root node
+dlc_map_begin                     0x38    # DLC coordinator: map begin node
+dlc_map_end                       0x3c    # DLC coordinator: map end node
+dlc_map_size                      0x40    # DLC coordinator: map size
 json_number_refs                  0x4     # number object: int32 refcount
 json_number_value                 0x8     # number object: double value
-json_number_add_ref_slot          0x0     # number object vtable: AddRef (before the destructor, so the Mac's; not checked)
-json_number_release_slot          0x1     # number object vtable: Release (before the destructor, so the Mac's; not checked)
-ak_ps_refills                     unsupported  not matched yet (the Mac value is a 64-bit layout)
+json_number_add_ref_slot          0x0     # number object vtable: AddRef (read in num_intern, 0x14000b6)
+json_number_release_slot          0x1     # number object vtable: Release (read in num_intern, 0x14000c7)
+ak_ps_refills                     0x24    # AkPlatformInitSettings: u16, set from LatencyBuffer (config +8, default 4) at 0x17cb174 in the game's copy 0x1f089e8
 ak_sink_refills                   unsupported  Mac-only (the CoreAudio sink; the Windows Wwise build has its own sink)
 ak_sink_ring                      unsupported  Mac-only (the CoreAudio sink; the Windows Wwise build has its own sink)
-si_state                          unsupported  not matched yet (the Mac value is a 64-bit layout)
+si_state                          unsupported  Mac-only: the Mac SoundInput; the Windows one is SoundInputPortAudio (si_open)
 si_dev                            unsupported  Mac-only (CoreAudio AudioObjectID)
-si_channels                       unsupported  not matched yet (the Mac value is a 64-bit layout)
+si_channels                       0x1a    # SoundInputPortAudio: u16 (the Mac's is u32), the channel count of its format at +0x18, read at 0x17c4fb5
 ak_lengine_stop                   unsupported  Mac-only (the LEngine thread argument with its mach semaphore)
-siq_bufs                          unsupported  not matched yet (the Mac value is a 64-bit layout)
-siq_filled                        unsupported  not matched yet (the Mac value is a 64-bit layout)
-siq_slot_size                     unsupported  not matched yet (the Mac value is a 64-bit layout)
-siq_read_off                      unsupported  not matched yet (the Mac value is a 64-bit layout)
-siq_read_idx                      unsupported  not matched yet (the Mac value is a 64-bit layout)
-siq_empty                         unsupported  not matched yet (the Mac value is a 64-bit layout)
+siq_bufs                          unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
+siq_filled                        unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
+siq_slot_size                     unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
+siq_read_off                      unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
+siq_read_idx                      unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
+siq_empty                         unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map
 siq_lock                          unsupported  Mac-only (pthread mutex)
-guest_jmp_buf_size                unsupported  not matched yet (the Mac value is a 64-bit layout)
-service_holder_sm                 unsupported  not matched yet (the Mac value is a 64-bit layout)
+guest_jmp_buf_size                0x40    # sizeof(jmp_buf) of msvcr100: every png_set_longjmp_fn caller passes it and the function checks it
+service_holder_sm                 0x4     # ServiceManager holder (*0x1ee0bfc): the ServiceManager, read by every function here
 efd_inc_ref_slot                  0x1     # efd IBase vtable: IncRefCount (slots below the destructor, 8, are the Mac's)
 efd_dec_ref_slot                  0x2     # efd IBase vtable: DecRefCount (slots below the destructor, 8, are the Mac's)
 efd_query_interface_slot          0x4     # efd IBase vtable: QueryInterface (4 and 5, folded; names.tsv)
 sm_get_system_service_slot        0xf     # ServiceManager vtable: GetSystemService (efd_get_config_bool, names.tsv)
 config_get_bool_slot              0x14    # config manager vtable: GetValue(bool) (= Mac 0x15; names.tsv)
-connect_set_dlc_service_slot      unsupported  probably 0x86 (Mac slot m >= 10 is slot m - 1); not checked
-connect_set_profile_service_slot  unsupported  probably 0x87 (Mac slot m >= 10 is slot m - 1); not checked
-connect_set_extension_slot        unsupported  probably 0x88 (Mac slot m >= 10 is slot m - 1); not checked
-rs_object_size_steam_service      unsupported  not matched yet (the Mac value is a 64-bit layout)
-rs_object_size_connect_service    unsupported  not matched yet (the Mac value is a 64-bit layout)
-rs_object_size_dlc_service        unsupported  not matched yet (the Mac value is a 64-bit layout)
-rs_object_size_profile_service    unsupported  not matched yet (the Mac value is a 64-bit layout)
-rs_object_size_property_object    unsupported  not matched yet (the Mac value is a 64-bit layout)
+connect_set_dlc_service_slot      0x86    # rsconnect_factory: [vtable + 0x218], the Mac order (0x143cb87)
+connect_set_profile_service_slot  0x87    # rsconnect_factory: [vtable + 0x21c] (0x143cb94)
+connect_set_extension_slot        0x88    # rsconnect_factory: [vtable + 0x220] (0x143cbe3)
+rs_object_size_steam_service      0xd0    # rsconnect_factory: efd_alloc size (0x143ca2d)
+rs_object_size_connect_service    0x10c   # rsconnect_factory (0x143ca07)
+rs_object_size_dlc_service        0xf0    # rsconnect_factory (0x143caa9)
+rs_object_size_profile_service    0xd0    # rsconnect_factory (0x143cb26)
+rs_object_size_property_object    unsupported  not needed: see property_object_ctor
 property_object_ref_slot          0x0     # empty property object vtable (before the destructor, so the Mac's; not checked)
 profile_regs_pad                  0x4     # RSProfileService: int[2] pad of each player (signin_start_no_uplay, names.tsv)
 profile_pad_player                0xc     # RSProfileService: int[4] player of each pad, -1 = none
@@ -73,12 +73,12 @@ profile_block_a                   0x71    # RSProfileService: byte, StartSignIn 
 profile_block_b                   0x73    # RSProfileService: byte, StartSignIn refuses when set
 profile_block_c                   0x74    # RSProfileService: byte, StartSignIn refuses when set
 profile_set_pad_slot              0x10    # RSProfileService vtable: SetPad(this, player, pad) (= Mac 0x11)
-dlc_job_delete_slot               unsupported  MSVC has one deleting destructor where the Mac has two, so probably 0x0; not checked
-dlc_job_fail_slot                 unsupported  MSVC has one deleting destructor where the Mac has two, so probably 0x3; not checked
+dlc_job_delete_slot               0x0     # job functor vtable: delete (win32_overrides.c: dlc_job_fail)
+dlc_job_fail_slot                 0x3     # job functor vtable: completion, 0x1445f10 (win32_overrides.c: dlc_job_fail)
 
 # --- offsets added after the initial fill
-boot_intro_playing                      unsupported  not yet matched
-boot_intro_state                        unsupported  not yet matched
-boot_phase                              unsupported  not yet matched
-boot_phase3_steps                       unsupported  not yet matched
-boot_step                               unsupported  not yet matched
+boot_intro_playing                0x2d    # RSBootService: cleared by the game's own skip, 0x1126759
+boot_intro_state                  0x60    # RSBootService: the same five-state switch in 0x1126950
+boot_phase                        0x48    # RSBootService: dispatcher 0x112614d; the intro skip reads it (win32_overrides.c)
+boot_phase3_steps                 0xa     # RSBootService: the same count
+boot_step                         0x28    # RSBootService: 11-case switch on counter + 1 at 0x112727a

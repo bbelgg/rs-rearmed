@@ -12,7 +12,7 @@ tools/targets/
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map yet); 919 symbols matched, the rest `unsupported`
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map yet); 957 symbols read, the rest `unsupported` with the reason
   names/             shared by every target
     overrides/*.list the functions each override module replaces
     hooks.list       hook points (the names mods use with rc_hook_add_name)

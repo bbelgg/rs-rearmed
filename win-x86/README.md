@@ -30,7 +30,7 @@ Win32 seam by name (`shims/win32_dispatch.c`).
 
 - `unpack/` — the exe unpacked on the Mac with the release's seed (`lp_unpack.py`), and how a seed is made
 - `image/` — the game image from the unpacked exe or a harvest (`lp_image.py`) and its P1 facts (`lp_p1.py`)
-- `install/` — install steps: the game from Steam, the code image, the Microsoft DLLs (`lp_install.py`; pins in `target.toml`),
+- `install/` — install steps: the game from Steam, the code image, the Microsoft DLLs (`lp_install.py`; pins in `tools/targets/win-x86/target.toml`),
   the build, the app bundle and the clean-up (`lp_build.py`, through `lp_install.py build`, `app-install`, `build-clean`)
 - `imports/` — the import tables (IAT slots and VMProtect wrapper sites) at link addresses
 - `build/` — `translate.sh` (the game, ~15-25 min), `build_modules.sh` (the DLLs), `build_shims.sh`,

@@ -70,7 +70,7 @@ Steam's depot download folder: the native Steam client writes download_depot out
 <Steam>/steamapps/content/. Both are looked at.
 
 Common options: --steam DIR (default $RS_STEAM_DIR, else ~/Library/Application Support/Steam),
---config FILE (default $LP_CONFIG, else win-x86/target.toml), --progress-lines ("progress F LABEL" lines
+--config FILE (default $LP_CONFIG, else tools/targets/win-x86/target.toml), --progress-lines ("progress F LABEL" lines
 and "guide" lines on stdout, the installer app's format, instead of a status line in a terminal).
 
 Every command can run again: what is already in place is checked and kept, a partial download continues.
@@ -103,7 +103,7 @@ from rebase_pe import rebase  # noqa: E402
 import gamefiles  # noqa: E402
 import lp_build  # noqa: E402
 
-CONFIG = os.environ.get("LP_CONFIG") or os.path.join(ROOT, "win-x86", "target.toml")
+CONFIG = os.environ.get("LP_CONFIG") or os.path.join(ROOT, "tools", "targets", "win-x86", "target.toml")
 LOADSCREEN = os.path.join(ROOT, "tools", "loadscreen", "build.sh")
 TAR = "/usr/bin/tar"
 CURL = "/usr/bin/curl"
@@ -1077,7 +1077,7 @@ def wait(cfg, folder, steam, progress, timeout=0, interval=2.0, settle=90.0, clo
                                          "manifest %s" % manifest if manifest else "") if x)
             progress.say("Steam finished the download%s." % (" (%s)" % what if what else ""))
             if loc.status == "ok" and manifest and manifest != cfg.get("depot_manifest"):
-                progress.say("Manifest %s holds the supported build (depot_manifest in win-x86/target.toml)." % manifest)
+                progress.say("Manifest %s holds the supported build (depot_manifest in tools/targets/win-x86/target.toml)." % manifest)
             if loc.status != "ok":
                 raise Failure(describe(cfg, loc), 2 if loc.status == "different" else 1)
             break

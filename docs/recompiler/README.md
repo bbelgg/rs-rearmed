@@ -11,7 +11,7 @@ game runs. It has two front ends, one per game binary, and one back end:
 | Generator | `build/gen_image.py` | `build/gen_image_pe.py` |
 | Guest memory | the image at its slide in the host address space | a 4 GB window; guest address = `rc_mem + (uint32_t)addr` |
 | Runtime | `runtime/rc_*` | `runtime/rc_*` plus `runtime/rc32_*` (`-DRC_GUEST32`) |
-| Tables | `tools/targets/mac-x64` | `tools/targets/win-x86` (919 of 1,142 symbols matched), `win-x86/imports` (import sites), `win-x86/target.toml` |
+| Tables | `tools/targets/mac-x64` | `tools/targets/win-x86` (957 of 1,142 symbols read), `win-x86/imports` (import sites), `tools/targets/win-x86/target.toml` |
 
 How each port uses it: [Mac design](../mac/DESIGN.md), [Windows design](../windows/DESIGN.md).
 
@@ -47,9 +47,9 @@ Everything tied to one binary (function addresses, calling conventions, struct o
 - `tools/targets/check.py` (ctest `targets.check`) fails when a name in `names/` has no entry in a target
   that does not mark it `unsupported`, or when native code uses a name no list has.
 
-Only `mac-x64` is a full target today. `win-x86` has every name, nearly all of them `unsupported` until
-matched (the online layer's few are filled in), so `check.py` covers both; the Windows build does not use
-it yet: it has no overrides or hook points of its own, and its pins are in `win-x86/target.toml`.
+`mac-x64` is a full target. `win-x86` has an entry for every name, `check.py` covers both: 957 of the 1,142
+symbols and 56 of the 75 offsets are read from the Windows code, and an `unsupported` line says why for the
+rest (inlined by LTCG, Mac-only, not needed, or not proved). Its `target.toml` also holds the install pins.
 
 ## Overrides and hook points
 

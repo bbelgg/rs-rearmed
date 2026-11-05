@@ -356,7 +356,8 @@ in `Info.plist`, then `codesign --force --sign -`), and before each run delete `
 the test home's `Library/Caches/rs-rearmed`. Start the executable directly, with `HOME` and `CFFIXED_USER_HOME` at the test home: with
 `open`, a test bundle with its files on another drive waits for macOS's question about the volume, with no window to show for it (a
 process stuck in `dyld4::open`, no log), and nobody may answer it in an unattended run. Metal's cache is the same either way
-([METAL.md](../mac/METAL.md#safe-load)).
+(`lib_ms` 7.7 ms by `open` from the internal disk, 7.8 ms started directly; [METAL.md](../mac/METAL.md#safe-load)). For a run by
+`open`, keep the app, its home and the game copy on the internal disk (`RS_GAME_COPY_DIR=home`).
 
 Screens not in the other routes, by key from the main menu (2026-11-05, keyfifo, a test profile, no guitar; `key` is left out):
 

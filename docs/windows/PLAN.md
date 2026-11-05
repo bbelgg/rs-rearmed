@@ -85,14 +85,20 @@ needs it: 441 archives peak at 461 descriptors, over the 256 of an app started f
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
-Mods and hook points (2026-11-04): 11 of the 14 hook points, the `mods/` folder and one mod ABI
+Mods and hook points (2026-11-05): 11 of the 14 hook points, the `mods/` folder and one mod ABI
 with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The same `probe_mod.dylib`, its SHA-256 in both logs, ran to the
-note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, 9 of the 11 points called
-with the arguments the Mac run shows (`rr_speed_ratio` and `ui_event` were not reached), `game_frame`'s quit answered on both. No mod
-code runs without the guard (no `libnetguard.dylib`, or a restart that lost it) or from a library built without `rc_mod.h`. With no
-mod the table doesn't show on the game thread ([PERFORMANCE.md](PERFORMANCE.md#hook-points)). Started with `open`, the app
-restarts with the guard and loads the mod, but that run had no game files: the test bundle has no macOS permission for the
-volume the test copy is on, and `open` waits there for an answer. A whole game by `open` with a mod is open.
+note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, nothing refused, all 11 points
+reached with the arguments the Mac run shows, `game_frame`'s quit answered on both. No mod code runs without the guard (no
+`libnetguard.dylib`, or a restart that lost it) or from a library built without `rc_mod.h`. With no mod the table doesn't show on the
+game thread ([PERFORMANCE.md](PERFORMANCE.md#hook-points)). Started with `open`, from a test home on the internal disk, the app
+restarts with the guard, keeps what was already inserted, and plays a whole song with the mod; with an empty `mods/` folder it
+doesn't restart.
+
+Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
+source given by `RS_SOURCE_URL` and a stand-in Steam, through Preparing shaders; the image's SHA-256 is the pin in `target.toml`. With
+the system's cache cold, the warm-up and then a first play started with `open` gave the figures of
+[PERFORMANCE.md](PERFORMANCE.md#shader-preparation) (7.7 ms of compiling, no frame over 33 ms in the song), so the warm-up and `open`
+share the cache. Not in these runs: a real Steam download, a guitar. All suites of [TESTING.md](TESTING.md) pass on that code.
 
 Not there yet: the loading-screen fix, the OpenGL renderer (no window path).
 
@@ -184,6 +190,17 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
   render buffer depending on the opening order.
 - **Installer**: closing its window quits without a crash.
 
+## Built in for 1.5.0
+
+Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
+
+- **Shaders prepared at install**: a Metal corpus made from the user's game files at build time and a Preparing shaders step, the
+  Mac's, so a first play has about 1.2 s more of long frames than the second instead of 22 s
+  ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
+- **Mods and hook points**: the `mods/` folder and 11 of the 14 hook points, with the network guard loaded for any mod. The same mod
+  binary serves both editions ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)).
+- **The `win-x86` target tables**: 957 of 1,142 symbols, 57 of 76 offsets, 12 of 14 hook points, and the image's `.text` and SHA-256.
+
 ## Next work
 
 **Parity (P4):**
@@ -199,8 +216,7 @@ A patch release of what was found after 1.4.0, the same in the [Mac plan](../mac
   plug-in DSP, small efd helpers): those have candidates in the map, and a wrong address would be worse than
   the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
   register arguments), which their overrides have to read by hand.
-- Hook points and mods, left to do: a whole game by `open` with a mod ([Status](#status)); `rr_speed_ratio` and `ui_event` in a run
-  (Riff Repeater, the focus loss); `si_open`, refused for
+- Hook points and mods, left to do: `si_open`, refused for
   now: a run shows what looks like the slot as its first stack word and 0 for success, so an adapter looks possible; `input_sink` and
   `set_app_focus`; the overlay API for mods that draw, and `OV_VCALL`, which the app doesn't export. `mods.c` and `audio_in.c`
   are not built here, so their pointer-width layouts need no names per target.

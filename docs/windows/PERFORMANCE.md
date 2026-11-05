@@ -249,8 +249,10 @@ the app was started directly rather than with `open` ([TESTING.md](TESTING.md#sh
 So the first play after an install has about 1.2 s more of frames over 33 ms up to the highway than the second, against
 about 22 s without the warm-up. What is left is pipelines: the corpus has libraries, and the pipelines need draw state
 it doesn't have, as on the Mac; the disk cache has them from the second play on. All 98 programs of the run came out of the corpus.
-The worst frame of 1.4 s, 3 s after the start, is in every run and has nothing to do with shaders. In the Final pass it was 0.7 s: these runs
-started the app directly and without `open`, the only difference found, and it was not looked into further.
+The worst frame of 1.4 s, 3 s after the start, is in every run and has nothing to do with shaders. By `open` from the internal disk it
+is 1.1 s, on the first and the second play alike, so starting the app directly isn't the cause; in the Final pass it was 0.7 s, and it
+was not looked into further. The warm-up followed by a first play by `open` has the same picture: to the highway 10 frames over 33 ms in
+0.6 s, none in the song, 7.7 ms of compiling, 1,117 ms of pipelines.
 
 A program the corpus doesn't have costs what it did before, a stall of about 0.25 s the first time. After a macOS update the system's
 cache and the disk cache are both new, and so is the first play: the warm-up has to be run again ([INSTALL.md](INSTALL.md#known-issues)).

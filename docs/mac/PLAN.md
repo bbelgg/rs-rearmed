@@ -6,6 +6,10 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 - **Released**: `VERSION` says which release this is. 1.4.0 is the first with the experimental Windows (Learn & Play)
   port.
+- **Checked for 1.5.0** (2026-11-05, a build by hand and one by the installer with the source given by `RS_SOURCE_URL`, a test home, by
+  keys and snapshots): the image matches the pin; a song to the note highway and out, with a mod and without, no signal, nothing
+  refused by the network guard; the shader warm-up. The game was started directly with the launcher's environment, not by `open`. All
+  suites of [TESTING.md](TESTING.md) pass.
 - **Shader warm-up**: the loop is now in libRSOpenGL (`rs_gfx_warm_only`), which Learn & Play's install runs too; nothing changed
   here. `tools/metal/make-corpus.sh --learn-play` and `build-msl-corpus.sh --pairs` are that edition's way through the same tools.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with
@@ -72,6 +76,14 @@ A patch release of what was found after 1.4.0, the same in the [Windows plan](..
 - **Guitar on an interface also used for output**: a device with inputs keeps a 128-frame buffer, so a sink rebuilt
   after the input opens can't leave the guitar with half of each buffer.
 - **Installer**: closing its window quits without a crash.
+
+## Built in for 1.5.0
+
+Nothing here is meant to change how this edition plays. What changed is shared with Learn & Play, whose news are in the
+[Windows plan](../windows/PLAN.md#built-in-for-150):
+
+- **One mod binary for both editions**: a mod built with `rc_mod.h` loads in either app. This edition's mod interface is as it was.
+- **Shader warm-up**: the loop moved to libRSOpenGL, unchanged, and the corpus made by the same scripts is byte for byte 1.4.1's.
 
 ## Next work
 

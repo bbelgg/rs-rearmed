@@ -49,8 +49,6 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the
   Retina mouse in songs, a Guitarcade game played with an instrument, and a fresh player's first answer to macOS's
   question about another disk with the compiled launcher (an earlier Allow covered the one run).
-- Changing the default output during a run doesn't move the game: the sink stays on its device. Learn & Play
-  follows the change ([TESTING.md](TESTING.md#game-runs)).
 - The installer keeps its preferences in the user's defaults even when run with a test `HOME`
   ([TESTING.md](TESTING.md#installer-tests)).
 
@@ -85,6 +83,14 @@ Nothing here is meant to change how this edition plays. What changed is shared w
 - **One mod binary for both editions**: a mod built with `rc_mod.h` loads in either app. This edition's mod interface is as it was.
 - **Shader warm-up**: the loop moved to libRSOpenGL, unchanged, and the corpus made by the same scripts is byte for byte 1.4.1's.
 
+## Fixed in 1.5.1
+
+- **The default output**: the sound now follows a change of the default output during a run, as in Learn & Play. The game opens
+  its sink once and never moves it, so the override stops the graph, moves it, and starts it again
+  ([TESTING.md](TESTING.md#game-runs)).
+- **Learn & Play's hidden window** is that edition's fix ([Windows plan](../windows/PLAN.md#fixed-in-151)); this edition's
+  display link already kept the rate.
+
 ## Next work
 
 Being looked into, with no promise of if or when:
@@ -95,9 +101,6 @@ Being looked into, with no promise of if or when:
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)
   already serve the Windows port; hook points and the mods folder are shared now, and the rest of its
   parity work is in the [Windows plan](../windows/PLAN.md#next-work).
-- **Build options**: `-mno-outline` for the generated C gave the Windows port 4% of its game thread
-  ([Windows performance](../windows/PERFORMANCE.md#opportunities-by-expected-payoff)); not measured on the
-  Mac yet.
 
 ## Risks
 

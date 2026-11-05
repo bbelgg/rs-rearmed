@@ -26,7 +26,7 @@ list, the Multiplayer menus, DIRECT CONNECT with an audio interface listed and c
 (without `crd`), the Metal cache in its own folder, the game's own Exit and the app's Quit (gone in 0.3 s), 74.9 fps on
 a 75 Hz display. The Real Tone cable is seen; a guitar through it was not played in these runs. The default output
 changed during a song: the render stream reopens on the new device (`audio: the default output is now ...`) and the
-sound follows, there and back; the Mac edition stays on the device it opened ([Mac testing](../mac/TESTING.md#game-runs)).
+sound follows, there and back; the Mac edition does the same since 1.5.1 ([Mac testing](../mac/TESTING.md#game-runs)).
 `RS_METAL_RETINA=1` on the built-in screen: a 2940x1912 back buffer and frames of that size, the menu and a song on the
 highway at 60 fps, 54% of a core.
 
@@ -58,7 +58,7 @@ measurements was the logo video, and the 15-35 s since then was not seen again. 
 
 The system's default output changing reaches the game: Wwise then makes a new sink, and the sound follows, there and
 back. Checked through the window script's `audio` step and by switching a real device during a song (2026-11-04). The
-Mac edition stays on the device it opened ([Mac testing](../mac/TESTING.md#game-runs)).
+Mac edition follows too since 1.5.1 ([Mac testing](../mac/TESTING.md#game-runs)).
 
 Command-Q and the close button quit through the game's own shutdown (`WM_CLOSE`), and losing the keyboard lets go
 of held keys and tells the game; checked on 2026-11-04 (the quit ended in `ExitProcess(0)` 0.4-0.5 s after
@@ -127,11 +127,6 @@ already, or has no need of them.
 
 ## Open issues
 
-- **A hidden window runs at about 120 fps**: the full-screen window hides when another app is active, its layer then
-  stops pacing presents, and the game runs free up to some limit of about 8.3 ms (not in our code; not found). Measured
-  on 2026-11-04 on a 75 Hz display: 74.9 fps in front, 117.6 with Finder active, 74.9 again in front. The Mac edition
-  stays at the display's rate there (a display link drives its frames). Harmless but wasteful; a fix is a wait in
-  Present while the window is occluded (`windowDidChangeOcclusionState`), and a build to test it.
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address
   0x0`), a fault at guest address 0x168 before it. Neither reproduced on demand yet; neither came back in the
   runs of 2026-11-04 (about ten tuner skips, on builds with x86 memory ordering and one without).
@@ -201,6 +196,13 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   binary serves both editions ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)).
 - **The `win-x86` target tables**: 957 of 1,142 symbols, 57 of 76 offsets, 12 of 14 hook points, and the image's `.text` and SHA-256.
 
+## Fixed in 1.5.1
+
+- **A hidden window keeps the display's rate**: the full-screen window hides when another app is active, its layer then stops
+  pacing presents, and the game ran at about 120 fps. `windowDidChangeOcclusionState` now sets a wait in Present, outside the device
+  lock. On a 60 Hz display, 60 fps in front, behind Finder and in front again, against 60, 120 and 60 for an earlier build; the D3D9
+  host test covers the wait. Goes with the same section of the [Mac plan](../mac/PLAN.md#fixed-in-151).
+
 ## Next work
 
 **Parity (P4):**
@@ -225,7 +227,7 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
 the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of
 the draw-time upload; zero-copy dynamic buffers; `-mno-outline` for the generated C (4% of the game thread,
-15% larger binary); memory (guest copies of D3D9 buffers).
+15% larger binary; on the Mac build it changes nothing, [Mac performance](../mac/PERFORMANCE.md#build-options)); memory (guest copies of D3D9 buffers).
 
 ## Risks
 

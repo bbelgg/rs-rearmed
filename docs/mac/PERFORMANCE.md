@@ -156,6 +156,7 @@ The switches change only how the generated C is compiled; the normal build uses 
 | `RC_LTO=thin` | no measurable change | about 3.5 minutes more build time |
 | `RC_LTO=thin` with `RC_PGO=use:` a played profile | about 2% less | two builds and a playing session |
 | `RC_OPT=-O3` | little change | |
+| `RC_OPT="-O2 -mno-outline"` | none: the build is the same | all 244 objects byte for byte the default build's (1.5.1) |
 
 With `RC_LTO=thin` the objects are LLVM bitcode and the final link does the optimisation, so it takes
 longer; `<output>/lto-cache` makes relinks incremental. A changed switch recompiles everything in that

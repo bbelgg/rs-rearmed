@@ -830,6 +830,7 @@ AudioService_QueryInterface                                      0x101337230  sy
 AudioService_QueryInterface_const                                0x101337290  sysv  -
 input_queue_read                                                 0x10133b310  sysv  -
 si_open                                                          0x10133bee0  sysv  bool(void *self, int slot)
+si_io                                                            0x10133c6d0  sysv  bool(void *self, uint32_t device, const AudioBufferList *input)
 lib_cryptopp_begin                                               0x101343dd0  code  -
 rsg_cryptopp_aes_ctr_decrypt                                     0x101376328  sysv  _Bool(const uint8_t *, uint64_t, const char *, uint32_t, uint8_t *, uint32_t)
 rsg_cryptopp_dsa_sha1_verify                                     0x10137683d  sysv  _Bool(const uint8_t *, uint32_t, const char *)
@@ -856,6 +857,7 @@ json_number_vtable                                               0x1017f5c70  da
 RSConnectExtension_RDV_vtable                                    0x101822c98  data  void *[]
 objc_classref_MessageBox                                         0x10186da28  data  Class
 game_config                                                      0x101873e08  data  rsp_config
+audio_mono_to_stereo                                             0x101873e10  data  uint32_t  # +8 of the [Audio] settings at 0x101873e08
 key_profile                                                      0x101877060  data  uint8_t[32]
 key_sng_aes_blob_len                                             0x1018784b0  data  uint32_t
 key_sng_aes_blob                                                 0x1018784c0  data  uint8_t[]

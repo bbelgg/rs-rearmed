@@ -61,7 +61,7 @@ port, and several features are not there yet.
 | Multiplayer (local) | ⚠️ | ⚠️ |
 | DLC | ✅ | ✅ ¹ |
 | Custom songs (CDLC) | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; all 14 hook points and the overlay API |
+| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 14 of the 15 hook points (not `si_io`, the Mac game's CoreAudio input) and the overlay API |
 | RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods; see [the Windows plan](docs/windows/PLAN.md#fixed-in-151) for what a run covered |
 | Built-in fixes (rs-mac-fixes, RSBypass) | ✅ | ✅ |
 | Loading-screen fix (fast-load `cache.psarc` with Metal) | ✅ | ❌ |
@@ -76,6 +76,7 @@ port, and several features are not there yet.
 | DIRECT CONNECT in the INPUT setting (overlay of your own `cache.psarc`) | ✅ | ✅ |
 | ENUMERATE in the main menu: new songs without a restart | ✅ | ✅ |
 | Lower guitar latency (buffers, real-time audio thread) | ✅ | ⚠️ |
+| Guitar input channel and gain (`guitar-input.ini`) | ✅ | ✅ |
 | Bink videos with sound | ✅ | ✅ intro video, lessons |
 | Window and full screen | ✅ | ✅ |
 | Retina rendering (`RS_METAL_RETINA=1`) | ✅ | ✅ |
@@ -133,6 +134,7 @@ These are compiled into the Mac app. Learn & Play has those marked "Both edition
 | **"Re-ARMed" title logo**: a tag over the title-screen logo, built automatically from your own `static.psarc` by `tools/loadscreen`. Both editions | on | `RS_REARMED=0` shows the original logo; or delete `static.psarc.rearmed` |
 | **Frame rate**: the game renders at the display's refresh rate (a 75 Hz or 120 Hz display gets 75 or 120 fps). A fixed rate can be set instead, with vsync off, for example 30 to save power | display | `RS_FPS=N` |
 | **Lower guitar latency**: a smaller output buffer (see the FAQ), a real-time audio thread, and stale guitar audio dropped instead of played late | on | `RS_AUDIO_FRAMES=N` sets the output buffer (e.g. 128; 0 leaves the system's), `RS_LATENCY_BUFFER=N` the game's (1-16). `RS_AUDIO_RT=0` and `RS_AUDIO_INPUT_TRIM=0` turn off the other two. `RS_AUDIO_LOG=1` logs the audio setup |
+| **Guitar input channel and gain**: which channel of an interface the game listens to, and a boost or cut before the game hears it, per device (see the FAQ). An interface of more than two channels is heard on its first channel, where the Mac game alone would mix its channels up. Both editions | first channel, 0 dB | `guitar-input.ini`; `RS_AUDIO_INPUT_CHANNEL=N` and `RS_AUDIO_INPUT_GAIN_DB=N` for every device; `RS_AUDIO_INPUT=0` turns it off |
 | **All guitar interfaces listed**: an interface no longer goes missing from Direct Connect because another device, such as a webcam, failed to open | on | `RS_AUDIO_STABLE_UIDS=0` and `RS_AUDIO_INPUTS_FIRST=0` turn them off |
 | **Renderer**: Metal, or Apple's OpenGL (see [Renderer](#renderer-metal-or-opengl)) | Metal | the `renderer` file, the installer, or `RS_GL_BACKEND=gl` |
 | **Retina** (Metal only): the game renders at the screen's full resolution on a Retina screen | off | `RS_METAL_RETINA=1` |
@@ -287,8 +289,6 @@ For the Mac port; the Windows port's are in [docs/windows/INSTALL.md](docs/windo
 Being looked into for future releases, with no promise of if or when:
 
 - **RSMods:** more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **Input channel selection:** choosing which input of an external audio interface the game listens to,
-  on interfaces with more than one input.
 - **The Windows game:** bringing the Learn & Play port to parity with the Mac port (the hook points left, the OpenGL
   renderer). See [docs/windows/PLAN.md](docs/windows/PLAN.md).
 
@@ -350,6 +350,20 @@ which is why 1 does not crackle here as it does under Rosetta, and on an interfa
 where the guitar shares it). At 1 only the game's output buffer is that
 small; the rest of its audio engine runs as at 2, double-buffered, which adds no delay
 (`RS_AUDIO_RING_SPLIT=0` turns that off). Both are read when the game starts.
+
+**My interface has several inputs, or the guitar is too quiet. What can I do?**
+Create `~/Library/Application Support/RS Re-ARMed/guitar-input.ini`, with one section per interface, named as in
+Audio MIDI Setup:
+
+```ini
+[HX Stomp]
+Channel=5
+```
+
+`Channel` counts from 1; on an HX Stomp the dry guitar is on USB channels 5 and 6. For a quiet interface, add a line
+such as `GainDb=6`, which boosts the signal before the game hears it (-24 to 36, default 0). Try it without a gain
+first: an HX Stomp needs none, too much clips the signal, and `RS_AUDIO_LOG=1` logs the peak and what was clipped. Both editions read this file when an input opens, so
+restart the game after a change, then calibrate again in the game. Pick the interface under Direct Connect.
 
 **Where do I report bugs?**
 In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check that the bug doesn't also happen in the original game

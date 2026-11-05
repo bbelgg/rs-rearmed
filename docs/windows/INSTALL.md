@@ -278,6 +278,20 @@ Metal only. The OpenGL renderer has no window path in this build, so there is no
 The setting is `[Audio] LatencyBuffer` in `userdata/game/Rocksmith.ini`. The output device's buffer is
 `RS_AUDIO_FRAMES` (default 256). The delay has not been measured against the Mac port.
 
+### Guitar input
+
+Which channel of an interface the game listens to, and a gain before the game hears it, are set per device in
+`~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (the Mac edition reads the same file):
+
+```ini
+[HX Stomp]
+Channel=5
+```
+
+The section is the device's name in Audio MIDI Setup. `Channel` counts from 1. For a quiet interface add a gain, such
+as `GainDb=6`: -24 to 36, default 0 (an HX Stomp needs none); above full scale the signal clips, as in an interface. The file is read when an input opens, so restart the game
+after a change and calibrate again. With nothing set the game hears the first channel.
+
 ## Settings and switches
 
 The app sets no environment. To pass a switch, start it with `open`:
@@ -292,6 +306,8 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen |
 | `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames |
 | `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_SET_RATE=0` | on | the real-time audio thread, the stale-input trim, switching devices to 48 kHz |
+| `RS_AUDIO_INPUT_CHANNEL=N`, `RS_AUDIO_INPUT_GAIN_DB=N` | `guitar-input.ini` | the guitar input's channel and gain, for every device |
+| `RS_AUDIO_INPUT_FILE=PATH`, `RS_AUDIO_INPUT=0` | `guitar-input.ini`, on | another settings file; none of this |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed |
 | `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off |
@@ -337,7 +353,7 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   [PLAN.md](PLAN.md#built-in-for-140)). The built-in fixes are the batched DLC mounting
   (`RS_MODS_BUDGET_MS=N`, default 50 ms a frame), the higher open-file limit, the song path cache and the
   number-table hash (`RS_MODS_FIXES=0` turns them off).
-- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). All 14 hook
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 14 of the 15 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
   `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
   event from the game); pass floating point arguments to `rc_call_guest`; call a

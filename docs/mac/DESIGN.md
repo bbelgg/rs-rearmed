@@ -108,11 +108,17 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 - the sink follows the default output: the game opens it once and never moves it, so when the default changes the override
   stops the game's audio graph, gives its output unit the new device with the sink's 48 kHz and buffer, and starts it again;
 - stale guitar audio queued from the cable is dropped instead of played late (`RS_AUDIO_INPUT_TRIM`);
+- the guitar input's channel and gain: the game's I/O function handles one channel, or picks one of two, and of a
+  device of more channels it queues the start of the buffer as it is, so 8 channels give 16 frames of mixed-up audio
+  per 128. A hook (`si_io`, `audio_chan.c`) gives it a mono buffer of the chosen channel with the gain instead, and the
+  game's mono path does the rest. The game can only change a level through the device's input volume, which most
+  interfaces don't have, so the gain comes before the game. Settings: `guitar-input.ini`
+  ([INSTALL.md](INSTALL.md#guitar-input));
 - devices get stable identifiers, so an interface is not dropped from Direct Connect after another device
   fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`, `RS_AUDIO_INPUTS_FIRST`).
 
-The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order)
-are in `shims/coreaudio/rs_audio_host.c`, which the Windows port shares. `RS_AUDIO_LOG=1` logs the setup.
+The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the
+input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which the Windows port shares. `RS_AUDIO_LOG=1` logs the setup.
 
 ## Video (Bink)
 

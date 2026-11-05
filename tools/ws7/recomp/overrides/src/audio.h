@@ -1,5 +1,5 @@
-// Override module `audio`: lower guitar-to-sound latency (audio_out.c, audio_in.c, audio_devs.c, audio_ring.c,
-// audio_trace.c).
+// Override module `audio`: lower guitar-to-sound latency and the guitar input (audio_out.c, audio_in.c,
+// audio_chan.c, audio_devs.c, audio_ring.c, audio_trace.c).
 //
 // The guitar reaches the speakers through three buffers the game sets up (Wwise 2013-era integration):
 //   * the cable's I/O buffer (128 frames) and a 5-slot queue of such buffers that the Wwise thread drains
@@ -54,6 +54,9 @@ int32_t rs_audio_set_property_data(uint32_t obj, const void *addr, uint32_t qsiz
                                    uint32_t size, const void *data);
 // Records a property read made while SoundInput opens an input device (audio_trace.c, RS_AUDIO_LOG=1).
 void rs_audio_trace_get(uint32_t obj, const void *addr, int32_t st, uint32_t size, const void *data);
+
+// With RS_AUDIO_LOG=1 the inputs' peak and clips every few seconds (audio_chan.c). Called by the input's reader.
+void rs_audio_chan_report(void);
 
 // The sink's ring in refills of 256 frames: LatencyBuffer, also when the engine runs with more (audio_ring.c).
 uint32_t rs_audio_ring_refills(void);

@@ -14,6 +14,7 @@ ak_set_rtpc_name    # AK::SoundEngine::SetRTPCValue(const char *, float, unsigne
 camera_set_frustum  # NiCamera::SetViewFrustum(const NiFrustum &): every camera, every frame
 ak_init             # AK::SoundEngine::Init(AkInitSettings *, AkPlatformInitSettings *): +0x54 = refills (LatencyBuffer); audio_ring.c
 si_open             # SoundInput open (this, int slot) -> bool: opens device list entry `slot` as a guitar input; audio_trace.c
+si_io               # SoundInput I/O (this, uint32 device, const AudioBufferList *input) -> bool: one I/O buffer of an input, on the device's I/O thread; audio_chan.c
 boot_intro_update   # RSBootService intro tick (this) -> bool still loading: the start-up intro movie; mods.c skips it
 steam_dlc_owned     # (Steam wrapper, int app id) -> bool: the game's DLC list has the AppID, installed; mods.c (songs added while the game runs)
 frontend_open_file  # FrontEnd_OpenFile(DataStream **out, const char *path): opens a game file through the VFS; mods.c (cache overlay)

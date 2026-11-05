@@ -133,7 +133,7 @@ static void after_open(rc_ctx *c, void *user) {
   device_name(dev, name, sizeof name);
   if (ok)
     rs_audio_log("input device %u \"%s\" (list entry %u) opened, %u channel(s)", dev, name, slot,
-                 *(uint32_t *)(self + RC_OFF(si_channels)));
+                 rs_audio_channels(dev, kAudioObjectPropertyScopeInput));
   else
     rs_audio_log("input device %u \"%s\" (list entry %u) not opened; its calls:%s", dev, name, slot,
                  t_open.steps);

@@ -259,6 +259,11 @@ as a real-time thread (`RS_AUDIO_RT`); stale input is trimmed (`RS_AUDIO_INPUT_T
 48 kHz when they can be (`RS_AUDIO_SET_RATE`). Exclusive output at a 256-frame period is about the Mac
 build at `LatencyBuffer=2`.
 
+**The guitar input's channel and gain** (shared code in `shims/coreaudio/rs_audio_input.c`): the capture stream reads
+the device's channels and gives the game the one `guitar-input.ini` sets, whatever number of channels the game opened,
+with the gain and a clip at full scale ([INSTALL.md](INSTALL.md#guitar-input)). The Mac port does this in a hook on the
+game's own input; here the stream is ours, so it needs no hook point (`si_io` is `unsupported`).
+
 **Cable detection.** On the PortAudio path the game accepts an input whose USB IDs are in its table
 (vendor/product 12BA/00FF is the Real Tone cable), read from the endpoint's device instance id; on the
 waveIn path it takes the first device named "Rocksmith". The layer gives each USB device an instance id

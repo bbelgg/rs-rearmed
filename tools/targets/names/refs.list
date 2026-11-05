@@ -30,6 +30,8 @@ ak_platform_settings   # Wwise's AkPlatformInitSettings copy
 ak_init                # AK::SoundEngine::Init
 ak_sink_ring_alloc     # CoreAudio sink: allocates the ring
 si_open                # SoundInput slot open
+si_io                  # SoundInput I/O: one buffer of an input
+audio_mono_to_stereo   # [Audio] MonoToStereoChannel as the game read it: 1 = a two-channel input's second channel
 ak_lengine_thread_id   # pthread_t of the LEngine thread
 ak_lengine_start_time  # time(0) at LEngine thread start
 ak_render_loop         # renders the blocks the sink needs

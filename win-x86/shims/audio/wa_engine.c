@@ -10,10 +10,12 @@
 #include <unistd.h>
 
 #include "rs_audio_host.h"
+#include "rs_audio_input.h"
 #include "win32_shims.h"
 
 #define MAX_DEVS 64
 #define MAX_CH 8
+#define MAX_DEV_CH 32  // a device's channels read, of which the game gets at most MAX_CH
 #define WA_RATE 48000u  // the rate the game opens every stream at (sink and guitar input)
 
 // ------------------------------------------------------------------------------------------------
@@ -129,18 +131,6 @@ void wa_from_float(const wa_fmt *f, const float *src, void *dst, uint32_t frames
 // ------------------------------------------------------------------------------------------------
 // Endpoints
 // ------------------------------------------------------------------------------------------------
-static int scope_channels(AudioObjectID dev, AudioObjectPropertyScope scope) {
-  AudioObjectPropertyAddress a = {kAudioDevicePropertyStreamConfiguration, scope, kAudioObjectPropertyElementMain};
-  UInt32 sz = 0;
-  if (AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &sz) != noErr || !sz) return 0;
-  AudioBufferList *l = malloc(sz);
-  int n = 0;
-  if (l && AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, l) == noErr)
-    for (UInt32 i = 0; i < l->mNumberBuffers; i++) n += (int)l->mBuffers[i].mNumberChannels;
-  free(l);
-  return n;
-}
-
 static void dev_string(AudioObjectID dev, AudioObjectPropertySelector sel, char *buf, size_t n) {
   CFStringRef s = NULL;
   buf[0] = 0;
@@ -203,7 +193,7 @@ void wa_game_name(char *name, size_t n, uint16_t vid, uint16_t pid) {
 }
 
 static int fill_endpoint(AudioObjectID dev, int flow, wa_endpoint *ep) {
-  int ch = scope_channels(dev, flow == WA_CAPTURE ? kAudioObjectPropertyScopeInput : kAudioObjectPropertyScopeOutput);
+  int ch = rs_audio_channels(dev, flow == WA_CAPTURE ? kAudioObjectPropertyScopeInput : kAudioObjectPropertyScopeOutput);
   if (ch <= 0) return 0;
   memset(ep, 0, sizeof *ep);
   ep->dev = dev;
@@ -306,7 +296,12 @@ struct wa_stream {
   float *in_buf;
   uint32_t in_max;
   double step, phase;
-  float last[MAX_CH];
+  float last[MAX_DEV_CH];
+  // the guitar input's settings (rs_audio_input.h): in_ch -1 = the game's channels as they are
+  int in_ch;
+  float in_gain;
+  rs_audio_input_stats in_stats;
+  char in_name[128];
   float *conv;  // guest-format conversions on the guest side (ring_frames x channels)
 };
 
@@ -373,15 +368,15 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
   uint32_t ch = s->fmt.channels, dch = s->dev_ch;
   uint64_t w = atomic_load_explicit(&s->w, memory_order_relaxed);
   uint64_t r = atomic_load_explicit(&s->r, memory_order_acquire);
-  float frame[MAX_CH];
-  uint32_t pushed = 0, dropped = 0;
+  float frame[MAX_CH], peak = 0;
+  uint32_t pushed = 0, dropped = 0, clips = 0;
   for (uint32_t i = 0; i < frames;) {
     // one output frame: at phase between last (i - 1) and in_buf[i]
     const float *cur = s->in_buf + (size_t)i * dch;
     for (uint32_t c = 0; c < ch; c++) {
-      uint32_t sc = c < dch ? c : 0;
+      uint32_t sc = s->in_ch >= 0 ? (uint32_t)s->in_ch : c < dch ? c : 0;
       float a = s->last[sc], b = cur[sc];
-      frame[c] = s->step == 1.0 ? b : a + (float)s->phase * (b - a);
+      frame[c] = rs_audio_input_apply(s->step == 1.0 ? b : a + (float)s->phase * (b - a), s->in_gain, &peak, &clips);
     }
     if ((uint32_t)(w - r) + pushed < s->ring_frames) {
       ring_write(s, w + pushed, frame, 1);
@@ -392,12 +387,13 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
     s->phase += s->step;
     while (s->phase >= 1.0 && i < frames) {
       s->phase -= 1.0;
-      for (uint32_t c = 0; c < dch && c < MAX_CH; c++) s->last[c] = cur[c];  // only the first ch are read
+      for (uint32_t c = 0; c < dch; c++) s->last[c] = cur[c];
       i++;
       cur += dch;
     }
   }
   atomic_store_explicit(&s->w, w + pushed, memory_order_release);
+  rs_audio_input_note(&s->in_stats, peak, clips, pushed);
   if (dropped) atomic_fetch_add_explicit(&s->overruns, dropped, memory_order_relaxed);
   if ((uint32_t)(w + pushed - r) >= s->period_frames) signal_guest(s);
   return noErr;
@@ -484,9 +480,15 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
   c.mFramesPerPacket = 1;
   c.mBitsPerChannel = 32;
   if (capture) {
-    s->dev_ch = (uint16_t)scope_channels(ep->dev, kAudioObjectPropertyScopeInput);
+    s->dev_ch = (uint16_t)rs_audio_channels(ep->dev, kAudioObjectPropertyScopeInput);
     if (!s->dev_ch) goto fail;
-    if (s->dev_ch > 32) s->dev_ch = 32;
+    if (s->dev_ch > MAX_DEV_CH) s->dev_ch = MAX_DEV_CH;
+    // By the device's name in the system: ep->name is the one the game sees.
+    rs_audio_input in;
+    rs_audio_dev_name(ep->dev, s->in_name, sizeof s->in_name);
+    rs_audio_input_for(s->in_name, &in);
+    s->in_ch = rs_audio_input_channel(&in, s->dev_ch, s->in_name);
+    s->in_gain = in.gain;
     c.mSampleRate = s->dev_rate;  // the input side of a HAL unit does not convert rates
     c.mChannelsPerFrame = s->dev_ch;
     c.mBytesPerFrame = c.mBytesPerPacket = 4u * s->dev_ch;
@@ -623,6 +625,7 @@ uint32_t wa_render_underruns(wa_stream *s) { return atomic_load(&s->underruns); 
 // cable and the output device), the oldest are dropped down to one so the guitar is never heard
 // late for the rest of the session.
 uint32_t wa_capture_available(wa_stream *s, int trim) {
+  rs_audio_input_report(&s->in_stats, 5 * s->fmt.rate, s->in_name);
   uint64_t r = atomic_load_explicit(&s->r, memory_order_relaxed);
   uint64_t w = atomic_load_explicit(&s->w, memory_order_acquire);
   uint32_t avail = (uint32_t)(w - r);

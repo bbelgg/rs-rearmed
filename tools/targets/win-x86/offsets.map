@@ -38,6 +38,8 @@ ak_sink_refills                   unsupported  Mac-only (the CoreAudio sink; the
 ak_sink_ring                      unsupported  Mac-only (the CoreAudio sink; the Windows Wwise build has its own sink)
 si_state                          unsupported  Mac-only: the Mac SoundInput; the Windows one is SoundInputPortAudio (si_open)
 si_dev                            unsupported  Mac-only (CoreAudio AudioObjectID)
+si_io_state                       unsupported  Mac-only: the Mac SoundInput's I/O state; the Windows input has no IOProc
+siio_stream                       unsupported  Mac-only: the Mac SoundInput's I/O state; the Windows input has no IOProc
 si_channels                       0x1a    # SoundInputPortAudio: u16 (the Mac's is u32), the channel count of its format at +0x18, read at 0x17c4fb5
 ak_lengine_stop                   unsupported  Mac-only (the LEngine thread argument with its mach semaphore)
 siq_bufs                          unsupported  Mac-only: the 5-slot queue; see input_queue_read in symbols.map

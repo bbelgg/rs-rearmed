@@ -5,6 +5,10 @@
 
 ## Status
 
+Guitar input channel and gain (2026-11-05, a build by hand, a test home): an HX Stomp's channel 5 at 0 dB through Direct
+Connect, heard right by the maintainer in a short run; peaks up to -16.4 dBFS, nothing clipped. Not in this pass: a gain
+above 0 dB in a run, a whole song, an install by the installer.
+
 Checked by hand on an Apple Silicon Mac (2026-11-01):
 
 - the game boots offline, with the Uplay screens skipped;
@@ -41,7 +45,7 @@ and plays without a restart ([TESTING.md](TESTING.md#unattended-runs)). The Shop
 game checks the Steam overlay first and shows a notice.
 
 Present but not tested: a multiplayer song (the tuner asks for Player 2's cable, and this Mac has one), the Workshop's
-other screens, the DLC preview, playing through Direct Connect and other inputs, and the prebuilt harvester
+other screens, the DLC preview, a whole song through Direct Connect and other inputs, and the prebuilt harvester
 (`win-x86/harvest/rsharvest2.exe`: the capture used so far was made with an earlier build of the same tool).
 
 Built in, as on the Mac: DLC archives mounted in batches within a frame budget and the song-file signature skip
@@ -85,7 +89,7 @@ needs it: 441 archives peak at 461 descriptors, over the 256 of an app started f
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
-Mods and hook points (2026-11-05): all 14 hook points since 1.5.1, the overlay API, the `mods/` folder and one mod ABI
+Mods and hook points (2026-11-05): the 14 hook points of 1.5.1 (the 15th since, `si_io`, is the Mac game's CoreAudio input and has no counterpart), the overlay API, the `mods/` folder and one mod ABI
 with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The same `probe_mod.dylib`, its SHA-256 in both logs, ran to the
 note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, nothing refused, the 11 points of 1.5.0
 reached with the arguments the Mac run shows, `game_frame`'s quit answered on both. No mod code runs without the guard (no
@@ -241,7 +245,9 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-150):
   the gap. 19 offsets are left for the same reasons. 76 overridden functions have `custom` conventions (LTCG
   register arguments), which their overrides have to read by hand.
 - Hook points and mods: `mods.c` and `audio_in.c` are not built here, so their pointer-width layouts need no names per target.
-- The checks the Mac port has had that are left: a guitar through Direct Connect, long sessions.
+- The checks the Mac port has had that are left: a whole song with a guitar through Direct Connect (a short run is done), long sessions.
+
+**Guitar input:** a picker in the installer app, and two guitars on one interface, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
 the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of

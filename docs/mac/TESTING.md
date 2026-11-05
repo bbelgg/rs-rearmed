@@ -25,6 +25,7 @@ in the repository.
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (the cable screen's DIRECT CONNECT button, the INPUT slider's fourth value, the main menu's ENUMERATE, the notice) and that a file which has them is left alone; the psarc and 7z readers and writers with made-up archives (a rewritten 7z keeps every other file's stored bytes, order, times and attributes); the overlay made, and left out for a cache that has the entries; `gamefiles.py` making it after a copy. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`, also `python3 tools/targets/check.py`) | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
 | Hook points and mods | `recomp.hooks` (`tools/ws7/recomp/test/hooks`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
+| Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with the Windows port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
 | Renderer | `opengl.*` (`shims/opengl/test`) | the GL entry-point table and its clients (`opengl.table.clients`), offscreen contexts on both backends, 40 GL sequences run on GL and Metal with their pixels compared (`opengl.metal.*`), every game import with `RS_GL_CHECK=1` (`opengl.metal.coverage`), the Metal disk cache (`opengl.metal.cache`) |
 | Shader translator | `msl.unit`, `msl.verify.builtin`, `msl.verify.corpus` | GLSL to MSL; `msl_verify` runs programs on offscreen GL and Metal with the same inputs and compares pixels, depth and vertex outputs (the corpus test needs shader dumps) |
@@ -104,6 +105,12 @@ user's, with a test profile.
     netguard stays in the list: `DYLD_INSERT_LIBRARIES=<home>/libnetguard.dylib:OUTDIR/libkeyfifo.dylib`.)
 - **By hand**: menus, a song, Session Mode, lessons, Guitarcade, full screen and back, quitting; on both
   renderers (`RS_GL_BACKEND=gl` for OpenGL).
+- **An interface's channel and gain**: `RS_AUDIO_LOG=1` with a `guitar-input.ini` (`RS_AUDIO_INPUT_FILE` for a test
+  one). The log should have `listening to channel N of M` at the start, and a peak every five seconds while the game
+  listens: for a person, the INPUT setting to DIRECT CONNECT, the interface, the calibration, then play. An input of more
+  than two channels without the setting is the case to compare with: scrambled and quiet on a build before this.
+  A new launcher in a test home on an external drive stops at macOS's prompt for that drive; start the game's executable
+  directly, as above.
 - **First play of a song stutters** with Metal after an install: Metal builds pipelines the first time they
   are used, so the first half-minute of a song, venue or mode has a few 0.3-0.8 s stalls. Measure frame
   times on a second play.
@@ -234,7 +241,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | Switch | What |
 |---|---|
 | `RS_MODS_LOG=1` | what the built-in fixes apply |
-| `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input |
+| `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
 | `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_TRACE_DIR` | GL calls, errors after each call, counts, traces |
 | `RS_MSL_LOG=1`, `RS_MTL_DUMP_MSL` | shaders translated at run time, the MSL of slow compiles |

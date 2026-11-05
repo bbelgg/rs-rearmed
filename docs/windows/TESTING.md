@@ -15,6 +15,7 @@ where you point them and never copied into the repository.
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
 | Kernel32 waits, input hooks | `make -C win-x86/shims/tests test OUT=DIR` | `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game); events, mutexes, semaphores, wait-any and wait-all, timeouts; an idle waiter is not woken by other objects; a wait keeps objects whose handles are closed; `PulseEvent`; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); the open-file limit from 256 (`rc_nofile.h`, shared with the Mac port) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
+| Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Steam face | `make -C win-x86/shims/steam test OUT=DIR` | the guest ABI end to end: exports, interface vtables, `thiscall`, callbacks and call results |
 | Online layer | `make -C win-x86/online test OUT=DIR` | the three vtables in guest memory with fake game functions: every replaced slot, the posted events, a layout that does not match left alone |
 | D3D9 layer | `win-x86/test/d3d9_test.sh <cmake build dir> [out dir]` (needs `cmake --build <dir> --target opengl`) | the layer's host test on both libRSOpenGL backends: fixed-function draws checked pixel by pixel, every stage operation, lights, fog, generated texture coordinates, the draw-time upload of dynamic buffers, the wait in Present while the window is hidden (1,272 checks) |
@@ -147,6 +148,10 @@ The installed app takes a folder of its own with `open -n --env LP_HOME=<folder>
 the game files (`lp_install.py game-copy GAME --dest <folder>/game`, clones on the same volume) or pass
 `--env LP_GAME_DIR=<game folder>`, which reads that folder as it is (no copy check); `--env` passes any
 other variable.
+
+**An interface's channel and gain**, as on the Mac ([Mac TESTING](../mac/TESTING.md#game-runs)): the same steps, with
+`RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log has `guitar input "<device>": channel N, gain G dB` when the capture
+stream opens, and a peak for each open input every five seconds, the microphones among them.
 
 **No intro screens** (`RS_MODS_INTRO`, as on the Mac, [Mac TESTING](../mac/TESTING.md#game-runs)): the
 game should reach the title without the logos and legal screens, and with `RS_MODS_INTRO=0` play them. The
@@ -447,7 +452,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
 | `RS_GL_FRAMETIMES=FILE` | a line per Present |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
-| `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input |
+| `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each input's peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the Steam face's calls (`[steam-shim]`) |
 | `RS_MODS_LOG=1` | the built-in fixes: the open-file limit, the DLC mounting's end (archives, frames, time, and the path cache's and number hash's counts), each song-file signature skip, each DLC preview job that fails offline |
 | `RS_MODS_FIXES=0`, `RS_MODS_BUDGET_MS=N`, `RS_MODS_BYPASS=0` | the built-in fixes off, the DLC mounting's time per frame (0: one archive a frame), the song-file signature check on |

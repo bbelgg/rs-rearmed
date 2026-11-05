@@ -55,7 +55,7 @@ find_package(Python3 COMPONENTS Interpreter)
 enable_testing()
 
 # shims/steam builds with its own Makefile (make -C shims/steam).
-foreach(shim libstdcxx bink opengl cg game platform)
+foreach(shim libstdcxx bink opengl cg game platform coreaudio)
   add_subdirectory(shims/${shim})
 endforeach()
 

@@ -105,6 +105,7 @@ void RC_FN(input_queue_read)(rc_ctx *c) {
   void *dst = OV_PTR(a, void);
   uint16_t req = (uint16_t)OV_U64(a);
   if (g_trim < 0) g_trim = rs_audio_env_on("RS_AUDIO_INPUT_TRIM", 1);
+  rs_audio_chan_report();
   unsigned limit = g_trim ? trim_limit(Q_SIZE(q), atomic_load_explicit(&rs_audio_out_frames, memory_order_relaxed))
                           : Q_SLOTS;
   ov_ret_u32(c, rs_queue_read(q, dst, req, limit));

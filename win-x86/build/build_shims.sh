@@ -18,7 +18,7 @@ mkdir -p "$obj/shims"
 CC="clang -arch arm64 -O2 -g -Wall -Wno-unused-parameter -DRC_GUEST32 -I$runtime -I$shims -I$gl_inc"
 echo "=== Win32 shims ==="
 rm -f "$obj/shims"/*.o
-for f in "$shims"/win32_*.c "$shims"/d3d9/*.c "$shims"/audio/wa_*.c "$root/shims/coreaudio/rs_audio_host.c" \
+for f in "$shims"/win32_*.c "$shims"/d3d9/*.c "$shims"/audio/wa_*.c "$root/shims/coreaudio"/rs_audio_*.c \
          "$root"/win-x86/online/online32.c; do
   $CC -I"$root/shims/coreaudio" -c "$f" -o "$obj/shims/$(basename "$f" .c).o"
 done

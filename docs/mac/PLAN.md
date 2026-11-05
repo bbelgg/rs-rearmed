@@ -13,6 +13,10 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 - **Checked for 1.5.1** (2026-11-05, the app from `install.sh` over an existing install): the default output changed in Sound settings during
   a song and the sound moved, heard by the maintainer. All suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the
   installer app, a guitar.
+- **Guitar input channel and gain** (2026-11-05, a test home, started directly): an HX Stomp, 8 channels, the dry guitar
+  on channel 5 at 0 dB, through Direct Connect and the game's calibration, heard right by the maintainer; peaks up to
+  -14.1 dBFS, nothing clipped. Before, the game opened it with its 8 channels mixed up. The UR22 and the other
+  inputs opened as before. Not in this pass: a gain above 0 dB in a run, an install by the installer app.
 - **RSMods' library** (2026-11-05): the same `rearmed-mods.dylib` 0.3.0 as Learn & Play's, all its mods on, a test home, to the note highway and
   a quit ([Fixed in 1.5.1](#fixed-in-151)).
 - **Shader warm-up**: the loop is now in libRSOpenGL (`rs_gfx_warm_only`), which Learn & Play's install runs too; nothing changed
@@ -106,8 +110,10 @@ Nothing here is meant to change how this edition plays. What changed is shared w
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **Input channel selection**: choosing which input of an audio interface with more than one input the game
-  listens to.
+- **A picker for the guitar input**: a section of the installer app with the device, channel, gain and a live meter
+  per channel, for both editions. Today it is `guitar-input.ini`.
+- **Two guitars on one interface**: the game opens one stream per device, so a second player on another channel of it
+  would need a device of its own, made up by the audio layer.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)
   already serve the Windows port; hook points and the mods folder are shared now, and the rest of its
   parity work is in the [Windows plan](../windows/PLAN.md#next-work).

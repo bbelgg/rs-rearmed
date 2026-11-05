@@ -66,6 +66,8 @@ efd_alloc                                                        0x014791e0  cde
 json_number_base_ctor                                            unsupported  inlined into num_intern (0x1400040), which writes the vtable and fields itself
 json_number_base_dtor                                            unsupported  inlined into num_dtor (0x13fff60), which writes the base vtable 0x1d5a358
 sng_load_verify_ret                                              0x010d96f7  code      -  # the return of the verifier's call at 0x10d96f2 in the SNG check 0x10d96a0; its only other caller is the package config, 0x130aaed
+si_io                                                            unsupported  Mac-only: the CoreAudio IOProc; Learn & Play's channel and gain are in its capture stream (win-x86/shims/audio/wa_engine.c)
+audio_mono_to_stereo                                             unsupported  Mac-only: used for the Mac input; Learn & Play's capture stream gives the game the channel
 ak_platform_settings                                             0x1ed2860  data      AkPlatformInitSettings  # Wwise's own copy: the 0xd0 bytes 0x1a4a5a0 copies from the argument, or fills through the defaults 0x1a454c0; the game's is 0x1f089e8
 ak_sink_ring_alloc                                               unsupported  Mac-only: the CoreAudio sink; the Windows Wwise build has its own sink
 ak_lengine_thread_id                                             unsupported  Mac-only type (pthread_t); the Windows LEngine thread is a Win32 thread

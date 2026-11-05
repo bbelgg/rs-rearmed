@@ -62,6 +62,18 @@ static int has_streams(AudioObjectID dev, AudioObjectPropertyScope scope) {
 int rs_audio_has_input(AudioObjectID dev) { return has_streams(dev, kAudioObjectPropertyScopeInput); }
 int rs_audio_has_output(AudioObjectID dev) { return has_streams(dev, kAudioObjectPropertyScopeOutput); }
 
+int rs_audio_channels(AudioObjectID dev, AudioObjectPropertyScope scope) {
+  AudioObjectPropertyAddress a = {kAudioDevicePropertyStreamConfiguration, scope, kAudioObjectPropertyElementMain};
+  UInt32 sz = 0;
+  if (AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &sz) != noErr || !sz) return 0;
+  AudioBufferList *l = malloc(sz);
+  int n = 0;
+  if (l && AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, l) == noErr)
+    for (UInt32 i = 0; i < l->mNumberBuffers; i++) n += (int)l->mBuffers[i].mNumberChannels;
+  free(l);
+  return n;
+}
+
 // ------------------------------------------------------------------------------------------------
 // Output device buffer
 // ------------------------------------------------------------------------------------------------

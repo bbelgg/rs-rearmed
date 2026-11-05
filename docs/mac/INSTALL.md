@@ -369,6 +369,23 @@ The setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer in s
 (5.3 ms). The launcher keeps it across launches. The output device's buffer is `RS_AUDIO_FRAMES`
 (default 256; 128 at `LatencyBuffer=1` and on an interface that also has inputs).
 
+### Guitar input
+
+Which channel of an interface the game listens to, and a gain before the game hears it, are set per device in
+`~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (Learn & Play reads the same file):
+
+```ini
+[HX Stomp]
+Channel=5
+```
+
+The section is the device's name in Audio MIDI Setup. `Channel` counts from 1. For a quiet interface add a gain, such
+as `GainDb=6`: -24 to 36, default 0 (an HX Stomp needs none); above full scale the signal clips, as in an interface. The file is read when an input opens, so restart the game
+after a change and calibrate again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device),
+`RS_AUDIO_INPUT_FILE` (another file) and `RS_AUDIO_INPUT=0` (none of this) are switches. A device of up to two
+channels with nothing set runs as the game has it, `MonoToStereoChannel` included. With `RS_AUDIO_LOG=1` the log has
+the channel, and every few seconds the peak and the samples clipped.
+
 ## Settings and switches
 
 The built-in fixes and their switches are listed in the [README](../../README.md#built-in-patches-and-mods).

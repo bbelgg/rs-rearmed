@@ -35,6 +35,8 @@ ak_sink_ring                      0x28    # CoreAudio sink: ring buffer pointer
 si_state                          0x228   # SoundInput: u32 state (2 = closed, to be opened)
 si_dev                            0x30    # SoundInput: u8 selected, u32 AudioObjectID at +4
 si_channels                       0x20    # SoundInput: u32 channel count
+si_io_state                       0x28    # SoundInput: pointer to its I/O state (+0 device, +0x10 stream, +0x14/+0x15 flags), allocated at open
+siio_stream                       0x10    # SoundInput I/O state: u32 index of the input stream it reads
 ak_lengine_stop                   0x4     # LEngine thread argument: u8 stop flag (+0 mach semaphore)
 siq_bufs                          0x8     # SoundInput queue: slot buffer pointers (5)
 siq_filled                        0x30    # SoundInput queue: int32 filled flags (5)

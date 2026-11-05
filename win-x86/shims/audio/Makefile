@@ -15,13 +15,16 @@ CFLAGS   := -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializ
 FRAMEWORKS := -framework AudioToolbox -framework CoreAudio -framework CoreFoundation
 
 SRC := wa_engine wa_com wa_winmm
-HDR := audio.h wa_engine.h ../win32_guestobj.h ../win32_shims.h $(coreaudio)/rs_audio_host.h
+HDR := audio.h wa_engine.h ../win32_guestobj.h ../win32_shims.h $(coreaudio)/rs_audio_host.h \
+       $(coreaudio)/rs_audio_input.h
 
 all: $(OUT)/libwinaudio.a
 
 $(OUT)/%.o: %.c $(HDR) | $(OUT)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/rs_audio_host.o: $(coreaudio)/rs_audio_host.c $(coreaudio)/rs_audio_host.h | $(OUT)
+	$(CC) $(CFLAGS) -c $< -o $@
+$(OUT)/rs_audio_input.o: $(coreaudio)/rs_audio_input.c $(coreaudio)/rs_audio_input.h $(coreaudio)/rs_audio_host.h | $(OUT)
 	$(CC) $(CFLAGS) -c $< -o $@
 $(OUT)/win32_guestobj.o: ../win32_guestobj.c ../win32_guestobj.h | $(OUT)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -30,7 +33,7 @@ $(OUT)/win32_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h | $(O
 $(OUT):
 	mkdir -p $@
 
-$(OUT)/libwinaudio.a: $(SRC:%=$(OUT)/%.o) $(OUT)/rs_audio_host.o
+$(OUT)/libwinaudio.a: $(SRC:%=$(OUT)/%.o) $(OUT)/rs_audio_host.o $(OUT)/rs_audio_input.o
 	rm -f $@ && ar rcs $@ $^
 
 RT := rc32_mem rc32_teb rc32_image rc32_seh

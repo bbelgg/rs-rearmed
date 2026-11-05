@@ -1,6 +1,7 @@
 // The game-independent half of the Mac build's audio module (tools/ws7/recomp/overrides/src/audio.h):
 // environment switches, logging, the output device's I/O buffer, the real-time audio thread and
-// the device's audio workgroup, stable device UIDs and the inputs-first device order.
+// the device's audio workgroup, stable device UIDs and the inputs-first device order. The guitar input's
+// channel and gain are in rs_audio_input.h.
 //
 // The Mac overrides (audio_out.c, audio_devs.c) and the Learn & Play WASAPI/winmm faces
 // (win-x86/shims/audio) both use them, passing in their own numbers (the Mac build: the Wwise
@@ -38,6 +39,8 @@ void rs_audio_dev_name(AudioObjectID dev, char *buf, size_t n);
 int rs_audio_has_input(AudioObjectID dev);
 // 1 when the device has output streams.
 int rs_audio_has_output(AudioObjectID dev);
+// The device's channels in scope, across its streams.
+int rs_audio_channels(AudioObjectID dev, AudioObjectPropertyScope scope);
 
 // RS_AUDIO_FRAMES: unset or empty = dflt, 0 = leave the device alone.
 uint32_t rs_audio_frames_wanted(uint32_t dflt);

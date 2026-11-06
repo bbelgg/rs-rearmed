@@ -61,7 +61,7 @@ port.
 | Multiplayer (local) | ⚠️ | ⚠️ |
 | DLC | ✅ | ✅ ¹ |
 | Custom songs (CDLC) | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 14 of the 15 hook points (not `si_io`, the Mac game's CoreAudio input) and the overlay API |
+| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 14 of the 16 hook points (not `si_io`, the Mac game's CoreAudio input, or `autosave_warning`, which isn't ported yet) and the overlay API |
 | RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods; see [the Windows plan](docs/windows/PLAN.md#fixed-in-151) for what a run covered |
 | Built-in fixes (rs-mac-fixes, RSBypass) | ✅ | ✅ |
 | "Re-ARMed" title logo | ✅ | ✅ |

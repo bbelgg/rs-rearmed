@@ -42,7 +42,7 @@ ak_set_rtpc_name                                                 0x1a42400  cdec
 camera_set_frustum                                               0x01557f20  fastcall  void(void *camera, const void *frustum)  # ecx = camera, edx = frustum: the same fields in the same order as the Mac function (near clamp against +0x14c/+0x148 = Mac +0x1a0/+0x19c), 7 callers against 7, one of them the matched 0x134bc60
 ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
 si_open                                                          0x017c50a0  custom    bool<zero>(void *self@edi, int slot, int a=hidden, int b=hidden, void *c=hidden)  # SoundInputPortAudio::InputOn: edi = the input, the slot the first of 4 stack arguments (ret 0x10; a run has 0, 1, 2, 3), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
-autosave_warning                                                 unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+autosave_warning                                                 unsupported  not ported yet: the handler is 0x120adf0 (ebx = this, three stack arguments, ret 0xc; the same strings and branches as the Mac's), and the skip needs a Windows override (docs/windows/PLAN.md)
 
 # --- names/refs.list
 scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys
@@ -67,8 +67,9 @@ efd_alloc                                                        0x014791e0  cde
 json_number_base_ctor                                            unsupported  inlined into num_intern (0x1400040), which writes the vtable and fields itself
 json_number_base_dtor                                            unsupported  inlined into num_dtor (0x13fff60), which writes the base vtable 0x1d5a358
 sng_load_verify_ret                                              0x010d96f7  code      -  # the return of the verifier's call at 0x10d96f2 in the SNG check 0x10d96a0; its only other caller is the package config, 0x130aaed
-autosave_signin_query                                            unsupported  not matched yet (no shared string, export, name table or vtable anchor)
-autosave_query_arg                                               unsupported  not matched yet (no shared string, export, name table or vtable anchor)
+autosave_signin_query                                            unsupported  inlined into 0x120adf0: the global 0x1ef5e90, made by 0x1438320
+autosave_query_arg                                               unsupported  folded: push 1 at 0x120ae60
+input_mode_restore                                               unsupported  inlined into 0x120adf0, 0x120ae72-0x120ae8d: 0x13e3ed0 and 0x13e3de0 (edi = the player), then 0x1342300 and 0x1342400
 si_io                                                            unsupported  Mac-only: the CoreAudio IOProc; Learn & Play's channel and gain are in its capture stream (win-x86/shims/audio/wa_engine.c)
 audio_mono_to_stereo                                             unsupported  Mac-only: used for the Mac input; Learn & Play's capture stream gives the game the channel
 ak_platform_settings                                             0x1ed2860  data      AkPlatformInitSettings  # Wwise's own copy: the 0xd0 bytes 0x1a4a5a0 copies from the argument, or fills through the defaults 0x1a454c0; the game's is 0x1f089e8

@@ -57,6 +57,7 @@ SceneGraphsUpdatedMessage_QueryInterface                         0x1000d0bb0  sy
 SceneGraphsUpdatedMessage_QueryInterface_const                   0x1000d0c00  sysv  -
 service_manager_holder                                           0x1000dc450  sysv  void *(void)
 set_app_focus                                                    0x1000e1e70  sysv  void(bool)
+input_mode_restore                                               0x1000e4e00  sysv  void(void *)
 GRMusicService_QueryInterface                                    0x1000e5290  sysv  -
 GRMusicService_QueryInterface_const                              0x1000e52f0  sysv  -
 sub_IMessage_QueryInterface                                      0x1000e5930  sysv  -

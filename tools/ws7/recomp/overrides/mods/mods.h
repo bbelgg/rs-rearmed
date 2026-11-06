@@ -38,7 +38,7 @@ uint64_t rs_mods_raise_nofile(void);
 int rs_mods_keys_poll_once(void);
 
 typedef struct {
-  unsigned long path_hits, path_misses, installed, frames, bypassed, autosaved;
+  unsigned long path_hits, path_misses, installed, frames, bypassed;
 } rs_mods_stats;
 rs_mods_stats rs_mods_stats_get(void);
 void rs_mods_stats_reset(void);

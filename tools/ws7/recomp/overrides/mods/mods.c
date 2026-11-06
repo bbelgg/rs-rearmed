@@ -35,7 +35,7 @@ extern void rs_op_delete(void *) __asm__("__ZdlPv");
 // ------------------------------------------------------------------------------------------------
 static rs_mods_config g_cfg = {.bypass = 1, .fixes = 1, .autosave = 1, .budget_s = 0.050, .intro = 1};
 static int g_log;
-static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed, g_autosaved, g_overlaid;
+static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed, g_overlaid;
 #define COUNT(x) atomic_fetch_add_explicit(&(x), 1, memory_order_relaxed)
 
 static void logf_(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
@@ -73,15 +73,10 @@ void rs_mods_reload_config(void) {
 const rs_mods_config *rs_mods_config_get(void) { return &g_cfg; }
 
 rs_mods_stats rs_mods_stats_get(void) {
-  return (rs_mods_stats){.path_hits = g_path_hits,
-                         .path_misses = g_path_misses,
-                         .installed = g_installed,
-                         .frames = g_frames,
-                         .bypassed = g_bypassed,
-                         .autosaved = g_autosaved};
+  return (rs_mods_stats){g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed};
 }
 void rs_mods_stats_reset(void) {
-  g_path_hits = g_path_misses = g_installed = g_frames = g_bypassed = g_autosaved = 0;
+  g_path_hits = g_path_misses = g_installed = g_frames = g_bypassed = 0;
 }
 
 static double elapsed_s(void) {
@@ -667,6 +662,11 @@ __attribute__((constructor)) static void intro_init(void) {
 // is true it tail-calls the MP_Options controller 0x1005e7c60; other events return or tail-call the
 // compare for "OnSignInFlowError".
 //
+// Before the dialog the same branch calls input_mode_restore: it puts back the player's cached input mode
+// (CachedInputMode_<user id>), gives a finished profile with no InputMode the first one, and otherwise
+// applies the InputMode to the input system. Nothing else on the way to the main menu does, so the hook
+// calls it too.
+//
 // The x64 patches this ports NOP the navigate call (so the dialog is never constructed) and change the
 // timer from 4.0 to 0.0 (so the state machine advances at once instead of waiting). The hook does the
 // same, except for what it leaves in the created-dialog slot: the handler (0x1005e48b0) only runs the
@@ -678,7 +678,7 @@ __attribute__((constructor)) static void intro_init(void) {
 // itself is skipped with the call: it only feeds the skipped call, allocated and freed within the
 // function. Returning nonzero skips the original; every other case returns zero, so a true predicate
 // still reaches the MP_Options controller and other events behave as the game has them.
-// With RS_MODS_AUTOSAVE=0 the hook never fires.
+// With RS_MODS_AUTOSAVE=0 the hook returns zero at once.
 // ------------------------------------------------------------------------------------------------
 // Token for the created-dialog slot (see above): guest memory with a high reference count at +0x8, so the
 // handler's release never calls through it. Reused for the life of the process.
@@ -707,13 +707,11 @@ static int before_autosave_warning(rc_ctx *c, void *user) {
     // the MP_Options branch: the original takes it (evaluating the predicate again, a state read)
     return 0;
   void **slot = (void **)(self + RC_OFF(autosave_menu));
-  if (*slot == NULL) {
-    if (!autosave_token_ready()) return 0;  // out of memory: the original shows the dialog
-    *slot = g_autosave_token;
-  }
+  if (*slot == NULL && !autosave_token_ready()) return 0;  // out of memory: the original shows the dialog
+  OV_GUEST(input_mode_restore, OV_GUESTV(service_manager_holder, NULL, 0));
   // A foreign object already in the slot is left alone: the zeroed timer below hurries it the same way.
+  if (*slot == NULL) *slot = g_autosave_token;
   RC_ST(double, self + RC_OFF(autosave_timer), 0.0);
-  COUNT(g_autosaved);
   logf_("auto save warning skipped");
   ov_ret_void(c);
   return 1;

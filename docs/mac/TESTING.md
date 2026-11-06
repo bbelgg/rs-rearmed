@@ -137,6 +137,14 @@ user's, with a test profile.
   `RS_MODS_LOG=1` logs `auto save warning skipped`. With `RS_MODS_AUTOSAVE=0` the RS2AutosaveWarning dialog
   appears after profile select instead. Checked 2026-11-05: profile select reaches the main menu with no
   dialog, and the dialog returns with the switch off.
+  The skip must keep the game's input mode step, so test it with a profile on DIRECT CONNECT and an interface connected:
+  from the main menu Ctrl, Down, Right three times, Esc, Esc, Return on "Yes, quit" to save it. After a new start, Return on
+  LEARN A SONG, on the first song and on Play Song must reach the tuner; Delete and Return then reach the note highway. Without
+  the step the tuner stops at "It sounds like your cable is unplugged". Checked 2026-11-06 by keyfifo (`front` before every
+  key, or a key is lost when another app has the focus), a test install, a UR22mkII: to the highway with the skip, to the
+  tuner with the switch off, and the message twice with the step left out. A new profile (Down to New profile, Return, a
+  name, Return) goes on to "Have you played Rocksmith before?" with the same log line and no dialog. Not checked: a Real Tone
+  cable or Microphone profile, and a cached mode to restore.
 - **Direct Connect overlay**: with the original `cache.psarc` (not one that has the entries already, or the
   overlay changes nothing) and `game/Update/patcharchives.psarc` made by `cache_overlay.py`, the INPUT
   setting (in My Path, `ui_menu_pillar_mission`) offers DIRECT CONNECT as a fourth value, and choosing it

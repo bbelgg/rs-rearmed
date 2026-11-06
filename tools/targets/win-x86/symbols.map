@@ -67,6 +67,15 @@ efd_alloc                                                        0x014791e0  cde
 json_number_base_ctor                                            unsupported  inlined into num_intern (0x1400040), which writes the vtable and fields itself
 json_number_base_dtor                                            unsupported  inlined into num_dtor (0x13fff60), which writes the base vtable 0x1d5a358
 sng_load_verify_ret                                              0x010d96f7  code      -  # the return of the verifier's call at 0x10d96f2 in the SNG check 0x10d96a0; its only other caller is the package config, 0x130aaed
+input_mode_is_cable                                              unsupported  inlined into 0x11f08d0, which forces Player 2 to Real Tone: win32_overrides.c replaces that
+input_bind                                                       unsupported  0x1344640 takes the input in eax with no arguments else: win32_overrides.c runs it
+input_mode                                                       unsupported  0x13e3fb0: used by address in win32_overrides.c
+input_profile_string                                             unsupported  0x13e2080: used by address in win32_overrides.c
+input_manager                                                    unsupported  0x17c3200: used by address in win32_overrides.c
+input_by_name                                                    unsupported  0x17c3890: used by address in win32_overrides.c
+input_binding                                                    unsupported  0x1ed87b0: used by address in win32_overrides.c
+input_key_direct                                                 unsupported  a literal, 0x1d57a4c: used by address in win32_overrides.c
+input_key_mic                                                    unsupported  a literal, 0x1d57a34: used by address in win32_overrides.c
 autosave_signin_query                                            unsupported  inlined into 0x120adf0: the global 0x1ef5e90, made by 0x1438320
 autosave_query_arg                                               unsupported  folded: push 1 at 0x120ae60
 input_mode_restore                                               unsupported  inlined into 0x120adf0, 0x120ae72-0x120ae8d: 0x13e3ed0 and 0x13e3de0 (edi = the player), then 0x1342300 and 0x1342400

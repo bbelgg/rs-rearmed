@@ -41,9 +41,9 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 |---|---|---|
 | Songs, Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons with video | ✅ | ✅ |
 | Rocksmith Workshop, tone designer | ⚠️ | ✅ the tone designer opens |
-| Multiplayer (local) | ⚠️ | ⚠️ |
+| Multiplayer (local), each player on any input | ✅ | ✅ |
 | DLC and custom songs | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 15 of the 16 hook points and the overlay API |
+| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 15 of the 18 hook points and the overlay API |
 | RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |

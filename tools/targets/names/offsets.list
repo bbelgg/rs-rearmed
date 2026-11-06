@@ -34,6 +34,7 @@ json_number_refs          # number object: int32 refcount
 json_number_value         # number object: double value
 json_number_add_ref_slot  # number object vtable: AddRef
 json_number_release_slot  # number object vtable: Release
+input_slot                # SoundInput: its slot
 autosave_menu             # UI event handler: created-dialog slot
 autosave_timer            # UI event handler: state-machine timer double
 autosave_query_slot       # sign-in query object vtable: the dialog predicate

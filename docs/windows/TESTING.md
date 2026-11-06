@@ -412,7 +412,7 @@ after the start and the menu is up 20 s after the profile. In this edition Shift
 DIRECT CONNECT, Down and Return lists the inputs, Return takes one. Main menu, from LEARN A SONG down: SESSION MODE (a
 first visit shows two notices; Space starts it, then the tuner; Esc, Down, Return ends it), NONSTOP PLAY (Return on START,
 the tuner, the song; Esc pauses with SKIP on top; Return on it shows the playlist), LESSONS (Down to a lesson, Return
-twice; Esc, Down, Return leaves), GUITARCADE, MULTIPLAYER (the second profile, CONTINUE, then the modes; a song stops at
+twice; Esc, Down, Return leaves), GUITARCADE, MULTIPLAYER (the second profile, CONTINUE, then the modes; a song needs Player 2's profile on an input, or it stops at
 "It sounds like Player 2's cable is unplugged"), TONE DESIGNER (Return on EDIT TONE), SHOP. A finished song shows
 notices that each take Return, and a Return too many starts the next song. Esc from the main menu, Return on "Yes, quit",
 Esc on the title, Return on EXIT GAME: the game's own Exit.
@@ -440,8 +440,11 @@ Screens not in the other routes, by key from the main menu (2026-11-05, keyfifo,
 - GUITARCADE: TECHNIQUE GAMES, Return on a game, then Calibration "Make some noise!" waits for a guitar; Esc goes back. So the games
   need a guitar. SCORE ATTACK works without: Return on the song, Return on EASY, Skip Tuner, Return; three strikes end it ("Song
   failed!") about 30 s in, Return goes back to the list.
-- MULTIPLAYER: Return on the second profile, Return on CONTINUE, Return on the mode and the first song, Return on Play Song, Skip
-  Tuner, Return: a split-screen song.
+- MULTIPLAYER: Return on the notice MULTIPLAYER INPUT SUPPORT, Return on the second profile, Return on CONTINUE, Return on the mode
+  and the first song, Return on Play Song, Skip Tuner, Return: a split-screen song.
+- Two players (2026-11-06, by hand, an HX Stomp with no `Channel` in `guitar-input.ini`): load the second profile on its own, `lpctrl`,
+  Down to INPUT, DIRECT CONNECT, Down and Return lists the inputs, Return takes `HX Stomp channel 6`; leave by the menus, or it isn't
+  saved. Load the first profile the same way on channel 5, then MULTIPLAYER as above: a song with each player on their channel.
 - A song's Esc: RESUME, RESTART, TUNER, MIXER, EXIT, Space Riff Repeater. Esc, Down four times, Return leaves it for the song's page; Esc is
   the list, Esc again clears its search. Down moves a row, Return on a row opens the song's page, Return there is Play Song.
 - Riff Repeater's speed (2026-11-05, `rr_speed_ratio` with a mod): in a song Esc, Space, Down twice to SPEED, Left once a second, each 1 off the

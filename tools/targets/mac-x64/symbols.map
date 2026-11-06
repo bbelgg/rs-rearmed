@@ -204,6 +204,12 @@ GC2DAssetHelper_QueryInterface_const                             0x1003b1df0  sy
 GCAccumulatedActor_QueryInterface                                0x1003c00d0  sysv  -
 GCAccumulatedActor_QueryInterface_const                          0x1003c0130  sysv  -
 frontend_open_file                                               0x1003c7810  sysv  void **(void **out, const char *path)
+input_mode_is_cable                                              0x1001c3af0  sysv  bool(int player)
+input_bind                                                       0x10044aaf0  sysv  void(int input, int force)
+input_mode                                                       0x1001c2530  sysv  uint8_t(int player)
+input_profile_string                                             0x1001c15f0  sysv  bool(int player, const char *key, void *out)
+input_manager                                                    0x10133ddc0  sysv  void *(void)
+input_by_name                                                    0x10131b9c0  sysv  void *(void *manager, const char *name)
 autosave_warning                                                 0x1005e7e10  sysv  void(void *, const char *, const char *)
 autosave_signin_query                                            0x100a05a50  sysv  void *(void)
 steam_dlc_owned                                                  0x100a07800  sysv  bool(void *steam, int app)
@@ -853,6 +859,9 @@ sng_verify                                                       0x10137683d  sy
 rsg_cryptopp_aes_cfb_decrypt                                     0x101376f8f  sysv  -
 lib_cryptopp_end                                                 0x101383700  code  -
 dsp_two                                                          0x1013ea36c  data  float
+input_binding                                                    0x1018f37c0  data  int[10]
+input_key_direct                                                 0x101878338  data  const char *
+input_key_mic                                                    0x101878340  data  const char *
 autosave_query_arg                                               0x1013ea6b0  data  int
 const_two_pow_63                                                 0x1013eaa50  data  double
 hashtable_prime_sizes                                            0x1013eaa70  data  uint64_t[28]

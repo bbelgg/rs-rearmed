@@ -16,6 +16,7 @@
 //                      skipped, the game goes straight to the title screen)
 //   RS_MODS_BUDGET_MS  per-frame budget of the batched DLC mounting (default 50; 0 = one per frame)
 //   RS_MODS_AUTOSAVE=0 the Auto Save warning dialog is shown (default: skipped)
+//   RS_MODS_MULTIPLAYER=0 Player 2 takes a Real Tone cable only, as in the original (default: any input)
 //   RS_MODS_NO_THREAD=1  do not start the End-key poller thread (tests)
 //   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only, without the
 //                      menu entries the installer's overlay adds (Direct Connect) (default on)
@@ -24,6 +25,7 @@ typedef struct {
   int bypass;
   int fixes;
   int autosave;
+  int multiplayer;
   double budget_s;
   int intro;  // skip the intro screens
   int overlay;

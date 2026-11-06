@@ -272,6 +272,10 @@ one value per endpoint (`wa_com.c`), and calibration steps it as on the Mac. For
 the shared level, applied in the capture callback with the clip and the peak report. Here the value started as a volume
 of up to 1.0, so it could only cut.
 
+**Two players on any input** (the [Mac design](../mac/DESIGN.md#built-in-fixes-and-mods) says why). `win32_overrides.c` has the same
+two changes as `mods.c`: `F_11f08d0` is the Mac's three inlined checks in one function, which sets Player 2 to Real Tone, and
+`F_1344640` is `input_bind`, with the input in `eax`. The profile's string is the Mac's with 32-bit pointers.
+
 **Cable detection.** On the PortAudio path the game accepts an input whose USB IDs are in its table
 (vendor/product 12BA/00FF is the Real Tone cable), read from the endpoint's device instance id; on the
 waveIn path it takes the first device named "Rocksmith". The layer gives each USB device an instance id
@@ -411,7 +415,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
   log line: built for the Mac alone, it would misread this game's memory.
 
-  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Thirteen of the 16
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Thirteen of the 18
   are functions of this game. Six of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
   its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
   Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /

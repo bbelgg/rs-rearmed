@@ -156,13 +156,14 @@ static int env_on(const char *name, int dflt) {
   if (!v || !*v) return dflt;
   return !(v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F');
 }
-static struct { int init, log, fixes, bypass, autosave; double budget_s; } g_cfg;
+static struct { int init, log, fixes, bypass, autosave, multiplayer; double budget_s; } g_cfg;
 static void cfg_load(void) {
   if (g_cfg.init) return;
   g_cfg.log = env_on("RS_MODS_LOG", 0);
   g_cfg.bypass = env_on("RS_MODS_BYPASS", 1);
   g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
   g_cfg.autosave = env_on("RS_MODS_AUTOSAVE", 1);
+  g_cfg.multiplayer = env_on("RS_MODS_MULTIPLAYER", 1);
   g_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -255,6 +256,82 @@ void N_120adf0(rc_ctx *c) {
   autosave_skipped = 0;
   memset(g8(self + AUTOSAVE_TIMER), 0, sizeof(double));
   if (g_cfg.log) fprintf(stderr, "mods: auto save warning skipped\n");
+}
+
+// ------------------------------------------------------------------------------------------------
+// Two players on any input: the counterpart of the Mac's (tools/ws7/recomp/overrides/mods/mods.c, before_is_cable
+// and before_input_bind, which say why), off with the same RS_MODS_MULTIPLAYER=0. 0x11f08d0 is the Mac's three
+// inlined checks in one function: it sets Player 2 to Real Tone unless they are, and returns al = it did. 0x1344640 is
+// input_bind, with the input in eax. The profile's string is the Mac's with 32-bit pointers: the end at +0x10, and
+// +0x14 says whether the text is in place or behind the pointer at +0.
+// ------------------------------------------------------------------------------------------------
+#define INPUT_MODE 0x13e3fb0u       // cdecl (player) -> al
+#define PROFILE_STRING 0x13e2080u   // cdecl (player, key, string)
+#define INPUT_MANAGER 0x17c3200u    // -> the manager
+#define INPUT_BY_NAME 0x17c3890u    // stdcall (manager, name) -> the input, or 0
+#define INPUT_BINDING 0x1ed87b0u    // int[10]: what each slot serves: 0-3 an input, 5 nothing
+#define INPUT_SLOT 0xc
+#define INPUT_KEY_DIRECT 0x1d57a4cu
+#define INPUT_KEY_MIC 0x1d57a34u
+#define PLAYER_2 1u
+#define INPUT_P1_MIC 1u
+#define INPUT_P2_GUITAR 2u
+#define INPUT_P2_MIC 3u
+#define INPUT_NONE 5u
+#define MODE_MIC 1
+#define MODE_DIRECT 3
+#define INPUT_SLOTS 10
+void W_11f08d0(rc_ctx *c);
+void W_1344640(rc_ctx *c);
+
+static uint8_t p2_mode(rc_ctx *c) {
+  uint32_t player = PLAYER_2;
+  return (uint8_t)rc32_call(c, INPUT_MODE, &player, 1, 0, 0, 0);
+}
+
+void F_11f08d0(rc_ctx *c) {
+  cfg_load();
+  uint8_t mode = g_cfg.multiplayer ? p2_mode(c) : 0;
+  if (mode == MODE_MIC || mode == MODE_DIRECT) ov_ret32(c, 0);
+  else W_11f08d0(c);
+}
+
+static void p2_saved_input(rc_ctx *c) {
+  static uint32_t s, name;  // guest memory, kept for the life of the process
+  uint8_t mode = p2_mode(c);
+  if (mode != MODE_MIC && mode != MODE_DIRECT) return;
+  for (uint32_t i = 0; i < INPUT_SLOTS; i++)
+    if (ld32(INPUT_BINDING + 4 * i) == INPUT_P2_GUITAR) return;
+  if ((!s && !(s = rc32_alloc(32))) || (!name && !(name = rc32_alloc(256)))) return;
+  st32(s + 0x10, s);
+  st32(s + 0x14, s + 0x10);
+  *g8(s) = 0;
+  uint32_t args[3] = {PLAYER_2, mode == MODE_DIRECT ? INPUT_KEY_DIRECT : INPUT_KEY_MIC, s};
+  rc32_call(c, PROFILE_STRING, args, 3, 0, 0, 0);
+  uint32_t from = ld32(s + 0x14) == s + 0x10 ? s : ld32(s), to = ld32(s + 0x10), len = to > from ? to - from : 0;
+  if (!len) return;
+  if (len > 255) len = 255;
+  memcpy(g8(name), g8(from), len);
+  *g8(name + len) = 0;
+  uint32_t manager = rc32_call(c, INPUT_MANAGER, 0, 0, 0, 0, 0);
+  uint32_t find[2] = {manager, name};
+  uint32_t in = rc32_call(c, INPUT_BY_NAME, find, 2, 0, 0, 0);
+  if (!in) return;
+  uint32_t slot = ld32(in + INPUT_SLOT);
+  if (slot >= INPUT_SLOTS) return;
+  uint32_t held = ld32(INPUT_BINDING + 4 * slot);  // a microphone input takes any slot, and finds another
+  if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
+    st32(INPUT_BINDING + 4 * slot, INPUT_P2_GUITAR);
+    if (g_cfg.log) fprintf(stderr, "mods: player 2 on \"%s\"\n", (const char *)g8(name));
+  }
+}
+
+void F_1344640(rc_ctx *c) {
+  uint32_t input = (uint32_t)c->r[0];
+  cfg_load();
+  if (g_cfg.multiplayer && input == INPUT_P2_GUITAR) p2_saved_input(c);
+  c->r[0] = input;
+  W_1344640(c);
 }
 
 // ------------------------------------------------------------------------------------------------

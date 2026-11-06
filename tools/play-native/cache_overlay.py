@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate): a small patch archive made from the user's own cache.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Multiplayer's notice): a small patch archive made from the user's own cache.psarc.
 
     cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
     cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing
@@ -14,7 +14,8 @@ The main menu's SHOP can't work offline: the game checks the Steam overlay befor
 the overlay off, shows a notice instead. So the entry (manifests/ui_menu_pillar_main.database.json) becomes
 ENUMERATE, in second place, its OnSelect left as it is, and the notice (row 36675 of localization/maingame.csv,
 all languages) says what now happens: the offline Steam layer takes the overlay check as the press, brings new
-songs into the copy and has the game scan dlc/ again (shims/steam/src/enumerate.h).
+songs into the copy and has the game scan dlc/ again (shims/steam/src/enumerate.h). Row 37359, the notice MULTIPLAYER
+INPUT SUPPORT, says what two players can use now.
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -477,6 +478,10 @@ ENUMERATE_ORDER = 1  # after LEARN A SONG
 # 36675 is "You must enable Steam Community In-Game to access the Shop."
 NOTICE_ID = "36675"
 NOTICE = "Looking for new songs. They will be in the song list in a moment."
+# 37359 is the notice MULTIPLAYER INPUT SUPPORT, which says Player 2 must use the Real Tone cable.
+MULTIPLAYER_ID = "37359"
+MULTIPLAYER = ("Each player can use any valid input device. To choose one load that profile on its own. "
+               "Multiplayer is not available in Disconnected Mode.")
 
 
 def _close(text, i):
@@ -616,13 +621,15 @@ def edit_main(text):
 
 
 def edit_notice(text):
-    """The notice of the Shop's overlay check, in every language; None when it says that already or the table
-    has no such row. A row is `id,text,text,...`, a comma in a text written {C}."""
-    m = re.search(r'^%s,([^\r\n]*)' % NOTICE_ID, text, re.M)
-    if not m or m.group(1).startswith(NOTICE + ","):
-        return None
-    fields = [NOTICE if f else f for f in m.group(1).split(",")]
-    return text[:m.start(1)] + ",".join(fields) + text[m.end(1):]
+    """The notices of the Shop's overlay check and of Multiplayer's inputs, in every language; None when they say
+    that already or the table has no such rows. A row is `id,text,text,...`, a comma in a text written {C}."""
+    out = text
+    for row, notice in ((NOTICE_ID, NOTICE), (MULTIPLAYER_ID, MULTIPLAYER)):
+        m = re.search(r'^%s,([^\r\n]*)' % row, out, re.M)
+        if m and not m.group(1).startswith(notice + ","):
+            fields = [notice if f else f for f in m.group(1).split(",")]
+            out = out[:m.start(1)] + ",".join(fields) + out[m.end(1):]
+    return None if out == text else out
 
 
 EDITS = {STARTUP: edit_startup, MISSION: edit_mission, MAIN: edit_main, NOTICES: edit_notice}

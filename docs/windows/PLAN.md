@@ -6,16 +6,16 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 ## Status
 
 - **Works**, checked on an Apple Silicon Mac: the game offline with the Uplay screens skipped; songs to the end, Score Attack, the Guitarcade, Session Mode,
-  Nonstop Play, video lessons, the Tone Designer's Edit Tone, the Multiplayer menus; custom songs and DLC; Enumerate and Refresh Game Files; a Real Tone cable
+  Nonstop Play, video lessons, the Tone Designer's Edit Tone, a Multiplayer song with each player on their own input; custom songs and DLC; Enumerate and Refresh Game Files; a Real Tone cable
   device (a virtual one named like the cable), the microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
   calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and the close button, in 0.3-0.5 s.
-- **Mods**: 15 of the 16 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart), the overlay API, the `mods/` folder and one mod ABI with the Mac
+- **Mods**: 15 of the 18 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). RSMods' `rearmed-mods.dylib` 0.3.0 runs as the same file, all 19 mods on. No mod code runs without the network guard.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). That figure predates the renderer's last change (fewer references, one pass descriptor), which played fine by the maintainer's own check but hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
-- **Present but not tested**: a multiplayer song played by two, the Workshop's other screens, the DLC preview, the prebuilt harvester
+- **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
   (`win-x86/harvest/rsharvest2.exe`), and Rocksmith 1 DLC songs in a game run (`test_steam32` covers `RS_STEAM_OWNED`; the test account owns none).
-- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 966 of the 1,156 symbols and 77 of the 98 offsets are read from
+- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 966 of the 1,165 symbols and 78 of the 99 offsets are read from
   the Windows code; the map says why for the rest. 88 names have `custom` conventions (LTCG register arguments), which their overrides read by hand.
 - **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build without one
   ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for its relocation sites, which nothing reads out of the capture VM yet.
@@ -66,7 +66,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   worse than the gap.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
-**Guitar input:** multiplayer with any input, as in the [Mac plan](../mac/PLAN.md#next-work).
+**Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
 Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).

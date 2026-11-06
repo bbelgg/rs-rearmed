@@ -274,6 +274,16 @@ again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `R
 `RS_AUDIO_INPUT_LEVEL=0` leaves the level to the device's own volume. `RS_AUDIO_INPUT=0` turns all of this off. With
 `RS_AUDIO_LOG=1` the log has the channel, each level set, and every few seconds the peak and the samples clipped.
 
+### Two players
+
+Each player's input is in their own profile. Load the profile on its own, set Path/Input to DIRECT CONNECT or MICROPHONE, pick the
+input, and leave through the menus so it saves. In MULTIPLAYER each player then has their own: `HX Stomp channel 5` for Player 1 and
+`HX Stomp channel 6` for Player 2, say, or two interfaces, or a cable and an interface. A profile on REAL TONE CABLE needs a
+cable, as in the original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them.
+
+For two channels of one interface, leave `Channel` out of `guitar-input.ini` for it, so its channels are listed.
+`RS_MODS_MULTIPLAYER=0` is the original rule: Player 2 takes a Real Tone cable only.
+
 ## Settings and switches
 
 The app sets no environment. To pass a switch, start it with `open`:
@@ -293,6 +303,7 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_AUDIO_CHANNEL_ENTRIES=N` | 10 | the inputs the game lists; 0: one per device, in the system's order |
 | `RS_AUDIO_INPUT_LEVEL=0` | on | the game's level stays a volume of up to 100%, with no boost |
 | `RS_AUDIO_INPUT_FILE=PATH`, `RS_AUDIO_INPUT=0` | `guitar-input.ini`, on | another settings file; none of this |
+| `RS_MODS_MULTIPLAYER=0` | any input | [two players](#two-players): Player 2 on a Real Tone cable only |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed |
 | `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off |
@@ -337,9 +348,9 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which leaves room
   ([Guitar input](#guitar-input)).
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- It has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
+- It has had far less testing than the Mac port. Not tested yet: the Workshop
   beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
-- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 15 of the 16 hook
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 15 of the 18 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
   `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
   event from the game); pass floating point arguments to `rc_call_guest` (`rc_call_name_f` can); call a

@@ -323,6 +323,16 @@ again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `R
 `RS_AUDIO_INPUT_LEVEL=0` leaves the level to the device's own volume. `RS_AUDIO_INPUT=0` turns all of this off. With
 `RS_AUDIO_LOG=1` the log has the channel, each level set, and every few seconds the peak and the samples clipped.
 
+### Two players
+
+Each player's input is in their own profile. Load the profile on its own, set Path/Input to DIRECT CONNECT or MICROPHONE, pick the
+input, and leave through the menus so it saves. In MULTIPLAYER each player then has their own: `HX Stomp channel 5` for Player 1 and
+`HX Stomp channel 6` for Player 2, say, or two interfaces, or a cable and an interface. A profile on REAL TONE CABLE needs a
+cable, as in the original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them.
+
+For two channels of one interface, leave `Channel` out of `guitar-input.ini` for it, so its channels are listed.
+`RS_MODS_MULTIPLAYER=0` is the original rule: Player 2 takes a Real Tone cable only.
+
 ## Settings and switches
 
 The launcher starts the game through macOS, so variables set in a Terminal do not reach it. Set them for
@@ -351,6 +361,7 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 | Frame rate follows the display; a fixed rate turns vsync off | | `RS_FPS=N` |
 | Lower guitar latency: a smaller output buffer, a real-time audio thread, stale guitar audio dropped | | `RS_AUDIO_FRAMES=N` (0 leaves the system's), `RS_LATENCY_BUFFER=N` (1-16), `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_LOG=1` |
 | [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
+| [Two players](#two-players) on any input | yes | `RS_MODS_MULTIPLAYER=0` |
 | An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
 | [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
 | Retina, Metal only (off by default) | yes | `RS_METAL_RETINA=1` |

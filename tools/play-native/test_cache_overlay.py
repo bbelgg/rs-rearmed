@@ -236,6 +236,13 @@ class Edits(unittest.TestCase):
         modded = MAIN.replace('"$[22952]SHOP"', '"ENUMERATE"')
         self.assertIsNone(co.edit_main(modded))  # the RSMods edit counts as there
 
+    def test_multiplayer_notice(self):
+        table = NOTICES + "37359,Player 2 must use the cable.,Le joueur 2,,Der Spieler,,,,\r\n"
+        rows = co.edit_notice(table).split("\r\n")
+        self.assertEqual(rows[-2].split(","), ["37359", co.MULTIPLAYER, co.MULTIPLAYER, "", co.MULTIPLAYER, "", "", "", ""])
+        self.assertNotIn(",", co.MULTIPLAYER)
+        self.assertIsNone(co.edit_notice(co.edit_notice(table)))
+
     def test_notice(self):
         out = co.edit_notice(NOTICES)
         rows = out.split("\r\n")

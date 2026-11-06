@@ -228,6 +228,15 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the
   compiler ("safe load", [METAL.md](METAL.md#safe-load)).
+- **Two players on any input** (`mods.c`, pre hooks on `input_mode_is_cable` and `input_bind`). A player's input mode and input
+  are in their profile, and the game serves up to four inputs: each player's guitar and microphone (`input_binding`, a slot each).
+  Two rules of the game's made two players need two cables. The Multiplayer screens ask whether Player 2 is in Real Tone mode
+  and set them to it when not; here a profile on Direct Connect or the microphone counts as in the right mode. And a saved input is
+  restored for Player 1 alone, after the profile screen, while Player 2 takes the first free slot; here `input_bind` finds Player 2's
+  saved input first. It has to be that early: moving the input of a running stream crashed the I/O thread, in the callback that feeds
+  the player. SWAP CABLE ASSIGNMENT is the game's own, lit when both modes match: it swaps the two slots and saves both
+  names. The flow that counts cables (`MultiplayerGuitarsNotPluggedIn`) belongs to the two-cable calibration. The menu
+  overlay rewords the notice MULTIPLAYER INPUT SUPPORT (row 37359), which said Player 2 must use the cable.
 - **Direct Connect choice.** The game code handles a fourth button on the cable screen, `othercable`
   (Direct Connect), and a fourth value of the INPUT slider, but the menu data (two JSON files in one of
   `cache.psarc`'s `cacheN.7z` archives) leaves them out. At each copy or refresh of the game files,

@@ -230,6 +230,12 @@ user's, with a test profile.
   Search `cherub`, Return, Return on Play Song, 26 s later `fwddelete` on the tuner, 6 s later Return: the highway about
   20 s after that, with no snapshot needed. NONSTOP PLAY: Return on START NONSTOP PLAY, the tuner, Delete, Return; Esc in
   a song puts the cursor on the entry last used, so look before pressing Down to EXIT.
+- **Two players** (2026-11-06, by hand, an HX Stomp with no `Channel` in `guitar-input.ini`): load the second profile on its own, Ctrl,
+  Down to INPUT, DIRECT CONNECT, Down and Return lists the inputs, Return takes `HX Stomp channel 6`; Esc back and leave by the menus, or
+  it isn't saved. Load the first profile the same way on channel 5. MULTIPLAYER, Return on any notice, Return on the second profile, Return on CONTINUE, a mode
+  and song, Play Song: a split-screen song with each player on their channel. SWAP CABLE ASSIGNMENT is lit with both on Direct Connect, and swaps the
+  channels. Without the change the song stops at "It sounds like
+  Player 2's cable is unplugged".
 - **Guitarcade**: Down five times to GUITARCADE, Return, Return on TECHNIQUE GAMES, a game, Return, Return. A game has a tuner
   with no Skip Tuner: Return starts Calibration (Esc cancels) and only a tuned instrument gets past it. So the menus and
   the list of games are what keys reach; the games themselves are a check by hand (the maintainer's, 2026-11-05). A virtual cable next to a Loopback device of the same name gives "Two

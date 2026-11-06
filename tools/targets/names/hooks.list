@@ -18,4 +18,6 @@ si_io               # SoundInput I/O (this, uint32 device, const AudioBufferList
 boot_intro_update   # RSBootService intro tick (this) -> bool still loading: the start-up intro movie; mods.c skips it
 steam_dlc_owned     # (Steam wrapper, int app id) -> bool: the game's DLC list has the AppID, installed; mods.c (songs added while the game runs)
 frontend_open_file  # FrontEnd_OpenFile(DataStream **out, const char *path): opens a game file through the VFS; mods.c (cache overlay)
+input_mode_is_cable # (int player) -> bool: the player is in Real Tone mode; the Multiplayer screens ask it of Player 2 and force the mode when not; mods.c
+input_bind          # (int input, int force): finds a slot for an input (0 Player 1's guitar, 2 Player 2's); mods.c (Player 2's saved input)
 autosave_warning    # UI event handler (menu, category, event): shows the Auto Save warning dialog; mods.c skips it

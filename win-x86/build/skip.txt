@@ -25,6 +25,11 @@
 # bool update(boot). `wrap`: still translated, as W_1126950; win32_overrides.c's F_1126950 skips the
 # intro (as the Mac mods.c does, off with RS_MODS_INTRO=0) and calls W_1126950 for the rest.
 1126950 wrap
+# Two players on any input: what forces Player 2 to Real Tone (0x11f08d0, inlined at the Mac's three callers of
+# input_mode_is_cable), and the search for an input's slot (0x1344640, the Mac input_bind). `wrap`: both stay
+# translated; win32_overrides.c's F_11f08d0 and F_1344640 run first, off with RS_MODS_MULTIPLAYER=0.
+11f08d0 wrap
+1344640 wrap
 # No Auto Save warning: the UI event handler (0x120adf0, the Mac autosave_warning, a hook point), and the
 # navigate call that makes a dialog (0x115db90), which it calls at 0x120aec9 for RS2AutosaveWarning. `wrap`: both
 # stay translated, as W_120adf0 and W_115db90. win32_overrides.c's F_115db90 leaves that one call out, as the Mac

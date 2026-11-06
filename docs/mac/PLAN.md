@@ -11,6 +11,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
   that can boost; the output following the system's default; Metal by default with OpenGL as choice and fallback; full screen, Retina; Enumerate; the built-in fixes, no intro
   screens or Auto Save warning; the GUI installer.
 - **Mods**: loaded at startup, with name-keyed hook points. A mod built with `rc_mod.h` is one dylib for this app and Learn & Play. RSMods' `rearmed-mods.dylib` 0.3.0 runs here.
+- **Two players**: a song with each player on their own input, played on two channels of one interface, SWAP CABLE ASSIGNMENT included; a cable and an interface and two interfaces have not been played.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with the owning account logged in to Steam.
 - **Installer**: decrypting is static (`tools/steamless/decrypt.py`): no Rosetta, no launch of the game, and Steam only has to have installed it.
 - **Performance**: about the CPU of the original under Rosetta. 6.1 ms a frame on [Learn & Play's route](PERFORMANCE.md#learn--plays-route), 45% of a core, against its 7.2 ms.
@@ -44,10 +45,8 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **Multiplayer with any input**: the game asks for two Real Tone cables. The audio layer has what two players on other inputs
-  need, as each channel of an interface is an input of its own since 1.6.0. What's left is the game's own rule and letting each
-  player take any input: two channels of one interface, two interfaces, or a cable and an interface. Not tried yet, in either
-  edition.
+- **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
+  hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)
   already serve the Windows port; hook points and the mods folder are shared now, and the rest of its
   parity work is in the [Windows plan](../windows/PLAN.md#next-work).

@@ -24,6 +24,13 @@ efd_alloc                # efd allocator
 json_number_base_ctor    # number object base constructor
 json_number_base_dtor    # number object base destructor
 sng_load_verify_ret      # SNG loader: return address of its DSA verify call
+input_mode               # (int player) -> u8: 0 Real Tone cable, 1 microphone, 2 disconnected, 3 Direct Connect, 4 not set
+input_profile_string     # (int player, const char *key, string *out): a string of the player's profile
+input_manager            # () -> SoundInput manager
+input_by_name            # (manager, const char *name) -> the input of that name, or null
+input_binding            # int[10]: what each slot serves: 0-3 an input, 5 nothing
+input_key_direct         # const char *: profile key of the Direct Connect input's name
+input_key_mic            # const char *: profile key of the microphone's name
 autosave_signin_query    # object answering the sign-in predicate gating the Auto Save dialog
 autosave_query_arg       # int argument (1) of that predicate
 input_mode_restore       # (ServiceManager): restores player 0's cached input mode and applies it, before the Auto Save dialog

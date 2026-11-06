@@ -159,16 +159,6 @@ inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`)
 - Fixed function not implemented (logged once): vertex blending, sphere maps, bump mapping, user clip
   planes, point sprites.
 
-## Fixed since 1.6.0
-
-Not released yet, 2026-11-06:
-
-- **CPU**: 9.4 to 7.2 ms a frame on one route, frames unchanged ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). A build by hand, one run to the note
-  highway and a quit. Not in this pass: a guitar, listening to the audio, an install by the installer, Guitarcade and the other modes, a long session.
-- **The 32-bit difftest**: no mismatch on `msvcr100`, `steam_api`, `systemdetection`, `bink2w32` ([TESTING.md](TESTING.md#the-recompiler) has the
-  documented 41 and two by name). One real translation gap fixed, `steam_api`'s `log10`, in a DLL the game doesn't load.
-- **The D3D9 host test**: run against a `libRSOpenGL` built from this branch, 1,272 checks pass.
-
 ## Built in for 1.4.0
 
 Learn & Play ships as an experimental release with these built in, the same way in both editions. All were checked
@@ -240,6 +230,18 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-160):
 - **Guitar input channel and gain**: `guitar-input.ini`, which came after 1.5.1, is in this release too.
 - **The installer**: a Learn & Play build stops on a game image that isn't the pinned one, and an image kept from an earlier
   version is made again; the Mac edition decrypts on every run. Its shader messages say what the game does.
+
+## Built in for 1.7.0
+
+Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-170):
+
+- **No Auto Save warning**: after profile select the game goes straight on, as on the Mac, and `RS_MODS_AUTOSAVE=0` shows it.
+- **CPU**: 9.4 to 7.2 ms a frame on one route, frames unchanged ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). A build by hand, one run to the note
+  highway and a quit, then a song played by the maintainer on that build, which went well; its first play had shader stalls, as a run with no warm-up has.
+  Not in this pass: Guitarcade and the other modes, a long session.
+- **The 32-bit difftest**: no mismatch on `msvcr100`, `steam_api`, `systemdetection`, `bink2w32` ([TESTING.md](TESTING.md#the-recompiler) has the
+  documented 41 and two by name). One real translation gap fixed, `steam_api`'s `log10`, in a DLL the game doesn't load.
+- **The D3D9 host test**: run against a `libRSOpenGL` built from this code, 1,272 checks pass.
 
 ## Next work
 

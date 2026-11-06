@@ -43,7 +43,7 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   game's bars are its own code, which the Mac game does not have.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen
   ([METAL.md](METAL.md#status) lists what the 1.3.0 release check covered).
-- **Auto Save warning skipped** (2026-11-06, a test install, by keys and snapshots): after profile select the game
+- **Auto Save warning skipped** (new in 1.7.0; 2026-11-06, a test install, by keys and snapshots): after profile select the game
   goes straight on without the autosave warning dialog (`RS_MODS_AUTOSAVE`), and a Direct Connect profile keeps its input: a
   UR22mkII to the note highway. Learn & Play skips it too ([Windows plan](../windows/PLAN.md#status)). Not in this pass: a Real
   Tone cable or Microphone profile, an install by the installer app.
@@ -126,6 +126,14 @@ Goes with the same section of the [Windows plan](../windows/PLAN.md#built-in-for
 - **Guitar input channel and gain**: `guitar-input.ini`, which came after 1.5.1, is in this release too.
 - **The installer**: a Learn & Play build stops on a game image that isn't the pinned one, and an image kept from an earlier
   version is made again; the Mac edition decrypts on every run. Its shader messages say what the game does.
+
+## Built in for 1.7.0
+
+Goes with the same section of the [Windows plan](../windows/PLAN.md#built-in-for-170):
+
+- **No Auto Save warning**: after profile select the game goes straight on, and a Direct Connect profile keeps its input. `RS_MODS_AUTOSAVE=0` shows it.
+- **Learn & Play's CPU** is that edition's. Nothing here is meant to change how this edition plays: `relaxed.py` is the one shared translator file touched, and
+  this edition's list works as before.
 
 ## Next work
 

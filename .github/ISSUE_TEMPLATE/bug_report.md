@@ -10,7 +10,7 @@ assignees: ""
 <!-- Mac (Rocksmith 2014 for Mac) or Windows (Learn & Play, experimental) -->
 
 **RS Re-ARMed version**
-<!-- e.g. 1.6.0. Finder's Get Info on the app shows it. -->
+<!-- e.g. 1.7.0. Finder's Get Info on the app shows it. -->
 
 **macOS version**
 <!-- e.g. macOS 15.1 -->

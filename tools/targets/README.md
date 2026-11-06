@@ -12,7 +12,7 @@ tools/targets/
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 965 of 1,152 symbols read, the rest `unsupported`
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 966 of 1,156 symbols read, the rest `unsupported`
                      with the reason; target.toml also has the install pins
   names/             shared by every target
     overrides/*.list the functions each override module replaces
@@ -71,7 +71,7 @@ A map line `unsupported` on a point can still run: the platform layer takes it w
 
 A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose stack
 arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments, so no check
-stands behind those prototypes: 7 of the 12 points on `win-x86`.
+stands behind those prototypes: 7 of the 13 points on `win-x86`.
 
 ## Adding a game function, global or field
 

@@ -80,7 +80,7 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,156 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (966 of the Mac's 1,156 symbols read, an
 `unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
@@ -417,7 +417,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
   log line: built for the Mac alone, it would misread this game's memory.
 
-  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Twelve of the 15
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Thirteen of the 16
   are functions of this game. Six of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
   its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
   Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /
@@ -480,8 +480,16 @@ More native replacements of single game functions by address (`win-x86/build/ski
   (`win-x86/shims/win32_overrides.c`) runs first, with the Windows build's field offsets (boot phase `+0x48`,
   phase 3 step counter `+0x28`, intro state `+0x60`, playing flag `+0x2d`). The behaviour is the Mac one
   ([Mac DESIGN](../mac/DESIGN.md#built-in-fixes-and-mods)).
-- **Auto Save warning**: not skipped here yet, so `RS_MODS_AUTOSAVE` has no effect ([Next work](PLAN.md#next-work) has what's
-  matched).
+- **Auto Save warning skipped**, as on the Mac (`RS_MODS_AUTOSAVE=0` shows it): the Mac `autosave_warning` is `0x120adf0` here, a
+  virtual with `this` in `ecx`, found by the same strings and branches. On `OnSignInFlowComplete` it runs the input mode step
+  (inlined here, `0x120ae72`-`0x120ae8d`), makes `RS2AutosaveWarning` with the navigate call `0x115db90`, stores it in the dialog
+  slot `+0x14` and writes 4.0 to the timer `+0x20`. The Mac copies that branch into a pre hook; here the handler runs as it is and
+  only the call is left out: `F_115db90` (`win-x86/shims/win32_overrides.c`; `win-x86/build/skip.txt`, `115db90 wrap` and `120adf0 wrap`) answers
+  for that one return address with a token, and every other caller gets `W_115db90`. So the input mode step, the slot, the string
+  and the release of the handler's third argument, which the Mac's call doesn't have, all stay the game's own. `N_120adf0`, around the
+  handler, clears the timer once it has returned. The menu's tick `0x1208fe0` (the same fields as `+0x2d4` and `+0x2e0`: the handler's
+  `this` is the menu's listener at `+0x2c0`) then goes on as when the dialog's time is up: like the Mac's, it needs a slot that isn't
+  NULL and a timer at most zero, and its dismiss by name does nothing for a dialog that isn't there.
 - **Title logo.** The same `tools/loadscreen` as the Mac's, and the same layout in the copy: `gamefiles.py`
   copies `static.psarc` as `static.psarc.original` and leaves `static.psarc` a link to it. `lp_install.py build`
   makes `static.psarc.rearmed` in the copy, as the Mac's `install.sh` does, not in the game folder, since Steam

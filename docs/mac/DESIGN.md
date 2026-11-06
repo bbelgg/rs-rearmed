@@ -210,8 +210,8 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   on `OnSignInFlowComplete` the game's UI event handler restores the player's input mode (`input_mode_restore`), shows
   `RS2AutosaveWarning` and starts a 4 s timer. The hook does the first and leaves out the rest: it stores a token in the
   handler's dialog slot and a zero in the timer, so the next tick goes on, as it does when the dialog's time is up. A NULL
-  slot would stop the flow on the profile screen. `RS_MODS_AUTOSAVE=0` shows the dialog. Not in the Windows build yet
-  ([Windows plan](../windows/PLAN.md#next-work)).
+  slot would stop the flow on the profile screen. `RS_MODS_AUTOSAVE=0` shows the dialog. The Windows build does the same, by leaving out only the dialog's call
+  ([Windows DESIGN](../windows/DESIGN.md#built-in-fixes-and-mods)).
 - **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared): every `.dylib` in `<home>/mods/` is loaded at startup. The
   executable exports the runtime. A mod hooks a game function by name with
   `rc_hook_add_name("game_frame", pre, post, user)`; the hook points are listed in

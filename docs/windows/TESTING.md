@@ -164,8 +164,27 @@ game should reach the title without the logos and legal screens, and with `RS_MO
 failure to look for is the title never coming (an empty screen after the loading screen). The scripts
 below wait for the title on a log line, so they need no change.
 
-**Auto Save warning** (`RS_MODS_AUTOSAVE`): not skipped in this build yet, so the notice should show after profile select with
-or without the switch ([Mac TESTING](../mac/TESTING.md#game-runs) has the test for when it is).
+**Auto Save warning** (`RS_MODS_AUTOSAVE`), as on the Mac ([Mac TESTING](../mac/TESTING.md#game-runs)): with the skip, profile select goes
+straight on with no warning dialog and `RS_MODS_LOG=1` logs `auto save warning skipped`. With `RS_MODS_AUTOSAVE=0` there is no such line, and
+"WARNING! This game uses an auto save feature" comes after "Loading profile…" and clears itself about 4 s later, so take snapshots every 2 s and
+look at every frame. `RC_HOOK_TRACE=autosave_warning` shows the handler either way. The skip must keep the game's input mode step: on a
+DIRECT CONNECT profile with an interface connected the tuner has to come up, and without the step it stops at "It sounds like your cable is
+unplugged". Checked 2026-11-06 by keyfifo, a test profile, a UR22mkII, no guitar: a new profile to "Have you played Rocksmith before?" with no
+dialog; DIRECT CONNECT to the tuner and the note highway with no dialog; the dialog back with the switch off. Not checked: a Real Tone cable or
+Microphone profile, and the tuner with the switch off.
+
+The route (`key` left out; `front` before each one, `HOME` and `CFFIXED_USER_HOME` at the test home):
+
+- A new profile: title Return, Return on New profile, a letter, Return. "Have you played Rocksmith before?": Down, Return on YES. "Would you like
+  to brush up": Down, Return on NO. Return on LEAD GUITAR, RIGHT-HANDED and 3+3.
+- Input selection: DIRECT CONNECT lists the inputs and goes on to Calibration, which needs a guitar, and Esc there comes back here. So without a guitar
+  take DISCONNECTED (Down twice from REAL TONE CABLE when nothing has moved it, Return), Return on its two pages, and Return on its notice over the main menu.
+- `lpctrl` for Path/Input, Down to INPUT, Right once from DISCONNECTED to DIRECT CONNECT, Down, Return lists the inputs, Return takes the first.
+- Esc asks "Calibrate now?" for a new input: Down, Return on "Not now" saves the profile. A second Esc there cancels the question and stays on Path/Input.
+- Return on the Welcome notice and on New Mission, Esc, Return on "Yes, quit". It goes back to the title, not out of the game: `quit` ends the run.
+- After a new start: title Return, profile Return, Return on LEARN A SONG, Return on each mission notice. The list is in Recommended order and a new
+  account owns no DLC, so Down to the first song with no DLC tag (Brannan Street Blues here), Return, Return on Play Song. The tuner is up about 35 s later;
+  `fwddelete`, Return, and the note highway about 25 s after that.
 
 **Title logo** (`RS_REARMED`, as on the Mac): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026"
 tag across REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. No keys are needed: with

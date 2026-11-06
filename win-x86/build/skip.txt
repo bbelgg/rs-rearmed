@@ -25,6 +25,12 @@
 # bool update(boot). `wrap`: still translated, as W_1126950; win32_overrides.c's F_1126950 skips the
 # intro (as the Mac mods.c does, off with RS_MODS_INTRO=0) and calls W_1126950 for the rest.
 1126950 wrap
+# No Auto Save warning: the UI event handler (0x120adf0, the Mac autosave_warning, a hook point), and the
+# navigate call that makes a dialog (0x115db90), which it calls at 0x120aec9 for RS2AutosaveWarning. `wrap`: both
+# stay translated, as W_120adf0 and W_115db90. win32_overrides.c's F_115db90 leaves that one call out, as the Mac
+# mods.c does, off with RS_MODS_AUTOSAVE=0; every other caller gets the original, and so does the handler's rest.
+120adf0 wrap
+115db90 wrap
 # Direct Connect: FrontEnd_OpenFile (0x101ba80; the Mac's 0x1003c7810), replaced by a native one that
 # opens a cacheN.7z from the installer's overlay (Update/patcharchives.psarc, which the engine mounts at
 # PatchUpdate/) before cache.psarc: the counterpart of the Mac pre hook in overrides/mods/mods.c. `wrap`: it

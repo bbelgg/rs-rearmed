@@ -156,12 +156,13 @@ static int env_on(const char *name, int dflt) {
   if (!v || !*v) return dflt;
   return !(v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F');
 }
-static struct { int init, log, fixes, bypass; double budget_s; } g_cfg;
+static struct { int init, log, fixes, bypass, autosave; double budget_s; } g_cfg;
 static void cfg_load(void) {
   if (g_cfg.init) return;
   g_cfg.log = env_on("RS_MODS_LOG", 0);
   g_cfg.bypass = env_on("RS_MODS_BYPASS", 1);
   g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
+  g_cfg.autosave = env_on("RS_MODS_AUTOSAVE", 1);
   g_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -192,6 +193,69 @@ static inline uint8_t *g8(uint32_t g) { return (uint8_t *)RC32_H(g); }
 static inline uint32_t ld32(uint32_t g) { uint32_t v; memcpy(&v, RC32_H(g), 4); return v; }
 static inline void st32(uint32_t g, uint32_t v) { memcpy(RC32_H(g), &v, 4); }
 static void log_counts(void);
+
+// ------------------------------------------------------------------------------------------------
+// No Auto Save warning: the counterpart of the Mac skip (tools/ws7/recomp/overrides/mods/mods.c,
+// before_autosave_warning), off with the same RS_MODS_AUTOSAVE=0. The handler is 0x120adf0, the Mac
+// autosave_warning: a virtual (vtable slot at 0x1d3c34c), thiscall (category, event, payload), `ret 0xc`,
+// `this` in ecx on entry and in ebx from 0x120ae1b on. `this` is the menu's listener at +0x2c0
+// (0x120939b). With category "UI", event "OnSignInFlowComplete" and the sign-in predicate false (slot 0x1e of the
+// global 0x1ef5e90, argument 1) it runs the input mode step (0x120ae72-0x120ae8d, inlined here: the Mac
+// input_mode_restore), makes the RS2AutosaveWarning dialog with the navigate call 0x115db90 at 0x120aec9, stores
+// it at this+0x14 (its reference count at +4, release at vtable +4), and writes 4.0 to the timer at this+0x20.
+//
+// The menu's tick 0x1208fe0 (the Mac 0x1005e48b0) reads the same two fields as +0x2d4 and +0x2e0: only with
+// the slot non-NULL and the timer at most zero does it dismiss the dialog by name (0x115e3e0, which does
+// nothing for a name it doesn't find), drop the slot's reference and go on (0x120a810). A NULL slot would stop the
+// flow on the profile screen, as on the Mac, so the call's result is a token: guest memory with a high count, so
+// no release calls through it.
+//
+// The Mac copies the branch into a pre hook. Here only the navigate call is left out and the handler runs
+// as it is, so the input mode step, the slot, the string and the release of the third argument (0x120af52) all
+// happen by construction, and a Direct Connect profile keeps its input (without that step it stops at the tuner with
+// "It sounds like your cable is unplugged"). The timer is written after the call, so N_120adf0 clears it
+// once the handler has returned, and the tick advances on its next run.
+// ------------------------------------------------------------------------------------------------
+#define AUTOSAVE_NAVIGATE_RET 0x120aeceu  // after the handler's navigate call
+#define AUTOSAVE_TIMER 0x20
+#define AUTOSAVE_TOKEN_REFS 1000000u
+void W_115db90(rc_ctx *c);
+void W_120adf0(rc_ctx *c);
+static uint32_t autosave_token;  // made once, for the life of the process
+static int autosave_skipped;     // the game thread's: F_115db90 tells N_120adf0
+
+// navigate (edi = the name), stdcall (menu system, Menu **out, payload); eax = out. The handler's payload is NULL.
+void F_115db90(rc_ctx *c) {
+  uint32_t sp = (uint32_t)c->r[4], ret = ld32(sp);
+  cfg_load();
+  if (ret != AUTOSAVE_NAVIGATE_RET || !g_cfg.autosave) {
+    W_115db90(c);
+    return;
+  }
+  if (!autosave_token && (autosave_token = rc32_alloc(16))) {
+    st32(autosave_token, 0);
+    st32(autosave_token + 4, AUTOSAVE_TOKEN_REFS);
+  }
+  if (!autosave_token) {  // out of memory: the original shows the dialog
+    W_115db90(c);
+    return;
+  }
+  uint32_t out = ld32(sp + 8);
+  st32(out, autosave_token);
+  autosave_skipped = 1;
+  c->r[0] = out;
+  c->ret_to = ret;
+  c->r[4] = sp + 16;  // ret 0xc
+}
+
+void N_120adf0(rc_ctx *c) {
+  uint32_t self = (uint32_t)c->r[1];
+  W_120adf0(c);
+  if (!autosave_skipped) return;
+  autosave_skipped = 0;
+  memset(g8(self + AUTOSAVE_TIMER), 0, sizeof(double));
+  if (g_cfg.log) fprintf(stderr, "mods: auto save warning skipped\n");
+}
 
 // ------------------------------------------------------------------------------------------------
 // CDLC (RSBypass): the SNG loader's signature check, 0x10d96a0 (edi = the loader; al: the song file

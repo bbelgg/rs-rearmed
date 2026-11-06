@@ -48,7 +48,7 @@ Load times are short and paced by the game itself, not by the translation.
 | First frame | 0.3 s after start |
 | Title takes keys | 27.4 s (three runs: 27.4, 27.4, 27.4); 31 fps during the logos, about 40% of a core |
 | Title -> profile list | under 1 s |
-| Profile -> main menu | about 6.5 s (the autosave notice, then the menu flies in: the game's pacing; the Mac build skips the notice with `RS_MODS_AUTOSAVE`) |
+| Profile -> main menu | about 6.5 s (the autosave notice, then the menu flies in: the game's pacing; both builds skip the notice now, `RS_MODS_AUTOSAVE`) |
 | Play Song -> tuner | 2-3 s (the first run after a build: one 3.5 s frame, caches cold) |
 | Skip tuner -> highway | about 5 s (the venue intro and song title) |
 | Song: frame rate | 60.0 fps, the display's rate |

@@ -75,7 +75,8 @@ def files_in(d, exts):
 def hook_tables_hash():
     """The tables that say which of the game's functions are hook points (gen_image_pe.py --target)."""
     tables = os.path.join(ROOT, "tools", "targets")
-    return tree_hash([os.path.join(tables, "names", "hooks.list"), os.path.join(tables, TARGET, "symbols.map")])
+    return tree_hash([os.path.join(tables, "names", "hooks.list"), os.path.join(tables, TARGET, "symbols.map"),
+                      os.path.join(tables, TARGET, "relaxed.map")])
 
 
 def translator_hash():

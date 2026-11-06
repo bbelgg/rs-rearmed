@@ -217,6 +217,8 @@ def main():
     args.obj_dir = args.obj_dir or os.path.join(args.outdir, "obj")
     os.makedirs(args.outdir, exist_ok=True)
     t0 = time.time()
+    if args.target:
+        os.environ["RC_TARGET"] = args.target    # xlat/relaxed.py reads the target's functions when it is imported
     from xlat.x86_32 import Translator32, read_wrappers
     wrappers = read_wrappers(args.wrappers) if args.wrappers else None
     tr = Translator32(args.image, wrappers=wrappers)

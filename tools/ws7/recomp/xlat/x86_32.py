@@ -683,7 +683,7 @@ class Translator32(X87Mixin, core.Translator):
             n = (ops[0].imm & 0xffff) if ops else 0
             if self.entry in self.flag_callees:
                 out.append("RC32_FLAGS_OUT();")
-            out.append("RC32_RET_SAVE(); rsp = (uint32_t)(rsp + %d); %sSPILL_RET(); return;" % (4 + n, self.leave_fn()))
+            out.append("%sRC32_RET_SAVE(); rsp = (uint32_t)(rsp + %d); %sSPILL_RET(); return;" % (self.relax_exit(), 4 + n, self.leave_fn()))
             return True
         if m == "jmp" and ops[0].type != x86.X86_OP_IMM:
             slot = self.iat_slot(i, ops[0])

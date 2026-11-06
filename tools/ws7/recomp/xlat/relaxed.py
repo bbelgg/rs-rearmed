@@ -23,7 +23,9 @@ with a warning).
 
 RC_RELAXED=0 in the environment turns the list off (A/B tests of a suspected memory-order problem).
 The functions are listed by name in tools/targets/names/relaxed.list, with what the code was identified as;
-their addresses (function starts of the original image) are in the target's symbols.map.
+their addresses (function starts of the original image) are in the target's symbols.map. A target can add functions
+by address in its relaxed.map. In the 32-bit front end a relaxed function's calls can only be to other relaxed
+functions: no entry of PURE_IMPORTS is a 32-bit import's name.
 """
 import os
 import sys
@@ -42,6 +44,14 @@ def _relaxed():
             name = s[0].strip()
             if name and t.addr(name) is not None:
                 out[t.addr(name)] = s[1].strip() if len(s) > 1 else name
+    # by address, for what a target has that the list doesn't name (tools/targets/win-x86/relaxed.map)
+    extra = os.path.join(targets.HERE, os.environ.get("RC_TARGET") or targets.DEFAULT_TARGET, "relaxed.map")
+    if os.path.exists(extra):
+        with open(extra) as f:
+            for ln in f:
+                if ln.strip() and not ln.startswith("#"):
+                    a, why = ln.split(None, 1)
+                    out[int(a, 16)] = why.strip()
     return out
 
 

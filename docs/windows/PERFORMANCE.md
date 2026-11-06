@@ -1,20 +1,11 @@
 # Performance of the Windows port (Learn & Play)
 
-Machine: Apple M2 (4 performance + 4 efficiency cores), 16 GB, macOS 27, Apple clang 21. The current figures are in
-[Toward the Mac edition](#toward-the-mac-edition), [Final pass](#final-pass-for-140), [Shader preparation](#shader-preparation), [Hook points](#hook-points) and
-[The build](#the-build-memory-and-time). The sections from [Baseline](#baseline-as-merged) to [Under load](#under-load) are
-from 2026-11-01/02, on the built-in display at 1470x956 points and 60 Hz, and tell how the seam's two big costs were found: there "final"
-is the build of 2026-11-02, before the memory order and the intro skip, so compare within those sections only.
+Machine: Apple M2 (4 performance + 4 efficiency cores), 16 GB, macOS 27, Apple clang 21. The Mac port's: [Mac performance](../mac/PERFORMANCE.md).
 
 ## Summary
 
 A song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 54% of a core and 7.2 ms of CPU a frame on the route of
-[Toward the Mac edition](#toward-the-mac-edition), which took 70% and 9.4 ms before that work. The last figures for both editions on one song are older:
-63% against the Mac build's 44%, 8.4 ms against 5.9 ms, 1.3 GB against 0.8 GB ([Final pass](#final-pass-for-140)). Most of the first gap to the Mac build was not translated
-code but two costs in the Win32 / D3D9 seam: every SetEvent woke every waiting guest thread (a fifth of a core of system time), and the game's
-whole-buffer vertex buffer locks were each uploaded whole (2.7 GB/s of copying). Fixing both took a song from 69% to 48% of a core at 60 fps.
-Keeping x86's memory order then cost about 10 to 15 points of a core at 120 fps and changed no frame times ([Memory order](#memory-order)).
-Load times are short and paced by the game itself, not by the translation.
+[Toward the Mac edition](#toward-the-mac-edition), where the Mac takes 6.1 ms. Load times are short and paced by the game itself.
 
 ## Method
 
@@ -45,174 +36,16 @@ Load times are short and paced by the game itself, not by the translation.
   (after the first fix): about +-1 point of a core between runs. Differences under 2 points are
   not results.
 
-## Baseline (as merged)
+## What the seam cost
 
-| | |
-|---|---|
-| First frame | 0.3 s after start |
-| Title takes keys | 27.4 s (three runs: 27.4, 27.4, 27.4); 31 fps during the logos, about 40% of a core |
-| Title -> profile list | under 1 s |
-| Profile -> main menu | about 6.5 s (the autosave notice, then the menu flies in: the game's pacing; both builds skip the notice now, `RS_MODS_AUTOSAVE`) |
-| Play Song -> tuner | 2-3 s (the first run after a build: one 3.5 s frame, caches cold) |
-| Skip tuner -> highway | about 5 s (the venue intro and song title) |
-| Song: frame rate | 60.0 fps, the display's rate |
-| Song: frame interval p50 / p95 / p99 / max | 16.7 / 17.2 / 17.5 / 18-27 ms |
-| Song: frames > 33 ms / > 50 ms | 0 / 0 (four runs, 6,600 frames each) |
-| Song: CPU | 69.4% of one core (69.0, 69.0, 69.5, 70.1), of it 21 points system time |
-| Song: GPU | 65% (full screen 1470x956, the game's default 4x MSAA) |
-| Song: memory | footprint 1.04-1.06 GB, RSS 0.97-1.0 GB, flat over the song |
+The first build took 69% of a core in a song at 60 fps, 48% after two fixes in the Win32 / D3D9 seam, both found by profile (2026-11-01/02):
 
-Threads in the song (as merged, `LP_THREAD_CPU`, % of one core):
+- **Wake only the threads waiting for an object**: every `SetEvent` woke every waiting guest thread, a fifth of a core of system time.
+- **Dynamic vertex buffers upload at the draw**: the game's whole-buffer locks were each uploaded whole, 2.7 GB/s of copying.
 
-| Thread | CPU | What it is |
-|---|---|---|
-| `w32 game` | 35 | the game's main thread: simulation, Scaleform, all D3D9 calls |
-| `w32 thread 1a823c0` | 9 | a worker thread, not identified (busy in every frame of the song) |
-| `w32 thread 78afc59c` (4) | 8 | threads started through msvcr100's `_beginthreadex`; 0.5% after the wake-up fix |
-| `w32 thread 149ab10` (2) | 8 | one of them the guitar note detection (`F_13f3690`, `_CIpow`) |
-| `w32 thread 1aa1f80` (2) | 3 | in long waits (one for the whole song); 0 after the wake-up fix |
-| Metal and CoreAudio threads | 4 | completion handlers, the audio I/O threads |
-
-Most threads other than the game's spent 1.5-2% each in system time with almost no user time,
-among them one whose single `WaitForMultipleObjects` lasted the whole run (`LP_DUMP_WAITS`): see
-"Changes made", 1.
-
-## Hot spots (as merged)
-
-Game thread, inclusive share of its samples (two 10 s samples in the song):
-
-| | share |
-|---|---|
-| D3D9 calls (`d3d9_hostfn_call` when measured, now `w32_hostfn_call`: all COM methods of the device and resources) | 32% |
-| of it `IDirect3DVertexBuffer9::Unlock` (`b_unlock` -> `glBufferSubData` -> `memmove`) | 18% |
-| of it draws (`rsm_draw`, Metal encoding) | 6% |
-| import calls (`rc32_import_thunk`) | 8% |
-| indirect-call dispatch (`rc32_icall`, `rc32_lookup`, `lookup_slow`, `_tlv_get_addr`) | 5% self |
-| translated game code, self | ~40% |
-| machine-outlined fragments of it (`OUTLINED_FUNCTION_*`) | 7% |
-
-All threads by category (self samples): translated game 41%, `memmove` 18%, other code in the
-binary (outlined fragments, the runtime's `run`) 13%, Metal driver 10%, runtime (`rc32_*`) 7%,
-libRSOpenGL 2%, seam 2%, libm 0.3%.
-
-The translated code's profile is flat: the hottest function has 3% of the samples. The top ones
-are x87 transform code: `F_ff80f0` (a 3x3 matrix product, `fld`/`fmul`/`faddp`) and `F_ff81e0`
-(composes a transform with it), the scene graph around `F_1577050`, `F_155ee30`, `F_1561fd0`,
-and msvcr100's `memcpy` (`F_78aa1e80`). The x87 stack lives in `rc_ctx` (`ST(k)` is
-`c->fpu.st[(top + k) & 7]`, every push and pop updates `top` and the tag word), and with
-`-fno-strict-aliasing` each guest store may alias it, so each x87 instruction is several loads
-and stores; clang cannot keep the stack in registers.
-
-Indirect calls are cheap after the lookup cache (rc32_lookup 1.2%, `_tlv_get_addr` 0.7% for its
-thread-local table): not worth more work now.
-
-Boot and the song load: in samples taken during the logos and right after Play Song the game
-thread renders (30 fps logos, then the menus) and the other threads are idle; nothing is CPU
-bound (37-43% of a core during the logos). The waits are the game's own pacing: logo and
-licence screens of fixed length, fades, the venue intro.
-
-## Changes made
-
-### 1. Wake only the threads waiting for an object
-
-Every kernel32 wait slept on one process-wide condition variable, and every SetEvent,
-ReleaseMutex, ReleaseSemaphore, timer arm, thread exit and overlapped completion broadcast it:
-each one woke every waiting guest thread to re-check under the global lock and sleep again. A
-wait now sleeps on a condition of its own, listed with the objects it waits for, and a change
-signals only the waits on that object (`w32_hwake_obj`, win32_ksync.c). `LP_WAKE_ALL=1` wakes
-every waiter again, for debugging. Test: `win-x86/shims/tests` (`make test`): an idle waiter is
-not woken by other objects (0 wake-ups for 1,000 SetEvents, the old way 100-200), auto-reset
-hand-offs (2,000 in 25 ms against 62 ms the old way), wait-any, wait-all, timeout.
-
-| Song | CPU (% of a core) | game thread | other guest threads |
-|---|---|---|---|
-| before (LP_WAKE_ALL=1, two runs) | 75.9, 76.7 | 34.1 | 36 |
-| after (two runs) | 52.4, 52.5 | 34.6 | 13 |
-| as merged (one broadcast, four runs) | 69.4 | 35 | 30 |
-
-(`LP_WAKE_ALL=1` signals each waiter separately, which costs more than the one broadcast did.)
-Frames are unchanged (60 fps, p99 17.4-17.5 ms).
-
-### 2. Dynamic vertex buffers upload at the draw
-
-The game locks its 1 MB dynamic vertex buffer whole (offset 0, size 0) about 2,900 times a second
-in the song (each frame: 4 DISCARD, ~37 NOOVERWRITE, ~7 plain locks) and appends a few vertices
-each time. The layer uploaded the locked range at each Unlock: 2.7 GB/s of `memmove` into Metal
-buffers, measured at 65 ms of every second of the game thread. Now Unlock of a dynamic buffer
-only notes the range as pending, and a draw uploads the part it reads (the vertex range of the
-draw; for an indexed draw from the smallest and largest index in the guest's index data, plus the
-base vertex; per instance for instanced streams; the index range of a dynamic index buffer).
-`LP_D3D9_EAGER=1` uploads at Unlock as before. `d3d9_test` streams quads the game's way and checks
-each is drawn (it fails if the draw-time upload is skipped).
-
-| Song (two runs each, same binary) | CPU | game thread |
-|---|---|---|
-| `LP_D3D9_EAGER=1` | 52.8, 52.2 | 34.7 |
-| upload at the draw | 48.9, 47.1 | 30.2 |
-
-Highway, notes, sustains and text checked by eye on snapshots.
-
-### 3. Diagnostics
-
-`LP_THREAD_CPU=S` (per-thread CPU log, named threads: `w32 game`, `w32 thread <start>`, also
-visible in `sample` and Instruments) and `RS_GL_FRAMETIMES=FILE` (frame times in the Mac build's
-format). Neither costs anything when unset.
-
-## After: the final build
-
-| Song, 120-230 s | as merged | now |
-|---|---|---|
-| CPU (% of one core) | 69.4 | 47.9 (48.9, 47.1, 47.6) |
-| game thread | 35 | 29-31 |
-| system time (all threads) | 20-21 | 4.7-4.8 |
-| frames | 60 fps, p99 17.5 ms, none > 33 ms | the same |
-| footprint | 1.05 GB | 1.05 GB |
-
-The game thread's profile afterwards (two 10 s samples): D3D9 calls 18% inclusive (was 32%),
-`IDirect3DVertexBuffer9::Unlock` 1.4% (was 18%), the draw-time upload 0.3%, Metal encoding of
-draws 7.5%; the hottest single symbols are now msvcr100's translated `memcpy` (4% of the game
-thread), `rc32_icall` (3%) and the x87 matrix code `F_ff80f0` / `F_ff81e0` (3% and 2%).
-
-## Options (final build, one run each unless noted)
-
-| Run | CPU | GPU | Frames | Notes |
-|---|---|---|---|---|
-| default (full screen 1470x956) | 47.6 | 65% | 60 fps, p99 17.4 | |
-| `LP_NATIVE_MATH=0` | 49.7 | | same | the note-detection thread 6.9% instead of 4.8%: native math saves 30% of it |
-| `RS_METAL_RETINA=1` (2940x1912, two runs) | 48.5, 49.1 | 73% | same | footprint +150 MB (1.20 GB) |
-| `RS_FULLSCREEN=0` (1280x720 window) | 47.7 | 38% | same | |
-| `LP_QOS=0` | 47.0 | 65% | same | a quiet machine does not need it |
-
-Compiler options (the game's generated C recompiled with ninja, 8 jobs, everything else the same;
-the CPU column is two or three runs, game thread in brackets):
-
-| `RC_OPT` | CPU | compile of the game (8 jobs) | binary |
-|---|---|---|---|
-| `-O2` (shipped) | 69.2 (34.7) | 4.1 min | 97.0 MB |
-| `-O2 -mno-outline` | 68.0 (33.1) | 4.0 min | 111.6 MB |
-| `-O3` | 67.8 (34.4) | 5.0 min | 97.4 MB |
-
-These were measured before the two fixes, on a build with a native `memcpy`/`memmove`/`memset`
-override (no measurable change: 69.2 against 69.4, so it was not kept). Turning off the machine
-outliner gains 1.5 points of the game thread (4%) for a 15% larger binary; `-O3` nothing
-measurable. As on the Mac build ([Mac performance](../mac/PERFORMANCE.md#build-options): ThinLTO no change, ThinLTO + PGO about 2%), the
-compiler is not where the time is. ThinLTO and PGO were not tried here: `gen_image_pe.py` has no
-switches for them yet, and the Mac's results bound what they can give.
-
-## Under load
-
-Eight busy loops (`perl -e 'while (1) {}'`, one per core) for the whole run:
-
-| Build | CPU | Frames (120-230 s) |
-|---|---|---|
-| as merged (QoS on) | 133.5 | 60 fps, p95 17.7, p99 18.5, max 28 ms, none > 33 ms |
-| final, QoS on | 45.1 | 60 fps, p95 17.7, p99 18.8, max 23 ms, none > 33 ms |
-| final, `LP_QOS=0` | 71.7 | 60 fps, p95 21.7, p99 27.4, max 38 ms, 5 > 33 ms |
-
-The user-interactive QoS of the game thread is what keeps the frames on a busy machine; the
-wake-up fix is what keeps the game from adding to the load (as merged, the process used 1.3 cores
-under contention, against 0.45 now). Without QoS the game thread likely runs more on the
-efficiency cores, which needs more CPU time for the same work (72% against 45%).
+Also measured then: native math saves 30% of the note detection thread (`LP_NATIVE_MATH=0` turns it off). User-interactive QoS on the game thread keeps the frames on a
+loaded machine (with eight busy loops 45% of a core and none over 33 ms, against 72% and 5 with `LP_QOS=0`). `-O3` gives nothing measurable, and ThinLTO and PGO weren't tried: as on
+the [Mac](../mac/PERFORMANCE.md#build-options), the compiler is not where the time is.
 
 ## Shader preparation
 
@@ -274,7 +107,7 @@ generated C compiled both ways, the same song (Cherub Rock, Lead, no guitar), 13
 All of these ran at 120 fps, twice the rate of the runs above, on a machine with two displays in use, so the
 absolute numbers and the noise are higher than in the rest of this page: compare within this table only. A run earlier
 the same day, the same way, showed 60 fps at 60% of a core. These runs were not looked into again; 1.5.1 found that a hidden full-screen window ran at
-about 120 fps ([plan](PLAN.md#fixed-in-151)), which may be why.
+about 120 fps, which may be why.
 
 So the fences cost 10 to 15 points of a core, about 17%, spread over all threads; frames do not change. Their cost at
 the display's rate was not measured: a build without them for the same song at 75 fps was started on 2026-11-04 and
@@ -443,13 +276,6 @@ note detection threads 1.9 ms against 1.1. What is left, by what the profiles sh
   detection is x87 here and SSE on the Mac (`F_105f420`, `F_13f3690`), and calls into functions that can't be relaxed as they are.
 - the D3D9 layer, 23% of the game thread, of which the Metal work the Mac does too is about half: the state and object lookups, the device lock.
 - the memory order itself is the same on both editions, so it isn't part of the gap, but it is the largest single cost left in this one.
-
-## Against the Mac build
-
-The last figures on one song are in [Final pass](#final-pass-for-140): 43% more CPU and 0.5 GB more memory, before [the work above](#toward-the-mac-edition). An earlier
-comparison on 2026-11-02, with other songs, in the 1280x720 window and before the memory order: the Mac build at 42.2% of a core and 0.81 GB,
-Learn & Play at 47.7% and 1.05 GB, both at 60 fps with no frame over 33 ms. The extra memory is likely the DLLs' images in the guest window and
-the D3D9 layer's guest copies of resources next to the Metal ones.
 
 ## Opportunities, by expected payoff
 

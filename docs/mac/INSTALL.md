@@ -115,8 +115,7 @@ Clone into a folder whose path has no spaces: the build scripts can't handle the
 
 ### 2. Python environment
 
-The recompiler needs Python with [Capstone](https://www.capstone-engine.org/), and the build uses the CMake
-and Ninja that pip installs next to it (`requirements.txt`):
+The recompiler needs Capstone, and the build uses the CMake and Ninja that pip installs next to it:
 
 ```bash
 python3 -m venv build/venv
@@ -125,15 +124,9 @@ export RC_PY="$PWD/build/venv/bin/python"
 export PATH="$PWD/build/venv/bin:$PATH"     # the venv's cmake and ninja for step 4
 ```
 
-The app build (step 5) runs the `ninja` next to `RC_PY` (`RS_NINJA` names another one).
-
-The title logo (`tools/loadscreen`) reads `RS_PY` instead. Without it `install.sh` uses this environment, and
-if there is none the logo script makes its own.
-
 ### 3. The game image
 
-The recompiler reads a DRM-free x86-64 binary. The Steam copy on disk is encrypted, and `tools/steamless` makes
-the decrypted image from it, in a few seconds, without running anything and without changing your Steam copy:
+`tools/steamless` makes the decrypted image from your Steam copy in a few seconds, without running or changing it:
 
 ```bash
 python3 tools/steamless/decrypt.py        # RS_GAME_DIR or --game: another game folder
@@ -151,8 +144,7 @@ make -C shims/steam                # the offline Steam layer: shims/steam/build/
 tools/ws8/netguard/build.sh        # the network guard: build/ws8/libnetguard.dylib
 ```
 
-Use `build` in the repository root as the CMake build directory: the later steps look for the shims in
-`build/shims/` and for the network guard in `build/ws8/`.
+Use `build` in the repository root: the later steps look there.
 
 ### 5. The app
 
@@ -160,17 +152,8 @@ Use `build` in the repository root as the CMake build directory: the later steps
 tools/ws7/recomp/app/build-m4.sh build/m4
 ```
 
-This builds the native override libraries, recompiles the game image to C, compiles it (the slowest part),
-makes the Metal renderer's shader corpus and links `build/m4/app/Rocksmith2014.app`. At the end it starts
-the new app once with `--init-only` as a check and prints `app: <path>`. Without an argument the output
-goes to `$RS_BUILD_DIR/m4`.
-
-The shader corpus (`tools/metal/make-corpus.sh`, under a minute) is the Metal translation of every shader
-the game can compile, made from the game files alone ([METAL.md](METAL.md#shader-translation)). If it
-can't be made, the build goes on without it.
-
-The generated C goes to `<output>/gen`, the objects to `<output>/obj`, the corpus to `<output>/shaders`.
-All three are derived from the game: keep them on your Mac.
+This recompiles the game image to C, compiles it (the slowest part), makes the Metal shader corpus and links `build/m4/app/Rocksmith2014.app`, then starts it once
+with `--init-only` as a check. Everything in the output folder is derived from the game: keep it on your Mac.
 
 Variables the build reads:
 
@@ -195,8 +178,7 @@ Variables the build reads:
 | `RS_MSL_VERIFY` | off | `1`: also check every corpus program against OpenGL (a few minutes) |
 | `RC_RELAXED` | on | `0`: fence the audio kernels too (for a suspected memory-ordering problem) |
 
-The optimisation switches (`RC_LTO`, `RC_PGO`, `RC_OPT`) are optional; what they measured and how to make a
-profile-guided build is in [PERFORMANCE.md](PERFORMANCE.md#build-options).
+What the optimisation switches measured: [PERFORMANCE.md](PERFORMANCE.md#build-options).
 
 ### 6. Install
 
@@ -204,93 +186,35 @@ profile-guided build is in [PERFORMANCE.md](PERFORMANCE.md#build-options).
 tools/play-native/install.sh
 ```
 
-It copies the game files from your game folder (`RS_GAME_DIR`, default Steam's library) into
-`~/Library/Application Support/RS Re-ARMed/game/` ([Game files](#game-files)), the app (by default
-`$RS_BUILD_DIR/m4/app/Rocksmith2014.app`; pass another path as the first argument) next to them and the
-network guard into `~/Library/Application Support/RS Re-ARMed/`, and creates the launcher
-`~/Applications/RS Re-ARMed.app`. Quit the game first. Start the game through the launcher, which prepares
-the game folder (the offline `Rocksmith.ini`, the title logo) and starts it offline; opening
-`Rocksmith2014.app` directly doesn't work.
+It makes the [copy of the game files](#game-files), puts the app (`$RS_BUILD_DIR/m4/app/Rocksmith2014.app`, or the path you pass) and the network guard in
+`~/Library/Application Support/RS Re-ARMed/`, creates the launcher `~/Applications/RS Re-ARMed.app`, and prepares the Metal shaders (about 4.5 minutes the first time, a second on later
+installs; `RS_WARM_SHADERS=0` skips it, `tools/play-native/warm-shaders.sh` does it later). Quit the game first. Always start the game through the launcher:
+opening `Rocksmith2014.app` directly doesn't work.
 
-Last, `install.sh` prepares the Metal shaders (`tools/play-native/warm-shaders.sh`): it runs the installed
-game once with `--warm-shaders`, which opens no window, and compiles the shader corpus into the caches the
-game reads, showing `Preparing shaders… N of M` (about 4.5 minutes for 3880 shaders on an M2 the first
-time, about a second on later installs). Metal keeps compiled shaders per app and per install location, so
-only the installed game can do this, and moving the install means preparing again. `RS_WARM_SHADERS=0`
-skips the step; run `tools/play-native/warm-shaders.sh` later to do it then.
-
-`RS_RENDERER=metal` or `RS_RENDERER=opengl` chooses the renderer; without it `install.sh` keeps the one the
-install has, else Metal. `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.
+`RS_RENDERER=metal` or `opengl` chooses the renderer. `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.
 
 ### Game files
 
-The game reads only RS Re-ARMed's own copy of the game files, `~/Library/Application Support/RS Re-ARMed/game/`,
-never Steam's folder, so a Steam update, uninstalling the game in Steam or moving your Steam library does not
-change or break it. `install.sh` makes the copy (`tools/play-native/gamefiles.py`) with what the game reads:
-the `.psarc` archives and folders of the game, `metadata`, `Rocksmith.ini` (the launcher makes the offline
-one from it), the title logo when you built it, and from `dlc/` (official DLC and custom songs, in their
-subfolders) the Mac archives, `*_m.psarc`. Not copied: Steam's own `Rocksmith2014.app` (the install has its
-build), the PC archives (`*_p.psarc`) and other files. It also records the DLC your account has installed
-and the game's language from Steam's `appmanifest_221680.acf` (`game/.rearmed/steam.env`), so the offline
-Steam layer does not need Steam's folder for them, and the Steam account the game plays as (`RS_STEAM_ID`):
-the account whose Steam license has the Mac game. Your saves and profiles belong to that account, so logging
-in to Steam with another account later (for example one that owns Learn & Play) does not change them. To
-choose the account yourself, set `RS_STEAM_ID` (a SteamID64, or the account number of
-`Steam/userdata/<number>`) when you refresh, e.g. `RS_STEAM_ID=12345678 tools/play-native/install.sh
---refresh-game`, or for the launcher with `launchctl setenv RS_STEAM_ID …`.
+The game reads only its own copy, `~/Library/Application Support/RS Re-ARMed/game/`, so a Steam update or uninstall can't break it. `install.sh` makes the copy
+(`tools/play-native/gamefiles.py`): the game's archives and folders, `metadata`, `Rocksmith.ini`, and from `dlc/` the Mac archives, `*_m.psarc`. It also records your installed DLC, the
+language and the account the game plays as in `game/.rearmed/steam.env`. That account is the one whose license has the Mac game, so logging in to Steam with another changes nothing. To choose it
+yourself, set `RS_STEAM_ID` (a SteamID64 or the number in `Steam/userdata/<number>`) when you refresh, or with `launchctl setenv` for the launcher.
 
-After each copy or refresh it also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
-(`tools/play-native/cache_overlay.py`): from your own `cache.psarc` it takes the two menu files that leave
-out the "DIRECT CONNECT" choice (on the cable screen and in the INPUT setting), adds it, and stores the
-archive that holds them, rewritten, where the game reads it instead of the one in `cache.psarc`. The same
-overlay turns the main menu's SHOP into ENUMERATE.
-`cache.psarc` itself is not changed, so a modded cache works as before; a cache that has both entries already
-gets no overlay. If your cache cannot be read, the copy goes on without the overlay and says so.
+Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed:
+it adds DIRECT CONNECT and turns SHOP into ENUMERATE. If your cache can't be read, the copy goes on without it and says so.
 
-- **Disk use.** When the game folder is on the same APFS volume as your home folder (Steam's default
-  library is), every file is an APFS clone: the copy takes seconds and no extra space; macOS shares the
-  data until one side changes (a Steam update then stores only what changed). `du` and the Finder count
-  the copy at its full size anyway; the free space on the disk shows what it really takes.
-- **A Steam library on another drive** (an external disk): when that drive is APFS, the copy goes onto it,
-  as clones again (no extra space): `RS Re-ARMed/game` at the top of the drive (when the top is not
-  writable, in the first writable folder on the way to the game, e.g. `SteamLibrary/RS Re-ARMed/game`), and
-  `~/Library/Application Support/RS Re-ARMed/game` is a link to it. The game then needs that drive
-  connected; without it the launcher says "The drive with the game files (*name*) isn't connected". On a
-  drive that cannot clone (exFAT, HFS+, a network volume) the copy is a real one in your home folder, as
-  large as the game and its DLC (about 6.5 GB without DLC); `install.sh` checks there is room first, says
-  how much is needed, and shows its progress. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game` instead
-  (any drive; `RS_GAME_COPY_DIR=home`: in your home folder whatever the drive; for the installer app, set it
-  with `launchctl setenv RS_GAME_COPY_DIR …` before opening it). This decides where a new
-  copy goes: a copy made by an earlier version stays where it is (in your home folder; delete
-  `~/Library/Application Support/RS Re-ARMed/game` and install again to have it moved), and a refresh
-  keeps the copy where it is.
-- **Refresh** after new DLC or custom songs, or a Steam update: the installer's **Refresh Game Files**, or
-  `tools/play-native/install.sh --refresh-game`. It copies new and changed files (by size and date, by
-  contents when only the date differs) and removes the files of the copy that the game folder no longer
-  has; it touches nothing else (your settings, saves, the app). Running `install.sh` again also refreshes.
-  If the game folder is gone (Steam uninstalled the game), a refresh changes nothing and says so.
-- **Stopped copies** continue where they were on the next run. The copy is complete when
-  `game/.rearmed/manifest.json` is there (written last); until then the launcher asks for a refresh.
-- `game-source` names the folder the copy comes from; `game/.rearmed/source.json` holds what a refresh
-  uses. The installed `gamefiles.py` next to them refreshes without the repository.
+- **Disk use.** On the same APFS volume as your home folder every file is a clone: seconds, and no extra space, though `du` and the Finder count the full size.
+- **A Steam library on another drive.** On APFS the copy goes onto that drive as clones, in `RS Re-ARMed/game` at its top, and `…/RS Re-ARMed/game` is a link to it, so the game needs that drive connected. On
+  a drive that can't clone (exFAT, HFS+, a network volume) it is a real copy in your home folder, about 6.5 GB without DLC, after a check for room. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game`
+  (`home`: your home folder; for the installer, `launchctl setenv`). A refresh keeps the copy where it is.
+- **Refresh** after new DLC or custom songs, or a Steam update: **Refresh Game Files**, or `tools/play-native/install.sh --refresh-game`. It copies new and changed files, removes what the game folder
+  no longer has, and touches nothing else. If the game folder is gone it changes nothing and says so.
+- **Stopped copies** continue on the next run. `game/.rearmed/manifest.json`, written last, marks a copy complete; until then the launcher asks for a refresh.
 
 ### The title logo
 
-The install makes the Re-ARMed title logo automatically, once, in the copy of the game files (Python with
-Pillow, numpy and etcpak: the build's environment has them; with neither that nor `RS_PY` it makes its own
-environment, which needs the network the first time). If it can't, the install goes on and the game shows its
-own logo. To rebuild it by hand:
-
-```bash
-game="$HOME/Library/Application Support/RS Re-ARMed/game"
-RS_GAME_DIR="$game" tools/loadscreen/build.sh "$game/static.psarc.rearmed"
-```
-
-It reads the copy's `static.psarc.original`, changes only the two title-logo textures and writes a new file
-next to it. The original is not changed, and the launcher uses the new file whenever it is there
-(`RS_REARMED=0`: the original). When a refresh brings a new `static.psarc`, it removes the logo made from the old
-one; the next install makes it again, or the command above. Steam's folder is not touched. Learn & Play does the
-same in its own copy ([Windows INSTALL](../windows/INSTALL.md#the-title-logo)).
+The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` shows the original. A
+refresh that brings a new `static.psarc` removes it, and the next install makes it again.
 
 ## Where things are
 
@@ -401,7 +325,6 @@ again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `R
 
 ## Settings and switches
 
-The built-in fixes and their switches are listed in the [README](../../README.md#built-in-patches-and-mods).
 The launcher starts the game through macOS, so variables set in a Terminal do not reach it. Set them for
 the login session:
 
@@ -410,10 +333,40 @@ launchctl setenv RS_MODS_BYPASS 0     # takes effect on the next launch
 launchctl unsetenv RS_MODS_BYPASS     # back to the default
 ```
 
-Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup
-(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). A mod built with
-`rc_mod.h` is the same dylib for Learn & Play. How mods hook the game:
-[DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
+Everything below is compiled into the app and on by default unless it says otherwise. LP: Learn & Play has it too; its switches
+are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writes what the mods apply to `logs/last-run.log`.
+
+| What | LP | Switch |
+|---|---|---|
+| [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit | loading, open files | `RS_MODS_FIXES=0`; `RS_MODS_BUDGET_MS=N`: time per frame for mounting DLC archives (default 50; 0 mounts one per frame, as the game does) |
+| CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass) | yes | `RS_MODS_BYPASS=0` |
+| No intro screens; no game file changed | yes | `RS_MODS_INTRO=0` |
+| DIRECT CONNECT in the INPUT setting and on the cable screen, from an overlay of your own `cache.psarc` | yes | `RS_MODS_OVERLAY=0` |
+| ENUMERATE in place of SHOP: adds new songs, with no restart. Changed and removed songs need **Refresh Game Files** | yes | `RS_MODS_OVERLAY=0` |
+| Uplay sign-in prompt skipped | yes | none |
+| Auto Save warning skipped | yes | `RS_MODS_AUTOSAVE=0` |
+| Offline Steam layer: `libsteam_api` with no client, cloud saves in a local folder | yes | none |
+| Song ownership: the base game, your DLC, the AppID of every archive in the copy's `dlc/`, and the Rocksmith 1 songs you own (a copy or refresh asks Steam, with your account logged in) | yes | `RS_STEAM_DLC=all`, or a list of AppIDs |
+| Title logo, from your own `static.psarc` | yes | `RS_REARMED=0`, or delete `static.psarc.rearmed` |
+| Frame rate follows the display; a fixed rate turns vsync off | | `RS_FPS=N` |
+| Lower guitar latency: a smaller output buffer, a real-time audio thread, stale guitar audio dropped | | `RS_AUDIO_FRAMES=N` (0 leaves the system's), `RS_LATENCY_BUFFER=N` (1-16), `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_LOG=1` |
+| [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
+| An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
+| [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
+| Retina, Metal only (off by default) | yes | `RS_METAL_RETINA=1` |
+| Multithreaded GL engine, OpenGL only (off by default) | | `RS_GL_MTENGINE=1` |
+
+Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup and survives a reinstall
+(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). Include
+`tools/ws7/recomp/runtime/rc_mod.h` and one dylib serves both editions:
+
+```bash
+clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runtime -Itools/ws7/recomp/overrides \
+    mod.c -o mod.dylib
+```
+
+`tools/ws7/recomp/test/hooks/probe_mod.c` is a small one; how mods hook the game: [DESIGN.md](DESIGN.md#built-in-fixes-and-mods). Mods
+made for the original game that change its files may work as before: a modified `cache.psarc` is used as it is.
 
 ## Update and uninstall
 

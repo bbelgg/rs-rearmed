@@ -235,15 +235,9 @@ exceptions, RTTI, iostreams and `std::string`, with exactly the layouts the game
 seam is the kernel32 the game needs anyway. None of these DLLs, nor anything generated from them, is
 shipped: the installer takes the user's copies ([INSTALL.md](INSTALL.md#install-from-a-clone)).
 
-**Native math overrides** (`win-x86/shims/win32_crtmath.c`, `rc32_override_add`): the guitar
-note-detection thread calls `_CIpow` four times per spectrum element. Every math export the five images
-import (`_CIsqrt`, `_CIlog`, `_CIlog10`, `_CIexp`, `_CIsin`, `_CIcos`, `_CItan`, `_CIasin`, `_CIacos`,
-`_CIatan`, `_CIsinh`, `_CIcosh`, `_CItanh`, `_CIatan2`, `_CIpow`, `_CIfmod`, `log`, `ceil`, `floor`, `modf`,
-`frexp`, `ldexp`, `_isnan`, `_finite`) runs on the host's libm instead, with the CRT's error rules (errno,
-MSVC's indefinite NaN) and its calling convention (`st(0)` in and out for the `_CI` functions). Every
-image's import of an export, a function pointer to it and an alias reach the override; msvcr100's own
-internal calls keep the translated code. Measured against the translated SSE2 paths: within 4 ulp, 2-6
-times faster; the note-detection thread uses 30% less CPU. `LP_NATIVE_MATH=0` turns them off. `memcpy`, `memmove`, `memset` and `memcpy_s` are native the same way (`LP_NATIVE_MEM=0`), fenced once around the call as a `rep movs` is.
+**Native math overrides** (`win-x86/shims/win32_crtmath.c`, `rc32_override_add`): the note detection calls `_CIpow` four times per spectrum element, so every math export
+the five images import runs on the host's libm, with the CRT's error rules and calling convention. Within 4 ulp of the translated code, 2-6 times faster, and the note detection
+uses 30% less CPU. `LP_NATIVE_MATH=0` turns them off. `memcpy`, `memmove`, `memset` and `memcpy_s` are native the same way (`LP_NATIVE_MEM=0`), fenced once around the call.
 
 ## Audio
 
@@ -384,7 +378,7 @@ switches are the Mac ones:
   `0x10f41c0` finds the CRC-32 of its `SongKey` in a table of 1590 known keys in the image (`0x1d1a0d0`), so
   a custom song was left out even with its archive mounted and its manifest read. `F_10f41c0` answers true
   (`skip.txt` `wrap`; `RS_MODS_BYPASS=0`: the table again, through `W_10f41c0`). The Mac image has no such
-  table ([PLAN.md](PLAN.md#built-in-for-140)).
+  table.
 
 The open-file limit needs no game function: `lp_mods_init()` in `win32_overrides.c` raises it at the start with
 the Mac's code (`rc_nofile.h`, `RS_MODS_FIXES=0` leaves it). The batched mounting depends on it: 441 archives
@@ -439,10 +433,8 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   The overlay API is the Mac's `rsp_overlay.c`, run in `d3d9_dev_present` on the back buffer before it is shown, and
   `OV_VCALL` is a thiscall through the guest's vtable (`rc32_hook.c`).
 
-  Two things stay different with the call the same. A mod's hooks run around a built-in fix here, where on the Mac the fix
-  is a pre hook of its own that can answer first: during DLC mounting a mod on `steam_dlc_owned` saw 148 calls here,
-  answered 1, and one on the Mac (2026-11-04, the probe mod). And `game_frame` is a tick of the Run loop: 19,499 ticks against
-  17,593 presents in a 240 s run, where the Mac has 15,909 against 15,893; where the extra ticks fall was not looked into.
+  Two things differ with the call the same: a mod's hooks run around a built-in fix here, where on the Mac the fix is a pre hook that can answer first, and `game_frame` is a tick
+  of the Run loop, so it runs more often than frames are presented.
 
   RSMods' library (`rearmed-mods.dylib`, from 0.3.0) runs here as the same file as on the Mac. What it needs of the game
   is in the tables ("the mods library" in `tools/targets/names`): Wwise by name, the UI manager, the DLC service, the Gamebryo
@@ -490,14 +482,8 @@ More native replacements of single game functions by address (`win-x86/build/ski
   handler, clears the timer once it has returned. The menu's tick `0x1208fe0` (the same fields as `+0x2d4` and `+0x2e0`: the handler's
   `this` is the menu's listener at `+0x2c0`) then goes on as when the dialog's time is up: like the Mac's, it needs a slot that isn't
   NULL and a timer at most zero, and its dismiss by name does nothing for a dialog that isn't there.
-- **Title logo.** The same `tools/loadscreen` as the Mac's, and the same layout in the copy: `gamefiles.py`
-  copies `static.psarc` as `static.psarc.original` and leaves `static.psarc` a link to it. `lp_install.py build`
-  makes `static.psarc.rearmed` in the copy, as the Mac's `install.sh` does, not in the game folder, since Steam
-  may clear its download folder and `gamefiles.py` only reads it; it is not in the manifest, so a refresh leaves it
-  alone, except that a new `static.psarc` removes it (it was made from the old one). `title_logo()` in
-  `lp_main.c` does what `launch.sh` does at each start, the link to one or the other, `RS_REARMED=0` for the
-  original; a folder without `static.psarc.original` (`LP_GAME_DIR` at the depot) stays as it is. The two
-  editions' logo textures are byte-identical, so the tag sits the same.
+- **Title logo.** The same `tools/loadscreen` and layout as the Mac's. `lp_install.py build` makes `static.psarc.rearmed` in the copy, and `title_logo()` in `lp_main.c` links
+  `static.psarc` at each start as `launch.sh` does (`RS_REARMED=0` for the original). It isn't in the manifest, so a refresh leaves it, except that a new `static.psarc` removes it.
 
 ## Installer and build
 
@@ -509,45 +495,19 @@ choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, a
 
 `win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships):
 
-1. **The game** (`game-locate`, `game-space`, `game-redirect`, `game-download`). Steam's launcher hands a
-   `+command` to the running Steam, which runs it as its console would, so
-   `steam_osx +download_depot 221680 221683 8918188356915973501` starts the download with nothing to paste. Only
-   if Steam ignores that for 30 seconds does `steam://open/console` open with the command on the clipboard.
-   A second command while a download runs makes Steam fetch every chunk twice, so one goes out only when Steam
-   started no download since it last started (`download_running`), or nothing has been written for ten minutes.
-   Before that, `gamefiles.SteamGate` reads what Steam shows on disk, with no Accessibility and no macOS
-   permission: Steam.app, the `steam_osx` process, and the last state in `logs/connection_log.txt`, and opens Steam
-   when it isn't open. What is left for the user comes out as `guide` lines, the same words as the Mac
-   edition's, and the run goes on by itself when it is done: Steam's `missing license for depot` line means the
-   wrong account, and the download starts again when another account signs in; a Steam that quits is opened
-   again, and Steam continues from what it wrote.
-   Steam for Mac downloads any depot the account owns, with the user's own login (the
-   installer never handles credentials), into
-   `~/Library/Application Support/Steam/Steam.AppBundle/Steam/Contents/MacOS/steamapps/content/`. Steam
-   makes every file at full size before filling it, so the whole depot (5.9 GB) must be free up front; when
-   it is not, `game-redirect` makes that folder a link to another disk (checked again before each download,
-   since a Steam update can put the folder back, and linked again from `LP_HOME/download-dir` if it dropped the
-   link). Progress comes from the bytes on disk and Steam's `console_log.txt` and `content_log.txt`. The download
-   counts as finished on Steam's word or at the depot's full size, not on a good exe: Steam makes every file at
-   full size first. The exe's SHA-256 is checked against `target.toml`; a different build is reported as
-   such. steamcmd is not used: it is an Intel binary.
+1. **The game** (`game-locate`, `game-space`, `game-redirect`, `game-download`). `steam_osx +download_depot 221680 221683 8918188356915973501` hands the running Steam the
+   download with nothing to paste; only if it ignores that for 30 seconds does `steam://open/console` open with the command on the clipboard. A second command during a download makes
+   Steam fetch every chunk twice, so one goes out only when no download has started since Steam did, or nothing was written for ten minutes. `gamefiles.SteamGate` reads Steam's state from
+   disk, with no macOS permission, and what's left for the user comes out as `guide` lines, the same words as the Mac edition's. The installer never handles credentials.
+   Steam makes every file at full size first, so the whole depot (5.9 GB) must be free up front; when it isn't, `game-redirect` links Steam's `steamapps/content` to another disk. The
+   download counts as finished on Steam's word or at the depot's full size, and the exe's SHA-256 is checked against `target.toml`. steamcmd is not used: it is an Intel binary.
 1a. **The DLC** (`gamefiles.py dlc-fetch`): each DLC is a depot of its own, with the AppID as its id, and the game's
    depot has none. The DLC the account owns are read from the app ownership ticket in Steam's `localconfig.vdf`, and
    Steam fetches them one after another with the same `+download_depot`. A state file remembers what is done, so a
    stopped run and a later refresh fetch only the rest, and one that fails is named and doesn't stop the install.
-1b. **The game files** (`game-copy`, `game-refresh`; `tools/play-native/gamefiles.py`, shared with the Mac
-   install): the app's own copy in `LP_HOME/game`, which `game-dir` names and the build and the app read.
-   Steam's depot folder lives inside Steam's app bundle and Steam may clear it, so the installed app never
-   reads it. The copy is the depot folder and, from its `dlc/` and the Mac game's `dlc/` in each Steam
-   library, the PC archives `*_p.psarc` (`static.psarc` as `static.psarc.original`, as on the Mac: see the
-   title logo in [Built-in fixes and mods](#built-in-fixes-and-mods)); files on the same APFS volume are
-   `clonefile(2)` clones (no extra space), others real copies after a free-space check. Files are compared by size and time (by SHA-256
-   when only the time differs), replaced by a rename (a clone's source is never written through), and only
-   files of the earlier copy are removed; `.rearmed/manifest.json`, written last, marks the copy complete, and
-   `lp_main.c` refuses to start without it (with a message to refresh). `.rearmed/steam.env` carries the
-   installed DLC and the language from Steam's appmanifest, the DLC of the account's ownership ticket, every AppID the
-   copy's archives carry and the account; `lp_main.c` sets them as `RS_STEAM_*` defaults,
-   and without Steam's `loginusers.vdf` it takes the account whose saves are in `steam/`.
+1b. **The game files** (`game-copy`, `game-refresh`; `tools/play-native/gamefiles.py`, shared with the Mac install): the app's own copy in `LP_HOME/game`, as Steam may clear its depot
+   folder. It is the depot folder plus the PC archives `*_p.psarc` of its `dlc/` and the Mac game's `dlc/`, as APFS clones where it can. `.rearmed/manifest.json`, written last, marks it complete,
+   and `lp_main.c` refuses to start without it. `.rearmed/steam.env` carries the DLC, language, AppIDs and account, which `lp_main.c` sets as `RS_STEAM_*` defaults.
 2. **The Microsoft DLLs** (`redist`): from Steam's Common Redistributables on the Mac
    (`Steamworks Shared/_CommonRedist`: `vcredist/2010/vcredist_x86.exe`,
    `DirectX/Jun2010/Aug2009_d3dx9_42_x86.cab`, `Aug2009_D3DCompiler_42_x86.cab`), else Microsoft's two

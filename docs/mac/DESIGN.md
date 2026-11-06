@@ -192,7 +192,7 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   key in menus, faster loading with large libraries, the number-table hash, worker-thread priority, the
   open-file limit, in `rc_nofile.h`, which the Windows build shares) and the RSBypass CDLC signature skip,
   each with a switch
-  ([README](../../README.md#built-in-patches-and-mods)). `RS_MODS_LOG=1` logs what they apply. The song path
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). `RS_MODS_LOG=1` logs what they apply. The song path
   cache and the number-table hash have Windows counterparts on the same switch, on that build's own functions
   ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)).
 - **No intro screens** (`mods.c`, `before_intro_update`, a pre-hook on the hook point `boot_intro_update`):

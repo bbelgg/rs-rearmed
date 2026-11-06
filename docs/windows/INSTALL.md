@@ -129,10 +129,7 @@ it needs nothing else. `CAPTURE` is an unzipped capture folder (or `LP_HARVEST`)
 the first run prepares the capture folder, opens it and stops, and you run it again with the folder. Re-run it to
 update. `tools/play-native/learn-play.sh --refresh` only refreshes the game files.
 
-The code image of an earlier run is kept only if it is the one this version is made for (`image_sha256` in
-`tools/targets/win-x86/target.toml`). Otherwise it is made again from the seed, and without a seed an earlier capture's
-image is used as it is, as a capture's can differ. `lp_install.py build` stops before building on any other image
-unless it has `--unpinned`, and `lp_install.py image-check EXE` says whether an image is the right one.
+An earlier run's code image is kept only if it is the one this version is made for (`image_sha256` in `tools/targets/win-x86/target.toml`); `lp_install.py image-check EXE` says whether it is.
 
 | Variable | Meaning |
 |---|---|
@@ -175,41 +172,17 @@ copied into `steam/` (without `crd`).
 
 ## Game files
 
-The app reads only its own copy of the game files, `~/Library/Application Support/RS Re-ARMed/learn-play/game/`.
-Steam's depot download folder lives inside Steam's own app bundle and Steam may clear it; an update or a
-cleared folder no longer changes the installed game. The copy (`lp_install.py game-copy`, with
-`tools/play-native/gamefiles.py`) has the whole Windows game folder and, from `dlc/` and from the Mac game's
-`dlc` folder in each Steam library (Steam downloads both kinds of archives there), only the PC song archives,
-`*_p.psarc` (the Windows game does not read the Mac `*_m.psarc`). It also records the DLC your account has
-installed and the language from Steam's `appmanifest_221680.acf`, the DLC your account owns
-(`game/.rearmed/steam.env`), and the Steam
-account the game plays as (`RS_STEAM_ID`): the account whose Steam license has Learn & Play (depot 221683),
-whichever account is logged in to Steam later. Its saves and profiles are that account's. To choose the
-account yourself, set `RS_STEAM_ID` (a SteamID64, or the account number of `Steam/userdata/<number>`) for
-the refresh, e.g. `RS_STEAM_ID=12345678 tools/play-native/learn-play.sh --refresh`.
+The app reads only its own copy, `~/Library/Application Support/RS Re-ARMed/learn-play/game/`, as Steam may clear its download folder. The copy (`lp_install.py game-copy`, with
+`tools/play-native/gamefiles.py`) has the Windows game folder and, from its `dlc/` and the Mac game's `dlc` folder in each Steam library, the PC song archives, `*_p.psarc`. It also records your DLC, the
+language and the account the game plays as in `game/.rearmed/steam.env`: the account whose license has Learn & Play (depot 221683), whichever is logged in later. To choose it yourself, set `RS_STEAM_ID` (a
+SteamID64 or the number in `Steam/userdata/<number>`) for a refresh.
 
-After each copy or refresh it also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
-(`tools/play-native/cache_overlay.py`, as on the Mac): from the copy's own `cache.psarc` it takes the two
-menu files that leave out the "DIRECT CONNECT" choice (on the cable screen and in the INPUT setting), adds
-it, and stores the archive that holds them, rewritten, where the game reads it instead of the one in
-`cache.psarc`. The same overlay turns the main menu's SHOP into ENUMERATE. `cache.psarc` itself is not changed; a
-cache that has both entries already gets no overlay. If the cache cannot be read, the copy goes on without the
-overlay and says so.
+Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`, as on the Mac), from the copy's `cache.psarc`, which isn't changed: it adds
+DIRECT CONNECT and turns SHOP into ENUMERATE. If the cache can't be read, the copy goes on without it and says so.
 
-- **Disk use.** Files on the same APFS volume (Steam's download folder on the startup disk, your home folder
-  there too) are APFS clones: seconds, and no extra space while both exist (`du` and the Finder count it at
-  full size anyway; the disk's free space shows what it takes). When the game is on another APFS drive (a
-  download redirected to an external disk), the copy goes onto that drive, as clones again:
-  `RS Re-ARMed/learn-play/game` at its top (when the top is not writable, in the first writable folder on
-  the way to the game), and `…/learn-play/game` is a link to it. The game then needs that drive connected;
-  without it the app says "The drive with the game files (*name*) isn't connected". From a drive that cannot
-  clone (exFAT, HFS+, a network volume), or for files on yet another disk (the Mac game's DLC there), it is a
-  real copy, about 6 GB for the game plus the PC DLC, after a check that there is room, with progress.
-  `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/learn-play/game` instead (`home`: in the app's folder).
-  This decides only where a new copy goes: a copy made by an earlier version stays where it is (delete
-  `…/learn-play/game` and install again to have it moved), and a refresh keeps it where it is. Once the copy
-  is made, Steam's download may be deleted to get that space back, unless the copy is on the same drive as
-  clones of it (deleting the download then frees nothing).
+- **Disk use.** On the same APFS volume the copy is clones: seconds, and no extra space, though `du` and the Finder count the full size. With the game on another APFS drive the copy goes onto that drive, in
+  `RS Re-ARMed/learn-play/game` at its top, and `…/learn-play/game` is a link to it, so the game needs that drive connected. From a drive that can't clone it is a real copy, about 6 GB plus DLC, after a check for
+  room. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/learn-play/game` (`home`: the app's folder); a refresh keeps it where it is. Once it's made, Steam's download may be deleted, though that frees nothing if the copy is clones of it.
 - **New songs while you play**: put a song in a folder the copy is made from (the Mac game's `dlc/` for its
   `*_p.psarc`) or in `game/dlc`, and press **ENUMERATE** in the main menu: it is in the list a moment later,
   with no restart. Changed or removed songs need a refresh.
@@ -222,20 +195,8 @@ overlay and says so.
 
 ### The title logo
 
-The build makes the Re-ARMed title logo automatically, once, in the copy of the game files (Python with
-Pillow, numpy and etcpak; with `RS_PY` unset it makes its own environment, which needs the network the first
-time). If it can't, the install goes on and the game shows its own logo. To rebuild it by hand:
-
-```bash
-game="$HOME/Library/Application Support/RS Re-ARMed/learn-play/game"
-RS_GAME_DIR="$game" tools/loadscreen/build.sh "$game/static.psarc.rearmed"
-```
-
-It reads the copy's `static.psarc.original`, changes only the two title-logo textures and writes a new file
-next to it. The original is not changed, and the app uses the new file whenever it is there (`RS_REARMED=0`:
-the original). When a refresh brings a new `static.psarc`, it removes the logo made from the old one; the next
-build makes it again, or the command above. Steam's download folder is not touched. The Mac edition does the
-same in its own copy ([Mac INSTALL](../mac/INSTALL.md#the-title-logo)).
+The build makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` shows the original. A
+refresh that brings a new `static.psarc` removes it, and the next build makes it again.
 
 ## Playing
 

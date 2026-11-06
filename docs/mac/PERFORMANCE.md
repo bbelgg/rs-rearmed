@@ -77,8 +77,7 @@ Learn & Play's corpus is 281 programs, from a list of what the game was seen lin
 ### Against the Windows port
 
 The same song on both at 75 fps: [Final pass](#final-pass-for-140). Learn & Play has come down since, to 7.2 ms a frame on a route of its own, and on that route
-this edition takes 6.1 ms: [Learn & Play's route](#learn--plays-route). An earlier comparison, with other songs and before
-the memory order and the intro skip, is in [Windows performance](../windows/PERFORMANCE.md#against-the-mac-build).
+this edition takes 6.1 ms: [Learn & Play's route](#learn--plays-route).
 
 ## Final pass for 1.4.0
 
@@ -132,13 +131,6 @@ So with the shaders prepared at install the Mac's first play has one 0.6 s stall
 Play's first play was what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
 in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first. Learn & Play
 prepares its shaders now too, in 16.5 s: [its numbers](../windows/PERFORMANCE.md#shader-preparation).
-
-**Against 1.3.0**: a comparison with the figures recorded above, not a same-day run: 1.3.0 was not built or run in this
-pass, and those figures come from other songs and a shorter window. CPU 44% of a core against the recorded 48-49%; game
-frame 3.95 ms against 3.96 ms; median 13.2-13.3 ms against 13.34 ms; footprint 0.80-0.81 GB against 0.81 GB; Preparing
-shaders about 330-390 s against 270-375 s. p99 is higher, 18.1-18.6 ms against 15.7 ms, and a run had 2 to 8 frames over 20 ms
-in 150 s against one in 53 s; Learn & Play shows the same p99 on this song, which suggests the song or the display and not
-the code, but no run shows that. Nothing recorded got clearly worse, and nothing here proves it did not.
 
 ## Learn & Play's route
 
@@ -195,7 +187,7 @@ the texture, buffer, uniform and query calls), with the context and objects in `
 strong local: an unretained one frees the new object at once. The game thread went from 30.1 to 29.5 points, again within the noise of one run each, and the profile agrees: the Objective-C runtime
 fell from 4.0% of the thread to 0.9%. The encoder itself stays: `renderCommandEncoderWithDescriptor` is Metal's own work.
 
-From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame. Learn & Play draws through the same code; its route was not run with it.
+From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame. Learn & Play draws through the same code and played fine with it, by the maintainer's own check; its route was not measured with it.
 
 ## Hook points
 

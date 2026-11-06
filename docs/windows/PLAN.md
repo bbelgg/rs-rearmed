@@ -6,7 +6,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 ## Status
 
 - **Works**, checked on an Apple Silicon Mac: the game offline with the Uplay screens skipped; songs to the end, Score Attack, the Guitarcade, Session Mode,
-  Nonstop Play, video lessons, the Tone Designer's Edit Tone, a Multiplayer song with each player on their own input; custom songs and DLC; Enumerate and Refresh Game Files; a Real Tone cable
+  Nonstop Play, video lessons, the Tone Designer's Edit Tone, a Multiplayer song with each player on their own input (new in 1.8.0); custom songs and DLC; Enumerate and Refresh Game Files; a Real Tone cable
   device (a virtual one named like the cable), the microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
   calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and the close button, in 0.3-0.5 s.
 - **Mods**: 15 of the 18 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac

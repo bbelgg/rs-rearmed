@@ -13,6 +13,8 @@ MMX instructions reuse the SSE helpers of rc_sse.h on a 128-bit value whose low 
 mm register; the forms whose MMX meaning is not the low half of the SSE one (pack*, punpckh*)
 are composed from the SSE helpers.
 """
+import re
+
 from capstone import x86
 
 from .common import COND, CTYPE, STYPE, Unsupported  # noqa: F401
@@ -41,6 +43,129 @@ MMX_CVT = {"cvtpi2ps", "cvtpi2pd", "cvtps2pi", "cvttps2pi", "cvtpd2pi", "cvttpd2
 
 def _fp(n):
     return {4: "float", 8: "double"}[n]
+
+
+# --- runs of x87 code in C locals -----------------------------------------------------------
+# A guest load or store is an asm with a memory clobber under RC_MO_TSO, so ST(k), in rc_ctx, is loaded
+# and stored around every one of them, and a push or pop works on TOP and the tag word in memory. In a
+# run, straight-line code with no label, jump or call, TOP moves by a known amount: x87_runs rewrites the
+# generated C of such a run so ST(k) is a local named after its register relative to TOP at the start
+# of the run. c->fpu.st, top and tag are read at the start and written at the end, so outside a run the
+# state is what it always was. A register a run leaves empty is not written back: an x87 program does
+# not read it, and the tag says it holds nothing. Control and status words stay in rc_ctx.
+X87_RUN_MIN = 4          # instructions: below this the block's entry and exit cost what they save
+X87_COMMENT = re.compile(r"  // [0-9a-f]+: .*$")
+X87_TOKEN = re.compile(r"(?<![A-Za-z_])ST\((\d)\)(?=(\s*=(?!=))?)|rc87_push\(c, |rc87_pop\(c\);")
+X87_ANY = re.compile(r"(?<![A-Za-z_])ST\(\d\)|rc87_push\(|rc87_pop\(")
+X87_HELPERS = {"rc87_push", "rc87_pop", "rc87_cmp", "rc87_round", "rc87_i16", "rc87_i32", "rc87_i64", "rc87_from80",
+               "rc87_to80"}
+X87_STOPS = ("goto", "return", "SPILL", "rc_fail", "switch", "RC32_", "_setjmp")
+
+
+def x87_kind(code):
+    """What a generated statement is to a run: x87 (rewritten), other (stays inside, as it is) or None (ends it)."""
+    if code.startswith("L_") or code.startswith("#") or any(w in code for w in X87_STOPS):
+        return None
+    if re.search(r"c->fpu\.(top|tag|st|mm)", code):
+        return None
+    helpers = set(re.findall(r"rc87_\w+", code))
+    if X87_ANY.search(code) or helpers:
+        if helpers - X87_HELPERS or ("if (" in code and ("rc87_push" in code or "rc87_pop" in code)):
+            return None
+        return "x87"
+    if re.search(r"\(c[,)]", code) or re.search(r"\b[FWI]_[0-9a-f]+\(", code) or "rc32_" in code:
+        return None      # native code that may look at the x87 state
+    return "other"
+
+
+class X87Run:
+    """The rewriting of one run: where each ST(k) lives, what has to come in and go out."""
+    def __init__(self):
+        self.depth = 0            # pushes less pops so far
+        self.load = set()         # locals read from c->fpu.st at the start
+        self.known = set()        # locals with a value
+        self.dirty = set()        # locals changed
+        self.tag = {}             # local -> 1 empty, 0 valid, as the run leaves it
+
+    def slot(self, k):
+        return (k - self.depth) & 7
+
+    def text(self, s):
+        out, at = [], 0
+        while True:
+            m = X87_TOKEN.search(s, at)
+            if m is None:
+                return "".join(out) + s[at:]
+            out.append(s[at:m.start()])
+            at = m.end()
+            if m.group(1) is not None:
+                n = self.slot(int(m.group(1)))
+                if n not in self.known:
+                    self.known.add(n)
+                    self.load.add(n)
+                if m.group(2):
+                    self.dirty.add(n)
+                out.append("x87_%d" % n)
+            elif m.group(0).startswith("rc87_pop"):
+                self.tag[self.slot(0)] = 1
+                self.depth -= 1
+                out.append(";")
+            else:            # rc87_push(c, EXPR);
+                level, e = 1, at
+                while level:
+                    level += {"(": 1, ")": -1}.get(s[e], 0)
+                    e += 1
+                v = self.text(s[at:e - 1])
+                self.depth += 1
+                n = self.slot(0)
+                self.known.add(n)
+                self.dirty.add(n)
+                self.tag[n] = 0
+                out.append("x87_%d = %s;" % (n, v))
+                at = e + 1   # the `;`
+
+    def lines(self, run):
+        body = [self.text(s) for s in run]
+        used = sorted(self.known)
+        head = "  { const uint32_t x87_t = c->fpu.top; double %s;" % ", ".join("x87_%d" % n for n in used)
+        head += "".join(" x87_%d = c->fpu.st[(x87_t + %d) & 7];" % (n, n) for n in sorted(self.load))
+        tail = ["c->fpu.st[(x87_t + %d) & 7] = x87_%d;" % (n, n) for n in sorted(self.dirty)
+                if not self.tag.get(n)]
+        full = sum(1 << n for n, e in self.tag.items() if not e)
+        empty = sum(1 << n for n, e in self.tag.items() if e)
+        tail.append("c->fpu.tag = (c->fpu.tag | rc87_rol8(0x%xu, x87_t)) & ~rc87_rol8(0x%xu, x87_t);" % (empty, full))
+        tail.append("c->fpu.top = (x87_t + %d) & 7; }" % (-self.depth & 7))
+        return [head] + body + ["  " + " ".join(tail)]
+
+
+def x87_runs(lines):
+    """lines of a generated function, with its runs of x87 code in locals."""
+    out, run, last, count = [], [], -1, 0
+
+    def flush():
+        nonlocal last, count
+        if count >= X87_RUN_MIN:
+            out.extend(X87Run().lines(run[:last + 1]) + run[last + 1:])
+        else:
+            out.extend(run)
+        del run[:]
+        last, count = -1, 0
+
+    for s in lines:
+        code = X87_COMMENT.sub("", s).strip()
+        kind = x87_kind(code)
+        if kind == "x87":
+            run.append(s)
+            last, count = len(run) - 1, count + 1
+        elif kind == "other" and run:
+            run.append(s)
+        elif kind is None:
+            flush()
+            out.append(s)
+        else:
+            out.append(s)
+    flush()
+    return out
 
 
 class X87Mixin:

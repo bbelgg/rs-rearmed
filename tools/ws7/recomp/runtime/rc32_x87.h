@@ -32,6 +32,8 @@ static inline void rc87_pop(rc_ctx *c) {
   c->fpu.tag |= 1u << c->fpu.top;
   c->fpu.top = (c->fpu.top + 1) & 7;
 }
+// A run of x87 code in locals (xlat/emit_x87.py): its tag bits, by register relative to TOP, as physical ones.
+static inline uint32_t rc87_rol8(uint32_t m, uint32_t t) { return ((m << t) | (m >> (8 - t))) & 0xff; }
 static inline void rc87_setcc(rc_ctx *c, uint16_t cc) { c->fpu.sw = (c->fpu.sw & ~RC87_CC) | cc; }
 // fcom/fucom/ficom/ftst: C3 C2 C0 = 000 greater, 001 less, 100 equal, 111 unordered; C1 = 0.
 static inline void rc87_cmp(rc_ctx *c, double a, double b) {

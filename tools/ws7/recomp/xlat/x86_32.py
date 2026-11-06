@@ -50,11 +50,12 @@ from capstone import x86
 
 from . import core
 from .common import COND, CTYPE, MASK, NOPS, REGS, STYPE, Unsupported  # noqa: F401
-from .emit_x87 import X87Mixin
+from .emit_x87 import X87Mixin, x87_runs
 from .pe import SCN_WRITE, Image
 
 M32 = 0xffffffff
 JCC = {"j" + c for c in COND}
+FLAG_KEEPING = {"mov", "lea", "push", "wait", "fwait", "fnstcw", "fstcw", "nop"}   # between a call and the jump that reads its flags
 # imports that do not return
 NORETURN32 = {"kernel32.dll!ExitProcess", "kernel32.dll!ExitThread", "kernel32.dll!FatalExit",
               "kernel32.dll!FatalAppExitA", "kernel32.dll!FatalAppExitW", "msvcrt.dll!exit",
@@ -1029,7 +1030,7 @@ class Translator32(X87Mixin, core.Translator):
         first = next((n for n, s in enumerate(lines) if s.startswith("L_")), None)
         if first is not None and lines[first] != "L_%x:" % entry:
             lines.insert(first, "  goto L_%x;" % entry)
-        return lines
+        return x87_runs(lines)
 
     # --- function discovery ------------------------------------------------------
     @staticmethod

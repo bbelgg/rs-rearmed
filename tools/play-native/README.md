@@ -47,7 +47,7 @@ How it runs, every launch:
 - The game is started with `open -n -a … --env …`: exec'ing it from the launcher leaves it without a
   window when the launcher was opened from the Finder.
 
-## Learn & Play (the Windows game, experimental)
+## Learn & Play (the Windows game)
 
 ```bash
 tools/play-native/learn-play.sh [HARVEST]   # or install.sh --learn-play; re-run to update

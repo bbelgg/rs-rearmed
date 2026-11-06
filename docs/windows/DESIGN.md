@@ -5,7 +5,7 @@ The Windows port takes the 32-bit Windows build of Rocksmith 2014 that the Learn
 loads are translated to C at build time by the shared recompiler's 32-bit front end
 ([recompiler](../recompiler/README.md#the-32-bit-front-end-windows)); a Win32 seam on macOS stands in for
 Windows underneath. It reuses the Mac port's renderer, Steam layer and audio policy. User side:
-[INSTALL.md](INSTALL.md). Experimental: see [PLAN.md](PLAN.md).
+[INSTALL.md](INSTALL.md). Status: [PLAN.md](PLAN.md).
 
 ## Overview
 

@@ -4,7 +4,7 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 ## Status
 
-- **Released**: `VERSION` says which release this is. 1.4.0 is the first with the experimental Windows (Learn & Play)
+- **Released**: `VERSION` says which release this is. 1.4.0 is the first with the Windows (Learn & Play)
   port.
 - **What works**: the whole game as a native arm64 app, offline: songs, Score Attack, DLC and custom songs, Session
   Mode, lessons with their videos, Guitarcade; the Real Tone cable, the microphone and other audio interfaces (Direct

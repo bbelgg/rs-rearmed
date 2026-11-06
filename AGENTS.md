@@ -10,7 +10,7 @@ RS Re-ARMed builds a native arm64 Mac app from either of two games:
 | | Mac | Windows (Learn & Play) |
 |---|---|---|
 | Game | Steam macOS Rocksmith 2014 Remastered, x86-64 | Learn & Play, 32-bit Windows (Windows-only on Steam) |
-| Status | released (see `VERSION`) | experimental |
+| Status | released (see `VERSION`) | released (see `VERSION`) |
 | Code | `shims/`, `tools/ws7`, `tools/play-native`, root `CMakeLists.txt` | `win-x86/` (on top of the shared pieces) |
 | Docs | [docs/mac](docs/mac/README.md) | [docs/windows](docs/windows/README.md) |
 | Installs as | `RS Re-ARMed.app` | `RS Re-ARMed Learn & Play.app` |

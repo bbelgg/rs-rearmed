@@ -1,6 +1,6 @@
 # Installing the Windows port (Learn & Play)
 
-**Experimental.** Rocksmith 2014 **Learn & Play** is a purchased edition that Steam offers for Windows only:
+Rocksmith 2014 **Learn & Play** is a purchased edition that Steam offers for Windows only:
 its license grants the Windows depot 221683 and no Mac download, so the [Mac port](../mac/INSTALL.md) can't
 use it. RS Re-ARMed builds that Windows game into a native arm64 Mac app. Songs, scoring, the Guitarcade,
 Session Mode, Nonstop Play, lessons and the window modes work, but it has had far less testing than the Mac port
@@ -376,7 +376,7 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
   microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which leaves room
   ([Guitar input](#guitar-input)).
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- Experimental: it has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
+- It has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
   beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
 - Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 15 of the 16 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as

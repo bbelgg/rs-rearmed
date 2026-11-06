@@ -1,6 +1,6 @@
 # Windows port (Learn & Play)
 
-**Experimental.** RS Re-ARMed for Rocksmith 2014 **Learn & Play**, a purchased edition that Steam offers for
+RS Re-ARMed for Rocksmith 2014 **Learn & Play**, a purchased edition that Steam offers for
 Windows only: its 32-bit Windows game, recompiled into a native arm64 Mac app. Songs, Score Attack, the
 Guitarcade, Session Mode, Nonstop Play, lessons and the window modes work; it has had far less testing than the
 Mac port ([PLAN.md](PLAN.md#status)).

@@ -1,6 +1,6 @@
 # Windows port: status and plan
 
-**Experimental.** It is merged into `main` and goes out first with 1.4.0. The Mac port's plan:
+Released: it has gone out with every release since 1.4.0. The Mac port's plan:
 [Mac plan](../mac/PLAN.md).
 
 ## Status
@@ -161,7 +161,7 @@ inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`)
 
 ## Built in for 1.4.0
 
-Learn & Play ships as an experimental release with these built in, the same way in both editions. All were checked
+Learn & Play ships with these built in, the same way in both editions. All were checked
 together in one build ([TESTING.md](TESTING.md#unattended-runs)); how each works is in
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods).
 

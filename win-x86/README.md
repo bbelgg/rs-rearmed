@@ -1,7 +1,7 @@
 # Win-x86: Learn & Play static recompiler
 
 Translates the 32-bit Windows "Learn & Play" build of Rocksmith 2014 to an arm64 macOS binary with
-the ws7 recompiler's 32-bit front end (`tools/ws7/recomp`, PE mode). Experimental: playable (Learn a Song,
+the ws7 recompiler's 32-bit front end (`tools/ws7/recomp`, PE mode). Playable (Learn a Song,
 Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons, window or full screen, the Real Tone cable, Direct Connect). The docs are in
 [docs/windows](../docs/windows/README.md): install and play ([INSTALL.md](../docs/windows/INSTALL.md)), how it
 works ([DESIGN.md](../docs/windows/DESIGN.md)), status and open work ([PLAN.md](../docs/windows/PLAN.md)),

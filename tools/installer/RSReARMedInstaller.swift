@@ -29,12 +29,12 @@ let rendererDefaultsKey = "Renderer"
 let rendererChoices: [(title: String, value: String)] = [("Metal (recommended)", "metal"), ("OpenGL", "opengl")]
 let logsDir = NSHomeDirectory() + "/Library/Logs/RS Re-ARMed Installer"  // kept when build files are deleted
 // The game to build from: the Mac game, or the Windows game, Learn & Play, for Macs without the Mac game
-// (experimental: win-x86/install/lp_install.py gets the game and its DLLs, builds and installs the app).
+// (win-x86/install/lp_install.py gets the game and its DLLs, builds and installs the app).
 let gameDefaultsKey = "Game"
 let gameMac = "Rocksmith 2014 for Mac"
 let gameLP = "Rocksmith 2014 Learn & Play"
 let gameChoices: [(title: String, value: String)] = [
-    (gameMac, "mac"), ("Learn & Play (the Windows game, experimental)", "learnplay")]
+    (gameMac, "mac"), ("Learn & Play (the Windows game)", "learnplay")]
 // Standard library Python and macOS's own tools only (no venv, no Rosetta).
 let lpInstall = "python3 -I win-x86/install/lp_install.py"
 let gameFilesTool = "python3 -I tools/play-native/gamefiles.py"
@@ -807,7 +807,7 @@ enum Steps {
         r.appendLog("Done. Freed disk space from the downloaded source and build artifacts.")
     }
 
-    // MARK: Learn & Play (the Windows game, experimental)
+    // MARK: Learn & Play (the Windows game)
 
     // Natively on Apple Silicon with what macOS ships: no Rosetta, no Homebrew, no steamcmd.
     static func checkPrereqsWindows(_ r: BuildRunner) async throws {

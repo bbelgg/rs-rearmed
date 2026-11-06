@@ -9,7 +9,7 @@ that tie it to Intel Macs, Windows, Steam and online services. It builds from ei
 - **The Mac game** (the Steam macOS version of Rocksmith 2014 Remastered, an x86-64 app that otherwise
   runs under Rosetta). Released; this is what most of this page is about. Docs: [docs/mac](docs/mac/README.md).
 - **The Windows game, Learn & Play** (a purchased edition that Steam offers for Windows only, so it has no
-  Mac download). **Experimental.** Docs: [docs/windows](docs/windows/README.md).
+  Mac download). Released. Docs: [docs/windows](docs/windows/README.md).
 
 Both are translated by the same recompiler ([docs/recompiler](docs/recompiler/README.md)) and share the
 renderer, the offline Steam layer and the audio code.
@@ -37,15 +37,14 @@ This project does not include any game code or assets; you need your own copy of
 - macOS 12 Monterey or later.
 - The Steam macOS version of **Rocksmith 2014 (Remastered)**, installed through Steam (no Rosetta: the game is
   never started, the build reads it from disk); or, for the
-  experimental Windows port, **Rocksmith 2014 Learn & Play** on your Steam account
+  Windows port, **Rocksmith 2014 Learn & Play** on your Steam account
   ([details](docs/windows/INSTALL.md#requirements)). No Windows PC: the installer unpacks the game on the Mac.
 - A Real Tone cable, or another audio input the game accepts. macOS asks for microphone access the first
   time the game listens for your guitar.
 
 ## Mac and Windows compared
 
-The **Windows (Learn & Play) port is experimental**: it plays, but has had far less testing than the Mac
-port.
+The **Windows (Learn & Play) port** plays, but has had far less testing than the Mac port.
 
 ✅ works (tested) · ⚠️ present, not tested · ❌ not implemented · — not applicable
 
@@ -248,11 +247,11 @@ tools/play-native/install.sh
 
 Then start **RS Re-ARMed** from `~/Applications` (double-click, Launchpad or Spotlight).
 
-### Learn & Play (the Windows game): experimental
+### Learn & Play (the Windows game)
 
 **Learn & Play** is a purchased edition of Rocksmith 2014 that Steam offers for Windows only, so its owners
-can't use the Mac steps above. RS Re-ARMed can build its Windows game into a native Mac app too. This is
-**experimental** (see [the table](#mac-and-windows-compared)). In the installer choose **Game: Learn &
+can't use the Mac steps above. RS Re-ARMed can build its Windows game into a native Mac app too. What it
+has is in [the table](#mac-and-windows-compared). In the installer choose **Game: Learn &
 Play** and click Build & Install, or run it from a clone of this repository:
 
 ```bash

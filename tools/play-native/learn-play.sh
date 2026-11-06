@@ -3,8 +3,8 @@
 #        tools/play-native/install.sh --learn-play [HARVEST]
 #        tools/play-native/learn-play.sh --refresh
 #
-# The Windows game (Rocksmith 2014 Learn & Play, a purchased edition that Steam offers for Windows only) on a Mac,
-# EXPERIMENTAL. One run goes from your game files to an installed app:
+# The Windows game (Rocksmith 2014 Learn & Play, a purchased edition that Steam offers for Windows only) on a Mac.
+# One run goes from your game files to an installed app:
 #   1. The game: found in Steam's depot download folder (or $LP_GAME_DIR, e.g. a folder copied from a
 #      Windows PC) and checked against tools/targets/win-x86/target.toml. If it is not there, Steam is opened if it isn't
 #      and told to download it (lp_install.py game-download): nothing to paste. This says what is left for you
@@ -86,7 +86,7 @@ ensure_venv() {
         || rs_die "could not install the Python packages into $venv (pip needs the network once)"
 }
 
-echo "RS Re-ARMed for the Windows game (Learn & Play), experimental."
+echo "RS Re-ARMed for the Windows game (Learn & Play)."
 lpi build-estimate | fold -s -w 100
 mkdir -p "$build"
 # The startup disk holds swap wherever the build folder is. An estimate: said, and the build goes on.

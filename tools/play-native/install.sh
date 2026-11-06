@@ -26,7 +26,7 @@
 #
 #        tools/play-native/install.sh --learn-play [HARVEST]
 # The Windows game (Learn & Play) instead, for a Mac without the Mac game: tools/play-native/learn-play.sh
-# (experimental: from the game files to ~/Applications/RS Re-ARMed Learn & Play.app). Offered when neither a
+# (from the game files to ~/Applications/RS Re-ARMed Learn & Play.app). Offered when neither a
 # build nor the Mac game is there.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
@@ -48,7 +48,7 @@ fi
 app=${1:-${RS_BUILD_DIR:-$root/build}/m4/app/Rocksmith2014.app}
 if [[ ! -x "$app/Contents/MacOS/Rocksmith2014" && ! -d $RS_GAME_APP && -t 0 ]]; then
     echo "Rocksmith 2014 for Mac is not installed ($RS_GAME_APP)."
-    read -r -p "Set up the Windows game (Learn & Play, experimental) instead? [y/N] " answer
+    read -r -p "Set up the Windows game (Learn & Play) instead? [y/N] " answer
     [[ $answer == [yY]* ]] && exec "$here/learn-play.sh"
 fi
 launcher=${RS_NATIVE_LAUNCHER:-"$HOME/Applications/RS Re-ARMed.app"}

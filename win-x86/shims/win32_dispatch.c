@@ -194,7 +194,10 @@ static void *prof_dump(void *arg) {
     for (int k = 0; k < m; k++) v[k]->last = v[k]->n;
     pthread_mutex_unlock(&prof_mu);
     if (round == 1) fnames_scan();
-    if (round == 1) rc32_icall_trace = icall_note;
+    if (round == 1) {
+      rc32_icall_trace = icall_note;
+      memset(rc32_lookup_cache, 0, sizeof rc32_lookup_cache);   // from now on every call reaches rc32_icall
+    }
     else icall_dump();
     const char *nw = getenv("LP_PROF_NEW");
     if (nw && round >= atoi(nw)) icall_new_log = 1;

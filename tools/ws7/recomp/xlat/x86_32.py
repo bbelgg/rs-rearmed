@@ -695,7 +695,7 @@ class Translator32(X87Mixin, core.Translator):
                 cases = " ".join("case 0x%xu: goto L_%x;" % (t, t) for t in sorted(set(self.tables[A])))
                 out.append("switch ((uint32_t)%s) { %s default: rc_fail(\"jump table\", 0x%xull); }" % (tgt, cases, A))
             else:
-                out.append("{ uint32_t tgt = %s; %sSPILL(); rc32_icall(c, tgt); return; }" % (tgt, self.leave_fn()))
+                out.append("{ uint32_t tgt = %s; %sSPILL(); RC32_ICALL(c, tgt); return; }" % (tgt, self.leave_fn()))
             return True
         if m == "jmp":
             t = ops[0].imm & M32
@@ -726,7 +726,7 @@ class Translator32(X87Mixin, core.Translator):
             op = ops[0]
             slot = self.setjmp_slot(i)
             if slot is not None:      # an indirect call of what the slot holds: the return address stays
-                out.append("/* %s */ { uint32_t tgt = RC_LDS(uint32_t, RC_M(0x%xu)); %s SPILL_CALL(); rc32_icall(c, tgt); "
+                out.append("/* %s */ { uint32_t tgt = RC_LDS(uint32_t, RC_M(0x%xu)); %s SPILL_CALL(); RC32_ICALL(c, tgt); "
                            "FILL_CALL(); %s }" % (self.imports[slot], slot, self.push4("0x%xu" % ret), self.ret_other(ret)))
                 return True
             if op.type == x86.X86_OP_IMM:
@@ -743,7 +743,7 @@ class Translator32(X87Mixin, core.Translator):
                 self.imports_used.add(slot)
                 out.append("/* %s */ SPILL(); %s%x(c); FILL();" % (self.imports[slot], self.thunk_prefix, slot))
                 return True
-            out.append("{ uint32_t tgt = %s; %s SPILL_CALL(); rc32_icall(c, tgt); FILL_CALL(); %s }"
+            out.append("{ uint32_t tgt = %s; %s SPILL_CALL(); RC32_ICALL(c, tgt); FILL_CALL(); %s }"
                        % (self.rd(i, op, 4), self.push4("0x%xu" % ret), self.ret_other(ret)))
             return True
         return False

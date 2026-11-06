@@ -134,6 +134,16 @@ rc_fn rc32_lookup(uint32_t g);
 // translated function, an import's cell (return address popped, then its thunk), a host
 // function a hook claims (rc32_hostfn_hook_add), else rc_fail.
 void rc32_icall(rc_ctx *c, uint32_t g);
+// rc32_lookup's cache (rc32_image.c), and an indirect call through it at the call site: a branch of its own for each
+// site for the predictor, where rc32_icall has one for all of them. Whatever isn't a hit goes to rc32_icall.
+#define RC32_LOOKUP_BITS 16
+#define RC32_LOOKUP_NONE 0x7fffffffu
+extern uint64_t rc32_lookup_cache[1u << RC32_LOOKUP_BITS];
+#define RC32_ICALL(c, g) do { uint32_t g_ = (g); \
+    uint64_t e_ = __atomic_load_n(&rc32_lookup_cache[(g_ * 2654435761u) >> (32 - RC32_LOOKUP_BITS)], __ATOMIC_RELAXED); \
+    if (__builtin_expect((uint32_t)(e_ >> 32) == g_ && e_ && (uint32_t)e_ != RC32_LOOKUP_NONE, 1)) \
+      ((rc_fn)(uintptr_t)((const char *)(uintptr_t)rc32_lookup + (int32_t)(uint32_t)e_))(c); \
+    else rc32_icall(c, g_); } while (0)
 // When set, rc32_icall reports every target to it first (diagnostics: LP_PROF_IMPORTS).
 extern void (*rc32_icall_trace)(rc_ctx *c, uint32_t g);
 // When set, the runtime reports costly events to it (diagnostics: LP_FRAME_LOG): what is

@@ -407,6 +407,7 @@ static rc_fn table_lookup(const rc32_module *m, uint32_t g) {
 
 static rc_fn lookup_slow(uint32_t g);
 void (*rc32_note)(int what, uint64_t ticks);
+void (*rc32_icall_trace)(rc_ctx *c, uint32_t g);
 
 // Indirect calls (vtables, callbacks) look the same few thousand addresses up all the time: a direct-mapped
 // cache in front of the binary search, shared by all threads, an entry one 64-bit word: the guest address, and
@@ -414,24 +415,24 @@ void (*rc32_note)(int what, uint64_t ticks);
 // or an import cell: the COM objects of the seams are called through such cells many times a frame).
 // Entries only ever hold what the search answered, and the answer for an address does not change once the
 // images are bound, so a race costs nothing: a thread reads one whole word or another.
-#define LOOKUP_BITS 16
-#define LOOKUP_NONE 0x7fffffffu
-static uint64_t lookup_cache[1u << LOOKUP_BITS];
+// The generated code reads it itself (RC32_ICALL, rc32.h). While rc32_icall_trace is set nothing is added, so every
+// call reaches rc32_icall.
+uint64_t rc32_lookup_cache[1u << RC32_LOOKUP_BITS];
 
 rc_fn rc32_lookup(uint32_t g) {
-  uint32_t s = (g * 2654435761u) >> (32 - LOOKUP_BITS);
-  uint64_t e = __atomic_load_n(&lookup_cache[s], __ATOMIC_RELAXED);
+  uint32_t s = (g * 2654435761u) >> (32 - RC32_LOOKUP_BITS);
+  uint64_t e = __atomic_load_n(&rc32_lookup_cache[s], __ATOMIC_RELAXED);
   const char *base = (const char *)rc32_lookup;
   if ((uint32_t)(e >> 32) == g && e) {
     int32_t o = (int32_t)(uint32_t)e;
-    return (uint32_t)o == LOOKUP_NONE ? 0 : (rc_fn)(uintptr_t)(base + o);
+    return (uint32_t)o == RC32_LOOKUP_NONE ? 0 : (rc_fn)(uintptr_t)(base + o);
   }
   uint64_t t0 = rc32_note ? mach_absolute_time() : 0;
   rc_fn f = lookup_slow(g);
   if (t0) rc32_note(RC32_NOTE_LOOKUP_MISS, mach_absolute_time() - t0);
-  int64_t d = f ? (const char *)(uintptr_t)f - base : LOOKUP_NONE;
-  if (d >= INT32_MIN && d <= LOOKUP_NONE)  // a function in another library may be too far off: not cached
-    __atomic_store_n(&lookup_cache[s], (uint64_t)g << 32 | (uint32_t)(int32_t)d, __ATOMIC_RELAXED);
+  int64_t d = f ? (const char *)(uintptr_t)f - base : RC32_LOOKUP_NONE;
+  if (d >= INT32_MIN && d <= RC32_LOOKUP_NONE && !rc32_icall_trace)  // another library's may be too far off: not cached
+    __atomic_store_n(&rc32_lookup_cache[s], (uint64_t)g << 32 | (uint32_t)(int32_t)d, __ATOMIC_RELAXED);
   return f;
 }
 
@@ -467,8 +468,6 @@ void rc32_hostfn_hook_add(rc32_hostfn_hook h) {
 
 // rc32_seh.c: a resume point of a live generated frame (does not return when it is one)
 void rc32_resume_try(rc_ctx *c, uint32_t g);
-
-void (*rc32_icall_trace)(rc_ctx *c, uint32_t g);
 
 void rc32_icall(rc_ctx *c, uint32_t g) {
   if (__builtin_expect(rc32_icall_trace != 0, 0)) rc32_icall_trace(c, g);

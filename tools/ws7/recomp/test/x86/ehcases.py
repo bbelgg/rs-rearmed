@@ -422,7 +422,7 @@ def check(path, labels):
     for f, n in (("sj_basic", 1), ("sj_thunked", 1), ("sj_inner", 1)):
         assert len(resume_of(L[f])) == n, "the setjmp of %s is not a resume point" % f
     text = "\n".join(tr.function(L["sj_thunked"]))
-    assert "rc32_icall(c, tgt)" in text and "F_%x(c)" % L["sj_thunk"] not in text, "a setjmp call through the import thunk"
+    assert "RC32_ICALL(c, tgt)" in text and "F_%x(c)" % L["sj_thunk"] not in text, "a setjmp call through the import thunk"
     return len(conts)
 
 

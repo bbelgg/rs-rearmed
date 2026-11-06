@@ -55,6 +55,7 @@ from .pe import SCN_WRITE, Image
 
 M32 = 0xffffffff
 JCC = {"j" + c for c in COND}
+INTERLOCKED = {"kernel32.dll!InterlockedIncrement": "1", "kernel32.dll!InterlockedDecrement": "-1"}
 FLAG_KEEPING = {"mov", "lea", "push", "wait", "fwait", "fnstcw", "fstcw", "nop"}   # between a call and the jump that reads its flags
 # imports that do not return
 NORETURN32 = {"kernel32.dll!ExitProcess", "kernel32.dll!ExitThread", "kernel32.dll!FatalExit",
@@ -237,6 +238,7 @@ class Translator32(X87Mixin, core.Translator):
         self._trial = False
         self.thunk_prefix = "I_"  # import thunk names: <prefix><slot> (gen_image_pe.py --module)
         self.flag_callees = set()  # functions whose callers read the flags they leave (find_functions)
+        self.inline_interlocked = False  # the game's: the difftest stops at imports (gen_image_pe.py --target)
         self.set_wrappers(wrappers or ())
         if functions is None:
             functions = self.find_functions()
@@ -740,6 +742,14 @@ class Translator32(X87Mixin, core.Translator):
                 return True
             slot = self.iat_slot(i, op)
             if slot is not None:
+                # reference counts: the game does these all the time, and they are one instruction on the host.
+                # stdcall, one argument; what the call leaves in ecx and edx is unspecified
+                add = INTERLOCKED.get(self.imports[slot]) if self.inline_interlocked else None
+                if add:
+                    out.append("/* %s */ { uint32_t p = RC_LDS(uint32_t, RC_M(rsp)); rsp = (uint32_t)(rsp + 4); "
+                               "rax = (uint32_t)__atomic_add_fetch((int32_t *)(uintptr_t)RC_M(p), %s, __ATOMIC_SEQ_CST); }"
+                               % (self.imports[slot], add))
+                    return True
                 self.imports_used.add(slot)
                 out.append("/* %s */ SPILL(); %s%x(c); FILL();" % (self.imports[slot], self.thunk_prefix, slot))
                 return True

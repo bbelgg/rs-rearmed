@@ -67,11 +67,12 @@ G.PRELUDE = PRELUDE
 _tr = None
 
 
-def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix=""):
+def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix="", inline_interlocked=False):
     global _tr
     from xlat.x86_32 import Translator32
     _tr = Translator32(img, functions=funcs, wrappers=wrappers)
     _tr.thunk_prefix = prefix + "I_"
+    _tr.inline_interlocked = inline_interlocked
     _tr.resume = resume
     _tr.flag_callees = flag_callees
     _tr.set_data_code(data_code)
@@ -258,7 +259,8 @@ def main():
         status[a] = [st, reason, n, None]
 
     print("  0/%d functions, %.0fs" % (len(todo), time.time() - t0), file=sys.stderr, flush=True)
-    with mp.Pool(args.jobs, _init, (args.image, starts, resume, flag_callees, data_code, wrappers, P)) as pool:
+    with mp.Pool(args.jobs, _init, (args.image, starts, resume, flag_callees, data_code, wrappers, P,
+                                    bool(args.target))) as pool:
         done = 0
         for res in pool.imap(_work, batches):
             for a, st, reason, n, text, cs, us, info in res:

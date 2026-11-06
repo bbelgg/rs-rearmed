@@ -141,6 +141,19 @@ CASES = [
     3:
         ret
     """),
+    # the same with what leaves the flags alone before the jump: steam_api's CRT, `call; push edx; wait; fnstcw; je`
+    ("flags_callee_later", """
+        mov eax, 0
+        call flags_callee_zero
+        push edx
+        wait
+        fnstcw word ptr [esp]
+        je 1f
+        mov eax, 1
+    1:
+        pop edx
+        ret
+    """),
     ("flags_callee_keeps", """
         mov edx, 5
         ret

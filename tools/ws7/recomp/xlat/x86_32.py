@@ -76,6 +76,20 @@ JUNK = {"daa", "das", "aaa", "aas", "aam", "aad", "lds", "les", "lfs", "lgs", "l
         "verr", "verw", "pushal", "popal", "int"}
 
 
+def reads_flags(a, seen):
+    """A conditional jump at `a`, or after the few instructions that leave the flags alone: the CRT's hand-written
+    x87 code has `call helper; push edx; wait; fnstcw [esp]; je` as well as `call helper; je`. Compiled code
+    sets the flags again before a jump, so it stops at that instruction."""
+    for _ in range(4):
+        i = seen.get(a)
+        if i is None or i.mnemonic not in JCC and i.mnemonic not in FLAG_KEEPING:
+            return False
+        if i.mnemonic in JCC:
+            return True
+        a += i.size
+    return False
+
+
 def junk(i, seen):
     """An instruction compiled code never has (JUNK), or a gs: operand. `wait` next to an x87
     instruction is the CRT's hand-written x87 code (`fprem; wait; fnstsw ax; wait; sahf`), not
@@ -114,7 +128,7 @@ class Cover:
 class Found(collections.namedtuple("Found", "jumps junk flag_calls")):
     """What find_functions keeps of a function: the instructions themselves would be gigabytes. jumps:
     targets of its direct `jmp`s; junk: it has an instruction compiled code never has; flag_calls:
-    functions it calls where the next instruction reads the flags."""
+    functions it calls whose flags are read after the call (reads_flags)."""
 
 
 class _Insn:
@@ -1126,7 +1140,7 @@ class Translator32(X87Mixin, core.Translator):
                     any(junk(i, seen) for i in seen.values()),
                     {i.operands[0].imm & M32 for a, i in seen.items()
                      if i.mnemonic == "call" and i.operands[0].type == x86.X86_OP_IMM
-                     and a + i.size in seen and seen[a + i.size].mnemonic in JCC})
+                     and reads_flags(a + i.size, seen)})
                 for a, i in seen.items():
                     owner.setdefault(a, f)
                     cover.add(a, i.size)
@@ -1257,8 +1271,8 @@ class Translator32(X87Mixin, core.Translator):
         self.set_data_code(self.merge_ranges(self._dc_insns, self.insn))
         self._dc_insns = set()
         # flags are locals of a function, but the CRT's hand-written x87 helpers answer in ZF, or
-        # leave the caller's flags alone (`call helper; je`): a direct call followed by a conditional
-        # jump is such a call, and the flags pass through c->ret_flags both ways (rc32_gen.h)
+        # leave the caller's flags alone (`call helper; je`): a direct call with a conditional jump
+        # reading its flags (reads_flags) is such a call, and they pass through c->ret_flags both ways (rc32_gen.h)
         self.flag_callees = {t for v in funcs.values() if v for t in v.flag_calls}
         self.discovery = {"seeds": len(seeds), "functions": sum(1 for v in funcs.values() if v),
                           "failed": len(self.discovery_failed), "gaps": gaps, "gaps_rejected": gaps_rejected,

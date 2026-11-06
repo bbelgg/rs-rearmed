@@ -337,6 +337,7 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
+| `RS_MODS_AUTOSAVE=0` | — | no effect in this edition: Learn & Play still shows the Auto Save warning after profile select; the Mac build skips it |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
 | `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, and SHOP instead of ENUMERATE ([Game files](#game-files)) |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
@@ -376,7 +377,7 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - Experimental: it has had far less testing than the Mac port. Not tested yet: a multiplayer song, the Workshop
   beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
-- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 14 of the 15 hook
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 14 of the 16 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
   `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
   event from the game); pass floating point arguments to `rc_call_guest` (`rc_call_name_f` can); call a

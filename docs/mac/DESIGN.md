@@ -206,6 +206,12 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   seconds, then the title (about 8 s from launch instead of about 31 s). No game file is changed.
   `RS_MODS_INTRO=0` plays the intro. The Windows build does the same ([Windows
   DESIGN](../windows/DESIGN.md#built-in-fixes-and-mods)).
+- **Auto Save warning skipped** (`mods.c`, `before_autosave_warning`, a pre-hook on the hook point `autosave_warning`):
+  on `OnSignInFlowComplete` the game's UI event handler restores the player's input mode (`input_mode_restore`), shows
+  `RS2AutosaveWarning` and starts a 4 s timer. The hook does the first and leaves out the rest: it stores a token in the
+  handler's dialog slot and a zero in the timer, so the next tick goes on, as it does when the dialog's time is up. A NULL
+  slot would stop the flow on the profile screen. `RS_MODS_AUTOSAVE=0` shows the dialog. Not in the Windows build yet
+  ([Windows plan](../windows/PLAN.md#next-work)).
 - **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared): every `.dylib` in `<home>/mods/` is loaded at startup. The
   executable exports the runtime. A mod hooks a game function by name with
   `rc_hook_add_name("game_frame", pre, post, user)`; the hook points are listed in

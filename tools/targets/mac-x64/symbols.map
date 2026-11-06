@@ -57,6 +57,7 @@ SceneGraphsUpdatedMessage_QueryInterface                         0x1000d0bb0  sy
 SceneGraphsUpdatedMessage_QueryInterface_const                   0x1000d0c00  sysv  -
 service_manager_holder                                           0x1000dc450  sysv  void *(void)
 set_app_focus                                                    0x1000e1e70  sysv  void(bool)
+input_mode_restore                                               0x1000e4e00  sysv  void(void *)
 GRMusicService_QueryInterface                                    0x1000e5290  sysv  -
 GRMusicService_QueryInterface_const                              0x1000e52f0  sysv  -
 sub_IMessage_QueryInterface                                      0x1000e5930  sysv  -
@@ -202,6 +203,8 @@ GC2DAssetHelper_QueryInterface_const                             0x1003b1df0  sy
 GCAccumulatedActor_QueryInterface                                0x1003c00d0  sysv  -
 GCAccumulatedActor_QueryInterface_const                          0x1003c0130  sysv  -
 frontend_open_file                                               0x1003c7810  sysv  void **(void **out, const char *path)
+autosave_warning                                                 0x1005e7e10  sysv  void(void *, const char *, const char *)
+autosave_signin_query                                            0x100a05a50  sysv  void *(void)
 steam_dlc_owned                                                  0x100a07800  sysv  bool(void *steam, int app)
 GCPauseManager_QueryInterface                                    0x1003e09a0  sysv  -
 GCPauseManager_QueryInterface_const                              0x1003e0a00  sysv  -
@@ -838,6 +841,7 @@ sng_verify                                                       0x10137683d  sy
 rsg_cryptopp_aes_cfb_decrypt                                     0x101376f8f  sysv  -
 lib_cryptopp_end                                                 0x101383700  code  -
 dsp_two                                                          0x1013ea36c  data  float
+autosave_query_arg                                               0x1013ea6b0  data  int
 const_two_pow_63                                                 0x1013eaa50  data  double
 hashtable_prime_sizes                                            0x1013eaa70  data  uint64_t[28]
 dsp_two_pi                                                       0x1013ead64  data  float

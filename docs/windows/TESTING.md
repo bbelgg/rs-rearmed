@@ -164,6 +164,9 @@ game should reach the title without the logos and legal screens, and with `RS_MO
 failure to look for is the title never coming (an empty screen after the loading screen). The scripts
 below wait for the title on a log line, so they need no change.
 
+**Auto Save warning** (`RS_MODS_AUTOSAVE`): not skipped in this build yet, so the notice should show after profile select with
+or without the switch ([Mac TESTING](../mac/TESTING.md#game-runs) has the test for when it is).
+
 **Title logo** (`RS_REARMED`, as on the Mac): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026"
 tag across REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. No keys are needed: with
 `RS_GL_SNAPSHOT_SECS=3` the title is in the snapshots by about 30 s, on a busy Mac too. `static.psarc` in

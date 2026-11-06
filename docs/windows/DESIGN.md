@@ -80,7 +80,7 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,152 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (965 of the Mac's 1,156 symbols read, an
 `unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
@@ -480,6 +480,8 @@ More native replacements of single game functions by address (`win-x86/build/ski
   (`win-x86/shims/win32_overrides.c`) runs first, with the Windows build's field offsets (boot phase `+0x48`,
   phase 3 step counter `+0x28`, intro state `+0x60`, playing flag `+0x2d`). The behaviour is the Mac one
   ([Mac DESIGN](../mac/DESIGN.md#built-in-fixes-and-mods)).
+- **Auto Save warning**: not skipped here yet, so `RS_MODS_AUTOSAVE` has no effect ([Next work](PLAN.md#next-work) has what's
+  matched).
 - **Title logo.** The same `tools/loadscreen` as the Mac's, and the same layout in the copy: `gamefiles.py`
   copies `static.psarc` as `static.psarc.original` and leaves `static.psarc` a link to it. `lp_install.py build`
   makes `static.psarc.rearmed` in the copy, as the Mac's `install.sh` does, not in the game folder, since Steam

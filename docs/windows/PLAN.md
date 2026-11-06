@@ -72,9 +72,12 @@ tells the game (2026-11-04).
 Rocksmith 1 DLC songs: `RS_STEAM_OWNED` reaches the face as on the Mac and `test_steam32` covers it, but no game run
 yet: the test account owns none of those DLC. Open: one run with an account that does, or with the variable set.
 
+Auto Save warning: not skipped here yet, unlike the Mac (`RS_MODS_AUTOSAVE`); the notice still shows after
+profile select. The handler is matched ([Next work](#next-work)); the override isn't written.
+
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 
-Mods and hook points (2026-11-05): the 14 hook points of 1.5.1 (the 15th since, `si_io`, is the Mac game's CoreAudio input and has no counterpart), the overlay API, the `mods/` folder and one mod ABI
+Mods and hook points (2026-11-05): the 14 hook points of 1.5.1 (the 15th since, `si_io`, is the Mac game's CoreAudio input and has no counterpart; the 16th, `autosave_warning`, isn't ported yet), the overlay API, the `mods/` folder and one mod ABI
 with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The same `probe_mod.dylib`, its SHA-256 in both logs, ran to the
 note highway and a quit in this app and the Mac edition's, in test homes: the network guard inserted, nothing refused, the 11 points of 1.5.0
 reached with the arguments the Mac run shows, `game_frame`'s quit answered on both. No mod code runs without the guard (no
@@ -88,9 +91,9 @@ to the note highway and a quit ([Fixed in 1.5.1](#fixed-in-151) says what a run 
 only; `Mac/build.sh --install` puts it in both folders.
 
 The tables (`tools/targets/win-x86`): every name in `tools/targets/names` has an entry (`check.py` covers both targets), and `target.toml` has the
-image's `.text`, its SHA-256 and the install pins. 965 of the 1,152 symbols and 74 of the 95 offsets are read from the Windows code; 12 of the 15
+image's `.text`, its SHA-256 and the install pins. 965 of the 1,156 symbols and 77 of the 98 offsets are read from the Windows code; 12 of the 16
 hook points are there, `input_sink` and `set_app_focus`, which have no function here, are served from the seam
-([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)), and `si_io` has no counterpart. The 187 symbols left say why in the map: 32 are not needed here, 24 are Mac-only, 30 are not
+([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)), `si_io` has no counterpart, and `autosave_warning` isn't ported yet. The 191 symbols left say why in the map: 32 are not needed here, 24 are Mac-only, 30 are not
 proved, and the rest are inlined by LTCG or have no counterpart of the Mac's shape (48 of them the Lua API). 19 of the 21 offsets left are Mac-only.
 88 names have `custom` conventions (LTCG register arguments), which their overrides have to read by hand.
 
@@ -229,6 +232,9 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-160):
 
 - The 30 symbols not proved (the Wwise plug-in DSP, small efd helpers): they have candidates in the map, and a wrong address would be
   worse than the gap.
+- The Auto Save warning skip: the Mac's is in `mods.c`, which this build doesn't have, so it needs an override in
+  `win32_overrides.c`, as the intro skip has. The handler is `0x120adf0` (`ebx` = this, three stack arguments, `ret 0xc`), the
+  dialog slot `+0x14`, the timer `+0x20`. The input mode step is inlined in it and has to keep running, as on the Mac.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** multiplayer with any input, as in the [Mac plan](../mac/PLAN.md#next-work).

@@ -33,7 +33,7 @@ extern void rs_op_delete(void *) __asm__("__ZdlPv");
 // ------------------------------------------------------------------------------------------------
 // Configuration
 // ------------------------------------------------------------------------------------------------
-static rs_mods_config g_cfg = {1, 1, 0.050, 1};
+static rs_mods_config g_cfg = {.bypass = 1, .fixes = 1, .autosave = 1, .budget_s = 0.050, .intro = 1};
 static int g_log;
 static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed, g_overlaid;
 #define COUNT(x) atomic_fetch_add_explicit(&(x), 1, memory_order_relaxed)
@@ -61,6 +61,7 @@ void rs_mods_reload_config(void) {
   g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
   g_cfg.intro = env_on("RS_MODS_INTRO", 1);
   g_cfg.overlay = env_on("RS_MODS_OVERLAY", 1);
+  g_cfg.autosave = env_on("RS_MODS_AUTOSAVE", 1);
   g_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -129,19 +130,21 @@ static void *keys_thread(void *arg) {
 
 static int before_open_file(rc_ctx *c, void *user);
 static int before_dlc_owned(rc_ctx *c, void *user);
+static int before_autosave_warning(rc_ctx *c, void *user);
 
 __attribute__((constructor)) static void mods_init(void) {
   rs_mods_reload_config();
   if (rc_hook_add_name("frontend_open_file", before_open_file, NULL, NULL)) logf_("no FrontEnd_OpenFile hook point");
   if (rc_hook_add_name("steam_dlc_owned", before_dlc_owned, NULL, NULL)) logf_("no DLC ownership hook point");
+  if (rc_hook_add_name("autosave_warning", before_autosave_warning, NULL, NULL)) logf_("no Auto Save warning hook point");
   if (g_cfg.fixes) rs_mods_raise_nofile();
   if (g_cfg.fixes && !env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
   }
-  logf_("fixes %s, bypass %s, overlay %s, intro skip %s, budget %.0f ms", g_cfg.fixes ? "on" : "off",
-        g_cfg.bypass ? "on" : "off", g_cfg.overlay ? "on" : "off", g_cfg.intro ? "on" : "off",
-        g_cfg.budget_s * 1000);
+  logf_("fixes %s, bypass %s, overlay %s, intro skip %s, autosave %s, budget %.0f ms",
+        g_cfg.fixes ? "on" : "off", g_cfg.bypass ? "on" : "off", g_cfg.overlay ? "on" : "off",
+        g_cfg.intro ? "on" : "off", g_cfg.autosave ? "on" : "off", g_cfg.budget_s * 1000);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -648,6 +651,70 @@ static int before_intro_update(rc_ctx *c, void *user) {
 __attribute__((constructor)) static void intro_init(void) {
   if (rc_hook_add(RC_ADDR(boot_intro_update), before_intro_update, NULL, NULL))
     fputs("[rs-mods] intro: no boot_intro_update hook point\n", stderr);
+}
+
+// ------------------------------------------------------------------------------------------------
+// Auto Save warning: a pre hook on the UI event handler (autosave_warning), which takes
+// (self, category, event). With category "UI" and event "OnSignInFlowComplete" the handler asks the
+// sign-in state (autosave_signin_query, predicate slot 0x1f): when that is false it builds the
+// RS2AutosaveWarning dialog (string setup plus the navigate call 0x100306ac0 at 0x1005e7f92), stores
+// the menu at self+0x418 and writes 4.0 to the state-machine timer at self+0x428. When the predicate
+// is true it tail-calls the MP_Options controller 0x1005e7c60; other events return or tail-call the
+// compare for "OnSignInFlowError".
+//
+// Before the dialog the same branch calls input_mode_restore: it puts back the player's cached input mode
+// (CachedInputMode_<user id>), gives a finished profile with no InputMode the first one, and otherwise
+// applies the InputMode to the input system. Nothing else on the way to the main menu does, so the hook
+// calls it too.
+//
+// The x64 patches this ports NOP the navigate call (so the dialog is never constructed) and change the
+// timer from 4.0 to 0.0 (so the state machine advances at once instead of waiting). The hook does the
+// same, except for what it leaves in the created-dialog slot: the handler (0x1005e48b0) only runs the
+// advance past the warning while that slot is non-NULL and the timer is at most zero (it dismisses the
+// dialog by name, drops the slot's reference, calling the object's release only if the count reaches
+// zero, and continues). A NULL slot, which the skipped call's never-written out-parameter would leave,
+// stalls the state machine on the profile screen, so the hook stores a token object instead: guest heap
+// memory whose reference count starts high, so the handler's release never fires. The dialog string
+// itself is skipped with the call: it only feeds the skipped call, allocated and freed within the
+// function. Returning nonzero skips the original; every other case returns zero, so a true predicate
+// still reaches the MP_Options controller and other events behave as the game has them.
+// With RS_MODS_AUTOSAVE=0 the hook returns zero at once.
+// ------------------------------------------------------------------------------------------------
+// Token for the created-dialog slot (see above): guest memory with a high reference count at +0x8, so the
+// handler's release never calls through it. Reused for the life of the process.
+static void *g_autosave_token;
+static int autosave_token_ready(void) {
+  if (g_autosave_token) return 1;
+  uint64_t tok = OV_GUEST(efd_alloc, 0x18, 0);
+  if (!tok) return 0;
+  RC_ST(uint64_t, tok, 0);
+  RC_ST(int32_t, tok + 8, 1000000);
+  g_autosave_token = (void *)(uintptr_t)tok;
+  return 1;
+}
+
+static int before_autosave_warning(rc_ctx *c, void *user) {
+  (void)user;
+  if (!g_cfg.autosave) return 0;
+  OV_ARGS(a, c);
+  uint8_t *self = OV_PTR(a, uint8_t);
+  const char *cat = OV_PTR(a, const char);
+  const char *ev = OV_PTR(a, const char);
+  if (strncasecmp(cat, "UI", 3) != 0 || strncasecmp(ev, "OnSignInFlowComplete", 21) != 0) return 0;
+  uint64_t svc = OV_GUESTV(autosave_signin_query, NULL, 0);
+  if ((uint8_t)OV_VCALL(svc, RC_SLOT(autosave_query),
+                        (uint64_t)RC_LD(uint32_t, RC_GA(autosave_query_arg))) != 0)
+    // the MP_Options branch: the original takes it (evaluating the predicate again, a state read)
+    return 0;
+  void **slot = (void **)(self + RC_OFF(autosave_menu));
+  if (*slot == NULL && !autosave_token_ready()) return 0;  // out of memory: the original shows the dialog
+  OV_GUEST(input_mode_restore, OV_GUESTV(service_manager_holder, NULL, 0));
+  // A foreign object already in the slot is left alone: the zeroed timer below hurries it the same way.
+  if (*slot == NULL) *slot = g_autosave_token;
+  RC_ST(double, self + RC_OFF(autosave_timer), 0.0);
+  logf_("auto save warning skipped");
+  ov_ret_void(c);
+  return 1;
 }
 
 const ov_entry ov_mods_entries[] = {

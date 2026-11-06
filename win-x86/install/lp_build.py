@@ -281,7 +281,7 @@ def find_case(folder, name):
 
 
 # what translate() passes gen_image_pe.py besides the paths (part of each translation's key)
-TRANSLATE_OPTS = ["--cflags=-w", "--opt=-O2"]
+TRANSLATE_OPTS = ["--cflags=-w", "--opt=-O2 -mno-outline"]
 
 
 _py_ids = {}

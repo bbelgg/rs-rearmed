@@ -15,3 +15,4 @@ otherwise run under Rosetta, recompiled into a native arm64 app. Released; `VERS
 
 The shared recompiler: [docs/recompiler](../recompiler/README.md). The Windows port, for side-by-side
 reading (the same headings where the topics match): [docs/windows](../windows/README.md).
+How the two games differ: [EDITIONS.md](../EDITIONS.md).

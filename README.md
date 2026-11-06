@@ -63,7 +63,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 the installer has Steam fetch what your account owns; custom songs often exist for one platform only.
 ² Tested with a virtual device named like the cable.
 
-Status in detail: [Mac](docs/mac/PLAN.md#status), [Windows](docs/windows/PLAN.md#status).
+Status in detail: [Mac](docs/mac/PLAN.md#status), [Windows](docs/windows/PLAN.md#status). If you own both games: [which to build from](docs/EDITIONS.md).
 
 ## What it adds
 
@@ -141,7 +141,7 @@ Rosetta, or on Windows for Learn & Play).
 | Status and plan | [PLAN.md](docs/mac/PLAN.md) | [PLAN.md](docs/windows/PLAN.md) |
 | Testing | [TESTING.md](docs/mac/TESTING.md) | [TESTING.md](docs/windows/TESTING.md) |
 
-The recompiler both use: [docs/recompiler](docs/recompiler/README.md).
+The recompiler both use: [docs/recompiler](docs/recompiler/README.md). How the two games differ: [EDITIONS.md](docs/EDITIONS.md).
 
 ## Credits
 

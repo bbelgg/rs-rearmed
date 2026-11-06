@@ -16,3 +16,4 @@ Mac port ([PLAN.md](PLAN.md#status)).
 
 Code: [win-x86/README.md](../../win-x86/README.md). The shared recompiler: [docs/recompiler](../recompiler/README.md).
 The Mac port, for side-by-side reading (the same headings where the topics match): [docs/mac](../mac/README.md).
+How the two games differ: [EDITIONS.md](../EDITIONS.md).

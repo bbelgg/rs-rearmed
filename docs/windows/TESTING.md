@@ -216,14 +216,17 @@ the Real Tone Cable…"), after which Available Inputs is enabled and shows the 
 
 A user folder with no profile: the title's Return goes to New profile, which takes a letter and Return (`@callback
 1101,25:24,32:24,38:00,41:24,@DLC:`), then the path choice (Return), and first-run screens up to Calibration, which
-wait for a guitar; Esc is its Cancel. Without `RS_STEAM_ID` the Steam folder is `steam/1`, so a profile under another
-ID is not seen. Return 25 s after the Stats callback got through in both runs that tried it on 2026-11-04.
+wait for a guitar; Esc is its Cancel. With `HOME` and `CFFIXED_USER_HOME` at the test home and no `RS_STEAM_ID`, the Steam folder is `steam/1`, so a profile under another
+ID is not seen. With the real `HOME`, `RS_STEAM_DATA_DIR` alone is not a test folder: the Steam layer takes the account from Steam's `loginusers.vdf`
+and copies that account's saves into an empty folder (without `crd`), so the profile screen lists real profiles and Return takes the first. Return 25 s after the Stats callback got through in both runs that tried it on 2026-11-04.
 
 The tuner is up about 30 s after Play Song on a warm cache. A sixth Return before the tuner starts
 calibration instead, which waits for a guitar. The script's log lines carry the seconds since it started and
 the wall time, to match them with snapshots. `LP_WINDOW_SCRIPT=20:900x700,30:toggle` resizes the window and
 toggles full screen at those seconds; `quit`, `unfocus` and `focus` are the same steps as Command-Q and as the
-window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window.
+window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window, and starts neither
+script: `d3d9_platform_context` returns before `window_script` and `w32_input_script`, so the game stays on the
+title screen, there is no `input script` line in the log, and a `quit` step never comes. Use `RS_FULLSCREEN=0` for a scripted run.
 
 **Mods**: `make -C tools/ws7/recomp/test/hooks OUT=DIR`, `DIR/probe_mod.dylib` into `<LP_HOME>/mods/`, and the script to the note
 highway above, with `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:

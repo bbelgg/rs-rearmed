@@ -232,8 +232,9 @@ from below a frame with a destructor, a `try` inside a catch, `__except` around 
 the discovery finds in it; `crt_probe -eh` runs it on the real, translated msvcr100.
 
 Known differences the comparator accepts: flags images spilled below the final `esp`, AF, x87 C0/C2/C3
-after arithmetic, values beyond `double`'s exponent range, and Unicorn's own results for partial `fprem`
-and out-of-domain `fsqrt`/`fyl2x`.
+after arithmetic, a NaN's sign and payload, values beyond `double`'s exponent range, last-bit rounding in a case that ran a
+transcendental, and Unicorn's own results for partial `fprem`, out-of-domain `fsqrt`/`fyl2x`, `f2xm1` of a small number and
+`ret imm16` from `0x8000` up. Unicorn is also told that `in` and `out` fault at user level, and that a compare clears C1.
 
 Hook points have a test of their own that needs no game (`tools/ws7/recomp/test/hooks`, ctest `recomp.hooks`): one mod
 dylib, built once, runs in the 64-bit and the 32-bit runtime and reads the same call in both, for each

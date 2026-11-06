@@ -43,8 +43,10 @@ PEB = 0x00301000
 SENTINEL = 0xfffffff0
 GDT = 0x00380000
 FS_SEL = 0x08
+PORT_IO = {"in", "out", "insb", "insw", "insd", "outsb", "outsw", "outsd"}
 WIRE_FPU = struct.Struct("<8d8QHHBB2x")
 RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_main.c", "rc32_teb.c", "rc32_seh.c", "rc32_wrappers.c"]
+F2XM1_MIN = 2.0 ** -13     # below this, pow(2.0, x) - 1.0 has lost more than the comparison's 1e-12
 TRANSCENDENTAL = {(0xd9, 0xf0), (0xd9, 0xf1), (0xd9, 0xf2), (0xd9, 0xf3), (0xd9, 0xf9), (0xd9, 0xfb),
                   (0xd9, 0xfe), (0xd9, 0xff), (0xd9, 0xfd), (0xd9, 0xf5), (0xd9, 0xf8),
                   (0xd9, 0xf4), (0xd8, 0xf8), (0xdc, 0xf8), (0xde, 0xf8)}  # fxtract, fprem(1)/fdiv NaN payloads
@@ -178,6 +180,14 @@ class Unicorn:
                 u.hook_add(UC_HOOK_CODE, self._pushf_post, begin=nxt, end=nxt)
             elif kind == "ref_x87":    # an operand QEMU 5 handles unlike hardware
                 u.hook_add(UC_HOOK_CODE, self._ref_x87, begin=a, end=a)
+            elif kind == "fcom":       # a compare clears C1, which QEMU 5 leaves as it was
+                u.hook_add(UC_HOOK_CODE, self._fcom, begin=a, end=a)
+            elif kind == "trans":      # QEMU 5 computes these in the host's double, as the translation does
+                u.hook_add(UC_HOOK_CODE, self._trans, begin=a, end=a)
+            elif kind == "port":       # in, out: a fault at user level, which QEMU runs as a read of 0
+                u.hook_add(UC_HOOK_CODE, self._port, begin=a, end=a)
+            elif kind == "ret_far":    # ret imm16 of 0x8000 up: QEMU 5 takes the immediate as signed
+                u.hook_add(UC_HOOK_CODE, self._ref_any, begin=a, end=a)
             elif kind == "fprem":      # a partial reduction (C2=1): the step size is QEMU's own
                 u.hook_add(UC_HOOK_CODE, self._fprem_post, begin=nxt, end=nxt)
             elif kind == "rdtsc":
@@ -234,13 +244,30 @@ class Unicorn:
 
     def _ref_x87(self, uc, addr, size, ud):
         """fyl2x / fyl2xp1 with ST0 <= 0 (QEMU 5 sets C2 and does not pop), fsqrt of a negative
-        number (QEMU sets C2): the reference is not hardware there."""
+        number (QEMU sets C2), f2xm1 of a small number: the reference is not hardware there."""
         X = self.X
         top = (uc.reg_read(X.UC_X86_REG_FPSW) >> 11) & 7
         v = from80(uc.reg_read(X.UC_X86_REG_FP0 + top))
         op = bytes(uc.mem_read(addr, 2))
         if (op == b"\xd9\xf1" and not v > 0) or (op == b"\xd9\xf9" and not v + 1.0 > 0) or (op == b"\xd9\xfa" and v < 0):
             self.ref_limit = True
+        # f2xm1 is pow(2.0, x) - 1.0 in QEMU 5: 0 for a small x, where hardware gives x * ln 2
+        if op == b"\xd9\xf0" and abs(v) < F2XM1_MIN:
+            self.ref_limit = True
+
+    def _fcom(self, uc, addr, size, ud):
+        X = self.X
+        uc.reg_write(X.UC_X86_REG_FPSW, uc.reg_read(X.UC_X86_REG_FPSW) & ~0x200)
+
+    def _ref_any(self, uc, addr, size, ud):
+        self.ref_limit = True
+
+    def _trans(self, uc, addr, size, ud):
+        self.trans = True
+
+    def _port(self, uc, addr, size, ud):
+        self.stop = ("abnormal", "port")
+        uc.emu_stop()
 
     def _fprem_post(self, uc, addr, size, ud):
         if uc.reg_read(self.X.UC_X86_REG_FPSW) & 0x400:   # C2: reduction incomplete
@@ -294,6 +321,7 @@ class Unicorn:
         u.reg_write(X.UC_X86_REG_MXCSR, case["mxcsr"])
         self.stop = None
         self.ref_limit = False
+        self.trans = False
         try:
             u.emu_start(case["func"], SENTINEL, count=limit)
             pc = u.reg_read(X.UC_X86_REG_EIP)
@@ -303,7 +331,7 @@ class Unicorn:
             # the return sentinel is not mapped: fetching it is the return
             if self.stop is None:
                 self.stop = ("abnormal", str(e))
-        st = {"status": self.stop[0], "info": self.stop[1], "ref_limit": self.ref_limit,
+        st = {"status": self.stop[0], "info": self.stop[1], "ref_limit": self.ref_limit, "trans": self.trans,
               "regs": [u.reg_read(r) for r in regs], "mxcsr": u.reg_read(X.UC_X86_REG_MXCSR),
               "xmm": [u.reg_read(X.UC_X86_REG_XMM0 + k) for k in range(8)]}
         sw = u.reg_read(X.UC_X86_REG_FPSW)
@@ -493,22 +521,25 @@ def compare(case, c, u, tol):
         diffs = [a + k for k in range(n) if cb[k] != ub[k] and not skip[0] <= a + k < skip[1]
                  and not (on_stack and a + k < dead_below)]
         if diffs and (tol or case.get("x87")):
-            # a float-result function: a differing 8-byte-aligned slot that both sides read as
-            # NaN, or (same sign) as inf vs finite, is an x87 NaN-payload / exponent-range
-            # difference; with tol, a near-equal pair is a rounding difference
+            # a float-result function: a differing slot that both sides read as NaN, or (same
+            # sign) as inf vs finite, is an x87 NaN-payload / exponent-range difference; with
+            # tol, a near-equal pair is a rounding difference. 32-bit code keeps doubles on
+            # 4-byte boundaries, so a byte has two slots it can be in
             def fuzzy(off):
-                o = off & ~7
-                if o + 8 > n:
-                    return False
-                x = struct.unpack_from("<d", cb, o)[0]
-                y = struct.unpack_from("<d", ub, o)[0]
-                if x != x and y != y:
-                    return True
-                # one side inf, the other finite same-sign: the x87 80-bit exponent range the
-                # model computes as a 64-bit double does not have (runtime/rc32_x87.h)
-                if math.isinf(x) != math.isinf(y) and (x >= 0) == (y >= 0):
-                    return True
-                return feq(x, y, tol)
+                for o in (off & ~3, (off & ~3) - 4):
+                    if o < 0 or o + 8 > n:
+                        continue
+                    x = struct.unpack_from("<d", cb, o)[0]
+                    y = struct.unpack_from("<d", ub, o)[0]
+                    if x != x and y != y:
+                        return True
+                    # one side inf, the other finite same-sign: the x87 80-bit exponent range the
+                    # model computes as a 64-bit double does not have (runtime/rc32_x87.h)
+                    if math.isinf(x) != math.isinf(y) and (x >= 0) == (y >= 0):
+                        return True
+                    if feq(x, y, tol):
+                        return True
+                return False
             diffs = [p for p in diffs if not fuzzy(p - a)]
         if diffs:
             d.append("mem %d bytes from %08x (%02x/%02x)" % (len(diffs), diffs[0], cb[diffs[0] - a], ub[diffs[0] - a]))
@@ -558,7 +589,8 @@ def hook_points(tr, funcs):
                     pts.add((a, "fenv", nxt))
                 if oc in TRANSCENDENTAL:
                     trans.add(f)
-                if oc in ((0xd9, 0xf1), (0xd9, 0xf9), (0xd9, 0xfa)):
+                    pts.add((a, "trans", nxt))
+                if oc in ((0xd9, 0xf0), (0xd9, 0xf1), (0xd9, 0xf9), (0xd9, 0xfa)):
                     pts.add((a, "ref_x87", nxt))
                 if oc in ((0xd9, 0xf8), (0xd9, 0xf5)):    # fprem, fprem1
                     pts.add((a, "fprem", nxt))
@@ -567,6 +599,10 @@ def hook_points(tr, funcs):
                 pts.add((a, "sreg", nxt))
             if m in ("pushfd", "pushf"):
                 pts.add((a, "pushf", nxt))
+            if m in PORT_IO:
+                pts.add((a, "port", nxt))
+            if m == "ret" and i.operands and i.operands[0].imm & 0x8000:
+                pts.add((a, "ret_far", nxt))
             if m == "stmxcsr":
                 pts.add((a, "mxcsr", nxt))
             elif m == "cpuid":
@@ -577,6 +613,8 @@ def hook_points(tr, funcs):
                 mmx.add(f)
             if m.startswith(("fcom", "fucom", "ftst", "fxam", "ficom")):
                 ccset.add(f)
+                if m != "fxam":
+                    pts.add((a, "fcom", nxt))
             if oc:
                 x87set.add(f)
     return sorted(pts), mmx, trans, ccset, x87set
@@ -633,7 +671,7 @@ def debug_case(image, args):
     print("runner: %s" % "; ".join(other[-5:]))
     print("C:", c["status"], c.get("info"), " ".join("%08x" % v for v in c.get("regs", [])))
     print("U:", u["status"], u.get("info"), " ".join("%08x" % v for v in u.get("regs", [])))
-    print("diff:", compare(case, c, u, 1e-12))
+    print("diff:", compare(case, c, u, 1e-12 if f in trans or u["trans"] else 0))
     return 0
 
 
@@ -643,7 +681,8 @@ def run_image(image, args):
     os.makedirs(out, exist_ok=True)
     exe, man = build(image, out, args.jobs, args.cflags, wrappers=getattr(args, "wrappers", None))
     tr = translator(image, args)
-    ok = sorted(int(a, 16) for a, v in man["per_function"].items() if v[0] == "ok")
+    # an import slot the gap scan took for code: Unicorn runs the slot's bound value, the C its file bytes
+    ok = sorted(int(a, 16) for a, v in man["per_function"].items() if v[0] == "ok" and int(a, 16) not in tr.import_slots())
     funcs = ok
     if args.only:
         funcs = [int(a, 16) for a in args.only.split(",")]
@@ -667,7 +706,7 @@ def run_image(image, args):
             c = runner.run(case)
             u = uc.run(case, args.limit)
             case["stubs"] = stubs
-            d = compare(case, c, u, 1e-12 if f in trans else 0)
+            d = compare(case, c, u, 1e-12 if f in trans or u["trans"] else 0)
             if d is None:
                 kind = "timeout"
             elif d == "untranslated":

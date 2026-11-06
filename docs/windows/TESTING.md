@@ -18,7 +18,7 @@ where you point them and never copied into the repository.
 | Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Steam face | `make -C win-x86/shims/steam test OUT=DIR` | the guest ABI end to end: exports, interface vtables, `thiscall`, callbacks and call results |
 | Online layer | `make -C win-x86/online test OUT=DIR` | the three vtables in guest memory with fake game functions: every replaced slot, the posted events, a layout that does not match left alone |
-| D3D9 layer | `win-x86/test/d3d9_test.sh <cmake build dir> [out dir]` (needs `cmake --build <dir> --target opengl`) | the layer's host test on both libRSOpenGL backends: fixed-function draws checked pixel by pixel, every stage operation, lights, fog, generated texture coordinates, the draw-time upload of dynamic buffers, the wait in Present while the window is hidden (1,272 checks) |
+| D3D9 layer | `win-x86/test/d3d9_test.sh <cmake build dir> [out dir]` (needs `cmake --build <dir> --target opengl`) | the layer's host test on both libRSOpenGL backends: fixed-function draws checked pixel by pixel, every stage operation, lights, fog, generated texture coordinates, the draw-time upload of dynamic buffers, the wait in Present while the window is hidden (1,272 checks; 2026-11-06 against a `libRSOpenGL` built from the branch under test) |
 | Window rules | `cc -I win-x86/app win-x86/test/lp_screen_test.c win-x86/app/lp_screen.c -o lp_screen_test && ./lp_screen_test` | the window mode a style or back buffer means, `RS_FULLSCREEN`, sizes on a small screen and with Retina pixels, the pointer in a letterboxed back buffer |
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export over 3,000-5,500 inputs each (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
@@ -39,15 +39,29 @@ UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.handcases --out DIR                    #
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.difftest IMAGE.dll --out DIR --cases 6 --jobs 8
 ```
 
-`difftest` takes the DLLs from the command line or `RC32_TEST_DLLS` and skips without one. The plain DLLs
-in the game folder are the usual inputs (`bink2w32.dll`, `steam_api.dll`, `systemdetection.dll`). Two known
-mismatches, neither in code the game runs: one case in `systemdetection.dll`'s CPUID parser (`10010c50`), and
-`steam_api.dll`'s `log10` on its x87 path (`3b4213e0`, five of six cases). That one is the CRT's hand-written
-assembler, which reads the flags a helper left across a call and `ret` (`call 0x3b421e45` then `je`); the flags
-are C locals ([recompiler](../recompiler/README.md#what-the-c-looks-like)), so the translation does not see them.
-The game never loads `steam_api.dll`: the Steam face stands in for it. `msvcr100.dll` as an input shows the same in
-41 functions (the math exports, `_inp`, `_outp`): every math export an image imports is a native override
-(`win32_crtmath.c`), so the translated ones do not run.
+`difftest` takes the DLLs from the command line or `RC32_TEST_DLLS` and skips without one. The usual inputs are the plain DLLs in the
+game folder (`bink2w32.dll`, `steam_api.dll`, `systemdetection.dll`) and `msvcr100.dll` from the redistributables. None of the four shows a
+mismatch (2026-11-06), so any mismatch is new and worth reading. A case where the reference is known not to be hardware counts as
+`reference_limit`, not as a match: 32 of `msvcr100.dll`'s, 5 of `steam_api.dll`'s. `msvcr100.dll` leaves out its import slots: what
+Unicorn runs there is the value bound to the slot, what was translated is the file's bytes.
+
+`msvcr100.dll` used to be listed here with 41 functions. Run again at the commit that wrote that line, the 41 are real, and by name 27 of them
+are what a run showed before the changes of 2026-11-06, with nothing new:
+
+| Functions | What they were |
+|---|---|
+| 14: `acos` `asin` `atan` `log` `log10` `sin` `tan`, `__libm_sse2_cos` `_cosf` `_sin` `_sinf` `_tan` `_tanf`, `78aea630` | a translation bug, gone: flags left by a helper across a call (`call helper; je`). That tree didn't have the fix |
+| 6: `_inp` `_inpw` `_inpd` `_outp` `_outpw` `_outpd` | `in` and `out` fault at user level, and the translation stops there; Unicorn read 0 and went on |
+| 3: `78aa12c4`, `78b344da`, `78b4b5ec` | data the discovery took for code: an import slot, a table of doubles (`ret 0xa033`, whose immediate QEMU reads as signed), the names `tan`, `cos`, ... (`outsb`, as `in`). They do not run |
+| 12: `sqrt` `cos` `pow` `_CIacos` `_CIasin` `_CIlog` `_CIcosh` `_j0` `_y0` `_y1` `_yn`, `78aa3298` | a NaN's sign or payload: x87's default NaN is negative and arm64's positive. The comparison looked for doubles on 8-byte boundaries only, and 32-bit code keeps them on 4. `_CIcosh` shows it through `fxam`'s C1 in a saved status word; that case passes as a near-equal slot |
+| 4: `_CIpow` `_CIsinh` `_CItanh` `_CIexp` | the last bits: the CRT's x87 code sets 64-bit precision (`0x133f`) and the model computes in double. The tolerance went by the function's own instructions, not its helpers'. `_CIexp`'s `edx` is C1 after `ftst`, which hardware clears and QEMU leaves |
+| 2: `sinh` `tanh` | QEMU's `f2xm1` is `pow(2.0, x) - 1.0`, 0 for a small `x`; reference limit |
+
+The other two known mismatches: `steam_api.dll`'s `log10` on its x87 path (`3b4213e0`) was the same translation bug in another shape,
+`call helper; push edx; wait; fnstcw [esp]; je`, fixed in the same place, and the game never loads that DLL anyway: the Steam face stands in for it.
+`systemdetection.dll`'s `10010c50`, listed as its CPUID parser, is the CRT's x87 `log`, and it was the NaN's sign above.
+
+Every math export an image imports is a native override (`win32_crtmath.c`), so the translated ones do not run in the game either way.
 
 ## Installer tests
 

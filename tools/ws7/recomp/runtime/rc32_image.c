@@ -408,42 +408,31 @@ static rc_fn table_lookup(const rc32_module *m, uint32_t g) {
 static rc_fn lookup_slow(uint32_t g);
 void (*rc32_note)(int what, uint64_t ticks);
 
-// Indirect calls (vtables, callbacks) look the same few thousand addresses up all the time; a
-// per-thread direct-mapped cache in front of the binary search. Entries only ever hold what the
-// search answered, and the answer for an address does not change once the images are bound.
-#define LOOKUP_CACHE 8192
-static __thread struct { uint32_t g; rc_fn f; } *lookup_cache;
-static void lookup_none(rc_ctx *c) { (void)c; }
-#define LOOKUP_NONE lookup_none
-
-static pthread_key_t lookup_key;  // frees a thread's cache when it ends
-static pthread_once_t lookup_once = PTHREAD_ONCE_INIT;
-static void lookup_cache_free(void *p) {
-  lookup_cache = 0;  // a lookup in a later destructor of this thread allocates again
-  free(p);
-}
-static void lookup_key_make(void) { pthread_key_create(&lookup_key, lookup_cache_free); }
+// Indirect calls (vtables, callbacks) look the same few thousand addresses up all the time: a direct-mapped
+// cache in front of the binary search, shared by all threads, an entry one 64-bit word: the guest address, and
+// the function as an offset from this code (0x7fffffff: no translated function there, a host function's cell
+// or an import cell: the COM objects of the seams are called through such cells many times a frame).
+// Entries only ever hold what the search answered, and the answer for an address does not change once the
+// images are bound, so a race costs nothing: a thread reads one whole word or another.
+#define LOOKUP_BITS 16
+#define LOOKUP_NONE 0x7fffffffu
+static uint64_t lookup_cache[1u << LOOKUP_BITS];
 
 rc_fn rc32_lookup(uint32_t g) {
-  if (__builtin_expect(!lookup_cache, 0)) {
-    pthread_once(&lookup_once, lookup_key_make);
-    lookup_cache = calloc(LOOKUP_CACHE, sizeof *lookup_cache);
-    pthread_setspecific(lookup_key, lookup_cache);
+  uint32_t s = (g * 2654435761u) >> (32 - LOOKUP_BITS);
+  uint64_t e = __atomic_load_n(&lookup_cache[s], __ATOMIC_RELAXED);
+  const char *base = (const char *)rc32_lookup;
+  if ((uint32_t)(e >> 32) == g && e) {
+    int32_t o = (int32_t)(uint32_t)e;
+    return (uint32_t)o == LOOKUP_NONE ? 0 : (rc_fn)(uintptr_t)(base + o);
   }
-  if (lookup_cache) {
-    uint32_t s = (g * 2654435761u) >> 19;  // 13 bits
-    if (lookup_cache[s].f && lookup_cache[s].g == g)
-      return lookup_cache[s].f == LOOKUP_NONE ? 0 : lookup_cache[s].f;
-    uint64_t t0 = rc32_note ? mach_absolute_time() : 0;
-    rc_fn f = lookup_slow(g);
-    if (t0) rc32_note(RC32_NOTE_LOOKUP_MISS, mach_absolute_time() - t0);
-    // no translated function there (a host function's cell, an import cell): remembered too, as
-    // the COM objects of the seams are called through such cells many times a frame
-    lookup_cache[s].g = g;
-    lookup_cache[s].f = f ? f : LOOKUP_NONE;
-    return f;
-  }
-  return lookup_slow(g);
+  uint64_t t0 = rc32_note ? mach_absolute_time() : 0;
+  rc_fn f = lookup_slow(g);
+  if (t0) rc32_note(RC32_NOTE_LOOKUP_MISS, mach_absolute_time() - t0);
+  int64_t d = f ? (const char *)(uintptr_t)f - base : LOOKUP_NONE;
+  if (d >= INT32_MIN && d <= LOOKUP_NONE)  // a function in another library may be too far off: not cached
+    __atomic_store_n(&lookup_cache[s], (uint64_t)g << 32 | (uint32_t)(int32_t)d, __ATOMIC_RELAXED);
+  return f;
 }
 
 static rc_fn lookup_slow(uint32_t g) {

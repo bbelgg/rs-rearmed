@@ -375,6 +375,18 @@ vorbis_huffman_decode                                            unsupported  no
 vorbis_bits_look                                                 unsupported  not proved: Wwise plug-in code without strings; no candidate yet
 vorbis_bits_adv                                                  unsupported  not proved: Wwise plug-in code without strings; no candidate yet
 dsp_analysis_window                                              unsupported  not proved: Wwise plug-in code without strings; 0x1a14780 shares two constants
+compressor_gain                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+delay_network_wide                                               unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+biquad_block                                                     unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+biquad_scalar                                                    unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+biquad_direct                                                    unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+biquad_cascade                                                   unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+level_shaper                                                     unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+mix_stereo_ramp                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+fft_work                                                         unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+fft_bfly_generic                                                 unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+fft_complex_mac                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
+dsp_fft                                                          unsupported  not proved: 0x13f23e0 and 0x13f2d50 have its parts, by address in relaxed.map
 
 # --- names/overrides/audio.list
 ak_lengine_thread                                                unsupported  Mac-only: the thread that waits on the CoreAudio sink's mach semaphore; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)

@@ -121,15 +121,15 @@ static void rsm_map_grow(rsm_map *m) {
     *m = n;
 }
 
-id rsm_map_get(rsm_map *m, const void *key) {
+void *rsm_map_get_(rsm_map *m, const void *key) {
     if (!m->cap)
-        return nil;
+        return NULL;
     uint64_t h = rsm_hash(key, m->key_size);
     for (uint32_t j = (uint32_t)h & (m->cap - 1);; j = (j + 1) & (m->cap - 1)) {
         if (!m->hashes[j])
-            return nil;
+            return NULL;
         if (m->hashes[j] == h && !memcmp(m->keys + (size_t)j * m->key_size, key, m->key_size))
-            return (__bridge id)m->vals[j];
+            return m->vals[j];
     }
 }
 

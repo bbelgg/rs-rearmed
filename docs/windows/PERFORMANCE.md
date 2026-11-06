@@ -435,10 +435,9 @@ A batch is one rebuild and one run, so within a batch the shares below come from
 
 The binary is 122 MB, from 107: the inline lookups and `-mno-outline`. Audio buffers and the audio path were not changed; the song played with the highway and lyrics up, not checked by ear.
 
-Against the Mac: the same route was not run on the Mac build, so the gap is an estimate. The [Final pass](#final-pass-for-140) has it 2.5 ms
-apart, 8.4 against 5.9. If the Mac's frame grows on this route as Learn & Play's did (9.4 against 8.4), it would be about 6.6 ms, and 7.2 ms is about
-0.6 ms from that, where 9.4 ms was 2.8 ms from it. By thread the game is 4.2 ms a frame here, against the Mac's recorded game frame of about 4 ms on other
-songs. What is left, by what the profiles show:
+Against the Mac: the same route on the Mac build, [run later the same day](../mac/PERFORMANCE.md#learn--plays-route), is 6.1 ms a frame (6.2 before its 12 more relaxed
+functions), so 7.2 ms is about 1.1 ms from it, 17% more, and not the 0.6 ms estimated here first. The game thread is 4.2 ms a frame here against the Mac's 4.0, the Wwise and
+note detection threads 1.9 ms against 1.1. What is left, by what the profiles show:
 
 - the Wwise and note detection threads, 1.9 ms a frame. Fences take a good part of it: 0.5 ms a frame of these two threads went without them. The note
   detection is x87 here and SSE on the Mac (`F_105f420`, `F_13f3690`), and calls into functions that can't be relaxed as they are.

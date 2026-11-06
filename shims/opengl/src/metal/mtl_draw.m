@@ -51,6 +51,10 @@ void rsm_draw_init(RSMContext *ctx) {
     ctx->dummy_cube = rsm_dummy(ctx, true);
     MTLSamplerDescriptor *sd = [MTLSamplerDescriptor new];
     ctx->present_sampler = [ctx->dev newSamplerStateWithDescriptor:sd];
+    ctx->pass_desc = [MTLRenderPassDescriptor new];
+    ctx->pass_desc_color = ctx->pass_desc.colorAttachments[0];
+    ctx->pass_desc_depth = ctx->pass_desc.depthAttachment;
+    ctx->pass_desc_stencil = ctx->pass_desc.stencilAttachment;
 }
 
 // --- Render pass ------------------------------------------------------------------------
@@ -59,14 +63,14 @@ static RSMTexture *rsm_att_object(const rsm_attachment *a) {
 }
 
 // Resolve the draw framebuffer's attachments into ctx->pass_*.
-static void rsm_pass_targets(RSMContext *ctx) {
+static void rsm_pass_targets(__unsafe_unretained RSMContext *ctx) {
     ctx->pass_color = ctx->pass_depth = ctx->pass_stencil = nil;
     ctx->pass_color_level = ctx->pass_color_slice = 0;
     if (!ctx->draw_fb) {
         ctx->pass_color = ctx->def_color;
         ctx->pass_depth = ctx->pass_stencil = ctx->def_ds;
     } else {
-        RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, ctx->draw_fb);
+        __unsafe_unretained RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, ctx->draw_fb);
         id<MTLTexture> t;
         int l, s;
         if (fb && rsm_attachment_texture(ctx, &fb->att[RSM_ATT_COLOR0], &t, &l, &s)) {
@@ -107,31 +111,35 @@ static void rsm_pass_targets(RSMContext *ctx) {
     ctx->fb_dirty = false;
 }
 
-static void rsm_mark_targets(RSMContext *ctx) {
+static void rsm_mark_targets(__unsafe_unretained RSMContext *ctx) {
     if (!ctx->draw_fb)
         return;
-    RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, ctx->draw_fb);
+    __unsafe_unretained RSMFramebuffer *fb = rsm_get(&ctx->framebuffers, ctx->draw_fb);
     for (int i = 0; fb && i < RSM_ATT_COUNT; i++) {
-        RSMTexture *t = rsm_att_object(&fb->att[i]);
+        __unsafe_unretained RSMTexture *t = rsm_att_object(&fb->att[i]);
         if (t)
             t->last_use = ctx->serial;
     }
 }
 
-static bool rsm_begin_pass(RSMContext *ctx) {
+static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     if (ctx->enc)
         return true;
     if (ctx->fb_dirty)
         rsm_pass_targets(ctx);
-    if (!ctx->pass_color && !ctx->pass_depth && !ctx->pass_stencil) {
+    __unsafe_unretained id<MTLTexture> color = ctx->pass_color, depth = ctx->pass_depth, stencil = ctx->pass_stencil;
+    if (!color && !depth && !stencil) {
         ctx->pending_clear = 0;
         return false;
     }
-    MTLRenderPassDescriptor *rp = [MTLRenderPassDescriptor renderPassDescriptor];
+    __unsafe_unretained MTLRenderPassDescriptor *rp = ctx->pass_desc;
+    __unsafe_unretained MTLRenderPassColorAttachmentDescriptor *c = ctx->pass_desc_color;
+    __unsafe_unretained MTLRenderPassDepthAttachmentDescriptor *d = ctx->pass_desc_depth;
+    __unsafe_unretained MTLRenderPassStencilAttachmentDescriptor *s = ctx->pass_desc_stencil;
     unsigned pc = ctx->pending_clear;
-    if (ctx->pass_color) {
-        MTLRenderPassColorAttachmentDescriptor *c = rp.colorAttachments[0];
-        c.texture = ctx->pass_color;
+    // The descriptor is reused: what this pass doesn't set must not be left from the last one.
+    c.texture = color;
+    if (color) {
         c.level = (NSUInteger)ctx->pass_color_level;
         c.slice = (NSUInteger)ctx->pass_color_slice;
         c.loadAction = pc & GL_COLOR_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
@@ -139,20 +147,20 @@ static bool rsm_begin_pass(RSMContext *ctx) {
         c.clearColor = MTLClearColorMake(ctx->pending_color[0], ctx->pending_color[1], ctx->pending_color[2],
                                          ctx->pending_color[3]);
     }
-    if (ctx->pass_depth) {
-        rp.depthAttachment.texture = ctx->pass_depth;
-        rp.depthAttachment.loadAction = pc & GL_DEPTH_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
-        rp.depthAttachment.storeAction = MTLStoreActionStore;
-        rp.depthAttachment.clearDepth = ctx->pending_depth;
+    d.texture = depth;
+    if (depth) {
+        d.loadAction = pc & GL_DEPTH_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
+        d.storeAction = MTLStoreActionStore;
+        d.clearDepth = ctx->pending_depth;
     }
-    if (ctx->pass_stencil) {
-        rp.stencilAttachment.texture = ctx->pass_stencil;
-        rp.stencilAttachment.loadAction = pc & GL_STENCIL_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
-        rp.stencilAttachment.storeAction = MTLStoreActionStore;
-        rp.stencilAttachment.clearStencil = (uint32_t)ctx->pending_stencil & 0xFF;
+    s.texture = stencil;
+    if (stencil) {
+        s.loadAction = pc & GL_STENCIL_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
+        s.storeAction = MTLStoreActionStore;
+        s.clearStencil = (uint32_t)ctx->pending_stencil & 0xFF;
     }
-    if (!ctx->pass_color)
-        rp.renderTargetWidth = (NSUInteger)ctx->pass_w, rp.renderTargetHeight = (NSUInteger)ctx->pass_h;
+    rp.renderTargetWidth = color ? 0 : (NSUInteger)ctx->pass_w;
+    rp.renderTargetHeight = color ? 0 : (NSUInteger)ctx->pass_h;
     ctx->enc = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
     ctx->pending_clear = 0;
     rsm_mark_targets(ctx);
@@ -192,7 +200,7 @@ static unsigned rsm_sop(GLenum op) {
     return MTLStencilOperationKeep;
 }
 
-static id<MTLDepthStencilState> rsm_ds_state(RSMContext *ctx, uint64_t key) {
+static id<MTLDepthStencilState> rsm_ds_state(__unsafe_unretained RSMContext *ctx, uint64_t key) {
     id<MTLDepthStencilState> s = rsm_map_get(&ctx->ds_states, &key);
     if (s)
         return s;
@@ -238,7 +246,7 @@ static uint64_t rsm_ds_key(RSMContext *ctx) {
 }
 
 // --- Dynamic state ------------------------------------------------------------------------
-static bool rsm_apply_dynamic(RSMContext *ctx) {
+static bool rsm_apply_dynamic(__unsafe_unretained RSMContext *ctx) {
     __unsafe_unretained id<MTLRenderCommandEncoder> e = ctx->enc;
     unsigned d = ctx->dirty;
     if (d & RSM_DIRTY_VIEWPORT) {
@@ -592,7 +600,7 @@ static void rsm_index_range(const void *isrc, GLenum itype, GLsizei count, uint3
     *hi = mx;
 }
 
-static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, GLenum itype, const void *indices,
+static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint first, GLsizei count, GLenum itype, const void *indices,
                      GLsizei instances, bool indexed) {
     rsm_prim pr;
     if (!rsm_primitive(mode, &pr) ||
@@ -766,7 +774,9 @@ static void rsm_draw(RSMContext *ctx, GLenum mode, GLint first, GLsizei count, G
             k.eq_a = rsm_blend_op(ctx->blend_eq_a);
         }
         if (!ctx->cur_pkey_valid || ctx->cur_prog_uid != p->uid || memcmp(&k, &ctx->cur_pkey, sizeof k)) {
-            id<MTLRenderPipelineState> ps = rsm_pipeline(ctx, p, &k);
+            __unsafe_unretained id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, &k);  // keeps it alive
+            if (!ps)
+                ps = rsm_pipeline(ctx, p, &k);
             if (!ps)
                 return;
             if (ps != ctx->cur_pipeline) {

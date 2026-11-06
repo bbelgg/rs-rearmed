@@ -22,6 +22,11 @@ less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) chan
 - Frame times: `RS_GL_FRAMETIMES=FILE` (one line per frame); snapshot runs (`RS_GL_SNAPSHOT_DIR`) excluded,
   since each snapshot is a synchronous readback of about 70 ms.
 - Rosetta: the original game under Rosetta on the same Mac, over a scripted song.
+- **Hot spots of every thread**: `xcrun xctrace record --template 'Time Profiler' --attach PID --time-limit 20s`, then `xctrace export` of the
+  `time-profile` table, as in [Windows](../windows/PERFORMANCE.md#method). Shares within a thread are usable. A thread's total is not, for the audio threads:
+  the Wwise thread wakes every 5.33 ms for a burst shorter than the 1 ms between samples, and one trace had it at 2.6% where `ps -M` had 5.7% over the 90 s
+  just before ([Learn & Play's route](#learn--plays-route)). Take a thread's CPU from `ps -M`.
+- **Noise**: as in [Windows](../windows/PERFORMANCE.md#method), about +-1 point of a core between runs of one build. Differences under 2 points are not results.
 
 ## Results
 
@@ -71,8 +76,8 @@ Learn & Play's corpus is 281 programs, from a list of what the game was seen lin
 
 ### Against the Windows port
 
-The same song on both at 75 fps: [Final pass](#final-pass-for-140). Learn & Play has come down since: 9.4 to 7.2 ms a frame on a route of its own, not run
-on this edition, and [its notes](../windows/PERFORMANCE.md#toward-the-mac-edition) estimate this edition at about 6.6 ms there. An earlier comparison, with other songs and before
+The same song on both at 75 fps: [Final pass](#final-pass-for-140). Learn & Play has come down since, to 7.2 ms a frame on a route of its own, and on that route
+this edition takes 6.1 ms: [Learn & Play's route](#learn--plays-route). An earlier comparison, with other songs and before
 the memory order and the intro skip, is in [Windows performance](../windows/PERFORMANCE.md#against-the-mac-build).
 
 ## Final pass for 1.4.0
@@ -135,6 +140,63 @@ shaders about 330-390 s against 270-375 s. p99 is higher, 18.1-18.6 ms against 1
 in 150 s against one in 53 s; Learn & Play shows the same p99 on this song, which suggests the song or the display and not
 the code, but no run shows that. Nothing recorded got clearly worse, and nothing here proves it did not.
 
+## Learn & Play's route
+
+2026-11-06, an Apple M2, the 75 Hz 2560x1440 display. One run each, the game's executable started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal cache (a
+warm-up run first), the window in front, keys by `tools/ws8/keyfifo` on the same timing in both ([TESTING.md](TESTING.md#game-runs)): Cherub Rock, Lead, a DIRECT CONNECT
+profile on a UR22mkII, no guitar, measured for 90 s from 45 s after the tuner's skip. This is the route of [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition),
+at nice 0 where those runs were at nice 5. "Before" is the 1.7.0 build; "Relaxed" has 12 more functions relaxed; "Renderer" also has the [renderer's changes](#the-renderer-on-this-route),
+which Learn & Play's column does not. CPU by thread from `ps -M`.
+
+| | Before | Relaxed | Renderer | Learn & Play, final |
+|---|---|---|---|---|
+| CPU (% of a core) | 46.6 | 46.0 | 45.4 | 53.8 |
+| CPU per frame | 6.21 ms | 6.14 ms | 6.06 ms | 7.19 ms |
+| game thread | 30.6 | 30.1 | 29.5 | 31.8 |
+| Wwise thread | 5.7 | 5.7 | 5.5 | 8.1 |
+| note detection | 3.1 | 2.6 | 2.6 | 6.0 |
+| Frame rate | 74.93 | 74.92 | 74.92 | 74.93 |
+| median / p99 / worst (ms) | 13.31 / 16.54 / 20.0 | 13.35 / 16.23 / 18.2 | 13.34 / 16.40 / 19.3 | 13.34 / 14.44 / 18.8 |
+| Frames over 20 ms | 1 | 0 | 0 | 0 |
+| Footprint | 0.90 GB | 0.88 GB | 0.89 GB | 1.33 GB |
+
+So the 12 functions saved 0.6 points of a core, within the noise of one run each, where the same step saved Learn & Play about 2. The note detection's 0.5 points
+agrees with its FFT, the one large function here (2.0 points of a core in the profile before, 1.4 after). The Wwise thread did not move by `ps`, though most functions
+added there fell as a share of the thread in the profile (`delay_network_wide` from 8.7% to 3.3%; `biquad_block` and `fft_work` didn't): why isn't known, and a trace doesn't say ([Method](#method)). In these runs the song
+played with the highway and lyrics up and no guitar, so the FFT ran on the input's noise; the final build then played well with a guitar, by the maintainer's own check.
+
+What was in the profile (Time Profiler, 20 s of the song, before, % of a core, about 5 points in all):
+
+| Function | Thread | | |
+|---|---|---|---|
+| `dsp_fft` | note detection | 2.0 | relaxed: bit reversal and FFT passes in one function, Learn & Play's `0x13f23e0` and `0x13f2d50` |
+| `delay_network_wide` | Wwise | 0.5 | relaxed: the delay network |
+| `biquad_block`, `biquad_scalar` | Wwise | 0.5 | relaxed |
+| `level_shaper`, `compressor_gain`, `biquad_cascade`, `mix_stereo_ramp`, `biquad_direct` | Wwise | 0.9 | relaxed: mixes and filters |
+| `fft_work`, `fft_bfly_generic`, `fft_complex_mac` | Wwise | 0.4 | relaxed; `___stack_chk_fail` joined `PURE_IMPORTS` for the stack guard |
+| `F_100a6dc96` | Wwise | 0.4 | left out: indirect calls |
+| `F_10010bbc0` | note detection | 0.2 | left out: calls `vpowf` and code that isn't relaxed |
+
+None of the 12 sets a static's guard: none writes through a RIP-relative address. `parametric_eq_biquad`, on the list already, is the thread's largest at 36%.
+
+The game thread, 30 of the 46 points, has no such target. Its profile is flat: 66% in translated game code with no function over 2.5%. What stands out is on the
+Metal side, each about a point of a core or a little more: Objective-C retain, release and message sends (5.5% of the thread), a render encoder for each pass
+(`renderCommandEncoderWithDescriptor`, 4.3%, under `rsm_begin_pass`'s 5.2%), and the Cg layer (3.1%). Then `memmove` at 2.6% and the import thunks (`rc_arg_i`, `rc_imp`) at 2.5%.
+`rsm_draw` is 10.3% with what it calls. The fences on this thread were not measured here; in Learn & Play they cost about 2 points of its 32.
+
+### The renderer on this route
+
+A song draws 21 passes a frame and about 250 draws (temporary counters, one run). Passes can't be merged: none follows a pass on the same target without a clear between, 0.00 a frame, as
+each draws to another texture, mostly the post effects' chain of one draw each. About 3 of the 21 are only a clear. Keeping a clear back until its target is next used would take those out,
+about 0.2 points of a core by their share of the encoder time, but it has to hold against every read of the target; not done.
+
+What was done is less work for each pass and each GL call: one `MTLRenderPassDescriptor` for all passes instead of a new one, and lookups that take no reference (`rsm_get`, `rsm_map_get`,
+the texture, buffer, uniform and query calls), with the context and objects in `__unsafe_unretained` locals where the name tables keep them alive. A function that creates what it looks up keeps a
+strong local: an unretained one frees the new object at once. The game thread went from 30.1 to 29.5 points, again within the noise of one run each, and the profile agrees: the Objective-C runtime
+fell from 4.0% of the thread to 0.9%. The encoder itself stays: `renderCommandEncoderWithDescriptor` is Metal's own work.
+
+From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame. Learn & Play draws through the same code; its route was not run with it.
+
 ## Hook points
 
 Unchanged for this edition: the hook table is built in as it always was, and a function without hooks is called as
@@ -177,8 +239,8 @@ write it elsewhere, set the path before starting the launcher and keep `%c` in i
 `launchctl setenv LLVM_PROFILE_FILE "$HOME/Library/Application Support/RS Re-ARMed/logs/rs-%p%c.profraw"`
 (`launchctl unsetenv LLVM_PROFILE_FILE` afterwards). A profile stays usable after small source changes.
 
-**`RC_RELAXED`** (on by default): the Wwise effect kernels listed in `tools/targets/names/relaxed.list` are
+**`RC_RELAXED`** (on by default): the Wwise effect kernels and the note detector's window and FFT listed in `tools/targets/names/relaxed.list` are
 translated without a memory fence per access, which was about half their time; they fence at entry and
 exit instead. `RC_RELAXED=0` fences them too, for tracking down a suspected memory-ordering problem. Learn & Play's are by address, in
 `tools/targets/win-x86/relaxed.map`. The rest of what it gained has no counterpart here: this edition's game is SSE code, inlines its indirect calls and
-has the host's `memcpy`. Whether more of this edition's Wwise functions can be relaxed the same way has not been looked at.
+has the host's `memcpy`. The hottest of the rest of this edition's audio functions were added on Learn & Play's route: [what that gave](#learn--plays-route).

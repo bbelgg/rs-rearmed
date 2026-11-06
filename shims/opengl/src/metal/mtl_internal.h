@@ -77,9 +77,12 @@ typedef struct {
     uint32_t next;  // lowest name that may be free
 } rsm_names;
 
-static inline id rsm_get(const rsm_names *t, GLuint n) {
-    return n && n < t->cap ? (__bridge id)t->objs[n] : nil;
+// The table's own reference, with no retain or autorelease: these lookups run many times a frame, so a caller
+// that only uses the object during the call takes it in an __unsafe_unretained local.
+static inline void *rsm_get_(const rsm_names *t, GLuint n) {
+    return n && n < t->cap ? t->objs[n] : NULL;
 }
+#define rsm_get(t, n) ((__bridge id)rsm_get_((t), (n)))
 GLuint rsm_names_alloc(rsm_names *t);
 void rsm_names_set(rsm_names *t, GLuint n, id obj);  // nil frees the name
 void rsm_names_clear(rsm_names *t);
@@ -92,7 +95,8 @@ typedef struct {
     void **vals;
 } rsm_map;
 void rsm_map_init(rsm_map *m, uint32_t key_size);
-id rsm_map_get(rsm_map *m, const void *key);
+void *rsm_map_get_(rsm_map *m, const void *key);  // the map's own reference, as rsm_get
+#define rsm_map_get(m, key) ((__bridge id)rsm_map_get_((m), (key)))
 void rsm_map_put(rsm_map *m, const void *key, id val);
 void rsm_map_free(rsm_map *m);
 uint64_t rsm_hash(const void *p, size_t n);
@@ -361,6 +365,11 @@ typedef struct {
     int pass_w, pass_h;            // render target size of the open/next pass
     id<MTLTexture> pass_color, pass_depth, pass_stencil;
     int pass_color_level, pass_color_slice;
+    // One descriptor for every pass: a new one per pass costs more than the encoder's own setup on this side.
+    MTLRenderPassDescriptor *pass_desc;
+    MTLRenderPassColorAttachmentDescriptor *pass_desc_color;
+    MTLRenderPassDepthAttachmentDescriptor *pass_desc_depth;
+    MTLRenderPassStencilAttachmentDescriptor *pass_desc_stencil;
 
     // Draw state cache (valid while `enc` is open).
     unsigned dirty;

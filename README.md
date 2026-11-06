@@ -88,7 +88,7 @@ port.
 | Shaders prepared at install | ✅ | ✅ |
 | Installer app and install script | ✅ | ✅ |
 | Game image made on the Mac, with nothing from the user | ✅ | ✅ |
-| Performance | ✅ about Rosetta's CPU | ✅ the display's frame rate, about 10% more CPU than the Mac port by estimate, and more memory ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
+| Performance | ✅ about Rosetta's CPU | ✅ the display's frame rate, about 17% more CPU than the Mac port on one route, and more memory ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 
 ¹ The Windows game reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC
 has both, and the installer has Steam fetch every DLC the account owns. Custom songs often exist for one platform only.

@@ -58,10 +58,11 @@ def _relaxed():
 RELAXED = _relaxed()
 
 # Imports a relaxed function may call without fences around the call: native functions that
-# touch no guest memory beyond their arguments' buffers and never call back into guest code.
+# touch no guest memory beyond their arguments' buffers and never call back into guest code
+# (___stack_chk_fail ends the game, so it never comes back at all).
 PURE_IMPORTS = {
     "_expf", "_exp", "_log10", "_log10f", "_logf", "_log", "_powf", "_pow", "_sqrtf", "_sqrt",
     "_cosf", "_cos", "_sinf", "_sin", "_floorf", "_floor", "_ceilf", "_ceil", "_fabsf", "_fabs",
     "_tanf", "_tan", "_atan2f", "_atan2", "___exp10", "___exp10f", "_vcosf", "_vsinf", "___bzero",
-    "_memset", "_memcpy", "_memmove",
+    "_memset", "_memcpy", "_memmove", "___stack_chk_fail",
 }

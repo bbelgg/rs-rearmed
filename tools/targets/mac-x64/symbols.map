@@ -78,6 +78,7 @@ num_rehash                                                       0x1000f9920  sy
 property_object_ctor                                             0x1000f9ad0  sysv  void(void *obj)
 json_number_base_ctor                                            0x100105620  sysv  void(void *obj)
 json_number_base_dtor                                            0x100105640  sysv  void *(void *obj)
+dsp_fft                                                          0x10010c6f0  sysv  -
 dsp_analysis_window                                              0x10010da10  sysv  -
 PostEffectColorCorrect_QueryInterface                            0x100116be0  sysv  -
 PostEffectColorCorrect_QueryInterface_const                      0x100116c40  sysv  -
@@ -373,11 +374,18 @@ FrkService_QueryInterface                                        0x100a53270  sy
 FrkService_QueryInterface_const                                  0x100a532d0  sysv  -
 NiFrkParticleEffectModel_QueryInterface                          0x100a53fb0  sysv  -
 NiFrkParticleEffectModel_QueryInterface_const                    0x100a54010  sysv  -
+compressor_gain                                                  0x100a64504  sysv  -
+fft_work                                                         0x100a64e0c  sysv  -
+fft_bfly_generic                                                 0x100a660a4  sysv  -
+fft_complex_mac                                                  0x100a68f36  sysv  -
 expander_gain                                                    0x100a6a27c  sysv  -
 ak_buffer_zero_pad                                               0x100a6c5dc  sysv  -
+delay_network_wide                                               0x100a77182  sysv  -
 meter_peak_rms                                                   0x100a7f880  sysv  -
 parametric_eq_biquad                                             0x100a9a508  sysv  -
 peak_limiter_follower                                            0x100a9ae44  sysv  -
+biquad_block                                                     0x100aa2940  sysv  -
+biquad_scalar                                                    0x100aa2ca0  sysv  -
 roomverb_allpass                                                 0x100aa3914  sysv  -
 roomverb_early_reflections                                       0x100aa4208  sysv  -
 roomverb_fdn                                                     0x100aa4a60  sysv  -
@@ -390,10 +398,14 @@ ak_set_rtpc_name                                                 0x100ab1b20  sy
 ak_post_event_name                                               0x100ab2c60  sysv  uint32_t(const char *event, uint64_t game_object, ...)
 ak_render_loop                                                   0x100ab7200  sysv  void(void *engine)
 ak_lengine_thread                                                0x100b049b0  sysv  -
+mix_stereo_ramp                                                  0x100b08550  sysv  -
 vorbis_huffman_decode                                            0x100b2e350  sysv  -
 vorbis_codebook_decode_vq                                        0x100b2e570  sysv  -
 vorbis_bits_look                                                 0x100b2f480  sysv  -
 vorbis_bits_adv                                                  0x100b2f510  sysv  -
+level_shaper                                                     0x100b3bbf0  sysv  -
+biquad_direct                                                    0x100b3c90a  sysv  -
+biquad_cascade                                                   0x100b3cbe0  sysv  -
 jpeg_CreateDecompress                                            0x100b40bf0  sysv  void(j_decompress_ptr, int, size_t)
 jpeg_finish_decompress                                           0x100b41030  sysv  boolean(j_decompress_ptr)
 jpeg_read_header                                                 0x100b41100  sysv  int(j_decompress_ptr, boolean)

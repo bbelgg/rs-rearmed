@@ -196,6 +196,12 @@ user's, with a test profile.
   Return (no match: the box stays open), `i`; a click, `i`. The same dylib ran the same route in Learn & Play ([Windows
   testing](../windows/TESTING.md#unattended-runs)), with the same SHA-256 in both logs and the same results but for the lyrics (Learn & Play's test song has no lyric steps). Keep a copy of
   `steam/`: Return on ProfileSelect with no profile starts the first-time screens, and `fwddelete` there deletes the profile.
+- **The measured route** (2026-11-06, for [Learn & Play's route](PERFORMANCE.md#learn--plays-route): the executable started directly, `RS_FULLSCREEN=0`, a test home with APFS
+  clones of the game files, a copy of a test profile with a DIRECT CONNECT input): Cherub Rock is DLC, so `dlc/cherubrock_m.psarc` has to be in the home's `dlc/`, and with no other
+  file there the main menu is up 25 s after the profile. With `front` 1 s before each step: 16 s after the start Return on the title, 9 s, Return on the profile, 28 s, Return on LEARN A SONG,
+  10 s, `key /`, 2 s, `text cherub`, 11 s, Return on the match, 7 s, Return on Play Song, 29 s, `key fwddelete`, 4 s, Return: the highway within 30 s, and the window starts 46 s after that Return. To take the UR22mkII
+  on such a profile: Ctrl, Down twice to AVAILABLE INPUTS, Return, Down to it, Return, Esc; a normal quit saves it. Snapshots every 265 s give one look at the highway after the window
+  without one in it. Check the route by snapshots first, as `fwddelete` on ProfileSelect deletes the profile.
 - **Keys and the focus**: without `RS_KEY_DIRECT=1` a key goes to the window only while the game has the focus, and
   any other app coming forward loses it quietly (`[rsmods] key down` is missing from the log). With it, keys arrive
   in front or not. Search text then still needs 1.5 s between letters.

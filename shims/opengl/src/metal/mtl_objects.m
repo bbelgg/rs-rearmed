@@ -148,7 +148,7 @@ GLboolean rsmtl_glIsBuffer(GLuint name) {
     return b && b->bound;
 }
 
-static GLuint *rsm_buffer_binding(RSMContext *ctx, GLenum target) {
+static GLuint *rsm_buffer_binding(__unsafe_unretained RSMContext *ctx, GLenum target) {
     switch (target) {
     case GL_ARRAY_BUFFER: return &ctx->array_buffer;
     case GL_ELEMENT_ARRAY_BUFFER: return &ctx->vao->element_buffer;
@@ -164,9 +164,11 @@ void rsmtl_glBindBuffer(GLenum target, GLuint buffer) {
     GLuint *slot = rsm_buffer_binding(ctx, target);
     if (!slot)
         return;
-    RSMBuffer *b = nil;
+    __unsafe_unretained RSMBuffer *b = nil;
     if (buffer) {
-        b = rsm_buffer(ctx, buffer);
+        b = rsm_get(&ctx->buffers, buffer);
+        if (!b)
+            b = rsm_buffer(ctx, buffer);
         b->bound = true;
     }
     *slot = buffer;
@@ -174,16 +176,17 @@ void rsmtl_glBindBuffer(GLenum target, GLuint buffer) {
         ctx->vao->element_obj = b;
 }
 
-static RSMBuffer *rsm_bound_buffer(RSMContext *ctx, GLenum target) {
+static void *rsm_bound_buffer_(__unsafe_unretained RSMContext *ctx, GLenum target) {
     GLuint *slot = rsm_buffer_binding(ctx, target);
     if (!slot)
-        return nil;
+        return NULL;
     // The VAO's element buffer is the object it bound (its name may have been deleted and reused since).
-    RSMBuffer *b = target == GL_ELEMENT_ARRAY_BUFFER ? ctx->vao->element_obj : rsm_get(&ctx->buffers, *slot);
+    __unsafe_unretained RSMBuffer *b = target == GL_ELEMENT_ARRAY_BUFFER ? ctx->vao->element_obj : rsm_get(&ctx->buffers, *slot);
     if (!b)
         rsm_error(ctx, GL_INVALID_OPERATION);
-    return b;
+    return (__bridge void *)b;
 }
+#define rsm_bound_buffer(ctx, target) ((__bridge RSMBuffer *)rsm_bound_buffer_((ctx), (target)))
 
 static void rsm_buffer_modified(RSMContext *ctx, RSMBuffer *b, size_t off, size_t len) {
     if (ctx->buf_opts & MTLResourceStorageModeManaged)
@@ -244,7 +247,7 @@ void rsmtl_glBufferData(GLenum target, GLsizeiptr size, const GLvoid *data, GLen
 
 void rsmtl_glBufferSubData(GLenum target, GLintptr offset, GLsizeiptr size, const GLvoid *data) {
     RSM_CTX()
-    RSMBuffer *b = rsm_bound_buffer(ctx, target);
+    __unsafe_unretained RSMBuffer *b = rsm_bound_buffer(ctx, target);
     if (!b)
         return;
     if (offset < 0 || size < 0 || (size_t)(offset + size) > b->size) {
@@ -361,13 +364,14 @@ GLboolean rsmtl_glIsVertexArray(GLuint array) {
     return v && v->bound;
 }
 
-static void rsm_attrib_pointer(RSMContext *ctx, GLuint index, GLint size, GLenum type,
+static void rsm_attrib_pointer(__unsafe_unretained RSMContext *ctx, GLuint index, GLint size, GLenum type,
                                bool normalized, GLsizei stride, const GLvoid *ptr) {
     if (index >= RSM_MAX_ATTRIBS || stride < 0 || ((size < 1 || size > 4) && size != GL_BGRA)) {
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
-    rsm_attrib *a = &ctx->vao->a[index];
+    __unsafe_unretained RSMVertexArray *v = ctx->vao;
+    rsm_attrib *a = &v->a[index];
     a->size = size;
     a->type = type;
     a->normalized = normalized || size == GL_BGRA;
@@ -384,13 +388,14 @@ void rsmtl_glVertexAttribPointer(GLuint index, GLint size, GLenum type, GLboolea
     rsm_attrib_pointer(ctx, index, size, type, normalized != 0, stride, pointer);
 }
 
-static void rsm_attrib_enable(RSMContext *ctx, GLuint index, bool on) {
+static void rsm_attrib_enable(__unsafe_unretained RSMContext *ctx, GLuint index, bool on) {
     if (index >= RSM_MAX_ATTRIBS) {
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
-    if (ctx->vao->a[index].enabled != on) {
-        ctx->vao->a[index].enabled = on;
+    __unsafe_unretained RSMVertexArray *v = ctx->vao;
+    if (v->a[index].enabled != on) {
+        v->a[index].enabled = on;
         ctx->dirty |= RSM_DIRTY_VERTEX;
     }
 }
@@ -1159,7 +1164,9 @@ void rsmtl_glBindTexture(GLenum target, GLuint texture) {
         return;
     }
     if (texture) {
-        RSMTexture *t = rsm_texture(ctx, texture);
+        __unsafe_unretained RSMTexture *t = rsm_get(&ctx->textures, texture);
+        if (!t)
+            t = rsm_texture(ctx, texture);
         if (t->target && t->target != target) {
             rsm_error(ctx, GL_INVALID_OPERATION);
             return;
@@ -1173,7 +1180,7 @@ void rsmtl_glBindTexture(GLenum target, GLuint texture) {
     }
 }
 
-static RSMTexture *rsm_bound_texture(RSMContext *ctx, GLenum target, int *face) {
+static void *rsm_bound_texture_(__unsafe_unretained RSMContext *ctx, GLenum target, int *face) {
     *face = 0;
     if (target == GL_TEXTURE_1D)
         target = GL_TEXTURE_2D;
@@ -1187,22 +1194,23 @@ static RSMTexture *rsm_bound_texture(RSMContext *ctx, GLenum target, int *face) 
         *face = (int)(target - GL_TEXTURE_CUBE_MAP_POSITIVE_X);
     } else {
         rsm_error(ctx, GL_INVALID_ENUM);
-        return nil;
+        return NULL;
     }
-    RSMTexture *t = rsm_get(&ctx->textures, name);
+    void *t = rsm_get_(&ctx->textures, name);
     if (!t)
         rsm_error(ctx, GL_INVALID_OPERATION);  // texture object 0: not supported
     return t;
 }
+#define rsm_bound_texture(ctx, target, face) ((__bridge RSMTexture *)rsm_bound_texture_((ctx), (target), (face)))
 
 // --- Texture parameters / samplers ------------------------------------------------------
-static void rsm_tex_param(RSMContext *ctx, GLenum target, GLenum pname, float v) {
+static void rsm_tex_param(__unsafe_unretained RSMContext *ctx, GLenum target, GLenum pname, float v) {
     int face;
     if (target != GL_TEXTURE_2D && target != GL_TEXTURE_CUBE_MAP && target != GL_TEXTURE_1D) {
         rsm_error(ctx, GL_INVALID_ENUM);
         return;
     }
-    RSMTexture *t = rsm_bound_texture(ctx, target, &face);
+    __unsafe_unretained RSMTexture *t = rsm_bound_texture(ctx, target, &face);
     if (!t)
         return;
     rsm_texparams p = t->p;

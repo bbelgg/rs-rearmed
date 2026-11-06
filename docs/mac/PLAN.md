@@ -48,6 +48,11 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
   UR22mkII to the note highway. Learn & Play skips it too ([Windows plan](../windows/PLAN.md#status)). Not in this pass: a Real
   Tone cable or Microphone profile, an install by the installer app.
 
+- **CPU in a song** (2026-11-06, a test home, started directly): 6.1 ms a frame on [Learn & Play's route](PERFORMANCE.md#learn--plays-route), 45% of a core, measured
+  for the first time, against its 7.2 ms. 12 more functions are relaxed (the note detector's FFT, Wwise mixes, filters and delay network), and the Metal layer reuses one pass
+  descriptor and takes no references in its hot lookups: 0.6 points of a core each, within the noise of one run. Played with a guitar on this build, installed by `install.sh`, by the maintainer's own check. Not in this pass: an
+  install by the installer app. Learn & Play has its own relaxed list by address, and the same renderer: its host test passes, its route was not run with it.
+
 ## Open issues
 
 - **The title screen's own Auto Save call**: in Learn & Play the title has a second call of the dialog, behind the same sign-in event and a byte no

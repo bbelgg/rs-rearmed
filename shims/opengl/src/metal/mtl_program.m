@@ -78,8 +78,8 @@ static RSMShader *rsm_shader(RSMContext *ctx, GLuint name) {
     return o;
 }
 
-static RSMProgram *rsm_program(RSMContext *ctx, GLuint name) {
-    id o = rsm_get(&ctx->objects, name);
+static RSMProgram *rsm_program(__unsafe_unretained RSMContext *ctx, GLuint name) {
+    __unsafe_unretained id o = rsm_get(&ctx->objects, name);
     if (![o isKindOfClass:[RSMProgram class]]) {
         rsm_error(ctx, o ? GL_INVALID_OPERATION : GL_INVALID_VALUE);
         return nil;
@@ -440,7 +440,7 @@ bool rsm_program_ready(RSMContext *ctx, RSMProgram *p, bool wait) {
 
 void rsmtl_glUseProgram(GLuint program) {
     RSM_CTX()
-    RSMProgram *p = nil;
+    __unsafe_unretained RSMProgram *p = nil;
     if (program) {
         p = rsm_program(ctx, program);
         if (!p)
@@ -575,7 +575,7 @@ enum { U_FLOAT, U_INT, U_MAT };
 // Write `count` elements of `comps` components starting at location `loc`.
 static void rsm_set_uniform(GLint loc, GLsizei count, int kind, int comps, const void *data, bool transpose) {
     RSM_CTX()
-    RSMProgram *p = ctx->prog;
+    __unsafe_unretained RSMProgram *p = ctx->prog;
     if (!p) {
         rsm_error(ctx, GL_INVALID_OPERATION);
         return;

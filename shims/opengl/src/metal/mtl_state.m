@@ -442,7 +442,7 @@ static void qf(rsm_q *q, int kind, int n, const float *v) {
         q->v[i] = v[i];
 }
 
-static bool rsm_query(RSMContext *ctx, GLenum pname, rsm_q *q) {
+static bool rsm_query(__unsafe_unretained RSMContext *ctx, GLenum pname, rsm_q *q) {
     memset(q, 0, sizeof *q);
     unsigned dummy;
     bool *cap = rsm_cap(ctx, pname, &dummy);

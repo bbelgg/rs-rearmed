@@ -25,7 +25,7 @@ Checked by hand on an Apple Silicon Mac (2026-11-01):
 - window and full screen (the in-game Windowed Mode switch was checked from screenshots of a scripted run).
 
 Performance: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms. CPU per frame went from 9.4 to 7.2 ms on one route, 70% to 54% of a
-core (2026-11-06, [PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)); the Mac on that route is estimated at 6.6 ms, not measured. The install prepares the shaders:
+core (2026-11-06, [PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)); the Mac on that route is [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The renderer has had a change since that this figure doesn't have: fewer references and one pass descriptor, its host test passed, no run here. The install prepares the shaders:
 the first play after it has about 1.2 s more of frames over 33 ms up to the highway than the second, and none in the
 song ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
 

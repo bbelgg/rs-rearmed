@@ -19,5 +19,18 @@ vorbis_codebook_decode_vq   # Vorbis: decode one codebook entry and dequantise i
 vorbis_huffman_decode       # Vorbis: Huffman decode of one codebook entry
 vorbis_bits_look            # Vorbis: bit reader, look at the next n bits
 vorbis_bits_adv             # Vorbis: bit reader, advance by n bits
-# game: the note detector's analysis window
+# Other Wwise kernels: named by their shape, not proved to be the plug-ins they look like
+compressor_gain             # level in dB by a log2 polynomial, attack/release follower and gain over every channel (calls expf)
+delay_network_wide          # SSE feedback delay network over 16 line pointers of its own object
+biquad_block                # biquad, 4 samples per step, in place; its head and tail go to biquad_scalar
+biquad_scalar               # the same biquad, a sample at a time
+biquad_direct               # biquad (direct form I), a buffer to another
+biquad_cascade              # cascaded biquads, a buffer to another
+level_shaper                # per-sample level follower, a table with interpolation and filters (calls floorf)
+mix_stereo_ramp             # two channels added into two others with a linear gain ramp
+fft_work                    # mixed-radix FFT: recursion, radix 2 to 5 inline (Kiss FFT by shape)
+fft_bfly_generic            # the same FFT's butterfly for any other radix (has a stack guard)
+fft_complex_mac             # complex multiply and accumulate of two spectra
+# game: the note detector
 dsp_analysis_window         # analysis window: buffer *= raised cosine, 4 samples per step (calls vcosf)
+dsp_fft                     # complex FFT: bit reversal, radix-2 passes, twiddles by recurrence (calls bzero, sinf, cosf)

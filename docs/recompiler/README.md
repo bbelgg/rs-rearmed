@@ -102,7 +102,7 @@ its built-in fixes still name addresses in `win32_overrides.c`.
 `gen_image.py IMAGE OUT [--skip FILE]... [--o1 FILE] [--tso-ranges FILE] [--target T]` translates every
 function start in `__text`. Memory ordering: x86 is TSO and arm64 is not, so translation units get
 `-DRC_MO_TSO` and their memory accesses are fenced, except RIP-relative loads from sections nothing writes
-after load (`RC_LDC`) and the functions in `tools/targets/names/relaxed.list` (audio kernels, fenced only at
+after load (`RC_LDC`) and the functions in `tools/targets/names/relaxed.list` (audio and note detection kernels, fenced only at
 entry and exit; `RC_RELAXED=0` fences them too). `--o1 FILE` compiles listed functions alone at `-O1`.
 `build/README.md` lists the build's switches ([tools/ws7/recomp/build/README.md](../../tools/ws7/recomp/build/README.md)).
 

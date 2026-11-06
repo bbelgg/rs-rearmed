@@ -825,6 +825,55 @@ static void case_fbo(void) {
     glok("fbo");
 }
 
+// One pass descriptor serves every pass (mtl_draw.m): a pass gets its own attachments and load actions,
+// whatever the pass before it had. Colour and depth, then colour only, then depth as well on a smaller target,
+// then the first again with no clear: nothing of the passes between may stay.
+static void case_pass_targets(void) {
+    GLuint c1, ds1, c3, ds3;
+    GLuint fbo1 = make_fbo(&c1, &ds1, W, H);
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    glClearColor(1, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    uniform4(p, "color", 0, 1, 0, 1);
+    draw_rect(0, 0, 8, 8);
+    GLuint c2 = texture_rgba(W, H, NULL, GL_NEAREST), fbo2;
+    glGenFramebuffers(1, &fbo2);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo2);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, c2, 0);
+    check(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "colour-only FBO complete");
+    glClearColor(0, 0, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    uniform4(p, "color", 1, 1, 0, 1);
+    draw_rect(8, 8, 16, 16);
+    GLuint fbo3 = make_fbo(&c3, &ds3, 32, 32);
+    glViewport(0, 0, 32, 32);
+    glClearColor(1, 1, 1, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    draw_rect(0, 0, W, H);
+    glViewport(0, 0, W, H);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo1);
+    uniform4(p, "color", 1, 0, 1, 1);
+    draw_rect(16, 16, 24, 24);
+    snap();
+    check_px(60, 60, 255, 0, 0, 255, "first target kept with no clear");
+    check_px(4, 4, 0, 255, 0, 255, "first target's first draw kept");
+    check_px(20, 20, 255, 0, 255, 255, "first target drawn again");
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo2);
+    snap();
+    check_px(60, 60, 0, 0, 255, 255, "colour-only target cleared");
+    check_px(12, 12, 255, 255, 0, 255, "colour-only target drawn");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo1);
+    glDeleteFramebuffers(1, &fbo2);
+    glDeleteFramebuffers(1, &fbo3);
+    glDeleteRenderbuffers(1, &ds1);
+    glDeleteRenderbuffers(1, &ds3);
+    glDeleteTextures(1, &c1);
+    glDeleteTextures(1, &c2);
+    glDeleteTextures(1, &c3);
+    glok("pass targets");
+}
+
 static void case_render_to_texture(void) {
     GLuint color, ds;
     GLuint fbo = make_fbo(&color, &ds, 32, 32);
@@ -2147,6 +2196,7 @@ static const test_case kCases[] = {
     {"scissor", case_scissor, 0},
     {"viewport", case_viewport, 2},
     {"fbo", case_fbo, 0},
+    {"pass_targets", case_pass_targets, 0},
     {"render_to_texture", case_render_to_texture, 0},
     {"depth_texture", case_depth_texture, 1},
     {"cube_map", case_cube_map, 0},

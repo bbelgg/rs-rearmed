@@ -243,7 +243,7 @@ import (`_CIsqrt`, `_CIlog`, `_CIlog10`, `_CIexp`, `_CIsin`, `_CIcos`, `_CItan`,
 MSVC's indefinite NaN) and its calling convention (`st(0)` in and out for the `_CI` functions). Every
 image's import of an export, a function pointer to it and an alias reach the override; msvcr100's own
 internal calls keep the translated code. Measured against the translated SSE2 paths: within 4 ulp, 2-6
-times faster; the note-detection thread uses 30% less CPU. `LP_NATIVE_MATH=0` turns them off.
+times faster; the note-detection thread uses 30% less CPU. `LP_NATIVE_MATH=0` turns them off. `memcpy`, `memmove`, `memset` and `memcpy_s` are native the same way (`LP_NATIVE_MEM=0`), fenced once around the call as a `rep movs` is.
 
 ## Audio
 

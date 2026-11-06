@@ -474,6 +474,7 @@ int main(int argc, char **argv) {
   }
   // native libm for msvcr100's _CIpow & co. (docs/windows/DESIGN.md "Libraries"), before the binding
   fprintf(stderr, "lp: %d native msvcr100 math overrides\n", w32_crtmath_register());
+  fprintf(stderr, "lp: %d native msvcr100 memory overrides\n", w32_crtmem_register());
   if (rc32_images_bind()) {
     fprintf(stderr, "lp: cannot bind the imports\n");
     return 1;

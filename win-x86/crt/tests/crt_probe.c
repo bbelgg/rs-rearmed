@@ -440,6 +440,7 @@ int main(int argc, char **argv) {
 #endif
   rc32_image_alias("msvcr100.dll", "msvcrt.dll");  // as d3dx9_42 imports it
   fprintf(stderr, "%d native math overrides\n", w32_crtmath_register());  // as lp_main does
+  fprintf(stderr, "%d native memory overrides\n", w32_crtmem_register());
   crt_math_probe_setup();
   if (rc32_images_bind()) { fprintf(stderr, "cannot bind the imports\n"); return 2; }
   crt_base = rc32_image_base("msvcr100.dll");
@@ -474,6 +475,18 @@ int main(int argc, char **argv) {
   CHECK(call("strcmp", 2, p, s) == 0);
   CHECK(call("_stricmp", 2, w32_gstr("ABC"), w32_gstr("abc")) == 0);
   CHECK(call("strchr", 2, s, ' ') == s + 9);
+  {  // the native exports (w32_crtmem_register): the CRT's contracts, overlap and the errors of memcpy_s
+    uint32_t b = gbuf(64);
+    char *h = (char *)RC32_H(b);
+    CHECK(call("memset", 3, b, 0x141, 64) == b && h[0] == 'A' && h[63] == 'A');
+    CHECK(call("memcpy", 3, b, s, 9) == b && !memcmp(h, "Rocksmith", 9));
+    CHECK(call("memcpy", 3, b + 2, b, 9) == b + 2 && !memcmp(h + 2, "Rocksmith", 9));   // the CRT's copes with overlap
+    CHECK(call("memmove", 3, b, b + 2, 9) == b && !memcmp(h, "Rocksmith", 9));
+    CHECK(call("memcpy_s", 4, b, 64, s, 14) == 0 && !memcmp(h, "Rocksmith 2014", 14));
+    CHECK(call("memcpy_s", 4, 0, 0, 0, 0) == 0);
+    CHECK(call("memcpy_s", 4, b, 4, s, 14) == 34 && h[0] == 0 && h[3] == 0 && h[4] == 's');
+    CHECK(call("memcpy_s", 4, b, 4, 0, 1) == 22);
+  }
   uint32_t q = call("realloc", 2, p, 4000);
   CHECK(q && !strcmp((const char *)RC32_H(q), "Rocksmith 2014"));
   call("memset", 3, q, 'x', 3000);

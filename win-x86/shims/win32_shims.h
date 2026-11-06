@@ -116,6 +116,7 @@ static inline const char *w32_cstr(uint32_t g) { return g ? (const char *)RC32_H
 // them out (the translated CRT runs). Returns how many it registered. w32_crtmath_fn: one of
 // them by export name, 0 when it has none (tests).
 int w32_crtmath_register(void);
+int w32_crtmem_register(void);   // memcpy, memmove, memset, memcpy_s; LP_NATIVE_MEM=0 leaves them out
 rc_fn w32_crtmath_fn(const char *name);
 
 // Debug output (LP_LOG): 0 quiet, 1 first call of each import, 2 every call

@@ -29,6 +29,7 @@
 #include "rc32_x87.h"
 #include "win32_shims.h"
 
+#define W32_EINVAL 22
 #define W32_EDOM 33
 #define W32_ERANGE 34
 
@@ -244,6 +245,66 @@ static const struct { const char *name; rc_fn fn; } overrides[] = {
     {"log", c_log}, {"ceil", c_ceil}, {"floor", c_floor}, {"modf", c_modf}, {"frexp", c_frexp},
     {"ldexp", c_ldexp}, {"_isnan", c_isnan}, {"_finite", c_finite},
 };
+
+// --- memory -------------------------------------------------------------------------------------
+// The CRT's copy and fill as host calls: the translated ones go a dword at a time through jump tables, with a fence
+// for each access, and the game copies through memcpy_s all the time. Fenced once around the call, as a
+// `rep movs` is (rc32_gen.h): each RC_LD is followed by a load fence and each RC_ST preceded by a store fence,
+// so the two ends need only the other half. The CRT's memcpy copes with overlap, as memmove does.
+static inline void mem_fence_in(void) { __asm__ volatile("dmb ishst" ::: "memory"); }
+static inline void mem_fence_out(void) { __asm__ volatile("dmb ishld" ::: "memory"); }
+
+static void c_memmove(rc_ctx *c) {
+  uint32_t d = carg_u(c, 0), s = carg_u(c, 4), n = carg_u(c, 8);
+  mem_fence_in();
+  memmove(RC32_H(d), RC32_H(s), n);
+  mem_fence_out();
+  c->r[0] = d;
+  crt_ret(c);
+}
+static void c_memset(rc_ctx *c) {
+  uint32_t d = carg_u(c, 0), v = carg_u(c, 4), n = carg_u(c, 8);
+  mem_fence_in();
+  memset(RC32_H(d), (int)(v & 0xff), n);
+  mem_fence_out();
+  c->r[0] = d;
+  crt_ret(c);
+}
+// memcpy_s: as the CRT does (its invalid parameter handler aside, which ends a Windows process with the defaults),
+// nothing for a count of 0, EINVAL for a null, the destination cleared and ERANGE or EINVAL for what doesn't fit.
+static void c_memcpy_s(rc_ctx *c) {
+  uint32_t d = carg_u(c, 0), size = carg_u(c, 4), s = carg_u(c, 8), n = carg_u(c, 12), r = 0;
+  if (n) {
+    if (!d) r = W32_EINVAL;
+    else if (!s || size < n) {
+      memset(RC32_H(d), 0, size);
+      r = s ? W32_ERANGE : W32_EINVAL;
+    } else {
+      mem_fence_in();
+      memmove(RC32_H(d), RC32_H(s), n);
+      mem_fence_out();
+    }
+    if (r) set_errno(c, (int)r);
+  }
+  c->r[0] = r;
+  crt_ret(c);
+}
+
+static const struct { const char *name; rc_fn fn; } mem_overrides[] = {
+    {"memcpy", c_memmove}, {"memmove", c_memmove}, {"memset", c_memset}, {"memcpy_s", c_memcpy_s},
+};
+
+int w32_crtmem_register(void) {
+  const char *off = getenv("LP_NATIVE_MEM");
+  if (off && off[0] == '0') {
+    fprintf(stderr, "lp: msvcr100 memory exports run translated (LP_NATIVE_MEM=0)\n");
+    return 0;
+  }
+  int n = 0;
+  for (size_t k = 0; k < sizeof mem_overrides / sizeof mem_overrides[0]; k++)
+    n += !rc32_override_add("msvcr100.dll", mem_overrides[k].name, mem_overrides[k].fn);
+  return n;
+}
 
 rc_fn w32_crtmath_fn(const char *name) {
   for (size_t k = 0; k < sizeof overrides / sizeof overrides[0]; k++)

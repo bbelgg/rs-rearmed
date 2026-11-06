@@ -41,7 +41,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 |---|---|---|
 | Songs, Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons with video | ✅ | ✅ |
 | Rocksmith Workshop, tone designer | ⚠️ | ✅ the tone designer opens |
-| Multiplayer (local), each player on any input | ✅ | ✅ |
+| Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 15 of the 18 hook points and the overlay API |
 | RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods |

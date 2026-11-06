@@ -278,8 +278,9 @@ again. `RS_AUDIO_INPUT_CHANNEL`, `RS_AUDIO_INPUT_GAIN_DB` (for every device), `R
 
 Each player's input is in their own profile. Load the profile on its own, set Path/Input to DIRECT CONNECT or MICROPHONE, pick the
 input, and leave through the menus so it saves. In MULTIPLAYER each player then has their own: `HX Stomp channel 5` for Player 1 and
-`HX Stomp channel 6` for Player 2, say, or two interfaces, or a cable and an interface. A profile on REAL TONE CABLE needs a
-cable, as in the original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them.
+`HX Stomp channel 6` for Player 2, say. Two interfaces, or a cable and an interface, go the same way but haven't been played yet. A
+profile on REAL TONE CABLE needs a cable, as in the original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them; on interfaces that hasn't been played
+in this edition yet.
 
 For two channels of one interface, leave `Channel` out of `guitar-input.ini` for it, so its channels are listed.
 `RS_MODS_MULTIPLAYER=0` is the original rule: Player 2 takes a Real Tone cable only.

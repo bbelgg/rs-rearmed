@@ -12,7 +12,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **Mods**: 15 of the 18 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). RSMods' `rearmed-mods.dylib` 0.3.0 runs as the same file, all 19 mods on. No mod code runs without the network guard.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
-  [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). That figure predates the renderer's last change (fewer references, one pass descriptor), which played fine by the maintainer's own check but hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
+  [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
   (`win-x86/harvest/rsharvest2.exe`), and Rocksmith 1 DLC songs in a game run (`test_steam32` covers `RS_STEAM_OWNED`; the test account owns none).
 - **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 966 of the 1,165 symbols and 78 of the 99 offsets are read from

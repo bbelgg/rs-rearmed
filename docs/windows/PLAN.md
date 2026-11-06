@@ -38,7 +38,7 @@ menu and a song on the highway at 60 fps, 54% of a core.
 
 Final pass for 1.5.1 (2026-11-05, the final code, `learn-play.sh`, a test home): a song to the note highway and a quit with RSMods' library, the
 same route and results as before the last fixes; a start and a clean quit without mods; nothing refused by the network guard. The 32-bit
-difftest shows only its two known mismatches, and all suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the installer app,
+difftest shows only the two mismatches known then, and all suites of [TESTING.md](TESTING.md) pass. Not in this pass: an install by the installer app,
 a real Steam download, a guitar.
 
 Final pass for 1.5.0 (2026-11-05, nothing from an earlier build): `learn-play.sh` and the installer app each installed from nothing, with the
@@ -74,8 +74,12 @@ yet: the test account owns none of those DLC. Open: one run with an account that
 
 Auto Save warning: skipped, as on the Mac (`RS_MODS_AUTOSAVE`). Checked 2026-11-06 by keyfifo, a test profile, a UR22mkII: a new
 profile goes on to the first-time questions, a DIRECT CONNECT profile to the tuner and the note highway, with no dialog either way, and the
-dialog is back with the switch off. Not in this pass: a Real Tone cable or Microphone profile. The skip is in the sign-in handler: another
-menu's tick has its own call of the same dialog, which none of these routes reached. Open: which screen that is, on both editions.
+dialog is back with the switch off. Not in this pass: a Real Tone cable or Microphone profile. The skip is in the sign-in handler. The other call of the dialog (`0x12bd061`)
+is the title screen's. Read from the code, not seen in a run: the title listens for the same `OnSignInFlowComplete` (`0x12bdd00`). With slot 0 of the
+object at `[[0x1ee0bfc] + 0x30]` set and its byte `+0x14` set, it raises a flag (title `+0x1d0`), and its tick (`0x12bcfd0`), once no dialog is open,
+shows the warning for 4 s and goes to the main menu. Otherwise it goes straight to the main menu (`0x12bdab0`). Every route tried goes
+through ProfileSelect, whose handler has the event. Open: what sets that byte, so whether a player can reach this at all; the Mac game's counterpart
+has not been read. If it is reachable, the skip needs the tick wrapped too, to clear its timer.
 
 Guest memory doesn't grow over songs in a row: 415 MB at the menu, 449 MB in the second song.
 

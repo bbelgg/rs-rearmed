@@ -50,6 +50,9 @@ The Windows port's plan: [Windows plan](../windows/PLAN.md).
 
 ## Open issues
 
+- **The title screen's own Auto Save call**: in Learn & Play the title has a second call of the dialog, behind the same sign-in event and a byte no
+  tried route sets ([Windows plan](../windows/PLAN.md#status)). This game's counterpart has not been read.
+
 - The list of inputs and the level, not checked yet: unplugging an interface while the game runs (the game's property listeners get the real device, not a channel's id), a Real Tone cable with this
   build, and the level with a second profile, which counts as calibrated with the first.
 - With the legacy fast-load `cache.psarc`, a start can stay on the white loading screen now and then (a

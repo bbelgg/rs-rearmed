@@ -400,6 +400,8 @@ To find a route rather than repeat one, `tools/ws8/keyfifo` takes keys one at a 
 Starting a run from a script: `nohup` and `env` are SIP-protected and drop `DYLD_INSERT_LIBRARIES`, so a run started through them has no keyfifo, no
 `keyfifo:` line in the log, and no key arrives. Export the variables in the shell and start the binary from it. In zsh a job started with `&` also runs at nice 5.
 
+If the log says `lp: the window is hidden` at the title, keys don't arrive, `front` and `RS_KEY_DIRECT=1` included (2026-11-07): click the window and press Return by hand, then go on.
+
 The measured route (2026-11-06, `out/rs2014_lp` started directly, a test home, a copy of a DIRECT CONNECT test profile, `RS_FULLSCREEN=0`, a
 UR22mkII): after the `dispatch callback 1101` line wait 10 s, `front`, 2 s, Return, 6 s, Return, wait for `mods: DLC:`, 12 s, `front`, Return on LEARN A SONG,
 9 s, Return on Mission Complete, 5 s, Return on New Mission, 4 s, `lpshift`, 2 s, `text cher`, 8 s, Down to Cherub Rock, 2 s, Return, 6 s, Return on Play Song, 31 s,

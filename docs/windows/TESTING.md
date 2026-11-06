@@ -397,6 +397,14 @@ To find a route rather than repeat one, `tools/ws8/keyfifo` takes keys one at a 
 ([Mac testing](../mac/TESTING.md#game-runs)): start `Contents/MacOS/rs2014_lp` with
 `RS_KEY_FIFO=FILE DYLD_INSERT_LIBRARIES=<dir>/libkeyfifo.dylib`, then `echo "key return" > FILE`.
 
+Starting a run from a script: `nohup` and `env` are SIP-protected and drop `DYLD_INSERT_LIBRARIES`, so a run started through them has no keyfifo, no
+`keyfifo:` line in the log, and no key arrives. Export the variables in the shell and start the binary from it. In zsh a job started with `&` also runs at nice 5.
+
+The measured route (2026-11-06, `out/rs2014_lp` started directly, a test home, a copy of a DIRECT CONNECT test profile, `RS_FULLSCREEN=0`, a
+UR22mkII): after the `dispatch callback 1101` line wait 10 s, `front`, 2 s, Return, 6 s, Return, wait for `mods: DLC:`, 12 s, `front`, Return on LEARN A SONG,
+9 s, Return on Mission Complete, 5 s, Return on New Mission, 4 s, `lpshift`, 2 s, `text cher`, 8 s, Down to Cherub Rock, 2 s, Return, 6 s, Return on Play Song, 31 s,
+`key fwddelete`, 4 s, Return: the note highway within 30 s. Cherub Rock needs no DLC of the test account.
+
 The screens by key (`tools/ws8/keyfifo`, the installed app, 2026-11-04): send `front` before keys, or the game takes
 none. With `LP_HOME` and a `DYLD_INSERT_LIBRARIES` of keyfifo through `open -n --env`, the title takes Return about 35 s
 after the start and the menu is up 20 s after the profile. In this edition Shift and Ctrl are `lpshift` and `lpctrl`;
@@ -508,6 +516,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `RS_AUDIO_FRAMES`, `RS_AUDIO_RT`, `RS_AUDIO_INPUT_TRIM`, `RS_AUDIO_SET_RATE` | the audio policy ([INSTALL.md](INSTALL.md#settings-and-switches)) |
 | `RS_REARMED=0` | the game's own title logo ([INSTALL.md](INSTALL.md#the-title-logo)) |
 | `LP_NATIVE_MATH=0` | the CRT's math translated instead of libm |
+| `LP_NATIVE_MEM=0` | the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` translated instead of the host's |
 | `LP_QOS=0` | the default QoS for the game's threads |
 | `LP_WAKE_ALL=1` | every wait woken on every change (the old way) |
 | `LP_D3D9_EAGER=1` | dynamic buffers uploaded at `Unlock` instead of at the draw |

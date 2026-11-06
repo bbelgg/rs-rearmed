@@ -24,8 +24,8 @@ Checked by hand on an Apple Silicon Mac (2026-11-01):
 - the sound of the intro video;
 - window and full screen (the in-game Windowed Mode switch was checked from screenshots of a scripted run).
 
-Performance: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 33 ms, at 63% of a core against the Mac
-port's 44% on the same song and screen ([PERFORMANCE.md](PERFORMANCE.md#final-pass-for-140)). The install prepares the shaders:
+Performance: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms. CPU per frame went from 9.4 to 7.2 ms on one route, 70% to 54% of a
+core (2026-11-06, [PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)); the Mac on that route is estimated at 6.6 ms, not measured. The install prepares the shaders:
 the first play after it has about 1.2 s more of frames over 33 ms up to the highway than the second, and none in the
 song ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)).
 
@@ -136,9 +136,8 @@ inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`)
   memory (`win32_guestobj.c`), but the audio and D3D9 faces still each keep their own table of objects and
   their own `IUnknown` (D3D9's also has internal references and forwarded counts).
 - Guitar latency against the Mac port has not been measured.
-- **CPU and memory**: 63% of a core against the Mac edition's 44%, and 1.3 GB against 0.8 GB, on the same song and
-  screen. How much of the CPU is the memory order at the display's rate is not measured: the only figures are at
-  120 fps ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
+- **CPU and memory**: about 0.6 ms a frame over the Mac edition by estimate, and 1.3 GB against 0.8 GB. Neither edition has been measured on the other's
+  route since the work of 2026-11-06. The memory order costs about 1 ms a frame at the display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
 - **Shaders the list doesn't have**: the corpus has the programs seen in runs, and the Guitarcade's games wait for a guitar at
   calibration, so of them it has only their effects, and of the venues (Venue Mode) one was seen, with four programs of its own. Run them
   with `LP_SHADER_LOG` and add them ([TESTING.md](TESTING.md#shaders-of-a-run)). A program not in it stalls about 0.25 s the first time, as before.
@@ -159,6 +158,16 @@ inner frames and `longjmp` work and are tested on the real CRT (`crt_probe -eh`)
   volume loaders, `D3DXSaveSurfaceToFileInMemory`, effects with textures.
 - Fixed function not implemented (logged once): vertex blending, sphere maps, bump mapping, user clip
   planes, point sprites.
+
+## Fixed since 1.6.0
+
+Not released yet, 2026-11-06:
+
+- **CPU**: 9.4 to 7.2 ms a frame on one route, frames unchanged ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). A build by hand, one run to the note
+  highway and a quit. Not in this pass: a guitar, listening to the audio, an install by the installer, Guitarcade and the other modes, a long session.
+- **The 32-bit difftest**: no mismatch on `msvcr100`, `steam_api`, `systemdetection`, `bink2w32` ([TESTING.md](TESTING.md#the-recompiler) has the
+  documented 41 and two by name). One real translation gap fixed, `steam_api`'s `log10`, in a DLL the game doesn't load.
+- **The D3D9 host test**: run against a `libRSOpenGL` built from this branch, 1,272 checks pass.
 
 ## Built in for 1.4.0
 
@@ -242,10 +251,8 @@ Goes with the same section of the [Mac plan](../mac/PLAN.md#built-in-for-160):
 
 **Guitar input:** multiplayer with any input, as in the [Mac plan](../mac/PLAN.md#next-work).
 
-**Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff:
-the x87 stack in C locals within blocks of known depth (5-10% of the game thread); the index-range scan of
-the draw-time upload; zero-copy dynamic buffers; the relaxed audio kernels; `-mno-outline` for the generated C (4% of the game thread,
-15% larger binary; on the Mac build it changes nothing, [Mac performance](../mac/PERFORMANCE.md#build-options)); memory (guest copies of D3D9 buffers).
+**Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
+Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers). And a run of both editions on one route, to replace the estimate.
 
 ## Risks
 

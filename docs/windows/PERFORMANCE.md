@@ -1,15 +1,16 @@
 # Performance of the Windows port (Learn & Play)
 
 Machine: Apple M2 (4 performance + 4 efficiency cores), 16 GB, macOS 27, Apple clang 21. The current figures are in
-[Final pass](#final-pass-for-140), [Shader preparation](#shader-preparation), [Hook points](#hook-points) and
+[Toward the Mac edition](#toward-the-mac-edition), [Final pass](#final-pass-for-140), [Shader preparation](#shader-preparation), [Hook points](#hook-points) and
 [The build](#the-build-memory-and-time). The sections from [Baseline](#baseline-as-merged) to [Under load](#under-load) are
 from 2026-11-01/02, on the built-in display at 1470x956 points and 60 Hz, and tell how the seam's two big costs were found: there "final"
 is the build of 2026-11-02, before the memory order and the intro skip, so compare within those sections only.
 
 ## Summary
 
-A song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 33 ms, at 63% of a core against the Mac build's 44% on the same
-song and screen, and 1.3 GB against 0.8 GB ([Final pass](#final-pass-for-140)). Most of the first gap to the Mac build was not translated
+A song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 54% of a core and 7.2 ms of CPU a frame on the route of
+[Toward the Mac edition](#toward-the-mac-edition), which took 70% and 9.4 ms before that work. The last figures for both editions on one song are older:
+63% against the Mac build's 44%, 8.4 ms against 5.9 ms, 1.3 GB against 0.8 GB ([Final pass](#final-pass-for-140)). Most of the first gap to the Mac build was not translated
 code but two costs in the Win32 / D3D9 seam: every SetEvent woke every waiting guest thread (a fifth of a core of system time), and the game's
 whole-buffer vertex buffer locks were each uploaded whole (2.7 GB/s of copying). Fixing both took a song from 69% to 48% of a core at 60 fps.
 Keeping x86's memory order then cost about 10 to 15 points of a core at 120 fps and changed no frame times ([Memory order](#memory-order)).
@@ -37,6 +38,9 @@ Load times are short and paced by the game itself, not by the translation.
   stops the threads to walk their stacks, about 6 ms per sample here: under it the frame rate
   falls to ~47 fps and the game thread runs all the time, so shares within a thread are usable,
   absolute numbers and frame times of sampled runs are not.
+- **Hot spots of every thread**: `xcrun xctrace record --template 'Time Profiler' --attach PID --time-limit 15s`, then `xctrace export` of
+  the `time-profile` table. `sample` shows the audio threads idle (the Wwise thread at 2 of 1,093 samples when it uses 10% of a core), so its
+  figures for them are not usable.
 - **Noise**: the same configuration measured 69.0, 69.0, 69.5, 70.1% (as merged) and 52.4, 52.5%
   (after the first fix): about +-1 point of a core between runs. Differences under 2 points are
   not results.
@@ -279,11 +283,15 @@ of the 19 points over the Mac build is fences is not known. The
 binary grows from 97 to 106 MB. Of the guest loads the translator emits, 834,000 are fenced, 563,000 are on the
 stack and 23,000 read constants (`RC_LDC`).
 
-Tried, not kept: native `memcpy`, `memmove` and `memset` fenced once per call, as translated they fence every 16
-bytes: 81.5 and 85.7, no better than without. Not done: `relaxed.list`. None of its 14 functions is matched in
-`win-x86` yet, and the front end does not emit the relaxed form. On the Mac it takes about half the time of the
-effect kernels; here the worker and note detection threads grew most, but whether those kernels run there has not
-been checked.
+Tried then, not kept: native `memcpy`, `memmove` and `memset` fenced once per call, as translated they fence every 16
+bytes: 81.5 and 85.7, no better than without. Nearly all those calls come through `memcpy_s`, which that try left translated; with it
+they are kept ([Toward the Mac edition](#toward-the-mac-edition)).
+
+At the display's rate (2026-11-06, the final build's generated C for the game compiled without `RC_MO_TSO`, the DLLs as they were, the route
+of [Toward the Mac edition](#toward-the-mac-edition), 60 s of the song, one run): 46.5% of a core and 6.21 ms a frame against 53.8% and 7.19 ms, so about 1 ms a frame.
+The game thread 29.7 against 31.8, the Wwise thread 6.7 against 8.1, the note detection 3.6 against 6.0. Frames the same. That build is only a
+measurement: a thread can hang at a spin without the fences. `ldapr` and `stlr` instead of the fences don't help: 0.53 ns an access against 0.48 on a
+microbenchmark, and they fault on an access across 16 bytes.
 
 ## Final pass for 1.4.0
 
@@ -394,44 +402,79 @@ and caches 50,000 instructions (msvcr100: 1.3 GB to 0.34 GB, the same C at the s
 GB Mac, every core from 10 GB up; `--jobs N` overrides it. So an 8 GB Mac should peak at about 3 GB. That is
 worked out from the numbers above, not run on an 8 GB Mac.
 
+## Toward the Mac edition
+
+2026-11-06, an Apple M2, the 75 Hz 2560x1440 display. One run each, `out/rs2014_lp` started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal
+cache, the window in front, the route of [TESTING.md](TESTING.md#unattended-runs): Cherub Rock, Lead, a DIRECT CONNECT profile on a UR22mkII, no
+guitar, measured from 45 s after the tuner's skip. Started from zsh with `&`, so at nice 5, all alike. This is a heavier route than the
+[Final pass](#final-pass-for-140)'s (the bass arrangement, Disconnected): 9.4 ms a frame here against 8.4 there, for builds with the same code. So
+don't compare these with that table figure by figure.
+
+| | Before | Batch 1 | Batch 2 | Final | Without fences |
+|---|---|---|---|---|---|
+| CPU (% of a core) | 70.2 | 57.7 | 55.6 | 53.8 | 46.5 |
+| CPU per frame | 9.38 ms | 7.70 ms | 7.42 ms | 7.19 ms | 6.21 ms |
+| game thread | 44.8 | 32.7 | 32.0 | 31.8 | 29.7 |
+| Wwise thread (`1a823c0`) | 10.2 | 9.7 | 9.0 | 8.1 | 6.7 |
+| note detection (`149ab10`) | 7.9 | 7.2 | 6.3 | 6.0 | 3.6 |
+| Frame rate | 74.93 | 74.92 | 74.92 | 74.93 | 74.92 |
+| median / p99 / worst (ms) | 13.35 / 14.53 / 18.9 | 13.34 / 14.54 / 18.1 | 13.34 / 14.36 / 18.5 | 13.34 / 14.44 / 18.8 | 13.34 / 14.59 / 16.5 |
+| Frames over 20 ms | 0 | 0 | 0 | 0 | 0 |
+| Footprint | 1.30 GB | 1.33 GB | 1.33 GB | 1.33 GB | 1.33 GB |
+| Seconds measured | 150 | 90 | 90 | 90 | 60 |
+
+A batch is one rebuild and one run, so within a batch the shares below come from profiles (Time Profiler, 15 s of the song), not from a run each.
+
+- **Batch 1**: x87 runs in C locals, `-mno-outline`, the shared lookup cache, native `memcpy`, `memmove`, `memset`, `memcpy_s`. Nearly all on the game thread,
+  a quarter of it. In the profile the x87 matrix code (`F_ff80f0`, `F_ff81e0`) went from 6.4% of that thread to 4.4%; the outlined fragments, which
+  were 15%, are gone; `memcpy` was 6.2% translated and is 4.7% as the host's.
+- **Batch 2**: an indirect call's lookup at its site, the reference counts as one atomic, 11 DSP functions relaxed. `rc32_icall` went from 3.7% of
+  the game thread to 1.3%, the dispatcher's `run` from 2.8% to 0.9%. The relaxed functions dropped by a factor of five in the profile (`F_1ab4100`
+  13.7% of the Wwise thread to 2.6%), but the thread by 0.7 points: most of what they took now sits in functions they are inlined into, or wasn't fences.
+- **Final**: 6 more relaxed.
+
+The binary is 122 MB, from 107: the inline lookups and `-mno-outline`. Audio buffers and the audio path were not changed; the song played with the highway and lyrics up, not checked by ear.
+
+Against the Mac: the same route was not run on the Mac build, so the gap is an estimate. The [Final pass](#final-pass-for-140) has it 2.5 ms
+apart, 8.4 against 5.9. If the Mac's frame grows on this route as Learn & Play's did (9.4 against 8.4), it would be about 6.6 ms, and 7.2 ms is about
+0.6 ms from that, where 9.4 ms was 2.8 ms from it. By thread the game is 4.2 ms a frame here, against the Mac's recorded game frame of about 4 ms on other
+songs. What is left, by what the profiles show:
+
+- the Wwise and note detection threads, 1.9 ms a frame. Fences take a good part of it: 0.5 ms a frame of these two threads went without them. The note
+  detection is x87 here and SSE on the Mac (`F_105f420`, `F_13f3690`), and calls into functions that can't be relaxed as they are.
+- the D3D9 layer, 23% of the game thread, of which the Metal work the Mac does too is about half: the state and object lookups, the device lock.
+- the memory order itself is the same on both editions, so it isn't part of the gap, but it is the largest single cost left in this one.
+
 ## Against the Mac build
 
-The figures to use are in [Final pass](#final-pass-for-140): the same song on both, 43% more CPU and 0.5 GB more memory. An earlier
+The last figures on one song are in [Final pass](#final-pass-for-140): 43% more CPU and 0.5 GB more memory, before [the work above](#toward-the-mac-edition). An earlier
 comparison on 2026-11-02, with other songs, in the 1280x720 window and before the memory order: the Mac build at 42.2% of a core and 0.81 GB,
 Learn & Play at 47.7% and 1.05 GB, both at 60 fps with no frame over 33 ms. The extra memory is likely the DLLs' images in the guest window and
 the D3D9 layer's guest copies of resources next to the Metal ones.
 
 ## Opportunities, by expected payoff
 
-1. **x87 stack in locals** (translator, `xlat/emit_x87.py`): within a block whose x87 stack depth
-   is known statically (all of the hot transform code), keep `st(i)` in C locals and write the
-   stack back only at calls, exits and unknown-depth instructions. The x87-heavy functions are a
-   large part of the game thread's translated time; expect 5-10% of the game thread, more in
-   physics-heavy screens (Guitarcade). Medium effort, needs the differential tests of the
-   front end.
-2. **Index-range scan** (D3D9 layer): the draw-time upload reads every index of an indexed draw
-   from a dynamic buffer to find its vertex range. Trusting `MinVertexIndex` / `NumVertices`
-   instead (D3D9's contract; some games lie) or caching the range per (buffer, start, count)
-   until the next lock would save part of the remaining upload cost. Small; measure first.
-3. **Zero-copy dynamic buffers**: back each dynamic D3D9 buffer's guest memory with the Metal
+1. **The note detection and the rest of the Wwise thread**: what is left of [Toward the Mac edition](#toward-the-mac-edition)'s audio threads. Three
+   functions as hot as those in `relaxed.map` set a static's guard (`0x1a35660`, `0x1a35ba0`, `0x1a08300`), and the note detection's `F_105f420` and `F_13f3690`
+   call out. A relaxed form that allows those, or a native note detection window, would take part of the 0.5 ms a frame the fences cost there. Medium.
+2. **The D3D9 layer's bookkeeping**: `d3d9_obj_get`, `d3d9_dev_lock`, the buffer sync, about a tenth of the game thread besides Metal's own work.
+   The layer has one lock and a table lookup per call, on a device only the game thread uses.
+3. **Index-range scan** (D3D9 layer): the draw-time upload reads every index of an indexed draw
+   from a dynamic buffer to find its vertex range: 0.7% of the game thread, so small. Trusting `MinVertexIndex` / `NumVertices`
+   instead (D3D9's contract; some games lie) or caching the range per (buffer, start, count) until the next lock would save part of it.
+4. **Zero-copy dynamic buffers**: back each dynamic D3D9 buffer's guest memory with the Metal
    buffer itself (`newBufferWithBytesNoCopy` on page-aligned guest memory, a ring of a few such
    regions per buffer for DISCARD, Lock handing out the next one): no copy at all, and NOOVERWRITE
    then means exactly what it means in D3D9. Removes the rest of the upload (under 1 point of a
    core now) and the guest-side duplicate memory of big dynamic buffers. Medium-large; needs a
    libRSOpenGL entry point for client-memory buffers.
-4. **Relaxed audio kernels**: match `relaxed.list` in `win-x86` and emit the relaxed form in the 32-bit front
-   end ([Memory order](#memory-order)). The worker and note detection threads went from 11 to about 16 points of a
-   core with the fences; find out first what of that is in those kernels. Medium effort: the matching is by hand.
-5. **`-mno-outline` for the generated C**: 4% of the game thread for 15% more binary size, the
-   same compile time. Cheap (`--opt` in `TRANSLATE_OPTS`, which rebuilds every cache);
-   worth taking with the next translator change that invalidates the caches anyway.
-6. **Memory**: 0.5 GB over the Mac build. Every D3D9 buffer keeps its guest copy for its whole
+5. **Memory**: 0.5 GB over the Mac build. Every D3D9 buffer keeps its guest copy for its whole
    life (`w32_galloc`); dropping it for write-only static buffers after the upload (and
    re-reading from Metal on the rare readback) would return some of that. Medium; measure the
    split first (`footprint -v`, the guest window against the Metal heaps).
-Not worth pursuing now: the indirect-call lookup (5% of the samples with its cache, little left
-to take), the import thunks (8% inclusive, mostly the D3D9 work behind them), `-O3`, a native
-`memcpy` override, QoS changes.
+
+Done, in [Toward the Mac edition](#toward-the-mac-edition): the x87 stack in locals, `-mno-outline`, relaxed audio kernels (by address), the indirect-call
+lookup, a native `memcpy`. Not worth pursuing now: `-O3`, QoS changes (every busy thread already runs on the performance cores), `ldapr`/`stlr`.
 
 ## Reproducing
 

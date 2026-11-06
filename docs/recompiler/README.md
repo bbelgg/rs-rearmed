@@ -125,8 +125,10 @@ hook point that is also an override is `N_<addr>` in the override module, and th
   (`c->fs`).
 - 4-byte stack slots; `call` pushes a 32-bit return address; `ret N` adds `4 + N` to `esp`. The split
   between caller and callee of `stdcall`/`thiscall`/`fastcall` needs nothing more inside translated code.
-- `call/jmp [IAT slot]` goes to the import's thunk `I_<slot>`; any other indirect transfer goes to
-  `rc32_icall`.
+- `call/jmp [IAT slot]` goes to the import's thunk `I_<slot>`; any other indirect transfer goes through
+  `RC32_ICALL`, a look at the shared lookup cache and a call at the site, one branch per site for the predictor as `rc_icall` is
+  on the Mac, then `rc32_icall` for a miss. With `--target`, `InterlockedIncrement` and `InterlockedDecrement` are one atomic in place
+  (the game's reference counts); not without it, because the difftest stops at imports.
 - The direction flag, `pushad`/`popad`, `pushfd`/`popfd` (bits outside the modelled ones are carried, so
   the CPUID-availability toggle works; `popfd` with TF raises a single-step exception), `enter`/`leave`,
   the `loop` family, `rdtsc`, `xlat`, segment-register reads as flat selectors.
@@ -147,7 +149,10 @@ in the object code: a thread that reaches it with the flag set hangs at 100% of 
 what the game publishes to its other threads. Not fenced: `esp`-based and frame-pointer accesses (`RC_LDS`,
 `RC_STS`), and loads from a fixed address in a section nothing writes, a constant or a table of them
 (`read_only`, `RC_LDC`). A `rep movs` or `rep stos` taking the `memmove`/`memset` path is fenced before and
-after, not store by store. `relaxed.list` does not apply yet: none of its functions is matched in `win-x86`.
+after, not store by store. None of `relaxed.list`'s functions is matched in `win-x86`, so its relaxed functions are by address, in
+`tools/targets/win-x86/relaxed.map` (read for `--target`, so the game only): the hottest DSP functions of the Wwise thread and the note detection,
+with the same check. A relaxed function here can call only other relaxed ones. `ldapr`/`stlr` were tried in place of the fences on
+a microbenchmark: no faster on an M2 (0.53 ns an access against 0.48), and they fault on an access across 16 bytes.
 
 ### x87 and MMX
 
@@ -157,6 +162,11 @@ after, not store by store. `relaxed.list` does not apply yet: none of its functi
 transcendentals, `fldenv`/`fnstenv`/`fnsave`/`frstor`, and the `fnstsw ax; test ah` and `_ftol2` idioms.
 Values are computed as `double`, which is what MSVC's default precision control gives. MMX maps onto the
 SSE helpers.
+
+`x87_runs` rewrites a function's generated C after the fact: in a run of x87 code with no label, jump or call between, TOP moves by a known
+amount, so `ST(k)` becomes a C local named after its register relative to TOP at the start of the run. `c->fpu` is read at the start of
+the run and written at the end, so between runs the state is as it always was; only a register the run leaves empty isn't written. Without this
+every `ST(k)` is reloaded after each guest access, whose fence has a memory clobber.
 
 ### Conventions
 

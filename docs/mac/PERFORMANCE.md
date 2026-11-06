@@ -71,7 +71,8 @@ Learn & Play's corpus is 281 programs, from a list of what the game was seen lin
 
 ### Against the Windows port
 
-The same song on both at 75 fps: [Final pass](#final-pass-for-140). An earlier comparison, with other songs and before
+The same song on both at 75 fps: [Final pass](#final-pass-for-140). Learn & Play has come down since: 9.4 to 7.2 ms a frame on a route of its own, not run
+on this edition, and [its notes](../windows/PERFORMANCE.md#toward-the-mac-edition) estimate this edition at about 6.6 ms there. An earlier comparison, with other songs and before
 the memory order and the intro skip, is in [Windows performance](../windows/PERFORMANCE.md#against-the-mac-build).
 
 ## Final pass for 1.4.0
@@ -178,4 +179,6 @@ write it elsewhere, set the path before starting the launcher and keep `%c` in i
 
 **`RC_RELAXED`** (on by default): the Wwise effect kernels listed in `tools/targets/names/relaxed.list` are
 translated without a memory fence per access, which was about half their time; they fence at entry and
-exit instead. `RC_RELAXED=0` fences them too, for tracking down a suspected memory-ordering problem.
+exit instead. `RC_RELAXED=0` fences them too, for tracking down a suspected memory-ordering problem. Learn & Play's are by address, in
+`tools/targets/win-x86/relaxed.map`. The rest of what it gained has no counterpart here: this edition's game is SSE code, inlines its indirect calls and
+has the host's `memcpy`. Whether more of this edition's Wwise functions can be relaxed the same way has not been looked at.

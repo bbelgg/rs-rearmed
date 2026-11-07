@@ -102,8 +102,10 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 
 - the output device runs with a 256-frame buffer (`RS_AUDIO_FRAMES`; at most half the game's own buffer,
   so 128 at `LatencyBuffer=1`, and 128 on an interface that also has inputs, whose buffer the guitar input
-  shares and needs at 128), and the game's ring is split so `LatencyBuffer=1` does not crackle
+  shares and opens at 128), and the game's ring is split so `LatencyBuffer=1` does not crackle
   (`RS_AUDIO_RING_SPLIT`);
+- a smaller buffer set on the guitar's device by another program, such as `rs-tonehost` at 64 frames, is collected
+  into whole 128-frame slots before the game's input takes it (`audio_chan.c`); at 128 nothing changes;
 - the Wwise thread is a real-time thread in the output device's audio workgroup (`RS_AUDIO_RT`);
 - the sink follows the default output: the game opens it once and never moves it, so when the default changes the override
   stops the game's audio graph, gives its output unit the new device with the sink's 48 kHz and buffer, and starts it again;

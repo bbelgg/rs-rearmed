@@ -16,6 +16,11 @@
 //
 // A device of up to two channels with nothing set is left alone, MonoToStereoChannel included. One of more
 // channels gets its first channel, as Learn & Play's input does.
+//
+// A buffer smaller than a slot: another program on the device can set a smaller one, as a device has one size and the
+// last to set it wins, and the game would then queue a slot of which only the start is sound. So what comes is
+// collected, and the game is called only with a whole slot. A call in between counts as done, and a buffer of a slot's
+// size runs as before. The game still opens the device at 128, which sizes the slots.
 #include <CoreAudio/CoreAudio.h>
 #include <stdatomic.h>
 #include <string.h>
@@ -28,6 +33,7 @@
 #define MAX_FRAMES 4096u   // of an I/O buffer; the game asks for 128
 #define REPORT_FRAMES (5u * 48000u)
 #define SI_LISTENING 1     // si_state
+#define SLOT_FRAMES RS_AUDIO_INPUT_FRAMES  // what the game queues per call
 
 typedef struct {
   _Atomic(uint8_t *) self;  // the SoundInput this slot belongs to
@@ -38,6 +44,8 @@ typedef struct {
   AudioBufferList list;
   char name[128];
   float mono[MAX_FRAMES];
+  float whole[SLOT_FRAMES];  // a slot put together from smaller buffers, what the game reads
+  uint32_t have;             // frames collected in mono so far
 } input;
 
 static input g_in[SLOTS];
@@ -81,6 +89,7 @@ static void apply_settings(uint8_t *self, input *in) {
   in->list.mNumberBuffers = 1;
   in->list.mBuffers[0].mNumberChannels = 1;
   in->list.mBuffers[0].mData = in->mono;
+  in->have = 0;
   rs_audio_log("guitar input \"%s\": listening to channel %d of %d", in->name, channel + 1, channels);
   atomic_store_explicit(&in->dev, dev, memory_order_release);
 }
@@ -111,9 +120,22 @@ static int before_io(rc_ctx *c, void *user) {
   if (*(uint32_t *)(self + RC_OFF(si_state)) != SI_LISTENING) return 0;
   uint8_t *state = *(uint8_t **)(self + RC_OFF(si_io_state));
   if (!state) return 0;
-  uint32_t frames = rs_audio_input_take(list, in->channel, in->gain * rs_audio_soft_gain(id), in->mono, MAX_FRAMES,
-                                        &in->stats);
+  uint32_t frames = rs_audio_input_take(list, in->channel, in->gain * rs_audio_soft_gain(id), in->mono + in->have,
+                                        MAX_FRAMES - in->have, &in->stats);
   if (!frames) return 0;
+  if (in->have || frames < SLOT_FRAMES) {
+    in->have += frames;
+    if (in->have < SLOT_FRAMES) {
+      ov_ret_u32(c, 1);
+      return 1;
+    }
+    memcpy(in->whole, in->mono, sizeof in->whole);
+    in->have -= SLOT_FRAMES;
+    memmove(in->mono, in->mono + SLOT_FRAMES, in->have * sizeof(float));
+    in->list.mBuffers[0].mData = in->whole;
+    frames = SLOT_FRAMES;
+  } else
+    in->list.mBuffers[0].mData = in->mono;
   in->list.mBuffers[0].mDataByteSize = frames * (uint32_t)sizeof(float);
   *(uint32_t *)(self + RC_OFF(si_channels)) = 1;
   *(uint32_t *)(state + RC_OFF(siio_stream)) = 0;

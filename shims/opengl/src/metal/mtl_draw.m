@@ -890,6 +890,8 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
         }
 
         // Textures.
+        uint64_t log_ids[RSM_TEXLOG_UNITS] = {0};
+        bool hidden = false;
         for (int i = 0; i < p->n_tex; i++) {
             const rsm_texbind *tb = &p->tex[i];
             int unit = tb->value_loc >= 0 ? p->int_values[tb->value_loc] : 0;
@@ -901,6 +903,11 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                                                     : t->swz == RSM_SWZ_NONE ? t->mtl
                                                     : t->view                ? t->view
                                                                              : rsm_texture_view(t);
+            if (rsm_texlog_on && t && unit < RSM_TEXLOG_UNITS)
+                log_ids[unit] = t->log_id;
+            id<MTLTexture> instead = t && t->rule ? rsm_rule_texture(ctx, t->rule, &hidden) : nil;
+            if (instead)
+                mt = instead;
             __unsafe_unretained id<MTLSamplerState> ms = ctx->present_sampler;
             if (t && t->mtl) {
                 if (!t->sampler)
@@ -928,6 +935,11 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                 }
             }
         }
+
+        if (rsm_texlog_on)
+            rsm_texlog_draw(p->uid, mode, count, k.vl.stride[0], instances, log_ids);
+        if (hidden)
+            return;
 
         // Draw.
         if (use_index) {

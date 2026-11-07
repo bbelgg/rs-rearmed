@@ -45,6 +45,9 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
+- **Colors of notes and the highway**: the [render API](METAL.md#render-api-shimsincluders_renderh) is there, and RSMods' library uses it from 0.5.0, not released yet. The game colors them through small palette
+  textures, found with the texture log ([TESTING.md](TESTING.md#diagnostics)) in one song in each edition: a 256x128 ramp for note heads, tails and open-string bars, a second
+  on the indicators' shapes, and 256x32 and 512x32 ones for the highway. Other modes aren't checked. The string colors are in the game's own table, named `game_color_manager` and `game_color_table`, the same in both games.
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
   hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

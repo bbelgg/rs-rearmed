@@ -142,8 +142,29 @@ typedef struct {
     id<MTLSamplerState> sampler;  // nil: rebuild from p
     uint64_t last_use;
     bool bound;
+    uint64_t log_id;  // the texture log's hash of level 0 (mtl_texlog.m); 0 without the log
+    struct rsm_rule *rule;  // the render API's rule of level 0 (mtl_render.m); NULL for nearly every texture
 }
 @end
+
+// The texture log (mtl_texlog.m), a diagnostic: off unless a switch is set
+#define RSM_TEXLOG_UNITS 4
+extern bool rsm_texlog_on;
+void rsm_texlog_upload(RSMTexture *t, GLenum internal, GLenum format, GLenum type, int w, int h, const void *data,
+                       size_t bytes);
+void rsm_texlog_update(RSMTexture *t);
+void rsm_texlog_draw(uint64_t prog, GLenum mode, int count, int stride, int instances, const uint64_t *ids);
+void rsm_texlog_frame(void);
+
+// The render API's rules (mtl_render.m). An upload of the whole of level 0 of a texture calls RSM_TEX_UPLOADED.
+extern _Atomic int rsm_render_rules;
+void rsm_tex_uploaded(RSMTexture *t, GLenum internal, GLenum format, GLenum type, int w, int h, const void *data,
+                      size_t bytes);
+#define RSM_TEX_UPLOADED(t, internal, format, type, w, h, data, bytes)                 \
+    do {                                                                               \
+        if (rsm_texlog_on || rsm_render_rules)                                         \
+            rsm_tex_uploaded(t, internal, format, type, w, h, data, bytes);            \
+    } while (0)
 
 @interface RSMRenderbuffer : NSObject {
 @public
@@ -450,6 +471,8 @@ bool rsm_attachment_texture(RSMContext *ctx, const rsm_attachment *a, id<MTLText
 void rsm_fb_changed(RSMContext *ctx);  // bound draw fb's attachments changed
 // Read back a region of a texture as tightly packed rows (row 0 = GL bottom).
 // Returns malloc'd bytes in the texture's own format (bytes per pixel in *bpp).
+// What a draw binds instead of a texture with a rule (nil: the texture itself); sets *hide for a hidden draw.
+id<MTLTexture> rsm_rule_texture(RSMContext *ctx, struct rsm_rule *r, bool *hide);
 void *rsm_read_texture(RSMContext *ctx, id<MTLTexture> tex, int level, int slice, int x, int y,
                        int w, int h, MTLBlitOption opt, size_t *bpp);
 // Pixel conversion to the caller's (format, type) with the pack state.

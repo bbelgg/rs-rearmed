@@ -101,6 +101,7 @@ ni_step_active                    0x1c    # 0x139b66e: 1
 ni_get_rtti_slot                  0x2     # the deleting destructor, DeleteThis, GetRTTI: `mov eax, rtti; ret`
 ni_camera_frustum                 0x114   # NiCamera::SetViewFrustum 0x1557f20
 ni_camera_far                     0x128   # 0x1557f9e
+game_color_table                  0x350   # read in a run; RSMods' StringState, on the Windows game
 song_search_key                   0x38    # left Shift: the list's own label, SEARCH [SHIFT]
 song_search_key2                  0x3c    # right Shift: the same virtual key to the game (win32_input.c)
 input_slot                        0xc     # 0x11decca: [eax + 0xc]

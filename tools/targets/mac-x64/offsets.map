@@ -99,5 +99,6 @@ ni_step_active                    0x38    # 0x100ea8e20
 ni_get_rtti_slot                  0x3     # the two destructors, DeleteThis, GetRTTI
 ni_camera_frustum                 0x168   # NiCamera::SetViewFrustum 0x100e438c0
 ni_camera_far                     0x17c
+game_color_table                  0x690   # read in a run: the same colors as Learn & Play's at +0x350
 song_search_key                   0x2c    # `/`: this game's binding, seen in the song lists (docs/mac/TESTING.md)
 song_search_key2                  0x2c

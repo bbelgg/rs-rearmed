@@ -27,7 +27,7 @@ inc="-I$o -I$src/src -I$src/src/msl"
   for f in rsgl.c gltrace.c rs_gfx.c; do echo "$o/${f%.c}.o clang -std=gnu11 $inc $src/src/$f"; done
   echo "$o/rsmtl_stubs.o clang -std=gnu11 $inc $o/rsmtl_stubs.c"
   echo "$o/nsgl_hook.o clang -std=gnu11 $inc $src/src/nsgl_hook.m"
-  for f in mtl_context mtl_state mtl_objects mtl_program mtl_draw mtl_extras mtl_cache; do
+  for f in mtl_context mtl_state mtl_objects mtl_program mtl_draw mtl_extras mtl_texlog mtl_render mtl_cache; do
     echo "$o/$f.o clang -std=gnu11 -fobjc-arc $inc $src/src/metal/$f.m"
   done
   for f in msl_xlat msl_corpus; do echo "$o/$f.o clang++ -std=gnu++17 -I$src/src/msl $src/src/msl/$f.cpp"; done

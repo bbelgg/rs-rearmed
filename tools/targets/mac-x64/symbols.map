@@ -1179,4 +1179,5 @@ ak_seek_on_event_name                                            0x100ab3160  sy
 ak_query_objects_name                                            0x100af0960  sysv  int(const char *, uint32_t *, void *)
 ak_source_play_position                                          0x100ab33a0  sysv  int(uint32_t, int *, bool)
 ui_manager                                                       0x1018ef7c8  data  void *  # 0x100365e30 returns it
+game_color_manager                                               0x1018fa868  data  void *  # set by its init at 0x1006e8d02, cleared by 0x1006e8d10, its destructor
 nicamera_vtable                                                  0x101841d60  data  void *[]

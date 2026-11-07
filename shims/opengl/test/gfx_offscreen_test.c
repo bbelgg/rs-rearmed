@@ -1,12 +1,13 @@
 // Offscreen context through rs_gfx.h, same GL calls on either backend
 // (RS_GL_BACKEND=gl|metal): clear framebuffer 0, draw a triangle with a GLSL
 // 1.20 program from a VBO, read the pixels back and check them exactly. Then
-// rs_gl_current_program across binds, links, deletes and context switches, and
-// framebuffer 0 after deleting the bound framebuffer.
+// rs_gl_current_program across binds, links, deletes and context switches,
+// framebuffer 0 after deleting the bound framebuffer, and the render API for mods.
 //
 //   gfx_offscreen_test        prints "N passed, 0 failed"
 #include "gl_api.h"
 #include "rs_gfx.h"
+#include "../../include/rs_render.h"
 
 #include <pthread.h>
 #include <stdio.h>
@@ -32,6 +33,11 @@
 #define GL_DEPTH_TEST 0x0B71
 #define GL_BLEND 0x0BE2
 #define GL_READ_FRAMEBUFFER_BINDING 0x8CAA
+#define GL_TEXTURE_2D 0x0DE1
+#define GL_TEXTURE_MIN_FILTER 0x2801
+#define GL_TEXTURE_MAG_FILTER 0x2800
+#define GL_NEAREST 0x2600
+#define GL_TEXTURE0 0x84C0
 
 enum { W = 64, H = 48 };
 
@@ -184,6 +190,148 @@ static int px_eq(const unsigned char *p, unsigned r, unsigned g, unsigned b, uns
     return p[0] == r && p[1] == g && p[2] == b && p[3] == a;
 }
 
+static const char kTexFS[] =
+    "#version 120\n"
+    "uniform sampler2D tex;\n"
+    "void main() { gl_FragColor = texture2D(tex, vec2(0.5, 0.5)); }\n";
+
+static GLuint new_texture(const unsigned char *rgba) {
+    GLuint t;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, rgba);
+    return t;
+}
+
+// Clears to blue, draws a quad of the bound texture over framebuffer 0 and reads a pixel
+static void draw_texture(unsigned char *out) {
+    glClearColor(0.0f, 0.0f, 1.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glReadPixels(4, 4, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, out);
+}
+
+typedef struct {
+    rs_tex_rule *rule;
+    const unsigned char *rgba;
+    int result;
+} replace_args;
+
+static void *replace_thread(void *arg) {
+    replace_args *a = arg;
+    a->result = rs_render_replace(a->rule, 1, 1, a->rgba);
+    return NULL;
+}
+
+// rs_render.h: what a rule does to draws, and to the uploads that follow it.
+static void render_api(void) {
+    static const unsigned char red[16] = {255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255};
+    static const unsigned char white[16] = {255, 255, 255, 255, 255, 255, 255, 255,
+                                            255, 255, 255, 255, 255, 255, 255, 255};
+    static const unsigned char green[4] = {0, 255, 0, 255}, yellow[4] = {255, 255, 0, 255};
+    if (rs_gfx_backend() != RS_GFX_METAL) {
+        check(rs_render_api_version() == 0, "render API: no version on GL");
+        check(rs_render_match(2, 2, 1) == NULL, "render API: no rules on GL");
+        return;
+    }
+    check(rs_render_api_version() == RS_RENDER_API_VERSION, "render API: version");
+    uint64_t hash = rs_render_hash(red, sizeof red);
+    check(rs_render_hash(white, sizeof white) != hash, "render API: hash tells contents apart");
+    rs_tex_rule *rule = rs_render_match(2, 2, hash);
+    check(rule != NULL, "render API: a rule");
+    check(rs_render_match(2, 2, hash) == rule, "render API: the same rule for the same texture");
+    check(rs_render_match(4, 2, hash) != rule, "render API: another size is another rule");
+    check(rs_render_replace(NULL, 1, 1, green) == -1, "render API: no rule");
+    check(rs_render_replace(rule, 0, 1, green) == -1, "render API: size out of range");
+    check(rs_render_hide(NULL, 1) == -1, "render API: hide with no rule");
+
+    GLuint prog = glCreateProgram();
+    GLuint vs = shader(GL_VERTEX_SHADER, kVS), fs = shader(GL_FRAGMENT_SHADER, kTexFS);
+    glAttachShader(prog, vs);
+    glAttachShader(prog, fs);
+    glBindAttribLocation(prog, 0, "pos");
+    glLinkProgram(prog);
+    glUseProgram(prog);
+    glUniform1i(glGetUniformLocation(prog, "tex"), 0);
+    static const GLfloat quad[] = {-1, -1, 1, -1, 1, 1, -1, -1, 1, 1, -1, 1};
+    GLuint vbo;
+    glGenBuffers(1, &vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof quad, quad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, 0, 0, (const void *)0);
+    glEnableVertexAttribArray(0);
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_BLEND);
+    glActiveTexture(GL_TEXTURE0);
+
+    unsigned char px[4];
+    GLuint own = new_texture(red), other = new_texture(white);
+    glBindTexture(GL_TEXTURE_2D, own);
+    draw_texture(px);
+    check(px_eq(px, 255, 0, 0, 255), "render API: a rule alone changes nothing");
+
+    rs_render_replace(rule, 1, 1, green);
+    draw_texture(px);
+    check(px_eq(px, 0, 255, 0, 255), "render API: replaced");
+    glBindTexture(GL_TEXTURE_2D, other);
+    draw_texture(px);
+    check(px_eq(px, 255, 255, 255, 255), "render API: another content is left alone");
+    glBindTexture(GL_TEXTURE_2D, own);
+
+    pthread_t th;
+    replace_args a = {rule, yellow, -1};
+    pthread_create(&th, NULL, replace_thread, &a);
+    pthread_join(th, NULL);
+    check(a.result == 0, "render API: replaced from another thread");
+    draw_texture(px);
+    check(px_eq(px, 255, 255, 0, 255), "render API: the new pixels are drawn");
+
+    rs_render_hide(rule, 1);
+    draw_texture(px);
+    check(px_eq(px, 0, 0, 255, 255), "render API: hidden");
+    rs_render_hide(rule, 0);
+    draw_texture(px);
+    check(px_eq(px, 255, 255, 0, 255), "render API: shown again");
+
+    rs_render_replace(rule, 0, 0, NULL);
+    draw_texture(px);
+    check(px_eq(px, 255, 0, 0, 255), "render API: back to the game's texture");
+
+    // Learn & Play's upload: the level defined empty, then filled
+    rs_render_replace(rule, 1, 1, green);
+    GLuint filled = new_texture(NULL);
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 2, 2, GL_RGBA, GL_UNSIGNED_BYTE, red);
+    draw_texture(px);
+    check(px_eq(px, 0, 255, 0, 255), "render API: a level filled by a sub-image");
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, white);
+    draw_texture(px);
+    check(px_eq(px, 255, 0, 0, 255) || px_eq(px, 255, 255, 255, 255), "render API: part of a level ends the rule");
+
+    // Another upload to the texture
+    glBindTexture(GL_TEXTURE_2D, own);
+    draw_texture(px);
+    check(px_eq(px, 0, 255, 0, 255), "render API: still replaced before an upload");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, white);
+    draw_texture(px);
+    check(px_eq(px, 255, 255, 255, 255), "render API: another upload ends the rule");
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGBA, GL_UNSIGNED_BYTE, red);
+    draw_texture(px);
+    check(px_eq(px, 0, 255, 0, 255), "render API: the first content again finds it");
+    rs_render_replace(rule, 0, 0, NULL);
+
+    glDeleteTextures(1, &own);
+    glDeleteTextures(1, &other);
+    glDeleteTextures(1, &filled);
+    glDeleteBuffers(1, &vbo);
+    glUseProgram(0);
+    glDeleteProgram(prog);
+    glDeleteShader(vs);
+    glDeleteShader(fs);
+    check(glGetError() == 0, "render API: no GL error");
+}
+
 int main(void) {
     const char *be = rs_gfx_backend() == RS_GFX_METAL ? "metal" : "gl";
     printf("backend %s\n", be);
@@ -281,6 +429,7 @@ int main(void) {
 
     delete_bound_framebuffer();
     current_program(ctx);
+    render_api();
 
     glDeleteBuffers(1, &vbo);
     glDeleteProgram(prog);

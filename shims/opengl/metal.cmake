@@ -6,6 +6,8 @@ set(ogl_mtl_sources
   src/metal/mtl_program.m
   src/metal/mtl_draw.m
   src/metal/mtl_extras.m
+  src/metal/mtl_texlog.m
+  src/metal/mtl_render.m
   src/metal/mtl_cache.m)
 target_sources(opengl PRIVATE ${ogl_mtl_sources})
 set_source_files_properties(${ogl_mtl_sources} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")

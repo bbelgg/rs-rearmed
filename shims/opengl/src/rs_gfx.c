@@ -47,12 +47,30 @@ RSMTL_WEAK void rsmtl_gfx_unlock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx) { (void)ctx; return NULL; }
 RSMTL_WEAK int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds) { (void)ctx, (void)max_seconds; return 0; }
 RSMTL_WEAK int rsmtl_gfx_flush_cache(double max_seconds) { (void)max_seconds; return 0; }
+RSMTL_WEAK rs_tex_rule *rsmtl_render_match(int w, int h, uint64_t hash) { (void)w, (void)h, (void)hash; return NULL; }
+RSMTL_WEAK int rsmtl_render_replace(rs_tex_rule *rule, int w, int h, const void *rgba) {
+    (void)rule, (void)w, (void)h, (void)rgba;
+    return -1;
+}
+RSMTL_WEAK int rsmtl_render_hide(rs_tex_rule *rule, int on) { (void)rule, (void)on; return -1; }
+RSMTL_WEAK uint64_t rsmtl_render_hash(const void *data, size_t bytes) { (void)data, (void)bytes; return 0; }
 RSMTL_WEAK int rsmtl_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total) {
     (void)ctx;
     if (done) *done = 0;
     if (total) *total = 0;
     return 0;
 }
+
+// --- The render API for mods (rs_render.h): the Metal core's alone --------------------
+RS_EXPORT int rs_render_api_version(void) { return rs_gfx_backend() == RS_GFX_METAL ? RS_RENDER_API_VERSION : 0; }
+RS_EXPORT rs_tex_rule *rs_render_match(int w, int h, uint64_t hash) {
+    return rs_gfx_backend() == RS_GFX_METAL ? rsmtl_render_match(w, h, hash) : NULL;
+}
+RS_EXPORT int rs_render_replace(rs_tex_rule *rule, int w, int h, const void *rgba) {
+    return rsmtl_render_replace(rule, w, h, rgba);
+}
+RS_EXPORT int rs_render_hide(rs_tex_rule *rule, int on) { return rsmtl_render_hide(rule, on); }
+RS_EXPORT uint64_t rs_render_hash(const void *data, size_t bytes) { return rsmtl_render_hash(data, bytes); }
 
 // --- GL ----------------------------------------------------------------------------
 struct rs_gfx_context {

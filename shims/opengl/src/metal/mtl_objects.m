@@ -1429,6 +1429,7 @@ static void rsm_tex_grow(RSMContext *ctx, RSMTexture *t, int levels) {
 static bool rsm_tex_define(RSMContext *ctx, RSMTexture *t, int level, GLenum internal,
                            const rsm_texfmt *f, int w, int h) {
     if (level == 0) {
+        t->rule = NULL;  // an upload that follows finds its own
         bool same = t->mtl && t->fmt == f->fmt && t->w == w && t->h == h && t->swz == f->swz;
         if (!same) {
             // Keep the mip chain only for the same size (a format change): a smaller level 0
@@ -1535,6 +1536,9 @@ void rsmtl_glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsize
     @autoreleasepool {
         if (!rsm_tex_define(ctx, t, level, (GLenum)internalformat, &f, width, height) || !pixels || f.stencil)
             return;
+        if (level == 0)
+            RSM_TEX_UPLOADED(t, (GLenum)internalformat, format, type, width, height, pixels,
+                             rsm_unpack_bytes(ctx, format, type, width, height));
         size_t pitch;
         void *owned;
         const void *src = rsm_unpack(ctx, pixels, width, height, format, type, t->fmt, t->swz, &pitch, &owned);
@@ -1583,6 +1587,16 @@ void rsmtl_glTexSubImage2D(GLenum target, GLint level, GLint xoffset, GLint yoff
     pixels = rsm_unpack_ptr(ctx, pixels, rsm_unpack_bytes(ctx, format, type, width, height));
     if (!pixels)
         return;
+    // Learn & Play defines a level empty and fills it here: that is its upload. Part of level 0 is another content.
+    if (level == 0 && !xoffset && !yoffset && width == lw && height == lh) {
+        RSM_TEX_UPLOADED(t, t->internal, format, type, width, height, pixels,
+                         rsm_unpack_bytes(ctx, format, type, width, height));
+    } else {
+        if (level == 0)
+            t->rule = NULL;
+        if (rsm_texlog_on)
+            rsm_texlog_update(t);
+    }
     @autoreleasepool {
         size_t pitch;
         void *owned;
@@ -1623,6 +1637,8 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
     @autoreleasepool {
         if (!rsm_tex_define(ctx, t, level, internalformat, &f, width, height) || !data)
             return;
+        if (level == 0)
+            RSM_TEX_UPLOADED(t, internalformat, 0, 0, width, height, data, need);
         rsm_tex_write(ctx, t, level, face, 0, 0, width, height, data, pitch);
     }
 }

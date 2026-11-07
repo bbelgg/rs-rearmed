@@ -155,6 +155,9 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
     reference in fragment buffer 1 (`float`).
 - **Errors and queries**: `glGet*` answered from tracked state; `glGetError` returns the first recorded
   error. `RS_GL_CHECK` works the same on both backends.
+- **Texture log** (`mtl_texlog.m`, off unless set, [the switches](TESTING.md#diagnostics)): hashes level 0 at upload (in Learn & Play a
+  `glTexSubImage2D` of the whole level, as its D3D9 layer defines the level empty first) and records what each draw binds. It is how to find
+  a texture a mod should act on. `RS_GL_TEX_MARK` makes a [render API](#render-api-shimsincluders_renderh) rule that draws one in magenta.
 - **Built-in attributes**: GLSL `gl_Vertex`, `gl_Normal`, `gl_Color`, `gl_MultiTexCoordN` use NVIDIA's
   aliasing (0, 2, 3, 8+N), so `glVertexAttribPointer` indices drive them.
 
@@ -209,6 +212,19 @@ Exported by the executable. A mod registers a callback that runs after the game'
 present; inside it only `rs_overlay_*` calls are allowed (draw an RGBA image / text into a rect). The GL
 implementation uses only VBO + GLSL 1.20 + texture calls and saves/restores what it touches, so it runs
 unchanged on the Metal core. Rules as X-Plane's: no `glGet`, no game resources, state restored.
+
+## Render API (`shims/include/rs_render.h`)
+
+Exported by libRSOpenGL, for both editions, on Metal alone: on OpenGL `rs_render_api_version` is 0. A mod makes a rule for a game texture, by the size and the
+hash of what the game uploads to level 0 (`rs_render_match`), and gives pixels to draw in its place (`rs_render_replace`) or hides what is drawn with it (`rs_render_hide`).
+The core (`mtl_render.m`) keeps the rule on the texture object at upload and asks it when a draw binds the texture, so the game's own texture and its GL state stay as they
+were. Replacing a texture costs its draws a lock; a texture with no rule costs a draw one test, and an upload one test until a rule is made. Only uploads of the rule's size are
+hashed. New pixels wait for the next draw, which makes the Metal texture: a mod can give them from any thread. A rule ends with another upload or a sub-image of part of level 0,
+and an upload with the same content finds it again.
+
+Why at the bind, and not a callback per draw as RSMods has on Direct3D: no mod code runs in the draw loop, and a texture means the same in both editions, where
+vertex counts and states would need working out in each. It also needs no hook point, so no new translation of the game. The game colors notes and the highway through small palette
+textures (the [texture log](#metal-core-shimsopenglsrcmetal) found them), so this is enough for those. What it can't do: tell two objects that share a texture apart.
 
 ## Status
 

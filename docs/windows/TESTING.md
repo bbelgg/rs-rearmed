@@ -402,6 +402,10 @@ Starting a run from a script: `nohup` and `env` are SIP-protected and drop `DYLD
 
 If the log says `lp: the window is hidden` at the title, keys don't arrive, `front` and `RS_KEY_DIRECT=1` included (2026-11-07): click the window and press Return by hand, then go on.
 
+A song with no interface connected (2026-11-07, the texture log's runs, a copy of a test profile on DIRECT CONNECT with the Mac's microphone; the app's executable started directly with `LP_HOME`, `LP_GAME_DIR` and a copy of `steam/` in `RS_STEAM_DATA_DIR`): 10 s after `menu: TitleScreen`, `front`, Return; 7 s, Return on the profile; 24 s after `menu: MainMenu`, `lpctrl`, Down, Left to DISCONNECTED, Esc; 9 s, Return on LEARN A SONG; 7 s, `lpshift`, `c h e r` 1.6 s apart, Down until `song: CherubRock`, Return; 7 s, Return on Play Song; 4 s, Return on TUNE UP!, and `menu: LearnASong_Game`. The window wasn't hidden in these runs.
+
+The render API in a game: as on the [Mac](../mac/TESTING.md#game-runs), with `shims/opengl/test/render_mod.c`, on the route above. The log says `[render_mod] on win-x86, API 1`.
+
 The measured route (2026-11-06, `out/rs2014_lp` started directly, a test home, a copy of a DIRECT CONNECT test profile, `RS_FULLSCREEN=0`, a
 UR22mkII): after the `dispatch callback 1101` line wait 10 s, `front`, 2 s, Return, 6 s, Return, wait for `mods: DLC:`, 12 s, `front`, Return on LEARN A SONG,
 9 s, Return on Mission Complete, 5 s, Return on New Mission, 4 s, `lpshift`, 2 s, `text cher`, 8 s, Down to Cherub Rock, 2 s, Return, 6 s, Return on Play Song, 31 s,
@@ -510,6 +514,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
 | `RS_GL_FRAMETIMES=FILE` | a line per Present |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
+| `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | Metal: each new texture content with its hash, RSMods' checksum, size and format, and in `FILE.draws` each kind of draw (program, mode, count, vertex stride, the textures of units 0-3); each content saved to DIR; textures of those hashes drawn as solid magenta, to see what uses them |
 | `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each level set, each input's peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the Steam face's calls (`[steam-shim]`) |
 | `RS_MODS_LOG=1` | the built-in fixes: the open-file limit, the DLC mounting's end (archives, frames, time, and the path cache's and number hash's counts), each song-file signature skip, each DLC preview job that fails offline |

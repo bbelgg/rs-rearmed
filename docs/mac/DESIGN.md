@@ -217,7 +217,7 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   `rc_hook_add_name("game_frame", pre, post, user)`; the hook points are listed in
   `tools/targets/names/hooks.list` and declared in `tools/ws7/recomp/runtime/rc_hook.h`. A name the game doesn't
   have gives -1 and a log line. `rc_hook_add` with a game address keeps working; `rc_target()` returns `mac-x64`.
-  Mods that draw use the overlay API (`shims/include/rs_overlay.h`), which works on both renderers. A mod built
+  Mods that draw use the overlay API (`shims/include/rs_overlay.h`), which works on both renderers; a mod that changes a game texture uses the render API (`shims/include/rs_render.h`, Metal alone). A mod built
   with `tools/ws7/recomp/runtime/rc_mod.h` is the same dylib for this edition and Learn & Play: it looks offsets
   up by name when it runs and keeps pointer width out of its source
   ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A mod built for 1.4.x keeps working here as it

@@ -111,5 +111,6 @@ ni_step_active       # NiRenderStep: active, a byte
 ni_get_rtti_slot     # NiObject vtable: GetRTTI, which returns the class's NiRTTI {name, base}
 ni_camera_frustum    # NiCamera: the view frustum: left, right, top, bottom, near, far
 ni_camera_far        # NiCamera: the frustum's far plane
+game_color_table     # GameColorManager: pointers to each string's color (three floats), six for each kind of color, two banks of 0xa8: normal, colorblind
 song_search_key      # a macOS key code: the key the game's song lists open their search with
 song_search_key2     # a macOS key code: the other key that does, or the same

@@ -434,7 +434,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   waiting go past the hooks. With no such mod nothing waits. A modifier key is a down and an up here; the Mac
   sends a down for both.
 
-  The overlay API is the Mac's `rsp_overlay.c`, run in `d3d9_dev_present` on the back buffer before it is shown, and
+  The render API (`rs_render.h`, [METAL.md](../mac/METAL.md#render-api-shimsincluders_renderh)) is in libRSOpenGL, under the D3D9 layer: a texture this layer defines empty and fills with one `glTexSubImage2D` counts as uploaded then. The overlay API is the Mac's `rsp_overlay.c`, run in `d3d9_dev_present` on the back buffer before it is shown, and
   `OV_VCALL` is a thiscall through the guest's vtable (`rc32_hook.c`).
 
   Two things differ with the call the same: a mod's hooks run around a built-in fix here, where on the Mac the fix is a pre hook that can answer first, and `game_frame` is a tick

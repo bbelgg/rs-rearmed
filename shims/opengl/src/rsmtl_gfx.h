@@ -4,6 +4,7 @@
 // real ones. Internal to libRSOpenGL (hidden).
 #pragma once
 #include "rs_gfx.h"
+#include "../../include/rs_render.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -22,6 +23,10 @@ CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx);
 int rsmtl_gfx_prepare(rs_gfx_context *ctx, double max_seconds);
 int rsmtl_gfx_prepare_progress(rs_gfx_context *ctx, int *done, int *total);
 int rsmtl_gfx_flush_cache(double max_seconds);
+rs_tex_rule *rsmtl_render_match(int w, int h, uint64_t hash);
+int rsmtl_render_replace(rs_tex_rule *rule, int w, int h, const void *rgba);
+int rsmtl_render_hide(rs_tex_rule *rule, int on);
+uint64_t rsmtl_render_hash(const void *data, size_t bytes);
 
 // rsgl.c: the generated weak rsmtl_<name> stubs report through this.
 void rsmtl_unimplemented(int idx, const char *name);

@@ -413,3 +413,4 @@ ak_query_objects_name      # AK::SoundEngine::Query::QueryAudioObjectIDs(const c
 ak_source_play_position    # AK::SoundEngine::GetSourcePlayPosition(playing id, int *, bool)
 ui_manager                 # the UI manager: its current menu has the menu's name
 nicamera_vtable            # NiCamera's vtable, as an object's first word holds it
+game_color_manager         # GameColorManager, the game's colors by name: the string colors are in its table (game_color_table)

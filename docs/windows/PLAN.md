@@ -68,6 +68,9 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 **Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
 
+**Colors of notes and the highway:** the mods on the render API, as in the [Mac plan](../mac/PLAN.md#next-work), one change for both. Here the ramps are BGRA, so their hashes differ
+from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
+
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
 Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).
 

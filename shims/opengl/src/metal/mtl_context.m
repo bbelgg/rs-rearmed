@@ -616,6 +616,7 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
         rsm_tls = ctx;
         rsm_snapshot(ctx);
         rsm_end_pass(ctx);
+        rsm_texlog_frame();
         if (ctx->layer) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];
             if (d) {

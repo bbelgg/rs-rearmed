@@ -202,6 +202,13 @@ user's, with a test profile.
   10 s, `key /`, 2 s, `text cherub`, 11 s, Return on the match, 7 s, Return on Play Song, 29 s, `key fwddelete`, 4 s, Return: the highway within 30 s, and the window starts 46 s after that Return. To take the UR22mkII
   on such a profile: Ctrl, Down twice to AVAILABLE INPUTS, Return, Down to it, Return, Esc; a normal quit saves it. Snapshots every 265 s give one look at the highway after the window
   without one in it. Check the route by snapshots first, as `fwddelete` on ProfileSelect deletes the profile.
+- **A song with no interface connected** (2026-11-07, the texture log's runs, a test profile on REAL TONE CABLE): the tuner stops at "It sounds like your
+  cable is unplugged". So on the main menu, 22 s after `menu: MainMenu` (a Return sooner is lost in the transition): `front`, Ctrl, Down, Right twice to
+  DISCONNECTED, Esc, 8 s, Return on LEARN A SONG. Search, Return on the match, Return on Play Song, 26 s on the TUNE UP! dialog, `fwddelete`, 5 s, Return:
+  `menu: LearnASong_Game`. A kill loses the input, so each run sets it.
+- **The render API in a game** (2026-11-07): `shims/opengl/test/render_mod.c` turns the hues of the notes' two ramps once a second, in either edition. In a folder with `rearmed-mods.dylib`
+  and `RS_MODS_PATH` set to it, the route above, then snapshots of the highway: the notes change color from frame to frame, and strings, the highway and the numbers don't. The log has
+  `[render_mod] on mac-x64, API 1` and two `[rs-gl] render: a rule found its texture` lines. The ramps' hashes are in the mod.
 - **Keys and the focus**: without `RS_KEY_DIRECT=1` a key goes to the window only while the game has the focus, and
   any other app coming forward loses it quietly (`[rsmods] key down` is missing from the log). With it, keys arrive
   in front or not. Search text then still needs 1.5 s between letters.
@@ -280,6 +287,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_GL_TRACE_DIR=DIR`, `RS_GL_TRACE_START=S`, `RS_GL_TRACE_KEY=1\|PATH`, `RS_GL_TRACE_FRAMES=N` | a trace of N frames (default 30), from the second frame, S seconds after the first, or when `DIR/go` or PATH appears |
 | `RS_MSL_LOG=1`, `RS_MTL_DUMP_MSL` | shaders translated at run time, the MSL of slow compiles |
 | `RS_GL_DUMP_SHADERS` | the GLSL the game compiles |
+| `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | Metal: each new texture content with its hash, RSMods' checksum, size and format, and in `FILE.draws` each kind of draw (program, mode, count, vertex stride, the textures of units 0-3); each content saved to DIR; textures of those hashes drawn as solid magenta, to see what uses them |
 | `RS_GL_SNAPSHOT_DIR`, `RS_GL_SNAPSHOT_SECS` | frame snapshots |
 | `RS_GL_FRAMETIMES` | frame times |
 | `--renderer-check` | the renderer a start would use, without starting the game |

@@ -16,6 +16,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
   edition: a 256x128 ramp for note heads, tails and open-string bars, a second on the indicators' shapes, and 256x32 and 512x32 ones for the highway. Other modes aren't checked. The string colors are in the
   game's own table, named `game_color_manager` and `game_color_table`, the same in both games.
 - **Exit Game** (new in 1.9.0): EXIT GAME in the main menu, in place of UPLAY, pressed in a test install of each edition.
+- **Game Mode** (new in 1.9.1): the app's category is music, so macOS leaves Game Mode off, which made a plug-in host crackle. Played on an installed game changed by hand; not yet run in Learn & Play.
 - **Two players** (new in 1.8.0): a song with each player on their own input, played on two channels of one interface, SWAP CABLE ASSIGNMENT included; a cable and an interface and two interfaces have not been played.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with the owning account logged in to Steam.
 - **Installer**: decrypting is static (`tools/steamless/decrypt.py`): no Rosetta, no launch of the game, and Steam only has to have installed it.
@@ -28,7 +29,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 
 ## Open issues
 
-- **The published installer**: 1.9.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs. The last full install from a published installer was 1.6.0's.
+- **The published installer**: 1.9.1's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs. The last full install from a published installer was 1.6.0's.
 - **The title screen's own Auto Save call**: in Learn & Play the title has a second call of the dialog ([Windows plan](../windows/PLAN.md#open-issues)). This game's counterpart has not been read.
 - The cable screen's Direct Connect button hasn't been checked.
 

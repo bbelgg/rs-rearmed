@@ -13,6 +13,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and 0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
+- **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
@@ -26,7 +27,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 ## Open issues
 
-- **The published installer**: 1.9.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs.
+- **The published installer**: 1.9.1's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs.
 - **The title screen's own Auto Save call** (`0x12bd061`): read from the code, not seen in a run. The title listens for the same `OnSignInFlowComplete` (`0x12bdd00`), and with
   slot 0 of the object at `[[0x1ee0bfc] + 0x30]` and its byte `+0x14` set, its tick (`0x12bcfd0`) shows the warning for 4 s. What sets that byte isn't known, so whether a player can
   reach it isn't either. If so, the skip needs the tick wrapped too, to clear its timer.

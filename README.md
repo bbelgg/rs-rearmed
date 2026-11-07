@@ -29,7 +29,7 @@ it better. The priorities:
   menus, every channel listed, calibration that can boost a quiet input, lower guitar latency, and multiplayer with
   each player on their own input.
 - **Quality of life.** Custom songs out of the box, with no CDLC patch. **ENUMERATE** in the main menu adds new songs
-  without a restart. No intro screens, and mods load from a `mods/` folder.
+  without a restart. No intro screens, and mods load from a `mods/` folder, such as [rearmed-mods](https://github.com/glebb/rearmed-mods), RSMods' features and more with an app to set them up.
 
 Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can be
 switched off: [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
@@ -66,7 +66,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 15 of the 18 hook points, the overlay API and the render API |
-| The rearmed-mods library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods |
+| [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |

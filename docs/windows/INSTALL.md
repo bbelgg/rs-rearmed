@@ -178,7 +178,7 @@ language and the account the game plays as in `game/.rearmed/steam.env`: the acc
 SteamID64 or the number in `Steam/userdata/<number>`) for a refresh.
 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`, as on the Mac), from the copy's `cache.psarc`, which isn't changed: it adds
-DIRECT CONNECT and turns SHOP into ENUMERATE. If the cache can't be read, the copy goes on without it and says so.
+DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. If the cache can't be read, the copy goes on without it and says so.
 
 - **Disk use.** On the same APFS volume the copy is clones: seconds, and no extra space, though `du` and the Finder count the full size. With the game on another APFS drive the copy goes onto that drive, in
   `RS Re-ARMed/learn-play/game` at its top, and `…/learn-play/game` is a link to it, so the game needs that drive connected. From a drive that can't clone it is a real copy, about 6 GB plus DLC, after a check for
@@ -312,7 +312,7 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_MODS_INTRO=0` | on | the intro screens play |
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, and SHOP instead of ENUMERATE ([Game files](#game-files)) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files)) |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
 | `LP_NATIVE_MATH=0` | on | the CRT's math translated instead of the host's libm |
 | `LP_NATIVE_MEM=0` | on | the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` translated instead of the host's |

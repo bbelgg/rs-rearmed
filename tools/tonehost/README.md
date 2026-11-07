@@ -5,7 +5,7 @@ editions, and has only been tried with Helix Native.
 
 Two pieces:
 
-- **The mod** is RSMods' `ToneHost` (`Mac/src/mod_tone_host.c` in RSMods, on with `ToneHost = on` in `RSMods.ini`). On a
+- **The mod** is rearmed-mods' `ToneHost` (`src/mod_tone_host.c` there, on with `ToneHost = on` in `RSMods.ini`). On a
   tone change the game sets every knob of the gear as a Wwise RTPC by name, then the tone's balance, about two seconds
   before the change in the song. The mod sends these as one line. While the host runs, the game's guitar is silent
   (`Mixer_Player1` at 0; notes still score). With no host the mod does nothing, and the game plays its own tones; a host

@@ -11,7 +11,7 @@ included.
 | libjpeg | IJG 8d (15-Jan-2012) | https://www.ijg.org/files/jpegsrc.v8d.tar.gz | IJG licence | `shims/game/third_party/jpeg-8d` |
 | FFmpeg + Bink 2 decoder patch | FFmpeg 7.1.2 | https://ffmpeg.org/releases/ffmpeg-7.1.2.tar.xz (downloaded at build time) | LGPL-2.1-or-later | `shims/bink/build-ffmpeg.sh`, `shims/bink/third_party/ffmpeg-bink2.patch` |
 | rs-mac-fixes (behaviour only) | commit `2a05c31` | https://github.com/glebb/rs-mac-fixes | MIT; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c`, `win-x86/shims/win32_overrides.c` |
-| RSMods (behaviour only: the Direct Connect and Enumerate menu entries) | — | https://github.com/Lovrom8/RSMods | upstream has no licence file; no upstream code or resources are included | `tools/play-native/cache_overlay.py`, `shims/steam/src/enumerate.h` |
+| RSMods (behaviour only: the Direct Connect, Enumerate and Exit Game menu entries) | — | https://github.com/Lovrom8/RSMods | upstream has no licence file; no upstream code or resources are included | `tools/play-native/cache_overlay.py`, `shims/steam/src/enumerate.h` |
 | RSBypass (behaviour only) | — | https://github.com/aik002/RSBypass | upstream has no licence file; no upstream code is included | `tools/ws7/recomp/overrides/mods/mods.c`, `win-x86/shims/win32_overrides.c` |
 
 ## Lua 5.1.4 + LNUM

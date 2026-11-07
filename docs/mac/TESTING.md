@@ -189,7 +189,7 @@ user's, with a test profile.
   Return, 26 s later `fwddelete`, 6 s later Return: the highway about 20 s after that. `[probe]` lines in the log, `[probe] file
   sha256` the file that ran; the numbers to compare with Learn & Play's, whose first camera call is the same (-1 1 1 -1, near
   0.85, far 0). A mod on `steam_dlc_owned` sees 1 call here against 148 on Learn & Play: the built-in hook answers first here.
-- **RSMods' library** (`rearmed-mods.dylib` in `<home>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): by keyfifo, each key
+- **The rearmed-mods library** (`rearmed-mods.dylib` in `<home>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): by keyfifo, each key
   waiting for the mods' own log, whose `menu:` lines say which screen it is. With a profile, `ForceProfileLoad` reaches MainMenu by
   itself; Return is LearnASong_Songs; `/` opens the search; Return on a row is LearnASong_SongOptions; Return is LearnASong_PreSongTuner;
   `fwddelete`, Return; LearnASong_Game. Hotkeys in the search, all quiet, then firing again after Esc: `/`, then `i`, `l`, `5`, `f`; `/`, `qq`,

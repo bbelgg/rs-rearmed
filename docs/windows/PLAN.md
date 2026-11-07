@@ -10,7 +10,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   device (a virtual one named like the cable), the microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
   calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and the close button, in 0.3-0.5 s.
 - **Mods**: 15 of the 18 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
-  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). RSMods' `rearmed-mods.dylib` 0.3.0 runs as the same file, all 19 mods on. No mod code runs without the network guard.
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` 0.3.0 runs as the same file, all 19 mods on. No mod code runs without the network guard.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
@@ -20,7 +20,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build without one
   ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for its relocation sites, which nothing reads out of the capture VM yet.
 
-- **Your own plug-in** (`tools/tonehost`, RSMods' ToneHost): played with Helix Native at 64 frames, as on the Mac.
+- **Your own plug-in** (`tools/tonehost`, rearmed-mods' ToneHost): played with Helix Native at 64 frames, as on the Mac.
   Open: disguised amps are a best guess, and input level follows a rule, not a measurement of each amp.
 
 ## Open issues

@@ -378,7 +378,7 @@ what the game does for one song without changing it; one re-translation per set 
 headless analyzer on a copy of the image without the packer's sections (`.UBX*`, `.lpreloc`) finishes in
 about 30 minutes and decompiles single functions after that.
 
-**RSMods' library** (`rearmed-mods.dylib` in `<LP_HOME>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): the same route as
+**The rearmed-mods library** (`rearmed-mods.dylib` in `<LP_HOME>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`): the same route as
 the [Mac's](../mac/TESTING.md#game-runs), by keyfifo, the next key waiting for the mods' own log. Its `menu:` lines say which screen it
 is, so a key that only makes sense on one screen is sent only there. The screens in this edition: with a profile, `ForceProfileLoad`
 reaches MainMenu by itself; Return is LearnASong_Songs; `lpshift` opens the search; Esc closes it, and Esc with it closed leaves the

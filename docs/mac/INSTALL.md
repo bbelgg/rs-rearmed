@@ -201,7 +201,7 @@ language and the account the game plays as in `game/.rearmed/steam.env`. That ac
 yourself, set `RS_STEAM_ID` (a SteamID64 or the number in `Steam/userdata/<number>`) when you refresh, or with `launchctl setenv` for the launcher.
 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed:
-it adds DIRECT CONNECT and turns SHOP into ENUMERATE. If your cache can't be read, the copy goes on without it and says so.
+it adds DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. If your cache can't be read, the copy goes on without it and says so.
 
 - **Disk use.** On the same APFS volume as your home folder every file is a clone: seconds, and no extra space, though `du` and the Finder count the full size.
 - **A Steam library on another drive.** On APFS the copy goes onto that drive as clones, in `RS Re-ARMed/game` at its top, and `…/RS Re-ARMed/game` is a link to it, so the game needs that drive connected. On
@@ -353,6 +353,7 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 | No intro screens; no game file changed | yes | `RS_MODS_INTRO=0` |
 | DIRECT CONNECT in the INPUT setting and on the cable screen, from an overlay of your own `cache.psarc` | yes | `RS_MODS_OVERLAY=0` |
 | ENUMERATE in place of SHOP: adds new songs, with no restart. Changed and removed songs need **Refresh Game Files** | yes | `RS_MODS_OVERLAY=0` |
+| EXIT GAME in place of UPLAY | yes | `RS_MODS_OVERLAY=0` |
 | Uplay sign-in prompt skipped | yes | none |
 | Auto Save warning skipped | yes | `RS_MODS_AUTOSAVE=0` |
 | Offline Steam layer: `libsteam_api` with no client, cloud saves in a local folder | yes | none |

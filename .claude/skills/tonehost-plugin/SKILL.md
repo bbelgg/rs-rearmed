@@ -5,7 +5,7 @@ description: Set up another Audio Unit guitar plug-in with rs-tonehost, so the g
 
 # Adding a plug-in to rs-tonehost
 
-`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones; RSMods' `ToneHost` is the game's side.
+`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones; rearmed-mods' `ToneHost` is the game's side.
 Read `tools/tonehost/README.md` first: it has the config. The host knows no plug-in, so a new one is config and saved states.
 Only `tools/tonehost/helix/` is for Helix Native. It's the example for a full mapping, not something to copy unread.
 

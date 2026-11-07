@@ -138,7 +138,7 @@ input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audi
 ### Your own plug-in
 
 `tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
-RSMods' ToneHost is the game's side: on a tone change the game sets each knob of the gear as a Wwise RTPC by name, about
+rearmed-mods' ToneHost is the game's side: on a tone change the game sets each knob of the gear as a Wwise RTPC by name, about
 two seconds ahead of the change in the songs tried, and the mod passes them to the host and keeps `Mixer_Player1` at 0. So
 it needs no game code. The one change here is in `audio_chan.c`: the host can run the guitar's device at 64 frames, and the
 input collects that into the 128-frame slots the game queues. The game's own tones don't get faster: Wwise's 256-frame blocks
@@ -232,7 +232,7 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   with `tools/ws7/recomp/runtime/rc_mod.h` is the same dylib for this edition and Learn & Play: it looks offsets
   up by name when it runs and keeps pointer width out of its source
   ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A mod built for 1.4.x keeps working here as it
-  was, and is left out on Learn & Play. RSMods' library (`Mac/` in that repository, `rearmed-mods.dylib`, from 0.3.0) is
+  was, and is left out on Learn & Play. The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) is
   built this way: its names are under "the mods library" in `tools/targets/names`. Its song search check knows the key
   from the tables (`song_search_key`), as a game binding: `/` here, Shift in Learn & Play.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
@@ -258,6 +258,9 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   `overrides/mods/mods.c`) opens `PatchUpdate/cacheN.7z` first and the `cache.psarc` one when the overlay
   has none. `cache.psarc` is never changed, so a modded cache still works; one that has the entries gets no
   overlay. `RS_MODS_OVERLAY=0` reads `cache.psarc` alone.
+- **Exit Game.** The main menu's UPLAY, which can't work here, becomes EXIT GAME in the same overlay
+  (`ui_menu_pillar_main`: the label, the game's own row 19651 in every language, and the `OnSelect`, `ExitGame`, which the
+  file's help list has too). The game asks with its own dialog, then quits as it does on Cmd+Q.
 - **Enumerate.** The main menu's SHOP becomes ENUMERATE, second in the list, in the same overlay
   (`ui_menu_pillar_main`: the label and sort orders only; its `OnSelect` is still `ChangeMenu` to `Shop`). Before
   it opens the Shop the game asks `ISteamUtils::IsOverlayEnabled`, and it asks nowhere else (RSConnectService slot

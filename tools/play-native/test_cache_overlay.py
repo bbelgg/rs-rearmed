@@ -134,7 +134,8 @@ MAIN = """{ "Static" : { "UI" : { "Menus" : { "Entries" :
 \t\t\t\t{
 \t\t\t\t\t"ID": "uplay",
 \t\t\t\t\t"SortOrder" : 4,
-\t\t\t\t\t"Label" : "$[22953]UPLAY"
+\t\t\t\t\t"Label" : "$[22953]UPLAY",
+\t\t\t\t\t"OnSelect" : { "id" : "Uplay" }
 \t\t\t\t}
 \t\t\t},
 \t\t\t"Help" : { "helpshop": { "ID": "helpshop", "SortOrder" : 2, "Label" : "$[-1]helpSHOP" } }
@@ -229,12 +230,26 @@ class Edits(unittest.TestCase):
         self.assertNotIn('SHOP"', out.replace('helpSHOP"', ""))
         self.assertRegex(out, r'"ID": "shop",[^}]*"id" : "ChangeMenu",\r\n\t+"StageId" :"Shop"')  # OnSelect kept
         self.assertIn('"ItemTemplate": { "SortOrder" : 1,', out)  # outside the Buttons
-        self.assertEqual(len(out), len(MAIN) + len("ENUMERATE") - len("$[22952]SHOP"))  # the label and orders only
+        self.assertEqual(len(co.edit_enumerate(MAIN)), len(MAIN) + len("ENUMERATE") - len("$[22952]SHOP"))  # the label and orders only
         self.assertIsNone(co.edit_main(out))
+
+    def test_exit_game(self):
+        out = co.edit_main(MAIN)
+        self.assertRegex(out, r'"ID": "uplay",[^}]*"Label" : "\$\[19651\]EXIT GAME",[^}]*"id" : "ExitGame"')
+        self.assertNotIn("UPLAY", out)
+        self.assertNotIn('"Uplay"', out)
+        self.assertEqual(len(co.edit_exit(MAIN)),
+                         len(MAIN) + len(co.EXIT_LABEL) - len("$[22953]UPLAY") + len("ExitGame") - len("Uplay"))
+
+    def test_exit_game_modded(self):
+        modded = MAIN.replace('"$[22953]UPLAY"', '"$[19651]EXIT GAME"').replace('"id" : "Uplay"', '"id" : "ExitGame"')
+        self.assertIsNone(co.edit_exit(modded))  # the RSMods edit counts as there
+        self.assertIsNotNone(co.edit_enumerate(modded))  # and the rest of the file is still done
+        self.assertIsNotNone(co.edit_main(modded))
 
     def test_main_modded(self):
         modded = MAIN.replace('"$[22952]SHOP"', '"ENUMERATE"')
-        self.assertIsNone(co.edit_main(modded))  # the RSMods edit counts as there
+        self.assertIsNone(co.edit_enumerate(modded))  # the RSMods edit counts as there
 
     def test_multiplayer_notice(self):
         table = NOTICES + "37359,Player 2 must use the cable.,Le joueur 2,,Der Spieler,,,,\r\n"
@@ -255,6 +270,7 @@ class Edits(unittest.TestCase):
         self.assertIsNone(co.edit_startup('{"x": 1}'))
         self.assertIsNone(co.edit_mission('{"x": 1}'))
         self.assertIsNone(co.edit_main('{"x": 1}'))
+        self.assertIsNone(co.edit_exit('{"x": 1}'))
         self.assertIsNone(co.edit_notice('1,x,y\r\n'))
 
 

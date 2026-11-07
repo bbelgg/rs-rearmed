@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate, Multiplayer's notice): a small patch archive made from the user's own cache.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice): a small patch archive made from the user's own cache.psarc.
 
     cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
     cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing
@@ -16,6 +16,9 @@ ENUMERATE, in second place, its OnSelect left as it is, and the notice (row 3667
 all languages) says what now happens: the offline Steam layer takes the overlay check as the press, brings new
 songs into the copy and has the game scan dlc/ again (shims/steam/src/enumerate.h). Row 37359, the notice MULTIPLAYER
 INPUT SUPPORT, says what two players can use now.
+
+The main menu's UPLAY can't work either: there is no Uplay here. So the same file's entry becomes EXIT GAME, the
+game's own label (row 19651, in every language) and its own action, which the file's help list has too.
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -475,6 +478,7 @@ MAIN = "manifests/ui_menu_pillar_main.database.json"
 NOTICES = "localization/maingame.csv"
 ENUMERATE = "ENUMERATE"
 ENUMERATE_ORDER = 1  # after LEARN A SONG
+EXIT_LABEL = "$[19651]EXIT GAME"
 # 36675 is "You must enable Steam Community In-Game to access the Shop."
 NOTICE_ID = "36675"
 NOTICE = "Looking for new songs. They will be in the song list in a moment."
@@ -594,7 +598,27 @@ def edit_mission(text):
     return None
 
 
+def edit_exit(text):
+    """The main menu's UPLAY entry as EXIT GAME: its label and action. None when it does something else already
+    (RSMods' edit counts as there) or is not the expected file."""
+    for k, o, e in _entries(text, "uplay"):
+        entry, actions = re.subn(r'("id"\s*:\s*")Uplay"', r'\1ExitGame"', text[o:e], count=1)
+        entry, labels = re.subn(r'("Label"\s*:\s*")[^"]*', lambda m: m.group(1) + EXIT_LABEL, entry, count=1)
+        return text[:o] + entry + text[e:] if actions and labels else None
+    return None
+
+
 def edit_main(text):
+    """The main menu's two entries that can't work here; None when neither needs a change."""
+    out = text
+    for edit in (edit_enumerate, edit_exit):
+        edited = edit(out)
+        if edited is not None:
+            out = edited
+    return None if out == text else out
+
+
+def edit_enumerate(text):
     """The main menu's SHOP entry as ENUMERATE, second in the list, the entries it passes one place down: only
     the label and the sort orders change, its OnSelect stays. None when it has that label or is not the expected
     file."""

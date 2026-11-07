@@ -294,7 +294,7 @@ the HAL unit can convert, not only the device's own.
 ### Your own plug-in
 
 `tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
-RSMods' ToneHost is the game's side, with the same `ak_set_rtpc_name` hook point on this game, and played the same as on the
+rearmed-mods' ToneHost is the game's side, with the same `ak_set_rtpc_name` hook point on this game, and played the same as on the
 Mac. The input takes any buffer size (`input_cb`), so it needs no change like the Mac's `audio_chan.c`.
 
 ## Video (Bink)
@@ -446,7 +446,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   Two things differ with the call the same: a mod's hooks run around a built-in fix here, where on the Mac the fix is a pre hook that can answer first, and `game_frame` is a tick
   of the Run loop, so it runs more often than frames are presented.
 
-  RSMods' library (`rearmed-mods.dylib`, from 0.3.0) runs here as the same file as on the Mac. What it needs of the game
+  The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) runs here as the same file as on the Mac. What it needs of the game
   is in the tables ("the mods library" in `tools/targets/names`): Wwise by name, the UI manager, the DLC service, the Gamebryo
   fields and the search key. A mod finds its settings in the game folder: with mods the installed app goes to `LP_GAME_DIR`,
   the Mac's working directory, before it loads them. A mod's strings and results are memory from `rc_guest_alloc`.
@@ -467,6 +467,8 @@ More native replacements of single game functions by address (`win-x86/build/ski
   here: for a `cacheN.7z` it opens `PatchUpdate/<name>` first,
   then does what the original does (the lower-case path to the front-end file system's `Open`, slot +0x10
   of the singleton at 0x1ee67c4, and an `AddRef` for the caller). `RS_MODS_OVERLAY=0` as on the Mac.
+- **Exit Game.** The same entry as the Mac's ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)), and the same edit:
+  the game has the action.
 - **Enumerate.** The same entry and the same code as the Mac's ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)):
   the overlay's two edits, and `shims/steam/src/enumerate.h`, compiled in through `interfaces.cpp`. The overlay
   check is RSConnectService slot 125 here (four callers), `steam32.c` answers `IsOverlayEnabled` and posts the

@@ -66,14 +66,15 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 15 of the 18 hook points, the overlay API and the render API |
-| RSMods' library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods |
+| The rearmed-mods library (`rearmed-mods.dylib`, 0.3.0) | ✅ | ✅ the same file, all 19 mods |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |
 | ENUMERATE: new songs without a restart | ✅ | ✅ |
+| EXIT GAME in the main menu | ✅ | ✅ |
 | Lower guitar latency | ✅ | ⚠️ |
-| Your own plug-in in place of the game's tones (`tools/tonehost`, RSMods' ToneHost) | ✅ played with Helix Native | ✅ the same |
+| Your own plug-in in place of the game's tones (`tools/tonehost`, rearmed-mods' ToneHost) | ✅ played with Helix Native | ✅ the same |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |
 | Window, full screen, Retina | ✅ | ✅ |
 | Frame rate follows the display | ✅ 75/120 Hz | ✅ 75 Hz |
@@ -157,7 +158,7 @@ The recompiler both use: [docs/recompiler](docs/recompiler/README.md). How the t
   [XenonRecomp](https://github.com/hedge-dev/XenonRecomp), for the static-recompilation approach.
 - [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) by glebb.
 - [RSBypass](https://github.com/aik002/RSBypass) by aik002.
-- [RSMods](https://github.com/Lovrom8/RSMods) by Lovrom8, for the menu entry that Enumerate does the job of.
+- [RSMods](https://github.com/Lovrom8/RSMods) by Lovrom8, for the menu entries that Enumerate and Exit Game do the job of.
 - The Rocksmith modding community.
 - [FFmpeg](https://ffmpeg.org/), for Bink 2 decoding.
 - [Lua](https://www.lua.org/), [libpng](http://www.libpng.org/pub/png/libpng.html) and

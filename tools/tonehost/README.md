@@ -1,7 +1,7 @@
 # rs-tonehost
 
-Plays the guitar through an Audio Unit of your own in place of the game's tones. A first version: it works for one
-player on the Mac edition and has only been tried with Helix Native.
+Plays the guitar through an Audio Unit of your own in place of the game's tones. It works for one player, in both
+editions, and has only been tried with Helix Native.
 
 Two pieces:
 
@@ -106,4 +106,4 @@ Commands on the FIFO: `gear KEY=VALUE ...` and `mixer VALUE` from the mod, `use 
 Offline, against the game with a test signal: on one song a template with the tone's amp, compressor and drive pedal
 came within 0.29 dB RMS of the distorted tone's level and 1.41 dB of the clean one's, the clean amp being a stand-in.
 Each Helix instance costs about 2.7% of a core and two take about 1.4 GB; the one standing by renders only around a switch. A bypassed amp saves nothing. Not done:
-measuring each amp's drive against the game, real latency, Learn & Play, two players.
+measuring each amp's drive against the game, latency measured end to end, two players.

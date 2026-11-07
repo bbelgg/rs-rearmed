@@ -35,12 +35,24 @@ static void save(void) {
 @implementation Closer
 - (void)windowWillClose:(NSNotification *)n { save(); [NSApp terminate:nil]; }
 @end
+// Command-V works through an Edit menu, in the plug-in's fields and in the file dialogs it opens
+static void edit_menu(void) {
+  NSMenu *bar = [NSMenu new], *edit = [[NSMenu alloc] initWithTitle:@"Edit"];
+  [edit addItemWithTitle:@"Cut" action:@selector(cut:) keyEquivalent:@"x"];
+  [edit addItemWithTitle:@"Copy" action:@selector(copy:) keyEquivalent:@"c"];
+  [edit addItemWithTitle:@"Paste" action:@selector(paste:) keyEquivalent:@"v"];
+  [edit addItemWithTitle:@"Select All" action:@selector(selectAll:) keyEquivalent:@"a"];
+  [bar addItemWithTitle:@"" action:NULL keyEquivalent:@""].submenu = [NSMenu new];  // the first is the application's menu
+  [bar addItemWithTitle:@"Edit" action:NULL keyEquivalent:@""].submenu = edit;
+  NSApp.mainMenu = bar;
+}
 static uint32_t fourcc(const char *c) { return (uint32_t)c[0] << 24 | (uint32_t)c[1] << 16 | (uint32_t)c[2] << 8 | (uint32_t)c[3]; }
 int main(int argc, char **argv) { @autoreleasepool {
   if (argc < 4) { fprintf(stderr, "usage: rs-tone-editor TYPE SUBTYPE MANUFACTURER [STATE.plist]\n"); return 2; }
   if (argc > 4) file = [NSString stringWithUTF8String:argv[4]];
   [NSApplication sharedApplication];
   [NSApp setActivationPolicy:NSApplicationActivationPolicyRegular];
+  edit_menu();
   AudioComponentDescription d = {fourcc(argv[1]), fourcc(argv[2]), fourcc(argv[3]), 0, 0};
   AudioComponent c = AudioComponentFindNext(NULL, &d);
   if (!c || AudioComponentInstanceNew(c, &u)) { fprintf(stderr, "no such Audio Unit\n"); return 1; }

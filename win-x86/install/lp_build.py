@@ -727,7 +727,10 @@ def info_plist(version, icon):
         "CFBundleShortVersionString": version,
         "CFBundleVersion": version,
         "LSMinimumSystemVersion": "11.0",
-        "LSApplicationCategoryType": "public.app-category.music-games",
+        # Not a game category: macOS turns Game Mode on for one in full screen, whatever LSSupportsGameMode says, and
+        # the audio of a plug-in host (rs-tonehost) then crackles while the game has focus
+        "LSApplicationCategoryType": "public.app-category.music",
+        "LSSupportsGameMode": False,
         "NSHighResolutionCapable": True,
         "NSMicrophoneUsageDescription": "Rocksmith listens to your guitar through the Real Tone cable or another input.",
     }

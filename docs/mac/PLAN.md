@@ -19,8 +19,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - **Full-screen shape**: on a 16:10 screen the 16:9 picture is stretched, as in the original under Rosetta. The Windows game's bars are its own code.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 
-- **Your own plug-in** (`tools/tonehost`, rearmed-mods' ToneHost): played with Helix Native, with the game's gear mapped onto it.
-  Open: disguised amps are a best guess, and input level follows a rule, not a measurement of each amp.
+- **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native, with the game's gear mapped onto it. Its open work is kept with it.
 
 ## Open issues
 

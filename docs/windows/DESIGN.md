@@ -293,8 +293,8 @@ the HAL unit can convert, not only the device's own.
 
 ### Your own plug-in
 
-`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
-rearmed-mods' ToneHost is the game's side, with the same `ak_set_rtpc_name` hook point on this game, and played the same as on the
+rearmed-mods' ToneHost add-on plays the guitar through an Audio Unit in place of the game's tones, with a host of its own beside
+the game. Its mod is the game's side, with the same `ak_set_rtpc_name` hook point on this game, and played the same as on the
 Mac. The input takes any buffer size (`input_cb`), so it needs no change like the Mac's `audio_chan.c`.
 
 ## Video (Bink)

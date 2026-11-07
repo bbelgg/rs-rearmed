@@ -137,8 +137,8 @@ input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audi
 
 ### Your own plug-in
 
-`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
-rearmed-mods' ToneHost is the game's side: on a tone change the game sets each knob of the gear as a Wwise RTPC by name, about
+rearmed-mods' ToneHost add-on plays the guitar through an Audio Unit in place of the game's tones, with a host of its own beside
+the game. Its mod is the game's side: on a tone change the game sets each knob of the gear as a Wwise RTPC by name, about
 two seconds ahead of the change in the songs tried, and the mod passes them to the host and keeps `Mixer_Player1` at 0. So
 it needs no game code. The one change here is in `audio_chan.c`: the host can run the guitar's device at 64 frames, and the
 input collects that into the 128-frame slots the game queues. The game's own tones don't get faster: Wwise's 256-frame blocks

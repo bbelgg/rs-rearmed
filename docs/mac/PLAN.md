@@ -10,7 +10,11 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
   cable, the microphone and other interfaces through Direct Connect, with lower latency than under Rosetta; every channel in the input list, input channel and gain, calibration
   that can boost; the output following the system's default; Metal by default with OpenGL as choice and fallback; full screen, Retina; Enumerate; the built-in fixes, no intro
   screens or Auto Save warning; the GUI installer.
-- **Mods**: loaded at startup, with name-keyed hook points. A mod built with `rc_mod.h` is one dylib for this app and Learn & Play. `rearmed-mods.dylib` 0.3.0 runs here.
+- **Mods**: loaded at startup, with name-keyed hook points. A mod built with `rc_mod.h` is one dylib for this app and Learn & Play. `rearmed-mods.dylib` 0.8.0 loads here, with its 23 mods.
+- **Colors of notes, the highway and strings** (new in 1.9.0): mods change them, in rearmed-mods from 0.8.0, and they were checked in both editions with its 0.5.0. Notes and the highway go through the
+  [render API](METAL.md#render-api-shimsincluders_renderh) on Metal. The game colors them through small palette textures, found with the texture log ([TESTING.md](TESTING.md#diagnostics)) in one song in each
+  edition: a 256x128 ramp for note heads, tails and open-string bars, a second on the indicators' shapes, and 256x32 and 512x32 ones for the highway. Other modes aren't checked. The string colors are in the
+  game's own table, named `game_color_manager` and `game_color_table`, the same in both games.
 - **Exit Game** (new in 1.9.0): EXIT GAME in the main menu, in place of UPLAY, pressed in a test install of each edition.
 - **Two players** (new in 1.8.0): a song with each player on their own input, played on two channels of one interface, SWAP CABLE ASSIGNMENT included; a cable and an interface and two interfaces have not been played.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with the owning account logged in to Steam.
@@ -24,6 +28,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 
 ## Open issues
 
+- **The published installer**: 1.9.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs. The last full install from a published installer was 1.6.0's.
 - **The title screen's own Auto Save call**: in Learn & Play the title has a second call of the dialog ([Windows plan](../windows/PLAN.md#open-issues)). This game's counterpart has not been read.
 - The cable screen's Direct Connect button hasn't been checked.
 
@@ -48,9 +53,6 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **Colors of notes and the highway**: the [render API](METAL.md#render-api-shimsincluders_renderh) is there, and the rearmed-mods library uses it from 0.5.0, and in 0.8.0, its first release from rearmed-mods. The game colors them through small palette
-  textures, found with the texture log ([TESTING.md](TESTING.md#diagnostics)) in one song in each edition: a 256x128 ramp for note heads, tails and open-string bars, a second
-  on the indicators' shapes, and 256x32 and 512x32 ones for the highway. Other modes aren't checked. The string colors are in the game's own table, named `game_color_manager` and `game_color_table`, the same in both games.
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
   hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

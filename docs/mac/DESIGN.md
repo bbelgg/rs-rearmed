@@ -135,6 +135,15 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the
 input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which the Windows port shares. `RS_AUDIO_LOG=1` logs the setup.
 
+### Your own plug-in
+
+`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
+RSMods' ToneHost is the game's side: on a tone change the game sets each knob of the gear as a Wwise RTPC by name, about
+two seconds ahead of the change in the songs tried, and the mod passes them to the host and keeps `Mixer_Player1` at 0. So
+it needs no game code. The one change here is in `audio_chan.c`: the host can run the guitar's device at 64 frames, and the
+input collects that into the 128-frame slots the game queues. The game's own tones don't get faster: Wwise's 256-frame blocks
+set their latency.
+
 ## Video (Bink)
 
 The game plays its videos with Bink 2 (`libBink2Macx64.dylib`). `shims/bink` replaces it with a decoder on

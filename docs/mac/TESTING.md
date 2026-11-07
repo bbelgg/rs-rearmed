@@ -202,6 +202,10 @@ user's, with a test profile.
   10 s, `key /`, 2 s, `text cherub`, 11 s, Return on the match, 7 s, Return on Play Song, 29 s, `key fwddelete`, 4 s, Return: the highway within 30 s, and the window starts 46 s after that Return. To take the UR22mkII
   on such a profile: Ctrl, Down twice to AVAILABLE INPUTS, Return, Down to it, Return, Esc; a normal quit saves it. Snapshots every 265 s give one look at the highway after the window
   without one in it. Check the route by snapshots first, as `fwddelete` on ProfileSelect deletes the profile.
+- **The virtual cable with the list of inputs** (2026-11-07, a scripted run to a song with its signal recorded): a fake input
+  device's id must leave bit 30 clear, as `audio_devs.c` takes such an id for a channel's and the game then dies on `CFRelease(NULL)` in the
+  device scan. Reference images must have the snapshots' size (2560x1440 on a 1440p screen), and the old main menu's has no ENUMERATE,
+  so time that step. Give the title 8 s after it matches before Return: a Return in the fade is lost, and Escape there opens EXIT GAME.
 - **A song with no interface connected** (2026-11-07, the texture log's runs, a test profile on REAL TONE CABLE): the tuner stops at "It sounds like your
   cable is unplugged". So on the main menu, 22 s after `menu: MainMenu` (a Return sooner is lost in the transition): `front`, Ctrl, Down, Right twice to
   DISCONNECTED, Esc, 8 s, Return on LEARN A SONG. Search, Return on the match, Return on Play Song, 26 s on the TUNE UP! dialog, `fwddelete`, 5 s, Return:

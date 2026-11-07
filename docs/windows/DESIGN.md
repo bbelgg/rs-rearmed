@@ -291,6 +291,12 @@ The system's default output changing reaches the game's `IMMNotificationClient`s
 edition's override does by hand. Other device changes are seen at the game's next scan. Exclusive mode takes any format
 the HAL unit can convert, not only the device's own.
 
+### Your own plug-in
+
+`tools/tonehost` plays the guitar through an Audio Unit in place of the game's tones ([its README](../../tools/tonehost/README.md)).
+RSMods' ToneHost is the game's side, with the same `ak_set_rtpc_name` hook point on this game. Not tried here yet. The input
+takes any buffer size (`input_cb`), so it needs no change like the Mac's `audio_chan.c`.
+
 ## Video (Bink)
 
 The game plays Bink 2 videos (`video.psarc`: first-run tutorials and credits; `etudes.psarc`: 360 lesson

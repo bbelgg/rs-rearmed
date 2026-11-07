@@ -73,6 +73,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |
 | ENUMERATE: new songs without a restart | ✅ | ✅ |
 | Lower guitar latency | ✅ | ⚠️ |
+| Your own plug-in in place of the game's tones (`tools/tonehost`, RSMods' ToneHost) | ✅ played with Helix Native | ⚠️ not tried yet |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |
 | Window, full screen, Retina | ✅ | ✅ |
 | Frame rate follows the display | ✅ 75/120 Hz | ✅ 75 Hz |

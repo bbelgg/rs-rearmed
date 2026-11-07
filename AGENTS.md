@@ -20,7 +20,7 @@ Shared by both: the recompiler (`tools/ws7/recomp`, 64-bit and 32-bit PE front e
 backend; Learn & Play's D3D9 layer draws through it), the shader corpus tools (`tools/metal`), CoreAudio
 (`shims/coreaudio`), the offline Steam behaviour, the mod loader and its ABI
 (`tools/ws7/recomp/runtime/rc_mods.c`, `rc_mod.h`), the installer app (`tools/installer`), the game-file copy
-(`tools/play-native/gamefiles.py`) and the per-game tables (`tools/targets`).
+(`tools/play-native/gamefiles.py`), the per-game tables (`tools/targets`) and the plug-in host (`tools/tonehost`).
 
 The network guard is the same rule in two forms: the Mac edition loads `tools/ws8/netguard` into the game on
 every launch; Learn & Play has no host socket to guard (no `socket`, `connect` or name lookup is linked into

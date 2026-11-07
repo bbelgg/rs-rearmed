@@ -20,6 +20,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build without one
   ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for its relocation sites, which nothing reads out of the capture VM yet.
 
+- **Your own plug-in** (`tools/tonehost`, RSMods' ToneHost): not tried on this edition yet.
+
 ## Open issues
 
 - **The title screen's own Auto Save call** (`0x12bd061`): read from the code, not seen in a run. The title listens for the same `OnSignInFlowComplete` (`0x12bdd00`), and with

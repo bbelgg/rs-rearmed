@@ -4,7 +4,7 @@
 #   tools/tonehost/helix/setup.sh [--input DEVICE --channel N] [--output DEVICE]
 # The first time it needs --input and --channel; a later run keeps your settings. RS_NATIVE_HOME: the install, by default
 # ~/Library/Application Support/RS Re-ARMed. RS_HELIX_SETLIST: which setlist the import goes to, counted as MIDI does
-# (6 is USER 5). Then turn on ToneHost in RSMods: the game starts the host from then on.
+# (6 is USER 5). Then turn on ToneHost in rearmed-mods: the game starts the host from then on.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../../.." && pwd)
@@ -33,6 +33,7 @@ restore() {
   cp -R "$backup/#PRESET_LIBRARY" "$native/"
   cp "$backup/Helix Native.prefs" "$native/Helix Native.prefs"
   echo "Your Helix library is back as it was."
+  rm -rf "$work"  # also so that nobody can import this setlist by mistake next time
 }
 trap restore EXIT
 
@@ -40,7 +41,7 @@ cat <<EOT
 
 One step for you, in the window that opens:
   1. Choose the setlist USER $((setlist - 1)) at the top left. It is put back afterwards.
-  2. Click IMPORT next to SETLISTS and open
+  2. Click IMPORT next to SETLISTS, press Command-Shift-G and paste this path, then press Return and Open:
      $work/setlist.hls
   3. Answer Yes, then close the window.
 
@@ -57,11 +58,19 @@ print(' '.join(v['state'] for k, v in sorted(t.items(), key=lambda kv: kv[1]['sl
 DYLD_INSERT_LIBRARIES=$guard "$out/capture_states" "$setlist" "$work/states" $names | tail -1
 
 [ "$(md5 -q "$work"/states/* | sort -u | wc -l)" -gt 1 ] || { echo "The presets all came out the same: was the import in the right setlist?" >&2; exit 1; }
+# A state of an older setlist looks the same from outside: the reverb, the last block, has to answer
+first=${names%% *}
+read -r reverb_switch reverb_mix < <(python3 -c "
+import json, sys
+f = json.load(open(sys.argv[1]))['follow']
+print(max(r['param'] for r in f if 'present' in r), [r['param'] for r in f if r.get('prefix') == 'Rack_StudioPlate_' and r['from'] == '_Mix'][0])" "$work/tones.json")
+DYLD_INSERT_LIBRARIES=$guard "$out/check_states" "$work/states/$first" "$reverb_switch" "$reverb_mix" ||
+  { echo "These presets aren't the ones just made: was the right setlist.hls imported? Nothing was installed." >&2; exit 1; }
 
-[ -p "$dest/commands" ] && echo quit > "$dest/commands"
+pgrep -f "RS Tone Host.app" > /dev/null && echo quit > "$dest/commands"  # nobody reading: a write would wait for ever
 rm -rf "$dest/states" "$dest/RS Tone Host.app"
 cp -R "$work/states" "$dest/states"
 cp -R "$out/RS Tone Host.app" "$dest/"
 cp "$out/start.sh" "$out/stop.sh" "$dest/"
 python3 "$here/make_config.py" "$work/tones.json" "$dest/config.json" "$@"
-echo "Done. Turn on ToneHost in RSMods; macOS asks for the microphone the first time the host runs."
+echo "Done. Turn on ToneHost in rearmed-mods; macOS asks for the microphone the first time the host runs."

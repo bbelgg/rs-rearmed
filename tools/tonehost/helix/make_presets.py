@@ -6,15 +6,16 @@
 OUTDIR gets setlist.hls, one preset per Helix amp to import once, and tones.json, what the host's config needs: the
 presets in order and the rules from the game's knobs to parameters. Every value not set here is Line 6's default, read
 from the install, and nothing of Line 6's is kept in the repository. Each preset is the same chain, so the knobs and
-switches mean the same everywhere: octave up and down, wah, drive, amp and its default cab, compressor, chorus, flanger,
-then phaser, tremolo, delay and reverb on the second path, as a path has room for eight blocks.
+switches mean the same everywhere: octave up and down, wah, fuzz, metal, drive, amp and its default cab, compressor, then
+chorus, flanger, phaser, tremolo, delay and reverb on the second path, as a path has room for eight blocks. README.md has
+what was learned about Helix's files.
 """
 import base64, json, os, sys, time, zlib
 
 RES = "/Library/Application Support/Line 6/Helix Native/res"
 NATIVE = 2162944  # Helix Native in Helix compatibility mode
-ORDER = ["octave_up", "octave_down", "wah", "drive", None, "compressor", "chorus", "flanger",  # None: the amp
-         "phaser", "tremolo", "delay", "reverb"]
+ORDER = ["octave_up", "octave_down", "wah", "fuzz", "metal", "drive", None, "compressor",  # None: the amp
+         "chorus", "flanger", "phaser", "tremolo", "delay", "reverb"]
 PATH_ONE = 8  # blocks on the first path; the rest go on the second
 TO_PATH_2A = 2  # @output of the first path
 SWITCH = 16  # Audio Unit parameters: knobs 0-15, switches 16-31
@@ -54,7 +55,7 @@ def preset(name, amp, base, M, gear):
     d["outputA"]["@output"] = TO_PATH_2A
     second["inputA"]["@input"] = 0
     second["outputA"]["@output"] = 1
-    assign, knob_default, blocks = [None] * (SWITCH + 12), {}, {"dsp0": {}, "dsp1": {}}
+    assign, knob_default, blocks = [None] * (SWITCH + 13), {}, {"dsp0": {}, "dsp1": {}}
     sw = 0
     for index, kind in enumerate(ORDER):
         dsp_name, pos = ("dsp0", index) if index < PATH_ONE else ("dsp1", index - PATH_ONE)
@@ -113,11 +114,11 @@ def rules(gear):
     for suffix, k in (("_Bass", 1), ("_Mid", 2), ("_Treble", 3), ("_Pres", 4)):
         f.append({"param": k, "from": suffix, "contains": "Amp_", "scale": 0.01, "offset": 0})
     how = {("drive", "Gain"): ("_Gain", 0.0098, 0), ("drive", "Tone"): ("_Tone", 0.01, 0),
-           ("compressor", "Threshold"): ("_Threshold", 1 / 60, 1), ("compressor", "Ratio"): ("_Ratio", 0.2, 0),
+           ("compressor", "Threshold"): ("_Threshold", 1 / 60, 1), ("fuzz", "Sustain"): ("_Gain", 0.0098, 0), ("metal", "Drive"): ("_Gain", 0.0098, 0),
            ("chorus", "Mix"): ("_Mix", 0.01, 0), ("flanger", "Rate"): ("_Rate", 0.01, 0),
            ("delay", "Time"): ("_Time", 0.0005, 0), ("delay", "Feedback"): ("_Feedback", 0.01, 0), ("delay", "Mix"): ("_Mix", 0.01, 0),
-           ("reverb", "Decay"): ("_Time", 0.01, 0), ("reverb", "Mix"): ("_Mix", 0.01, 0)}
-    other = {"_Comp": (-1 / 150, 1), "_Compress": (-1 / 150, 1), "_Smash": (-1 / 150, 1), "_Limit": (-1 / 150, 1), "_Boost": (0.0098, 0), "_RateTen": (0.1, 0)}
+           ("reverb", "Mix"): ("_Mix", 0.01, 0)}
+    other = {"_Comp": (-1 / 150, 1), "_Compress": (-1 / 150, 1), "_Smash": (-1 / 150, 1), "_Limit": (-1 / 150, 1), "_Boost": (0.0098, 0), "_RateTen": (0.1, 0), "_GainWide": (0.0065, 0)}
     sw = 0
     for kind in [k for k in ORDER if k]:
         spec = gear["blocks"][kind]
@@ -129,7 +130,7 @@ def rules(gear):
                 if p in names:
                     suffix = names[p]
                     scale, offset = other.get(suffix, (scale, offset))
-                    suffix = {"_RateTen": "_Rate"}.get(suffix, suffix)
+                    suffix = {"_RateTen": "_Rate", "_GainWide": "_Gain"}.get(suffix, suffix)  # the knob's real name, on another scale
                 f.append({"param": k, "from": suffix, "prefix": key + "_", "scale": round(scale, 6), "offset": offset})
     return f
 
@@ -165,7 +166,7 @@ def main():
     json.dump(hls, open(os.path.join(out, "setlist.hls"), "w"), indent=2)
     by = {k + "_": v for k, v in gear["amps"].items()}
     json.dump({"templates": templates, "by_prefix": by, "fallback": gear["fallback"], "follow": rules(gear),
-               "drive_pedals": sorted(gear["blocks"]["drive"]["gear"])}, open(os.path.join(out, "tones.json"), "w"), indent=1)
+               "drive_pedals": sorted(k for b in ("drive", "fuzz", "metal") for k in gear["blocks"][b]["gear"])}, open(os.path.join(out, "tones.json"), "w"), indent=1)
     print("%d presets, %d game amps, %d rules" % (len(used), len(gear["amps"]), len(rules(gear))))
 
 

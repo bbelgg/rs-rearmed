@@ -14,5 +14,7 @@ clang -arch arm64 -O2 -Wall -fobjc-arc -mmacosx-version-min=11.0 "$here/editor.m
   -framework AudioUnit -o "$out/rs-tone-editor"
 clang -arch arm64 -O2 -Wall -fobjc-arc -mmacosx-version-min=11.0 "$here/helix/capture_states.m" -framework Foundation \
   -framework AudioToolbox -o "$out/capture_states"
+clang -arch arm64 -O2 -Wall -fobjc-arc -mmacosx-version-min=11.0 "$here/helix/check_states.m" -framework Foundation \
+  -framework AudioToolbox -o "$out/check_states"
 cp "$here/start.sh" "$here/stop.sh" "$out/"
 echo "built: $app"

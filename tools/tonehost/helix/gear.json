@@ -33,12 +33,14 @@
     "octave_up": {"model": "HD2_PitchSimplePitch", "set": {"Interval1": 12, "Mix": 0.5}, "gear": {"Pedal_OctaveUp": {}}},
     "octave_down": {"model": "HD2_PitchSimplePitch", "set": {"Interval1": -12, "Mix": 0.5}, "gear": {"Pedal_Octavius": {}, "Bass_Pedal_BassSubOctave": {}}},
     "wah": {"model": "HD2_FilterAutoFilter", "gear": {"Pedal_USWah": {}, "Pedal_ModernWah": {}, "Pedal_UKWah": {}, "Bass_Pedal_BassWah": {}, "Pedal_BobFilter": {}, "Pedal_AutoFilter": {}, "Bass_Pedal_BassAutoFilter": {}, "Rack_StudioWahFilter": {}}},
+    "fuzz": {"model": "HD2_DistTriangleFuzz", "knobs": {"Sustain": 8}, "gear": {
+      "Pedal_CaptFuzzle": {"Sustain": "_GainWide"}, "Pedal_BuzzToo": {}, "Pedal_BuzzOne": {}, "Pedal_FuzzWasHe": {}, "Bass_Pedal_BassFuzz": {}}},
+    "metal": {"model": "HD2_DistSwedishChainsaw", "knobs": {"Drive": 14}, "gear": {
+      "Pedal_MetalDistortion": {}, "Pedal_ShredZone": {}, "Pedal_Distortion": {}, "Pedal_VintageDistortion": {}, "Bass_Pedal_BassDistortion": {}}},
     "drive": {"model": "HD2_DistMinotaur", "knobs": {"Gain": 5, "Tone": 6}, "gear": {
-      "Pedal_GermaniumDrive": {}, "Pedal_LineDrive": {}, "Pedal_CustomDrive": {}, "Pedal_MetalDistortion": {}, "Pedal_ShredZone": {},
-      "Pedal_CaptFuzzle": {}, "Pedal_BuzzToo": {}, "Pedal_BuzzOne": {}, "Pedal_FuzzWasHe": {}, "Pedal_SuperDrive": {}, "Pedal_Distortion": {},
-      "Pedal_VintageDistortion": {}, "Pedal_RangeBooster": {"Gain": "_Boost"}, "Pedal_MarshallGuvnorPlus": {},
-      "Bass_Pedal_BassOverdrive": {}, "Bass_Pedal_BassDistortion": {}, "Bass_Pedal_BassFuzz": {}}},
-    "compressor": {"model": "HD2_CompressorDeluxeComp", "set": {"Level": 0.0, "Mix": 1.0}, "knobs": {"Threshold": 7, "Ratio": 8}, "gear": {
+      "Pedal_GermaniumDrive": {}, "Pedal_LineDrive": {}, "Pedal_CustomDrive": {}, "Pedal_SuperDrive": {},
+      "Pedal_RangeBooster": {"Gain": "_Boost"}, "Pedal_MarshallGuvnorPlus": {}, "Bass_Pedal_BassOverdrive": {}}},
+    "compressor": {"model": "HD2_CompressorDeluxeComp", "set": {"Level": 0.0, "Mix": 1.0, "Ratio": 2}, "knobs": {"Threshold": 7}, "gear": {
       "Rack_StudioCompressor": {}, "Pedal_Compression": {"Threshold": "_Comp"}, "Bass_Pedal_MBComp": {"Threshold": "_Compress"}, "Pedal_Swole": {"Threshold": "_Smash"}, "Pedal_Limiter": {"Threshold": "_Limit"}}},
     "chorus": {"model": "HD2_Chorus", "knobs": {"Mix": 10}, "gear": {
       "Rack_StudioChorus": {}, "Pedal_Chorus": {}, "Pedal_DigitalChorus": {}, "Pedal_Chorus20": {}, "Pedal_VintageChorus": {}, "Bass_Pedal_BassChorus": {}}},
@@ -49,7 +51,7 @@
     "delay": {"model": "HD2_DelaySimpleDelay", "knobs": {"Time": 11, "Feedback": 12, "Mix": 13}, "gear": {
       "Rack_StudioDelay": {"Time": "_TimeL"}, "Pedal_ModDelay": {}, "Pedal_AnalogueDelay": {}, "Pedal_ValveEcho": {}, "Pedal_CosmicEcho": {}, "Pedal_NoFiEcho": {},
       "Pedal_NPNDelay": {}, "Pedal_OilCanEcho": {}, "Rack_TapeEcho": {}}},
-    "reverb": {"model": "HD2_ReverbPlate", "knobs": {"Decay": 14, "Mix": 15}, "gear": {
+    "reverb": {"model": "HD2_ReverbPlate", "knobs": {"Mix": 15}, "gear": {
       "Pedal_SpringReverb": {}, "Rack_StudioChamber": {}, "Rack_StudioVerb": {}, "Rack_StudioPlate": {}, "Pedal_DigitalVerb": {}, "Pedal_PlateVerb": {}, "Pedal_TubeSpring": {}}}
   }
 }

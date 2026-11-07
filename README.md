@@ -12,6 +12,28 @@ services. It builds from either of two games:
 This project contains no game code or assets, so you need your own copy of the game. Not affiliated with or
 endorsed by Ubisoft. Rocksmith is a trademark of Ubisoft.
 
+## Why it exists
+
+Rocksmith on the Mac stands on ground that is going away: Apple is phasing out Rosetta and has deprecated OpenGL, and
+Ubisoft no longer updates the game and never brought Learn & Play to the Mac. RS Re-ARMed keeps it playing and makes
+it better. The priorities:
+
+- **Future-proof, whatever Apple or Ubisoft do.** Native code with no Rosetta, and Metal by default (the Mac game keeps
+  OpenGL as a choice and automatic fallback). Offline: no Steam client while you play, no Ubisoft sign-in, and every
+  connection that isn't local is refused and logged. The app has its own game files, so a Steam update or uninstall
+  can't break it; on the same disk the copy takes no extra space.
+- **A better game on the Mac.** It was always a bit laggy and buggy. Now it runs much smoother, without the stalls, at
+  your display's refresh rate, with the fixes from [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) and
+  [RSBypass](https://github.com/aik002/RSBypass) built in.
+- **Proper support for external audio devices.** Any interface, not only the Real Tone cable: Direct Connect in the
+  menus, every channel listed, calibration that can boost a quiet input, lower guitar latency, and multiplayer with
+  each player on their own input.
+- **Quality of life.** Custom songs out of the box, with no CDLC patch. **ENUMERATE** in the main menu adds new songs
+  without a restart. No intro screens, and mods load from a `mods/` folder.
+
+Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can be
+switched off: [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
+
 ## Requirements
 
 - A Mac with Apple Silicon (M1 or later), macOS 12 or later.
@@ -64,21 +86,6 @@ the installer has Steam fetch what your account owns; custom songs often exist f
 ² Tested with a virtual device named like the cable.
 
 Status in detail: [Mac](docs/mac/PLAN.md#status), [Windows](docs/windows/PLAN.md#status). If you own both games: [which to build from](docs/EDITIONS.md).
-
-## What it adds
-
-- **Native.** No Rosetta and no x86 code at run time, at about the CPU of the original under Rosetta, and at your
-  display's refresh rate.
-- **Offline.** No Steam client while you play, no Ubisoft sign-in. Every connection that isn't local is refused and logged.
-- **Your saves stay safe.** Steam saves are copied in once and never written; stored Ubisoft credentials are never copied.
-- **Its own game files.** A Steam update or uninstall can't break it. On the same disk the copy takes no extra space.
-- **Custom songs out of the box**, with no CDLC patch. **ENUMERATE** in the main menu adds new songs without a restart.
-- **Any audio interface.** Direct Connect in the menus, every channel listed, calibration that can boost a quiet input, and lower guitar latency.
-- **Built-in fixes** from [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) and [RSBypass](https://github.com/aik002/RSBypass), no intro
-  screens, and mods loaded from a `mods/` folder.
-- **Metal** by default, with OpenGL as a choice and automatic fallback on the Mac game.
-
-Every fix can be switched off: [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
 
 ## Known issues
 

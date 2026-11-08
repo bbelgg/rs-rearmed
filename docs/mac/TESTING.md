@@ -102,7 +102,9 @@ user's, with a test profile.
     snapshots in between. Build it with `tools/ws8/keyfifo/build.sh OUTDIR`, start the game's executable with
     `RS_KEY_FIFO=FILE DYLD_INSERT_LIBRARIES=OUTDIR/libkeyfifo.dylib`, then `echo "key return" > FILE`, `text danc`
     or `click X Y`. Keys go into the game's own event queue, so nothing else on the Mac gets them. (The launcher's
-    netguard stays in the list: `DYLD_INSERT_LIBRARIES=<home>/libnetguard.dylib:OUTDIR/libkeyfifo.dylib`.)
+    netguard stays in the list: `DYLD_INSERT_LIBRARIES=<home>/libnetguard.dylib:OUTDIR/libkeyfifo.dylib`.) Export the variables and start
+    the executable itself: through `env` or `nohup`, system programs, macOS drops every `DYLD_` variable, so neither the network guard
+    nor keyfifo loads (no `netguard.log`, keys never read). Check that `netguard.log` says `mode=block` before going on.
 - **By hand**: menus, a song, Session Mode, lessons, Guitarcade, full screen and back, quitting; on both
   renderers (`RS_GL_BACKEND=gl` for OpenGL).
 - **An interface's channel and gain**: `RS_AUDIO_LOG=1` with a `guitar-input.ini` (`RS_AUDIO_INPUT_FILE` for a test
@@ -196,6 +198,15 @@ user's, with a test profile.
   Return (no match: the box stays open), `i`; a click, `i`. The same dylib ran the same route in Learn & Play ([Windows
   testing](../windows/TESTING.md#unattended-runs)), with the same SHA-256 in both logs and the same results but for the lyrics (Learn & Play's test song has no lyric steps). Keep a copy of
   `steam/`: Return on ProfileSelect with no profile starts the first-time screens, and `fwddelete` there deletes the profile.
+- **Sharper picture and screen shape** (2026-11-08, a test install, the colors run's profile on DISCONNECTED, `RS_MODS_LOG=1`,
+  `RS_GL_SNAPSHOT_SECS=5`): the log has `MSAA 4x on the game's screen-sized targets`. By keyfifo, Return on TitleScreen, ProfileSelect,
+  SelectionListDialog, ProfileSelect, MainMenu, LearnASong_Songs and LearnASong_SongOptions (each a few seconds after its `menu:` line)
+  reach LearnASong_PreSongTuner; `fwddelete` there went back to the song options, and Return then gave "TUNE UP!" (no input on the
+  profile), whose Return (OK) starts the song: LearnASong_Game. The highway drew with MSAA, no errors. The window opens at 1280x720 whatever
+  `ScreenWidth` says; dragging its right edge in to 1152 points (computer use, the test executable's own window) made a 1153x720 game,
+  and Return on the song options (the song had ended) and on TUNE UP! started it again: the rearmed-mods log's frustums were
+  0.925 x 0.577 and 0.583 x 0.364 against 1.026 x 0.577 and 0.647 x 0.364 at 16:9, and the picture and menus undistorted.
+  Shift-Command-F then rendered 2560x1440 on the 16:9 screen. Not run: a 16:10 or ultrawide screen in full screen, Learn & Play.
 - **The measured route** (2026-11-06, for [Learn & Play's route](PERFORMANCE.md#learn--plays-route): the executable started directly, `RS_FULLSCREEN=0`, a test home with APFS
   clones of the game files, a copy of a test profile with a DIRECT CONNECT input): Cherub Rock is DLC, so `dlc/cherubrock_m.psarc` has to be in the home's `dlc/`, and with no other
   file there the main menu is up 25 s after the profile. With `front` 1 s before each step: 16 s after the start Return on the title, 9 s, Return on the profile, 28 s, Return on LEARN A SONG,
@@ -298,6 +309,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
 | `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |
 | `RS_METAL_CACHE=0`, `RS_MTL_COMPILE_THREADS=N`, `RS_METAL_DRAWABLES=2\|3` | no disk cache, the compile pool's size, the drawable count |
+| `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the game's screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's) |
 | `RS_FPS=N`, `RS_NO_VSYNC=1\|0`, `RS_NO_VSYNC_AFTER=S`, `RS_RENDER_THREAD=0` | a fixed frame rate; swap interval 0 or not, from S seconds on (default 30); the original's frame in the display link's callback |
 | `RS_LUA_TRACE=1` | Lua chunk loads, failed calls and errors |
 | `RC_LOG_UNRESOLVED=1`, `RC_TRACE_INITS=1` | every unresolved bind, each initializer before it runs |

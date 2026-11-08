@@ -260,8 +260,11 @@ From the title to a song: Return (title), Return (profile, or New profile), Retu
 ### Window modes
 
 Shift-Command-F switches between full screen and a window. In a window, drag the edges to resize: the new size
-becomes the game's resolution. On a 16:10 screen the 16:9 picture fills the screen, stretched, as in the original
-game.
+becomes the game's resolution, and the window takes any shape (the original kept it at 16:9; `RS_WINDOW_ANY_SHAPE=0`
+does too). The game follows the shape itself, in a window and in full screen alike: its cameras keep their height
+and take the resolution's width, and its menus are laid out to the width, so nothing is stretched. A 16:10 window
+shows a little less at the sides than 16:9, an ultrawide one more. Checked in a 16:10 window; full screen renders
+at the screen's size the same way, but hasn't been run on a 16:10 or ultrawide screen.
 
 ### Renderer
 
@@ -366,6 +369,9 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 | An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
 | [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
 | Retina, Metal only (off by default) | yes | `RS_METAL_RETINA=1` |
+| Sharper textures, Metal only: the game's own mipmap bias, and 16x anisotropic filtering where the game asks for 1x to 4x, so the note highway and strings stay sharp into the distance | yes | `RS_METAL_ANISO=N` (1-16; 1 keeps the game's) |
+| Anti-aliasing, Metal only: 4x MSAA on the game's 3D picture (its screen-sized targets with depth) | yes | `RS_METAL_MSAA=N` (1 off, 2, 4, 8) |
+| A window takes any shape, as full screen on a 16:10 or ultrawide screen; the game follows it ([Window modes](#window-modes)) | | `RS_WINDOW_ANY_SHAPE=0` keeps it at 16:9 |
 | Multithreaded GL engine, OpenGL only (off by default) | | `RS_GL_MTENGINE=1` |
 
 Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup and survives a reinstall

@@ -231,6 +231,10 @@ In a window, drag the edges to resize (the picture scales with its shape kept), 
 Control-Command-F for macOS full screen. Command-Q, the close button and the game's own
 Exit all quit through the game's shutdown. The display mode never changes.
 
+On a screen that isn't 16:9 the game keeps its 16:9 picture with bars at the sides or above and below, as on
+Windows. The Mac edition draws at the screen's or window's own shape ([Mac](../mac/INSTALL.md#window-modes)); this
+game fits its picture to 16:9 itself, so that isn't here yet ([PLAN.md](PLAN.md#next-work)).
+
 ### Renderer
 
 Metal only, so there is no choice and no fallback ([Known issues](#known-issues)).
@@ -297,6 +301,8 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 |---|---|---|
 | `RS_FULLSCREEN=1\|0` | the game's setting | force full screen, or a window |
 | `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen |
+| `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's ([Mac](../mac/INSTALL.md#settings-and-switches)) |
+| `RS_METAL_MSAA=N` | 4 | MSAA on the game's screen-sized targets with depth: 1 (off), 2, 4 or 8 |
 | `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames (0 leaves the device's) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_SET_RATE=0` | on | the real-time audio thread, the stale-input trim, switching devices to 48 kHz |

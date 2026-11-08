@@ -14,6 +14,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
+- **Sharper textures and MSAA**: the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
+  screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). Not yet run in this edition.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
@@ -73,6 +75,11 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
+
+**Screen shape**, as in the Mac edition ([Mac plan](../mac/PLAN.md#status)): the Mac game sets its cameras and menus from its resolution, so
+a 16:10 or ultrawide picture needs nothing more there. This game fits its picture to 16:9 inside the back buffer itself
+(`GRDisplayRatioAdjuster`, [DESIGN.md](DESIGN.md#screen-and-window)); its rectangle would have to be the whole back buffer, and the cameras
+and menus then checked. Not started.
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
 Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).

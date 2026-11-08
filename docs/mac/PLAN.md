@@ -22,7 +22,12 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - **Installer**: decrypting is static (`tools/steamless/decrypt.py`): no Rosetta, no launch of the game, and Steam only has to have installed it.
 - **Performance**: about the CPU of the original under Rosetta. 6.1 ms a frame on [Learn & Play's route](PERFORMANCE.md#learn--plays-route), 45% of a core, against its 7.2 ms.
   The 12 functions relaxed and the renderer's change of 2026-11-06 played well with a guitar; an install of them by the installer app is still to do.
-- **Full-screen shape**: on a 16:10 screen the 16:9 picture is stretched, as in the original under Rosetta. The Windows game's bars are its own code.
+- **Screen shape**: the game sets its cameras from its resolution (their height kept, the width the resolution's) and lays out its menus to
+  the width, so a 16:10 window draws undistorted (checked 2026-11-08, frustums 0.925 x 0.577 at 1153x720 against 1.026 x 0.577 at 16:9).
+  Full screen renders at the screen's size the same way; not yet run on a 16:10 or ultrawide screen. A window now takes any shape
+  (`RS_WINDOW_ANY_SHAPE`; the original kept 16:9). Learn & Play fits its picture to 16:9 with bars ([Windows plan](../windows/PLAN.md#next-work)).
+- **Sharper picture** (new, Metal): the game's own texture LOD bias, which Metal had dropped, 16x anisotropic filtering where the game asks for
+  1x to 4x, and 4x MSAA on its screen-sized 3D targets ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 
 - **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native, with the game's gear mapped onto it. Its open work is kept with it.
@@ -41,7 +46,7 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - The first play of a song after an install stutters briefly on Metal (pipelines built on first use).
 - Mods that draw with OpenGL show nothing on Metal; they need the overlay API.
 - Renderer details: `RS_GL_CHECK` keeps one pending error per thread, not per context;
-  `GL_TEXTURE_BASE_LEVEL` and `GL_TEXTURE_LOD_BIAS` are ignored on Metal; shared CGL contexts are not
+  `GL_TEXTURE_BASE_LEVEL` is ignored on Metal; shared CGL contexts are not
   supported on Metal; only the first GPU gets a disk cache.
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the
   Retina mouse in songs, and a fresh player's first answer to macOS's

@@ -12,6 +12,7 @@
 #include <pthread.h>
 #include <mach/mach_time.h>
 #include <stdlib.h>
+#include <string.h>
 
 #ifndef RSP_VERSION
 #define RSP_VERSION ""  // set by CMake from the repo's VERSION file
@@ -202,6 +203,19 @@ static CVReturn rsp_display_link_cb(CVDisplayLinkRef link, const CVTimeStamp *no
 // A display mode for updateScreenSize on the frame thread, which takes it at the start of a frame: the
 // flag goes last, so that thread cannot apply the old values and clear the request. (The original set
 // it first, and x86's store order alone did not save it.)
+// Not in the original: a window takes any shape (RS_WINDOW_ANY_SHAPE, on unless 0), as full screen does on a
+// 16:10 or ultrawide screen. The game follows the shape itself: its cameras keep their height and their width is
+// the window's (a frustum of the resolution's aspect), and its menus are laid out to the width. The original kept a
+// window at 16:9, its only shape for windows.
+static int rsp_window_any_shape(void) {
+  const char *e = getenv("RS_WINDOW_ANY_SHAPE");
+  return !(e && *e && strchr("0nNfF", e[0]));
+}
+static void rsp_window_shape(NSWindow *w, NSSize ratio) {
+  if (rsp_window_any_shape()) [w setResizeIncrements:NSMakeSize(1.0, 1.0)];
+  else [w setContentAspectRatio:ratio];
+}
+
 static void rsp_mode_request(MainController *c, BOOL full, int w, int h) {
   c->CurrentSetting_FullScreen = full;
   c->CurrentSetting_Width = w;
@@ -669,7 +683,7 @@ static BOOL rsp_mode_pending(MainController *c) {
   [w setLevel:windowLevel];
   [w setContentSize:NSMakeSize(1280.0, 720.0)];
   [openGLView setFrame:NSMakeRect(0, 0, 1280.0, 720.0)];
-  [w setContentAspectRatio:NSMakeSize(1280.0, 720.0)];
+  rsp_window_shape(w, NSMakeSize(1280.0, 720.0));
   NSRect b = openGLView ? [openGLView bounds] : NSZeroRect;
   rsp_mode_request(self, NO, (int)b.size.width, (int)b.size.height);
 }
@@ -709,7 +723,7 @@ static BOOL rsp_mode_pending(MainController *c) {
   int ax, ay;
   rsp_aspect_from_width(rsp_screen_width(), &ax, &ay);
   (void)rsp_screen_height();  // read and ignored, as in the original
-  [[openGLView window] setContentAspectRatio:NSMakeSize(ax, ay)];
+  rsp_window_shape([openGLView window], NSMakeSize(ax, ay));
   [openGLView startAnimation];
   isAnimating = YES;
   renderTimer = [NSTimer timerWithTimeInterval:0.1

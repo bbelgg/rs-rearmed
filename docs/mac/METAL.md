@@ -115,10 +115,21 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
 - **Textures**: `MTLTexture` per GL texture; level 0 size/format fixes the descriptor, mips allocated on
   `glGenerateMipmap` or on a non-zero level upload. DXT1/3/5 → BC1/2/3, RGBA/BGRA 8-bit, luminance/alpha via
   swizzle. Uploads into a texture still in flight go through a staging blit. Sampler state from the GL
-  texture parameters → cached `MTLSamplerState`.
+  texture parameters → cached `MTLSamplerState`. A Metal sampler has no LOD bias: `GL_TEXTURE_LOD_BIAS`
+  (the game sets -0.26 on most textures) goes to the fragment shader in buffer 2, one float per sampler
+  slot, added to its implicit-level samples. Mipmapped textures with a linear filter get at least 16x
+  anisotropy (`RS_METAL_ANISO=N`, 1 keeps the game's 1x to 4x): the note highway and the strings are seen at a
+  shallow angle.
 - **Framebuffers**: attachments → `MTLRenderPassDescriptor`, rebuilt on change. Default framebuffer = the
   context's own colour + depth/stencil textures (drawable-sized). Depth+stencil formats →
   `Depth32Float_Stencil8`.
+- **MSAA** (`RS_METAL_MSAA=N`, default 4; 1 off): the game draws its 3D picture into screen-sized textures with a
+  depth buffer and resolves nothing itself (it never asks GL for multisampling on this path). A pass whose colour
+  and depth targets are the default framebuffer's size draws into multisampled twins of them (an `NSMapTable`
+  keyed weakly by the target) and resolves into the targets as it ends (`StoreAndMultisampleResolve`; depth and
+  stencil sample 0), so whatever samples them later sees the resolved picture. The twins keep their samples for
+  the next pass that loads them; a pass that would load a twin that is out of date (its target was drawn to
+  without it) draws without MSAA. Post effects, the smaller targets and render-to-texture are left alone.
 - **Programs**: `glLinkProgram` hands vertex + fragment GLSL to `rsmsl_translate` (`src/msl/msl_xlat.h`)
   and keeps the reflection (attributes, uniforms, samplers), so status, locations and `glUniform*` work at
   once; the MSL compile (`newLibraryWithSource:`, 0.1–0.5 s cold) goes to a compile pool (CPUs − 2 worker
@@ -152,7 +163,8 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   - winding is reversed by the y flip: the core inverts `glFrontFace`;
   - clip-space depth: epilogue `z = (z + w) * 0.5`;
   - alpha test: function constant 0 (`uint`, the GL compare function minus `GL_NEVER`, 8 = off) and the
-    reference in fragment buffer 1 (`float`).
+    reference in fragment buffer 1 (`float`);
+  - texture LOD bias: fragment buffer 2 (`float[16]`, by sampler slot), added in `sample(..., bias(...))`.
 - **Errors and queries**: `glGet*` answered from tracked state; `glGetError` returns the first recorded
   error. `RS_GL_CHECK` works the same on both backends.
 - **Texture log** (`mtl_texlog.m`, off unless set, [the switches](TESTING.md#diagnostics)): hashes level 0 at upload (in Learn & Play a
@@ -204,7 +216,8 @@ would build at run time from other sources (none seen in game runs), and a game 
 does not hold the expected set (`extract_scaleform.py` then fails and the build goes on without a
 corpus). Binding conventions: vertex attributes `[[attribute(i)]]` from `[[stage_in]]`; vertex
 buffers at buffer index 14 + attribute index (14..29: one buffer per enabled attribute, Metal stops at 30); uniforms at buffer 0 in
-each stage; fragment alpha-test reference at buffer 1; textures and samplers at the sampler's texture unit.
+each stage; fragment alpha-test reference at buffer 1; texture LOD biases at fragment buffer 2 (16 floats, by
+sampler slot); textures and samplers at the sampler's texture unit.
 
 ## Overlay API (`shims/include/rs_overlay.h`)
 
@@ -246,7 +259,7 @@ Not checked: a second Mac or GPU, sleep and wake, unplugging a display, the Reti
   The second play has none.
 - Mods that draw with OpenGL themselves show nothing on Metal; they need the overlay API.
 - `RS_GL_CHECK` keeps one pending error per thread, not per context.
-- `GL_TEXTURE_BASE_LEVEL` and `GL_TEXTURE_LOD_BIAS` are ignored on Metal.
+- `GL_TEXTURE_BASE_LEVEL` is ignored on Metal.
 - Shared CGL contexts are not supported on Metal (the game uses one context).
 - Cube maps always filter across faces in Metal; legacy GL does not unless `GL_TEXTURE_CUBE_MAP_SEAMLESS`.
 - Only the first Metal device gets a disk cache.

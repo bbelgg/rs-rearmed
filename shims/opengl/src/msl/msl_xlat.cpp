@@ -38,6 +38,9 @@
 //   - uniform storage: bool and bvecN are stored as int / intN (as glUniform1i writes them);
 //     matrices are column-major with each column padded to its MSL alignment (float2 columns
 //     take 8 bytes, float3 and float4 columns 16); `stride` is the size of one array element.
+//   - texture LOD bias: fragment [[buffer(2)]] holds 16 floats, the bias of the texture bound at
+//     each sampler slot (GL_TEXTURE_LOD_BIAS), added to implicit-level samples (texture2D(s, c[, b]));
+//     Lod, Rect and vertex-stage samples take none.
 //   - attributes are always assigned a location (bound by name, built-in aliasing, or the lowest
 //     free location in declaration order, like GL's linker); never -1.
 #include "msl_internal.h"
@@ -293,6 +296,7 @@ struct E {
     Type t;
     std::string s;       // MSL text (for samplers: the texture)
     std::string smp;     // for samplers: the sampler state
+    std::string bias;    // for samplers: the texture's LOD bias (a float), or for a sampler array a pointer to them
     bool lvalue = false;
     bool cst = false;    // compile-time scalar constant
     double cv = 0;
@@ -839,7 +843,10 @@ struct Stage {
                     if (idx.cst && (idx.cv < 0 || idx.cv >= e.t.array)) fail(ln, "index %d out of range", (int)ival(idx.cv));
                     if (e.var && e.var->name == "gl_TexCoord") texcoord_mask |= idx.cst ? 1u << (int)ival(idx.cv) : 0xFFu;
                     if (e.var && e.var->name == "gl_FragData") fragdata_max = std::max(fragdata_max, idx.cst ? (int)ival(idx.cv) + 1 : 8);
-                    if (r.t.base == B_SAMPLER) r.smp = e.smp + "[" + idx.s + "]";
+                    if (r.t.base == B_SAMPLER) {
+                        r.smp = e.smp + "[" + idx.s + "]";
+                        r.bias = e.bias + "[" + idx.s + "]";
+                    }
                 } else if (e.t.vec()) {
                     r.t = mk(e.t.base);
                 } else if (e.t.mat()) {
@@ -972,7 +979,10 @@ struct Stage {
         e.s = v->msl;
         e.lvalue = v->lvalue;
         e.var = e.root = v.get();
-        if (v->t.base == B_SAMPLER) e.smp = "rs_s_" + v->mname;
+        if (v->t.base == B_SAMPLER) {
+            e.smp = "rs_s_" + v->mname;
+            e.bias = "rs_b_" + v->mname;
+        }
         if (v->has_cv) { e.cst = true; e.cv = v->cv; }
         if (v->kind == V_UNIFORM && v->t.base == B_BOOL && !v->t.is_array())
             e.s = msl_type(v->t) + "(" + v->msl + ")";  // stored as int
@@ -1143,7 +1153,7 @@ struct Stage {
             E &a = args[i];
             std::string s;
             if (p.t.base == B_SAMPLER) {
-                s = a.s + ", " + a.smp;
+                s = a.s + ", " + a.smp + ", " + a.bias;
             } else if (p.qual) {
                 if (!a.lvalue) fail(ln, "argument %zu of %s must be an l-value", i + 1, f.name.c_str());
                 if (a.root) a.root->written = true;
@@ -1372,11 +1382,15 @@ struct Stage {
         if (f->samp == S_1D) c = "float2(" + c + ", 0.5f)";
         if (f->samp == S_RECT) c = "(" + c + " / float2(" + a[0].s + ".get_width(), " + a[0].s + ".get_height()))";
         std::string opt;
+        // GL_TEXTURE_LOD_BIAS (a Metal sampler has none): added to the fragment stage's implicit level
+        std::string tb = f->samp == S_RECT || vs() ? std::string() : a[0].bias;
         if (a.size() == 3) {
             if (!a[2].t.scalar() || a[2].t.base == B_BOOL) fail(ln, "%s: bias/lod must be a float", n.c_str());
-            opt = std::string(f->lod ? ", level(" : ", bias(") + conv(a[2], T_FLOAT, ln) + ")";
+            opt = std::string(f->lod ? ", level(" : ", bias(") + conv(a[2], T_FLOAT, ln) + (f->lod || tb.empty() ? "" : " + " + tb) + ")";
         } else if (vs()) {
             opt = ", level(0.0f)";  // no derivatives in a vertex shader: base level
+        } else if (!tb.empty()) {
+            opt = ", bias(" + tb + ")";
         }
         E r;
         r.t = mk(B_FLOAT, 4);
@@ -1670,7 +1684,7 @@ struct Stage {
         std::string nm = v.mname;
         if (p.t.base == B_SAMPLER) {
             if (p.t.array) fail(0, "sampler array parameters are not supported");
-            return msl_type(p.t) + " " + nm + ", sampler rs_s_" + nm;
+            return msl_type(p.t) + " " + nm + ", sampler rs_s_" + nm + ", float rs_b_" + nm;
         }
         std::string ty = msl_type(p.t);
         if (p.t.array) {
@@ -1793,6 +1807,7 @@ const char *kPrelude =
     "template<typename D, typename S, size_t N> inline void rs_acopy(thread D (&d)[N], const constant S (&s)[N]) {\n"
     "    for (size_t i = 0; i < N; i++) d[i] = s[i];\n"
     "}\n"
+    "constant float rs_no_bias[16] = {};  // the vertex stage's texture LOD bias\n"
     "inline float rs_proj1(float2 c) { return c.x / c.y; }\n"
     "inline float rs_proj1(float4 c) { return c.x / c.w; }\n"
     "inline float2 rs_proj2(float3 c) { return c.xy / c.z; }\n"
@@ -1960,6 +1975,15 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
             members += "    " + ty + " " + g->mname + ";\n    " + sty + " rs_s_" + g->mname + ";\n";
             init.push_back("rs_t_" + g->mname);
             init.push_back("rs_ss_" + g->mname);
+            // The LOD bias of the texture in each slot: fragment buffer(2); none in the vertex stage
+            std::string from = sb == RSMSL_STAGE_FS ? "rs_lod_bias" : "rs_no_bias";
+            if (u.t.array) {
+                members += "    constant float *rs_b_" + g->mname + ";\n";
+                init.push_back(from + " + " + std::to_string(u.slot));
+            } else {
+                members += "    float rs_b_" + g->mname + ";\n";
+                init.push_back(from + "[" + std::to_string(u.slot) + "]");
+            }
         }
     };
     auto join = [](const std::vector<std::string> &v) {
@@ -2099,6 +2123,7 @@ Linked link(Stage &v, Stage &f, const rsmsl_attrib *bound, int n_bound, unsigned
         if (!in_s.empty()) { params.push_back("rs_fs_in rs_in [[stage_in]]"); members += "    thread const rs_fs_in &rs_in;\n"; init.push_back("rs_in"); }
         if (L.size[RSMSL_STAGE_FS]) { params.push_back("constant rs_fs_u &rs_u [[buffer(0)]]"); members += "    constant rs_fs_u &rs_u;\n"; init.push_back("rs_u"); }
         params.push_back("constant float &rs_alpha_ref [[buffer(1)]]");
+        params.push_back("constant float *rs_lod_bias [[buffer(2)]]");
         if (f.uses_fragcoord) { params.push_back("float4 rs_FragCoord [[position]]"); members += "    float4 rs_FragCoord;\n"; init.push_back("rs_FragCoord"); }
         if (f.uses_frontfacing) { params.push_back("bool rs_FrontFacing [[front_facing]]"); members += "    bool rs_FrontFacing;\n"; init.push_back("rs_FrontFacing"); }
         if (f.uses_pointcoord) {  // Metal's origin is the top of the target, i.e. GL's bottom (y flip): GL's upper left is 1 - y

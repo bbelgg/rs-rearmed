@@ -91,7 +91,7 @@ enum {
     // Bump when the core's pipeline or shader conventions change in a way the cache cannot see
     // (rsm_pipeline_desc maps an rsm_pkey differently, bindings move, ...): the new value starts
     // a new cache directory. MSL changes need no bump: libraries are keyed by their text.
-    RSM_CORE_CONVENTIONS = 1,
+    RSM_CORE_CONVENTIONS = 2,    // 2: fragment buffer(2) (texture LOD bias), rsm_pkey.samples
     RSM_KEEP_RUNS = 8,           // manifest: drop libraries not linked in this many runs
     RSM_SERIALIZE_EVERY = 32,    // new pipelines between archive writes
     RSM_SERIALIZE_DELAY_MS = 3000,
@@ -313,6 +313,8 @@ static bool rsm_pkey_ok(const rsm_pkey *k) {
         return false;
     if (k->stencil_fmt != MTLPixelFormatInvalid && k->stencil_fmt != MTLPixelFormatStencil8 &&
         k->stencil_fmt != MTLPixelFormatDepth32Float_Stencil8)
+        return false;
+    if (k->samples > 8 || (k->samples & (k->samples - 1)))
         return false;
     return k->blend <= 1 && k->color_mask <= 15 && k->alpha_func <= 8 &&
            k->src_rgb <= MTLBlendFactorOneMinusSource1Alpha && k->dst_rgb <= MTLBlendFactorOneMinusSource1Alpha &&

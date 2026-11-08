@@ -1088,7 +1088,7 @@ RSMTexture *rsm_texture(RSMContext *ctx, GLuint name) {
     if (!t && name) {
         t = [RSMTexture new];
         t->p = (rsm_texparams){GL_NEAREST_MIPMAP_LINEAR, GL_LINEAR, GL_REPEAT, GL_REPEAT, GL_REPEAT,
-                               GL_NONE, GL_LEQUAL, 1, -1000, 1000, 0, 1000};
+                               GL_NONE, GL_LEQUAL, 1, -1000, 1000, 0, 0, 1000};
         rsm_names_set(&ctx->textures, name, t);
     }
     return t;
@@ -1228,7 +1228,8 @@ static void rsm_tex_param(__unsafe_unretained RSMContext *ctx, GLenum target, GL
     case GL_TEXTURE_MAX_LOD: p.max_lod = v; break;
     case GL_TEXTURE_BASE_LEVEL: p.base_level = (GLint)v; break;
     case GL_TEXTURE_MAX_LEVEL: p.max_level = (GLint)v; break;
-    case GL_TEXTURE_LOD_BIAS: case GL_GENERATE_MIPMAP: case GL_TEXTURE_PRIORITY:
+    case GL_TEXTURE_LOD_BIAS: p.lod_bias = v; break;
+    case GL_GENERATE_MIPMAP: case GL_TEXTURE_PRIORITY:
     case GL_DEPTH_TEXTURE_MODE: case GL_TEXTURE_STORAGE_HINT_APPLE:
         return;  // no Metal equivalent; accepted
     default:
@@ -1281,6 +1282,7 @@ void rsmtl_glGetTexParameteriv(GLenum target, GLenum pname, GLint *params) {
     case GL_TEXTURE_MAX_ANISOTROPY_EXT: *params = (GLint)t->p.max_aniso; break;
     case GL_TEXTURE_MIN_LOD: *params = (GLint)t->p.min_lod; break;
     case GL_TEXTURE_MAX_LOD: *params = (GLint)t->p.max_lod; break;
+    case GL_TEXTURE_LOD_BIAS: *params = (GLint)t->p.lod_bias; break;
     case GL_TEXTURE_BASE_LEVEL: *params = t->p.base_level; break;
     case GL_TEXTURE_MAX_LEVEL: *params = t->p.max_level; break;
     default: rsm_error(ctx, GL_INVALID_ENUM);
@@ -1289,12 +1291,14 @@ void rsmtl_glGetTexParameteriv(GLenum target, GLenum pname, GLint *params) {
 
 void rsmtl_glGetTexParameterfv(GLenum target, GLenum pname, GLfloat *params) {
     RSM_CTX()
-    if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT || pname == GL_TEXTURE_MIN_LOD || pname == GL_TEXTURE_MAX_LOD) {
+    if (pname == GL_TEXTURE_MAX_ANISOTROPY_EXT || pname == GL_TEXTURE_MIN_LOD || pname == GL_TEXTURE_MAX_LOD ||
+        pname == GL_TEXTURE_LOD_BIAS) {
         int face;
         RSMTexture *t = rsm_bound_texture(ctx, target, &face);
         if (t)
             *params = pname == GL_TEXTURE_MAX_ANISOTROPY_EXT ? t->p.max_aniso
                       : pname == GL_TEXTURE_MIN_LOD          ? t->p.min_lod
+                      : pname == GL_TEXTURE_LOD_BIAS         ? t->p.lod_bias
                                                              : t->p.max_lod;
         return;
     }
@@ -1312,6 +1316,19 @@ static MTLSamplerAddressMode rsm_wrap(GLenum w) {
     return MTLSamplerAddressModeRepeat;
 }
 
+// RS_METAL_ANISO=N (1-16, default 16): the least anisotropy of a trilinear or bilinear mipmapped
+// texture, more than the game asks for (1 to 4); 1 keeps the game's own. The note highway and the
+// strings are seen at a shallow angle, where plain mipmapping blurs them along their length.
+static int rsm_aniso_min(void) {
+    static int v;
+    if (!v) {
+        const char *e = getenv("RS_METAL_ANISO");
+        int n = e && *e ? atoi(e) : 16;
+        v = n < 1 ? 1 : n > 16 ? 16 : n;
+    }
+    return v;
+}
+
 void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t) {
     const rsm_texparams *p = &t->p;
     // Levels the sampler may use: GL_TEXTURE_MAX_LEVEL, and level 0 only when the
@@ -1322,6 +1339,9 @@ void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t) {
     if (!mip)
         max_lod = 0;
     int aniso = (int)p->max_aniso;
+    if (mip && max_lod > 0 && p->min_filter != GL_NEAREST_MIPMAP_NEAREST && p->min_filter != GL_NEAREST_MIPMAP_LINEAR &&
+        aniso < rsm_aniso_min())
+        aniso = rsm_aniso_min();
     uint64_t key = (uint64_t)(p->min_filter & 0xF) | (uint64_t)(p->mag_filter & 0xF) << 4 |
                    (uint64_t)rsm_wrap(p->wrap_s) << 8 | (uint64_t)rsm_wrap(p->wrap_t) << 12 |
                    (uint64_t)rsm_wrap(p->wrap_r) << 16 | (uint64_t)(aniso & 31) << 20 |

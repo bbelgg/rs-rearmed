@@ -55,6 +55,72 @@ void rsm_draw_init(RSMContext *ctx) {
     ctx->pass_desc_color = ctx->pass_desc.colorAttachments[0];
     ctx->pass_desc_depth = ctx->pass_desc.depthAttachment;
     ctx->pass_desc_stencil = ctx->pass_desc.stencilAttachment;
+    ctx->pass_samples = 1;
+}
+
+// --- MSAA ---------------------------------------------------------------------------------
+// The game draws its 3D scene into screen-sized textures with a depth buffer (and Learn & Play into
+// its back buffer) and has no multisampling of its own on this path. A pass on such targets draws into
+// multisampled twins instead and resolves into the game's textures as it ends, so what the game samples
+// later is the resolved picture. RS_METAL_MSAA=N: 1 (off), 2, 4 (the default) or 8.
+//
+// A twin keeps the samples between passes: a later pass that loads the target loads its twin. A pass that
+// would load a twin that is out of date (the target was drawn to without it since) draws without MSAA,
+// and so do targets of another shape (not the screen's size, a mip level, a separate stencil texture).
+@interface RSMMsaa : NSObject {
+@public
+    id<MTLTexture> tex;
+    bool valid;  // holds what the target last had drawn to it
+}
+@end
+@implementation RSMMsaa
+@end
+
+static int rsm_msaa_samples(RSMContext *ctx) {
+    static int v;
+    if (!v) {
+        const char *e = getenv("RS_METAL_MSAA");
+        int n = e && *e ? atoi(e) : 4;
+        n = n >= 8 ? 8 : n >= 4 ? 4 : n >= 2 ? 2 : 1;
+        while (n > 1 && ![ctx->dev supportsTextureSampleCount:(NSUInteger)n])
+            n >>= 1;
+        v = n;
+        if (n > 1)
+            rsm_log("MSAA %dx on the game's screen-sized targets with depth (RS_METAL_MSAA)", n);
+    }
+    return v;
+}
+
+static RSMMsaa *rsm_msaa_find(RSMContext *ctx, id<MTLTexture> t) {
+    return t && ctx->msaa ? [ctx->msaa objectForKey:t] : nil;
+}
+
+static RSMMsaa *rsm_msaa_twin(RSMContext *ctx, id<MTLTexture> t, int n) {
+    if (!ctx->msaa)
+        ctx->msaa = [NSMapTable weakToStrongObjectsMapTable];
+    RSMMsaa *m = [ctx->msaa objectForKey:t];
+    if (m && m->tex.width == t.width && m->tex.height == t.height && m->tex.pixelFormat == t.pixelFormat &&
+        (int)m->tex.sampleCount == n)
+        return m;
+    // A weak-keyed table drops the twins of freed targets only now and then: after a few resizes they would pile
+    // up, so past a handful (the game uses three or four) all go, and the targets in use get new ones.
+    if (!m && ctx->msaa.count >= 12)
+        [ctx->msaa removeAllObjects];
+    MTLTextureDescriptor *d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:t.pixelFormat
+                                                                                 width:t.width
+                                                                                height:t.height
+                                                                             mipmapped:NO];
+    d.textureType = MTLTextureType2DMultisample;
+    d.sampleCount = (NSUInteger)n;
+    d.usage = MTLTextureUsageRenderTarget;
+    d.storageMode = MTLStorageModePrivate;
+    m = [RSMMsaa new];
+    m->tex = [ctx->dev newTextureWithDescriptor:d];
+    if (!m->tex)
+        return nil;
+    m->tex.label = @"rsgl MSAA twin";
+    [ctx->msaa setObject:m forKey:t];
+    return m;
 }
 
 // --- Render pass ------------------------------------------------------------------------
@@ -108,6 +174,12 @@ static void rsm_pass_targets(__unsafe_unretained RSMContext *ctx) {
         w = h = 0;
     ctx->pass_w = w;
     ctx->pass_h = h;
+    __unsafe_unretained id<MTLTexture> c = ctx->pass_color, d = ctx->pass_depth;
+    ctx->pass_msaa_shape = c && d && rsm_msaa_samples(ctx) > 1 && ctx->pass_color_level == 0 &&
+                           ctx->pass_color_slice == 0 && c.textureType == MTLTextureType2D && c.sampleCount == 1 &&
+                           c.width == ctx->def_color.width && c.height == ctx->def_color.height &&
+                           d.width == c.width && d.height == c.height && d.sampleCount == 1 &&
+                           (!ctx->pass_stencil || ctx->pass_stencil == d);
     ctx->fb_dirty = false;
 }
 
@@ -137,26 +209,58 @@ static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     __unsafe_unretained MTLRenderPassDepthAttachmentDescriptor *d = ctx->pass_desc_depth;
     __unsafe_unretained MTLRenderPassStencilAttachmentDescriptor *s = ctx->pass_desc_stencil;
     unsigned pc = ctx->pending_clear;
+    // MSAA (above): the twins, when every target it loads has one that is up to date
+    RSMMsaa *mc = nil, *md = nil;
+    int samples = 1;
+    if (ctx->pass_msaa_shape) {
+        int n = rsm_msaa_samples(ctx);
+        mc = rsm_msaa_twin(ctx, color, n);
+        md = rsm_msaa_twin(ctx, depth, n);
+        bool ok = mc && md && (mc->valid || (pc & GL_COLOR_BUFFER_BIT)) && (md->valid || (pc & GL_DEPTH_BUFFER_BIT)) &&
+                  (!stencil || md->valid || (pc & GL_STENCIL_BUFFER_BIT));
+        if (ok)
+            samples = n;
+        else
+            mc = md = nil;
+    }
+    if (samples == 1) {  // the targets change without their twins: those are out of date now
+        RSMMsaa *m;
+        if ((m = rsm_msaa_find(ctx, color)))
+            m->valid = false;
+        if ((m = rsm_msaa_find(ctx, depth)))
+            m->valid = false;
+        if ((m = rsm_msaa_find(ctx, stencil)))
+            m->valid = false;
+    } else {
+        mc->valid = md->valid = true;
+    }
+    ctx->pass_samples = samples;
+    MTLStoreAction store = samples > 1 ? MTLStoreActionStoreAndMultisampleResolve : MTLStoreActionStore;
     // The descriptor is reused: what this pass doesn't set must not be left from the last one.
-    c.texture = color;
+    c.texture = mc ? mc->tex : color;
+    c.resolveTexture = mc ? color : nil;
     if (color) {
         c.level = (NSUInteger)ctx->pass_color_level;
         c.slice = (NSUInteger)ctx->pass_color_slice;
         c.loadAction = pc & GL_COLOR_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
-        c.storeAction = MTLStoreActionStore;
+        c.storeAction = store;
         c.clearColor = MTLClearColorMake(ctx->pending_color[0], ctx->pending_color[1], ctx->pending_color[2],
                                          ctx->pending_color[3]);
     }
-    d.texture = depth;
+    d.texture = md ? md->tex : depth;
+    d.resolveTexture = md ? depth : nil;
     if (depth) {
         d.loadAction = pc & GL_DEPTH_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
-        d.storeAction = MTLStoreActionStore;
+        d.storeAction = store;
+        d.depthResolveFilter = MTLMultisampleDepthResolveFilterSample0;
         d.clearDepth = ctx->pending_depth;
     }
-    s.texture = stencil;
+    s.texture = md && stencil ? md->tex : stencil;
+    s.resolveTexture = md && stencil ? stencil : nil;
     if (stencil) {
         s.loadAction = pc & GL_STENCIL_BUFFER_BIT ? MTLLoadActionClear : MTLLoadActionLoad;
-        s.storeAction = MTLStoreActionStore;
+        s.storeAction = store;
+        s.stencilResolveFilter = MTLMultisampleStencilResolveFilterSample0;
         s.clearStencil = (uint32_t)ctx->pending_stencil & 0xFF;
     }
     rp.renderTargetWidth = color ? 0 : (NSUInteger)ctx->pass_w;
@@ -173,6 +277,7 @@ static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     memset(ctx->enc_vb_off, 0, sizeof ctx->enc_vb_off);
     memset(ctx->enc_tex, 0, sizeof ctx->enc_tex);
     memset(ctx->enc_smp, 0, sizeof ctx->enc_smp);
+    ctx->enc_bias_set = false;
     return ctx->enc != nil;
 }
 
@@ -300,7 +405,8 @@ static bool rsm_apply_dynamic(__unsafe_unretained RSMContext *ctx) {
 // --- glClear ---------------------------------------------------------------------------------
 static id<MTLRenderPipelineState> rsm_clear_pipeline(RSMContext *ctx, bool color, unsigned mask) {
     uint64_t key = (uint64_t)ctx->pass_color_fmt | (uint64_t)ctx->pass_depth_fmt << 16 |
-                   (uint64_t)ctx->pass_stencil_fmt << 32 | (uint64_t)mask << 48 | (uint64_t)color << 52;
+                   (uint64_t)ctx->pass_stencil_fmt << 32 | (uint64_t)mask << 48 | (uint64_t)color << 52 |
+                   (uint64_t)ctx->pass_samples << 56;
     id<MTLRenderPipelineState> ps = rsm_map_get(&ctx->clear_pipelines, &key);
     if (ps)
         return ps;
@@ -313,6 +419,7 @@ static id<MTLRenderPipelineState> rsm_clear_pipeline(RSMContext *ctx, bool color
     }
     d.depthAttachmentPixelFormat = ctx->pass_depth_fmt;
     d.stencilAttachmentPixelFormat = ctx->pass_stencil_fmt;
+    d.rasterSampleCount = (NSUInteger)ctx->pass_samples;
     NSError *e = nil;
     ps = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
     if (!ps) {
@@ -530,6 +637,7 @@ MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunctio
     }
     d.depthAttachmentPixelFormat = k->depth_fmt;
     d.stencilAttachmentPixelFormat = k->stencil_fmt;
+    d.rasterSampleCount = k->samples > 1 ? k->samples : 1;
     return d;
 }
 
@@ -761,6 +869,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
         k.color_fmt = (uint16_t)ctx->pass_color_fmt;
         k.depth_fmt = (uint16_t)ctx->pass_depth_fmt;
         k.stencil_fmt = (uint16_t)ctx->pass_stencil_fmt;
+        k.samples = ctx->pass_samples > 1 ? (uint8_t)ctx->pass_samples : 0;
         k.blend = ctx->blend;
         k.color_mask = (ctx->color_mask[0] ? MTLColorWriteMaskRed : 0) | (ctx->color_mask[1] ? MTLColorWriteMaskGreen : 0) |
                        (ctx->color_mask[2] ? MTLColorWriteMaskBlue : 0) | (ctx->color_mask[3] ? MTLColorWriteMaskAlpha : 0);
@@ -892,6 +1001,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
         // Textures.
         uint64_t log_ids[RSM_TEXLOG_UNITS] = {0};
         bool hidden = false;
+        float bias[RSM_MAX_UNITS] = {0};  // fragment buffer(2): GL_TEXTURE_LOD_BIAS by sampler slot
         for (int i = 0; i < p->n_tex; i++) {
             const rsm_texbind *tb = &p->tex[i];
             int unit = tb->value_loc >= 0 ? p->int_values[tb->value_loc] : 0;
@@ -914,6 +1024,8 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                     rsm_texture_sampler(ctx, t);
                 ms = t->sampler;
                 t->last_use = ctx->serial;
+                if (tb->stages & RSMSL_STAGE_FS)
+                    bias[tb->slot] = t->p.lod_bias;
             }
             for (int st = 0; st < 2; st++) {
                 if (!(tb->stages & (st ? RSMSL_STAGE_FS : RSMSL_STAGE_VS)))
@@ -934,6 +1046,13 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                     ctx->enc_smp[st][s] = ms;
                 }
             }
+        }
+
+        // rs_fs always declares buffer(2) too.
+        if (!ctx->enc_bias_set || memcmp(bias, ctx->enc_bias, sizeof bias)) {
+            [e setFragmentBytes:bias length:sizeof bias atIndex:2];
+            memcpy(ctx->enc_bias, bias, sizeof bias);
+            ctx->enc_bias_set = true;
         }
 
         if (rsm_texlog_on)

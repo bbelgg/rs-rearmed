@@ -124,6 +124,7 @@ typedef struct {
     GLenum min_filter, mag_filter, wrap_s, wrap_t, wrap_r;
     GLenum compare_mode, compare_func;
     float max_aniso, min_lod, max_lod;
+    float lod_bias;  // GL_TEXTURE_LOD_BIAS: in the shader (fragment buffer(2)), Metal samplers have none
     GLint base_level, max_level;
 } rsm_texparams;
 
@@ -289,7 +290,8 @@ typedef struct {
     uint16_t color_fmt, depth_fmt, stencil_fmt;
     uint8_t blend, color_mask, alpha_func;
     uint8_t src_rgb, dst_rgb, src_a, dst_a, eq_rgb, eq_a;
-    uint8_t pad[3];
+    uint8_t samples;  // the pass's sample count (MSAA, mtl_draw.m); 0 and 1 are one
+    uint8_t pad[2];
 } rsm_pkey;
 
 // --- Context -----------------------------------------------------------------
@@ -386,6 +388,9 @@ typedef struct {
     int pass_w, pass_h;            // render target size of the open/next pass
     id<MTLTexture> pass_color, pass_depth, pass_stencil;
     int pass_color_level, pass_color_slice;
+    bool pass_msaa_shape;          // the targets may take MSAA (rsm_pass_targets); begin_pass decides
+    int pass_samples;              // of the open pass: 1, or the MSAA count
+    NSMapTable *msaa;              // target texture (weak) -> its multisampled twin (RSMMsaa)
     // One descriptor for every pass: a new one per pass costs more than the encoder's own setup on this side.
     MTLRenderPassDescriptor *pass_desc;
     MTLRenderPassColorAttachmentDescriptor *pass_desc_color;
@@ -402,6 +407,8 @@ typedef struct {
     NSUInteger enc_vb_off[RSM_MAX_ATTRIBS];
     __unsafe_unretained id<MTLTexture> enc_tex[2][RSM_MAX_UNITS];
     __unsafe_unretained id<MTLSamplerState> enc_smp[2][RSM_MAX_UNITS];
+    float enc_bias[RSM_MAX_UNITS];  // fragment buffer(2) as bound in enc
+    bool enc_bias_set;
     id<MTLDepthStencilState> cur_ds;
     bool skip_raster;              // cull FRONT_AND_BACK
 

@@ -9,6 +9,8 @@
 //   uniforms            one struct per stage at [[buffer(0)]], layout in rsmsl_uniform
 //   alpha test          fragment [[function_constant(0)]] uint (GL func - GL_NEVER, 8 = off),
 //                       reference float at fragment [[buffer(1)]]
+//   texture LOD bias    fragment [[buffer(2)]]: 16 floats, GL_TEXTURE_LOD_BIAS of the texture at
+//                       each sampler slot (always bound)
 //   samplers            texture + sampler at index = the sampler uniform's unit, bound by
 //                       the core from the uniform's value (rsmsl_sampler.index is the slot)
 //   epilogue            gl_Position: y = -y, z = (z + w) / 2

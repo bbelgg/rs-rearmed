@@ -211,6 +211,7 @@ input_profile_string                                             0x1001c15f0  sy
 input_manager                                                    0x10133ddc0  sysv  void *(void)
 input_by_name                                                    0x10131b9c0  sysv  void *(void *manager, const char *name)
 autosave_warning                                                 0x1005e7e10  sysv  void(void *, const char *, const char *)
+tone_change                                                      0x1002bebc0  sysv  void(void *self, int player, int tone)  # reads Meter_Tone_Balance's caller 0x1002be5a8; the same as Learn & Play's 0x1352620
 autosave_signin_query                                            0x100a05a50  sysv  void *(void)
 steam_dlc_owned                                                  0x100a07800  sysv  bool(void *steam, int app)
 GCPauseManager_QueryInterface                                    0x1003e09a0  sysv  -

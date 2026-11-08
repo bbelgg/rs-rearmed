@@ -109,6 +109,7 @@ detector_detection                0x4     # the note check 0x1067130: [this + 4]
 detection_instrument              0x11ec  # set at 0x105cbe9; 0x1067189 compares it with 2
 detection_note                    0x5fc   # 0x1067190, RSMods' GetCurrentNote
 detection_note_bass               0x5f4   # 0x1067198
+tone_change_busy                  0x82    # 0x1352632 (cmpb $1); set at 0x135264f
 input_slot                        0xc     # 0x11decca: [eax + 0xc]
 autosave_menu                     0x14    # 0x120aece: the slot's reference at +4 (0x120aedd), not the Mac's +8
 autosave_timer                    0x20    # 0x120af2f: 4.0 from 0x1d18d48

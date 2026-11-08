@@ -119,3 +119,4 @@ detector_detection          # the detector: its pitch detection
 detection_instrument        # pitch detection: u32 instrument, 2 = bass
 detection_note              # pitch detection: s32 the note played (MIDI), a guitar's
 detection_note_bass         # pitch detection: s32 the note played (MIDI), a bass's
+tone_change_busy            # the tone system: a byte a player, a tone change under way (tone_change waits on it)

@@ -107,3 +107,4 @@ detector_detection                0x8     # the note check 0x10022dca0: [this + 
 detection_instrument              0x1300  # set at 0x10021bda0 from the input's +0x7c; 0x10022dcf0 compares it with 2
 detection_note                    0x70c   # 0x10022dd05: compared with the note asked for
 detection_note_bass               0x704   # 0x10022dcf9
+tone_change_busy                  0xfe    # 0x1002bebed: a byte a player; set at 0x1002bec04, cleared at 0x1002bd602

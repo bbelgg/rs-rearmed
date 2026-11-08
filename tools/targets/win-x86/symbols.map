@@ -43,6 +43,7 @@ camera_set_frustum                                               0x01557f20  fas
 ak_init                                                          0x1a45290  cdecl     int(AkInitSettings *, AkPlatformInitSettings *)
 si_open                                                          0x017c50a0  custom    bool<zero>(void *self@edi, int slot, int a=hidden, int b=hidden, void *c=hidden)  # SoundInputPortAudio::InputOn: edi = the input, the slot the first of 4 stack arguments (ret 0x10; a run has 0, 1, 2, 3), eax = 0 when the stream opened (a PaError, not a bool); the Mac si_open opens the stream the same way
 autosave_warning                                                 0x0120adf0  thiscall  void(void *self, const char *category, const char *event, void *payload=hidden)  # a virtual (vtable slot at 0x1d3c34c): this in ecx, moved to ebx at 0x120ae1b; ret 0xc; the same strings and branches as the Mac's. The third argument is an object it releases at 0x120af52, which the Mac's call doesn't have: a hook that skips the original leaves it unreleased
+tone_change                                                      0x01352620  custom    void(void *self@ecx, int player@eax, int tone)  # ret 4; RSMods' PreventStuckTone jumps past its check at 0x135263a; Meter_Tone_Balance's caller 0x135245c
 
 # --- names/refs.list
 scaleform_keycode_table                                          unsupported  Mac-only (macOS keycode -> Scaleform key); LP maps Windows virtual keys

@@ -9,11 +9,12 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   Nonstop Play, video lessons, the Tone Designer's Edit Tone, a Multiplayer song with each player on their own input (new in 1.8.0); custom songs and DLC; Enumerate, EXIT GAME (new in 1.9.0) and Refresh Game Files; a Real Tone cable
   device (a virtual one named like the cable), the microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
   calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and the close button, in 0.3-0.5 s.
-- **Mods**: 15 of the 18 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
+- **Mods**: 16 of the 19 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and 0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **The note the game hears** (new, not released): as in the [Mac plan](../mac/PLAN.md#status); here the names are RSMods' own chain on this game (`ptr_guitarSpeak`, the note at +0x5fc, a bass's at +0x5f4). Read on the Mac; not yet run here.
+- **A hook on the tone change** (new, not released): as in the [Mac plan](../mac/PLAN.md#status); here `tone_change` takes its `this` in ecx and the player in eax, at the function RSMods patches (0x1352620). Not yet run.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
   output and the shared renderer scales with MetalFX and tags the layer sRGB. First run here 2026-11-08, full screen on a built-in Retina screen:

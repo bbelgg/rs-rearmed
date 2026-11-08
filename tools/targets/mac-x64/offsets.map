@@ -102,3 +102,8 @@ ni_camera_far                     0x17c
 game_color_table                  0x690   # read in a run: the same colors as Learn & Play's at +0x350
 song_search_key                   0x2c    # `/`: this game's binding, seen in the song lists (docs/mac/TESTING.md)
 song_search_key2                  0x2c
+detection_service_detector        0x18    # Player 1's: made for input 0 by its init (0x10021acc1); +0x20 is Player 2's (input 2)
+detector_detection                0x8     # the note check 0x10022dca0: [this + 8]
+detection_instrument              0x1300  # set at 0x10021bda0 from the input's +0x7c; 0x10022dcf0 compares it with 2
+detection_note                    0x70c   # 0x10022dd05: compared with the note asked for
+detection_note_bass               0x704   # 0x10022dcf9

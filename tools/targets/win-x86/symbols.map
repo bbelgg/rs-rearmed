@@ -1224,4 +1224,5 @@ ak_query_objects_name                                            0x1a406b0  cdec
 ak_source_play_position                                          0x1a41300  cdecl  int(uint32_t, int *, bool)  # 0x1f (AK_InvalidParameter) for a null position
 ui_manager                                                       0x1ee062c  data  void *  # +0x28 and +0x8c are read from it as the Mac's +0x48 and +0xe0 are (0xf85e78, 0x103cc81); RSMods' ptr_currentMenu
 game_color_manager                                               0x1ee058c  data  void *  # set at 0x1098f87, the end of its constructor, cleared at 0x1099044, its destructor
+detection_service                                                0x1ee057c  data  void *  # set at 0x130b7a9 after its constructor, cleared by its destructor 0x105bf20; RSMods' ptr_guitarSpeak
 nicamera_vtable                                                  0x1d69598  data  void *[]  # its constructor 0x1557da0; GetRTTI 0x15596c0 in slot 2 gives the NiRTTI 0x1e73280 "NiCamera"

@@ -414,3 +414,4 @@ ak_source_play_position    # AK::SoundEngine::GetSourcePlayPosition(playing id, 
 ui_manager                 # the UI manager: its current menu has the menu's name
 nicamera_vtable            # NiCamera's vtable, as an object's first word holds it
 game_color_manager         # GameColorManager, the game's colors by name: the string colors are in its table (game_color_table)
+detection_service          # DetectionService, the guitar's pitch detection: its detector has the note the player plays (detection_note)

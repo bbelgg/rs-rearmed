@@ -114,3 +114,8 @@ ni_camera_far        # NiCamera: the frustum's far plane
 game_color_table     # GameColorManager: pointers to each string's color (three floats), six for each kind of color, two banks of 0xa8: normal, colorblind
 song_search_key      # a macOS key code: the key the game's song lists open their search with
 song_search_key2     # a macOS key code: the other key that does, or the same
+detection_service_detector  # DetectionService: Player 1's detector (what the song asks whether a note is played)
+detector_detection          # the detector: its pitch detection
+detection_instrument        # pitch detection: u32 instrument, 2 = bass
+detection_note              # pitch detection: s32 the note played (MIDI), a guitar's
+detection_note_bass         # pitch detection: s32 the note played (MIDI), a bass's

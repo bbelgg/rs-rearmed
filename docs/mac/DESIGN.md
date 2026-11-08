@@ -61,7 +61,9 @@ display link and render thread, input, file paths and `Rocksmith.ini` (`rsp_shel
 `rsp_config.c`). The engine sits behind function-pointer hooks; `tools/ws7/recomp/app/seam_platform.c`
 connects them to the translated `GameBootstrap` and `GameFrame`. The shell adds the keyboard keys the
 original lacked and follows the display's refresh rate (`RS_FPS` fixes a rate). `RS_METAL_RETINA=1`
-renders at backing-pixel size on a Retina screen. The screen saver and display sleep stay off while the game
+renders at backing-pixel size on a Retina screen. A window takes any shape, where the original kept it at 16:9
+(`RS_WINDOW_ANY_SHAPE=0` does too): the game sets its cameras from its resolution and lays out its menus to the width,
+so it needs nothing more ([INSTALL.md](INSTALL.md#window-modes)). The screen saver and display sleep stay off while the game
 is open, in a window or full screen: the view holds a display-sleep assertion for its whole life, as the
 original's does.
 

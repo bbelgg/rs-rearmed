@@ -5,7 +5,9 @@ Machine: Apple M2 (4 performance + 4 efficiency cores), 16 GB, macOS 27, Apple c
 ## Summary
 
 A song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 54% of a core and 7.2 ms of CPU a frame on the route of
-[Toward the Mac edition](#toward-the-mac-edition), where the Mac takes 6.1 ms. Load times are short and paced by the game itself.
+[Toward the Mac edition](#toward-the-mac-edition), where the Mac takes 6.1 ms. Load times are short and paced by the game itself. As on the
+Mac ([Mac performance](../mac/PERFORMANCE.md#summary)), the figures predate the renderer's 4x MSAA and 16x anisotropic filtering, which
+haven't been measured here.
 
 ## Method
 

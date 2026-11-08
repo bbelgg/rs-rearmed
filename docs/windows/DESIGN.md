@@ -142,8 +142,8 @@ Changing it in the game resets the device and restyles the window at once (`lp_w
 The Metal layer's drawable is always the back buffer, shown aspect-fit in the window, so resizing and
 macOS full screen need nothing from the game; the pointer goes back through the same fit. On a screen that is not
 16:9 the bars inside a desktop-sized back buffer are the game's own: `GRDisplayRatioAdjuster` fits the picture to 16:9
-(its rectangle at +0x28, the pointer mapped back at 0x13ab9e0). The Mac game has no such fit and stretches to the
-screen, the original too ([Mac plan](../mac/PLAN.md#status)). The rules are
+(its rectangle at +0x28, the pointer mapped back at 0x13ab9e0). The Mac game has no such fit: it sets its cameras and
+lays out its menus from its resolution, so it draws at the screen's or window's own shape ([Mac plan](../mac/PLAN.md#status)). The rules are
 plain C in `win-x86/app/lp_screen.c`.
 
 The screen saver and display sleep stay off while the game is open, in a window or full screen: `lp_window.m`

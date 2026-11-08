@@ -9,7 +9,9 @@ external display and the built-in 60 Hz Retina screen. The Windows port's measur
 In a song the native build holds the display's rate at 44% of a core (74.9 fps on a 75 Hz display,
 [Final pass](#final-pass-for-140)), about the same CPU as the original game under Rosetta. It renders at the
 display's refresh rate, so a 75 Hz or 120 Hz display gets 75 or 120 fps (`RS_FPS=N` fixes a rate). Metal uses about 5%
-less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little.
+less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little. The figures here predate 4x MSAA and 16x
+anisotropic filtering (on by default since 2026-11-08, [METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)), which cost mostly GPU time rather than
+CPU; with them the GPU hasn't been measured (`RS_METAL_MSAA=1 RS_METAL_ANISO=1` is the setting these were taken at).
 
 ## Method
 

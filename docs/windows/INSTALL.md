@@ -227,13 +227,17 @@ once and without a restart: from the main menu, Space (Tools) > Options > Visual
 then Windowed, Non-Exclusive Fullscreen or Exclusive Fullscreen. Resolutions, below it, sets the size. It
 is saved as `[Renderer.Win32] Fullscreen` in `userdata/game/Rocksmith.ini`.
 
-In a window, drag the edges to resize (the picture scales with its shape kept), or use the green button or
-Control-Command-F for macOS full screen. Command-Q, the close button and the game's own
-Exit all quit through the game's shutdown. The display mode never changes.
+In a window (Windowed Mode: Windowed), drag the edges to resize: the window takes any shape, and its new size
+becomes the game's resolution, as in the [Mac edition](../mac/INSTALL.md#window-modes). The green button or
+Control-Command-F gives macOS full screen, at the screen's size. Control-Command-F in the game's full screen gives a
+window of the screen's shape, which scales the picture as it is when resized: the game stays in full-screen mode.
+Command-Q, the close button and the game's own Exit all quit through the game's shutdown. The display mode never
+changes.
 
-On a screen that isn't 16:9 the game keeps its 16:9 picture with bars at the sides or above and below, as on
-Windows. The Mac edition draws at the screen's or window's own shape ([Mac](../mac/INSTALL.md#window-modes)); this
-game fits its picture to 16:9 itself, so that isn't here yet ([PLAN.md](PLAN.md#next-work)).
+The game draws at the shape of the screen or window, with no bars: on a 16:10 or ultrawide screen it fills it,
+its cameras keeping their height and taking the width, and its menus laid out to the width, as in the Mac edition.
+On Windows this game keeps a 16:9 picture with bars; `RS_WINDOW_ANY_SHAPE=0` does that here too, and a resized
+window then scales the picture with its shape kept.
 
 ### Renderer
 
@@ -300,6 +304,7 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | Switch | Default | What |
 |---|---|---|
 | `RS_FULLSCREEN=1\|0` | the game's setting | force full screen, or a window |
+| `RS_WINDOW_ANY_SHAPE=0` | on | 16:9 with bars, as on Windows, and a resized window keeps the game's resolution ([Window modes](#window-modes)) |
 | `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen (otherwise each frame is scaled up to them with MetalFX) |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as before |
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour screen shows it more saturated, as before |

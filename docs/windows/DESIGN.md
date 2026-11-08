@@ -142,12 +142,28 @@ Retina screen, `lp_window.m` asks libRSOpenGL for an output of the back buffer t
 
 Changing it in the game resets the device and restyles the window at once (`lp_window_style` from
 `SetWindowLong`, `d3d9_platform_resize` from `IDirect3DDevice9::Reset`). `RS_FULLSCREEN=1|0` pins the mode.
-The Metal layer's drawable is always the back buffer, shown aspect-fit in the window, so resizing and
-macOS full screen need nothing from the game; the pointer goes back through the same fit. On a screen that is not
-16:9 the bars inside a desktop-sized back buffer are the game's own: `GRDisplayRatioAdjuster` fits the picture to 16:9
-(its rectangle at +0x28, the pointer mapped back at 0x13ab9e0). The Mac game has no such fit: it sets its cameras and
-lays out its menus from its resolution, so it draws at the screen's or window's own shape ([Mac plan](../mac/PLAN.md#status)). The rules are
-plain C in `win-x86/app/lp_screen.c`.
+The Metal layer's drawable is always the back buffer, shown aspect-fit in the window; the pointer goes back
+through the same fit. The rules are plain C in `win-x86/app/lp_screen.c`.
+
+The game draws at its back buffer's shape, as the Mac game does (`RS_WINDOW_ANY_SHAPE`, on unless `0`, the Mac's
+switch). The original drew 16:9 whatever its resolution: its camera setup (`0x1539470`) makes a perspective
+frustum's width its height times a 16/9 constant (the double at `0x1da5e18`), where the Mac game's takes its render
+target's width / height, and `GRDisplayRatioAdjuster`'s update (`0x13ab190`, at the end of a frame) compares the
+window's client size with the same constant and squeezes the picture into a 16:9 band with bars (`StretchRect`
+into its own surface and back; the pointer mapped to match at `0x13ab9e0`). Nothing else reads the constant, so
+`lp_game_shape` (`win-x86/shims/win32_overrides.c`) sets it to the back buffer's width / height at each
+`CreateDevice` and `Reset`, on the game's thread before its next frame: the cameras keep their height and take the
+width, the menus are laid out to it, and the fit finds nothing to do. A 16:9 back buffer keeps the constant as it was.
+
+A window the user resizes, or takes in or out of macOS full screen, becomes the game's resolution, as the Mac shell
+makes a resized window the engine's resolution. The game has no path for that (its window procedure takes no
+`WM_SIZE`; on Windows its window can't be resized), so `lp_window.m` asks (`lp_request_resolution`) and the game's
+thread applies the size at its next `PeekMessage` (`w32_pump`) with the game's own settings calls, the read
+`0x13afbd0` and the apply `0x13afc50`, as its own display-mode pick and its F11 do: the device is `Reset` to the
+new size, and the window stays as the user left it. Only in the game's Windowed mode: in its full-screen modes the
+device keeps the desktop's or its own size whatever it is given, so a window showing them (`RS_FULLSCREEN=0`, or
+Control-Command-F from the borderless full screen) has the layer fit that back buffer, as before. With
+`RS_WINDOW_ANY_SHAPE=0` the game keeps 16:9 with its bars and a resized window scales the back buffer as it is.
 
 The screen saver and display sleep stay off while the game is open, in a window or full screen: `lp_window.m`
 takes a display-sleep assertion when it makes the window and holds it until the process ends, as the Mac game's

@@ -15,9 +15,16 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Retina upscaling and sRGB colour**: as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
-  output and the shared renderer scales with MetalFX and tags the layer sRGB. Not yet run in this edition.
+  output and the shared renderer scales with MetalFX and tags the layer sRGB. First run here 2026-11-08, full screen on a built-in Retina screen:
+  `upscaling 1470x956 to 2940x1912 with MetalFX`, a song played. The upscaled picture itself wasn't looked at (snapshots are the back buffer).
 - **Sharper textures and MSAA**: the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
-  screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). Not yet run in this edition.
+  screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). First run here in the same song, `MSAA 4x` in the log; not compared with them off.
+- **Screen shape** (new): the game draws at its screen's or window's own shape, with no bars, as the Mac edition does; the original fits a 16:9
+  picture into the screen itself ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed mode becomes the game's resolution.
+  Checked 2026-11-08 full screen on a MacBook's built-in screen (1470x956 points, 1.54:1): the cameras' frustums 1.430 x 0.930 at the title and
+  1.120 x 0.728 and 1.776 x 1.154 in a song, against 1.654, 1.294 and 2.052 wide at 16:9, the heights the same; the menus, the song list and the
+  highway undistorted. A window resized to 1200x600 by the window script became the game's resolution, drawn at 2:1. `RS_WINDOW_ANY_SHAPE=0`
+  keeps the original. Not run: an ultrawide screen, a drag by hand, macOS full screen from a window.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
@@ -78,11 +85,6 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
-
-**Screen shape**, as in the Mac edition ([Mac plan](../mac/PLAN.md#status)): the Mac game sets its cameras and menus from its resolution, so
-a 16:10 or ultrawide picture needs nothing more there. This game fits its picture to 16:9 inside the back buffer itself
-(`GRDisplayRatioAdjuster`, [DESIGN.md](DESIGN.md#screen-and-window)); its rectangle would have to be the whole back buffer, and the cameras
-and menus then checked. Not started.
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
 Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).

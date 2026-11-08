@@ -1,6 +1,7 @@
 // Host test of the game window's rules (win-x86/app/lp_screen.c): the mode a style or a back
-// buffer means, the RS_FULLSCREEN override, the window size on a small screen, and the pointer
-// mapping into a letterboxed back buffer. Prints "N passed, 0 failed".
+// buffer means, the RS_FULLSCREEN override, the window size on a small screen, the pointer
+// mapping into a letterboxed back buffer, RS_WINDOW_ANY_SHAPE and the resolution a resized window
+// asks for. Prints "N passed, 0 failed".
 //
 //   cc -I win-x86/app win-x86/test/lp_screen_test.c win-x86/app/lp_screen.c -o lp_screen_test
 #include <stdio.h>
@@ -71,6 +72,19 @@ int main(void) {
   // a full screen of another shape (1280x720 on 1470x956): bars top and bottom
   lp_view_to_pixels(735, 64, 1470, 956, 1280, 720, &x, &y, &k);
   CHECK(x == 640 && y == 0, "top bar clamps to row 0: %d,%d", x, y);
+
+  // RS_WINDOW_ANY_SHAPE: on unless 0, n or f, as on the Mac
+  CHECK(lp_any_shape(NULL) && lp_any_shape("") && lp_any_shape("1") && lp_any_shape("yes"), "on by default");
+  CHECK(!lp_any_shape("0") && !lp_any_shape("no") && !lp_any_shape("false") && !lp_any_shape("N"), "0, no, false: off");
+
+  // a resized window's resolution: whole points at 1x, whole pixels at 2x
+  int rw, rh;
+  CHECK(lp_follow_size(1152, 720, 1, 1280, 720, &rw, &rh) && rw == 1152 && rh == 720, "16:10 window: %dx%d", rw, rh);
+  CHECK(!lp_follow_size(1280, 720, 1, 1280, 720, &rw, &rh), "the back buffer's own size asks for nothing");
+  CHECK(lp_follow_size(1279.5, 719.5, 1, 1280, 720, &rw, &rh) && rw == 1279 && rh == 719, "half points: %dx%d", rw, rh);
+  CHECK(!lp_follow_size(1280, 720, 2, 2560, 1440, &rw, &rh), "RS_METAL_RETINA=1: pixels, 2560x1440 is the same");
+  CHECK(lp_follow_size(1470, 956, 2, 2560, 1440, &rw, &rh) && rw == 2940 && rh == 1912, "macOS full screen at 2x: %dx%d", rw, rh);
+  CHECK(lp_follow_size(0.4, 0, 0, 1280, 720, &rw, &rh) && rw == 1 && rh == 1, "never below 1x1: %dx%d", rw, rh);
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed != 0;

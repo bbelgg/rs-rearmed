@@ -19,7 +19,7 @@ where you point them and never copied into the repository.
 | Steam face | `make -C win-x86/shims/steam test OUT=DIR` | the guest ABI end to end: exports, interface vtables, `thiscall`, callbacks and call results |
 | Online layer | `make -C win-x86/online test OUT=DIR` | the three vtables in guest memory with fake game functions: every replaced slot, the posted events, a layout that does not match left alone |
 | D3D9 layer | `win-x86/test/d3d9_test.sh <cmake build dir> [out dir]` (needs `cmake --build <dir> --target opengl`) | the layer's host test on both libRSOpenGL backends: fixed-function draws checked pixel by pixel, every stage operation, lights, fog, generated texture coordinates, the draw-time upload of dynamic buffers, the wait in Present while the window is hidden (1,272 checks; 2026-11-06 against a `libRSOpenGL` built from the branch under test) |
-| Window rules | `cc -I win-x86/app win-x86/test/lp_screen_test.c win-x86/app/lp_screen.c -o lp_screen_test && ./lp_screen_test` | the window mode a style or back buffer means, `RS_FULLSCREEN`, sizes on a small screen and with Retina pixels, the pointer in a letterboxed back buffer |
+| Window rules | `cc -I win-x86/app win-x86/test/lp_screen_test.c win-x86/app/lp_screen.c -o lp_screen_test && ./lp_screen_test` | the window mode a style or back buffer means, `RS_FULLSCREEN`, sizes on a small screen and with Retina pixels, the pointer in a letterboxed back buffer, `RS_WINDOW_ANY_SHAPE` and the resolution a resized window asks for |
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export over 3,000-5,500 inputs each (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
@@ -256,7 +256,8 @@ and copies that account's saves into an empty folder (without `crd`), so the pro
 The tuner is up about 30 s after Play Song on a warm cache. A sixth Return before the tuner starts
 calibration instead, which waits for a guitar. The script's log lines carry the seconds since it started and
 the wall time, to match them with snapshots. `LP_WINDOW_SCRIPT=20:900x700,30:toggle` resizes the window and
-toggles full screen at those seconds; `quit`, `unfocus` and `focus` are the same steps as Command-Q and as the
+toggles full screen at those seconds (a resize is the end of a user's drag: with any shape the log has `asked for as the game's
+resolution`, `d3d9: Reset 900x700` and `the game draws 900x700 at its own shape`); `quit`, `unfocus` and `focus` are the same steps as Command-Q and as the
 window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window, and starts neither
 script: `d3d9_platform_context` returns before `window_script` and `w32_input_script`, so the game stays on the
 title screen, there is no `input script` line in the log, and a `quit` step never comes. Use `RS_FULLSCREEN=0` for a scripted run.
@@ -406,6 +407,17 @@ A song with no interface connected (2026-11-07, the texture log's runs, a copy o
 
 The render API in a game: as on the [Mac](../mac/TESTING.md#game-runs), with `shims/opengl/test/render_mod.c`, on the route above. The log says `[render_mod] on win-x86, API 1`.
 
+The screen shape (2026-11-08, `out/rs2014_lp` started directly with `HOME` and `CFFIXED_USER_HOME` at a test home, `RS_MODS_LOG=1` for the
+mods' `loft: camera` frustum lines, `ScreenWidth=1470`, `ScreenHeight=956`, `Fullscreen=0`): a back buffer the main screen's size opens full
+screen, so on a MacBook's built-in screen this is its full screen. The log has `the game draws 1470x956 at its own shape (1.5377; 16:9 is
+1.7778)`, and each camera's frustum keeps its 16:9 height (0.930 at the title, 0.728 and 1.154 in a song) with the width 1.54 times it. With a
+fake `HOME` the Steam folder is `steam/1` ([above](#unattended-runs)), so Return on ProfileSelect started a new profile: its screens took a name,
+Down and Return on PlayedRS1Select and RefresherSelect, Return on PathSelect, HandSelect and HeadstockSelect, Down three times to DISCONNECTED on
+FE_InputSelect and Return on its two notices, here by hand. Set `RS_STEAM_ID` to the test profile's account to skip them. From the main menu the
+route above to Cherub Rock; its tone switch and the highway fill the screen. A window's resize: `Fullscreen=0` with a size that isn't the screen's
+and `LP_WINDOW_SCRIPT=45:1200x600` (the log's `the game's resolution 1680x1050 -> 1200x600, the window's`); with `Fullscreen=1` and
+`RS_FULLSCREEN=0` the log says `the game is in full screen (Windowed Mode is not Windowed): its resolution stays` and nothing changes.
+
 The measured route (2026-11-06, `out/rs2014_lp` started directly, a test home, a copy of a DIRECT CONNECT test profile, `RS_FULLSCREEN=0`, a
 UR22mkII): after the `dispatch callback 1101` line wait 10 s, `front`, 2 s, Return, 6 s, Return, wait for `mods: DLC:`, 12 s, `front`, Return on LEARN A SONG,
 9 s, Return on Mission Complete, 5 s, Return on New Mission, 4 s, `lpshift`, 2 s, `text cher`, 8 s, Down to Cherub Rock, 2 s, Return, 6 s, Return on Play Song, 31 s,
@@ -521,6 +533,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `RS_MODS_FIXES=0`, `RS_MODS_BUDGET_MS=N`, `RS_MODS_BYPASS=0` | the built-in fixes off, the DLC mounting's time per frame (0: one archive a frame), the song-file signature check on |
 | `RS_D3D9_DISPLAY=WxH` | the desktop size the game sees |
 | `RS_FULLSCREEN=1\|0` | full screen or a window, whatever the game's setting |
+| `RS_WINDOW_ANY_SHAPE=0` | 16:9 with the game's bars, and a resized window keeps the resolution ([DESIGN.md](DESIGN.md#screen-and-window)) |
 | `RS_METAL_RETINA=1` | render in backing pixels |
 | `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen; the layer left untagged (not sRGB) |
 | `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's); the shared renderer, [Mac](../mac/TESTING.md#diagnostics) |

@@ -423,7 +423,23 @@ static int peek(uint32_t m, uint32_t fl) {
   pthread_mutex_unlock(&mu);
   return got;
 }
-static void u_PeekMessageA(rc_ctx *c) { w32_ret(c, (uint32_t)peek(w32_arg(c, 0), w32_arg(c, 4)), 5); }
+// The top of the game's message loop, on the thread that peeks (win32_overrides.c: a resolution the
+// host window asked for is applied here, as the game's own F11 is from its window procedure).
+__attribute__((weak)) void w32_pump(rc_ctx *c) { (void)c; }
+static void u_PeekMessageA(rc_ctx *c) {
+  w32_pump(c);
+  w32_ret(c, (uint32_t)peek(w32_arg(c, 0), w32_arg(c, 4)), 5);
+}
+// The host resized a window's client area, as a user's drag does on Windows: GetClientRect says so.
+void w32_window_size(uint32_t h, int w, int ht) {
+  pthread_mutex_lock(&mu);
+  wnd *o = wnd_of(h);
+  if (o && w > 0 && ht > 0) {
+    o->w = w;
+    o->h = ht;
+  }
+  pthread_mutex_unlock(&mu);
+}
 static void u_PeekMessageW(rc_ctx *c) { u_PeekMessageA(c); }
 static void u_GetMessageA(rc_ctx *c) {
   uint32_t m = w32_arg(c, 0);

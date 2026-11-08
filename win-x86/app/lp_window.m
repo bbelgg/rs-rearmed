@@ -26,8 +26,10 @@
 //
 // The drawable is the back buffer; the layer scales it to the window keeping its aspect ratio
 // (never cropped, letterboxed in black), so the user can resize the window, and enter and leave
-// macOS full screen (the green button, View > Enter Full Screen, Control-Command-F), without the
-// game noticing. In the borderless full screen Control-Command-F goes to a window instead.
+// macOS full screen (the green button, View > Enter Full Screen, Control-Command-F). With any shape
+// (RS_WINDOW_ANY_SHAPE, on by default) the game then takes the window's size as its resolution and
+// draws at its shape, as the Mac edition does; off, the game doesn't notice and keeps its size. In the
+// borderless full screen Control-Command-F goes to a window instead.
 //
 // The window's keys and pointer go to the game (win32_input.c): DirectInput, the virtual-key state
 // and the window messages; the pointer in back-buffer pixels. LP_INPUT_SCRIPT plays keys.
@@ -35,6 +37,7 @@
 // env: LP_OFFSCREEN=1     no window: the device renders offscreen
 //      RS_METAL_RETINA=1  the desktop, and so the game's resolution, in backing pixels
 //      RS_FULLSCREEN=1|0  always full screen / always a window, whatever the game's setting
+//      RS_WINDOW_ANY_SHAPE=0  16:9 with the game's bars, and a resized window keeps the resolution
 //      LP_WINDOW_SCRIPT   window resizes and full-screen toggles for unattended checks
 #import <Cocoa/Cocoa.h>
 #import <IOKit/pwr_mgt/IOPMLib.h>
@@ -107,6 +110,20 @@ static int g_windowed = 1;  // the device being made is windowed (d3d9_platform_
 
 static int native_full(void) { return (g_win.styleMask & NSWindowStyleMaskFullScreen) != 0; }
 
+// Any shape (RS_WINDOW_ANY_SHAPE, on unless 0, the Mac edition's switch): the game draws at its back
+// buffer's shape (win32_overrides.c's lp_game_shape, at each CreateDevice and Reset), and a window the
+// user resizes, or takes to macOS full screen, becomes the game's resolution (lp_request_resolution), as
+// the Mac game's shell does with its window. Off: 16:9 with the game's own bars, and a resized window
+// scales the back buffer as it is.
+void lp_game_shape(int w, int h);                            // win32_overrides.c
+void lp_request_resolution(uint32_t hwnd, int w, int h);  // win32_overrides.c: at the next PeekMessage
+static int any_shape(void) {
+  static int on = -1;
+  if (on < 0) on = lp_any_shape(getenv("RS_WINDOW_ANY_SHAPE"));
+  return on;
+}
+static int g_asked_w, g_asked_h;  // the size the window asked for, until the game's Reset to it
+
 // the titled window's content size for the back buffer
 static NSSize window_size(void) {
   NSRect frame, visible;
@@ -122,6 +139,20 @@ static void log_mode(const char *why) {
   NSSize c = g_view.bounds.size;
   fprintf(stderr, "lp: window %s: %s %.0fx%.0f points, back buffer %dx%d\n", why,
           native_full() ? "macOS full screen" : g_full ? "full screen" : "windowed", c.width, c.height, g_bw, g_bh);
+}
+
+// A window the user resized, or took in or out of macOS full screen: its content area, in the game's
+// pixels, becomes the game's resolution (any shape). Not the borderless full screen: that is the
+// desktop's size already, or the game's own choice (Fullscreen=2).
+static void follow_window(const char *why) {
+  if (!any_shape() || !g_win || !g_view || g_full) return;
+  NSSize c = g_view.bounds.size;
+  int w, h;
+  if (!lp_follow_size(c.width, c.height, retina() ? g_win.backingScaleFactor : 1, g_bw, g_bh, &w, &h)) return;
+  g_asked_w = w;
+  g_asked_h = h;
+  lp_request_resolution(g_hwnd, w, h);
+  fprintf(stderr, "lp: window %s: %dx%d asked for as the game's resolution\n", why, w, h);
 }
 
 static void go_full(void) {
@@ -189,12 +220,16 @@ static void set_output(int w, int h) {
 }
 
 void d3d9_platform_resize(uint32_t hwnd, int w, int h) {
+  if (any_shape()) lp_game_shape(w, h);  // the game's thread, before its next frame
   dispatch_async(dispatch_get_main_queue(), ^{
     if (!g_win || (w == g_bw && h == g_bh)) return;
+    // the size the window asked for: it has that shape already, so it stays where the user put it
+    int asked = w == g_asked_w && h == g_asked_h;
+    g_asked_w = g_asked_h = 0;
     g_bw = w;
     g_bh = h;
     set_output(w, h);
-    if (!g_full && !native_full()) go_window(1);
+    if (!g_full && !native_full() && !asked) go_window(1);
     log_mode("reset");
   });
 }
@@ -258,9 +293,18 @@ void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp);
   d3d9_set_hidden_period(shown ? 0 : 1000000000ull / (uint64_t)hz);
   fprintf(stderr, "lp: the window is %s\n", shown ? "visible" : "hidden");
 }
-- (void)windowDidEnterFullScreen:(NSNotification *)n { log_mode("macOS"); }
-- (void)windowDidExitFullScreen:(NSNotification *)n { log_mode("macOS"); }
-- (void)windowDidEndLiveResize:(NSNotification *)n { log_mode("resized"); }
+- (void)windowDidEnterFullScreen:(NSNotification *)n {
+  log_mode("macOS");
+  follow_window("macOS");
+}
+- (void)windowDidExitFullScreen:(NSNotification *)n {
+  log_mode("macOS");
+  follow_window("macOS");
+}
+- (void)windowDidEndLiveResize:(NSNotification *)n {
+  log_mode("resized");
+  follow_window("resized");
+}
 @end
 static LPController *g_ctl;
 
@@ -280,7 +324,10 @@ static void window_script(void) {
       else if ([a isEqualToString:@"audio"]) wa_default_changed();
       else if ([a isEqualToString:@"unfocus"]) [g_ctl windowDidResignKey:nil];
       else if ([a isEqualToString:@"focus"]) [g_ctl windowDidBecomeKey:nil];
-      else if (sscanf(a.UTF8String, "%dx%d", &w, &h) == 2) [g_win setContentSize:NSMakeSize(w, h)];
+      else if (sscanf(a.UTF8String, "%dx%d", &w, &h) == 2) {
+        [g_win setContentSize:NSMakeSize(w, h)];
+        follow_window("script");  // as the end of a user's resize
+      }
       fprintf(stderr, "lp: window script [%.0f] %s\n", at, a.UTF8String);
       dispatch_after(dispatch_time(DISPATCH_TIME_NOW, NSEC_PER_SEC), dispatch_get_main_queue(), ^{ log_mode("script"); });
     });
@@ -395,6 +442,7 @@ static void input_monitor(void) {
 }
 
 rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
+  if (any_shape()) lp_game_shape(w, h);  // the game's thread, before its first frame
   const char *off = getenv("LP_OFFSCREEN");
   if (off && *off && *off != '0') return rs_gfx_create_offscreen(w, h);
   int dw, dh;

@@ -49,6 +49,10 @@ const char *w32_host_module_name(uint32_t h);
 // The desktop size the game sees: the host's main screen in points, or in pixels with
 // RS_METAL_RETINA=1 (lp_screen_size, win-x86/app/lp_window.m); RS_D3D9_DISPLAY=WxH overrides.
 void w32_display_size(int32_t *w, int32_t *h);
+// The host resized window h's client area to w x ht pixels (GetClientRect then has it).
+void w32_window_size(uint32_t h, int w, int ht);
+// The top of the game's message loop (PeekMessage): win32_overrides.c's, a weak no-op without it.
+void w32_pump(rc_ctx *c);
 
 // --- input (win32_input.c): from the host window (win-x86/app/lp_window.m) to the game
 void w32_input_key(int mac_keycode, int down, uint32_t ch);

@@ -7,6 +7,8 @@
 // One that is also a hook point (tools/targets/names/hooks.list) is N_<addr> here: the generated F_<addr>
 // runs a mod's hooks around it, and a mod sees the function as the game now has it.
 #include <ctype.h>
+#include <pthread.h>
+#include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -660,3 +662,99 @@ void F_144bdb0(rc_ctx *c) { dlc_job_fail(c); }
 // The manager's flush (0x144bbd0, esi = the manager; the Mac dlc_worker_flush): nothing in flight. The
 // coordinator's shutdown calls it with a manager that was never made offline.
 void F_144bbd0(rc_ctx *c) { ov_ret32(c, 0); }
+
+// ------------------------------------------------------------------------------------------------
+// Any window or screen shape, as the Mac edition (RS_WINDOW_ANY_SHAPE, on unless 0, read by
+// win-x86/app/lp_window.m, which calls these only when it is on; the Mac's is in rsp_shell.m).
+//
+// This game draws 16:9 whatever its resolution, where the Mac game draws at its resolution's shape. Its
+// camera setup (0x1539470; the Mac's 0x1011684d0) makes a perspective frustum's width its height times
+// the double 16/9 at 0x1da5e18 (0x1539adb), and an orthographic one with a set height the same way
+// (0x1539a06); the Mac's takes its render target's width / height there (0x101168cdc). And
+// GRDisplayRatioAdjuster's update (0x13ab190, at the end of a frame) compares the window's client size
+// (GetClientRect) with the same constant (0x13ab236): more than 0.01 apart, or a client not the renderer's
+// size, and it stretches the renderer's picture into a 16:9 band of its own surface and back into the
+// back buffer (StretchRect twice), with bars, and maps the pointer to match (0x13ab9e0). Nothing else
+// reads the constant. lp_game_shape makes it the back buffer's width / height at each CreateDevice and
+// Reset (on the game's thread, before its next frame), so the cameras keep their height and take the
+// width, as the Mac's do, and the fit finds nothing to do. A 16:9 back buffer keeps the constant as the
+// game has it, so a 16:9 screen draws as before to the bit.
+//
+// A window resized on the Mac becomes the game's resolution, as the Mac game's shell does with a resized
+// window (lp_request_resolution, from lp_window.m). This game has no such path (its window procedure takes
+// no WM_SIZE, and its windows can't be resized on Windows), so the game's thread applies the size at its
+// next PeekMessage (w32_pump, win32_user32.c) through the game's own settings calls: the read 0x13afbd0
+// (esi = a 0x44-byte record: +0 width, +4 height) and the apply 0x13afc50 (eax = the record), as its pick
+// of a display mode does (0x130c3a9). The apply resets the device (d3d9_platform_resize, and so
+// lp_game_shape). The game takes F11 the same way, from its window procedure inside the message loop
+// (0x130d905). The window's client size changes first, as a user's drag makes it on Windows, so the fit's
+// comparison with the renderer's size holds. Only in Windowed mode: in the game's two full-screen modes the
+// device keeps the desktop's or the game's own size whatever the record says (a window showing them, from
+// RS_FULLSCREEN=0 or Control-Command-F, has the layer fit that back buffer), and a client size changed
+// alone would bring the fit's bars back.
+// ------------------------------------------------------------------------------------------------
+#define GAME_16_9 0x1da5e18u       // double, 1.7777777910232544 (16/9 as a float)
+#define SETTINGS_READ 0x13afbd0u   // esi = the record
+#define SETTINGS_APPLY 0x13afc50u  // eax = the record (0x44 bytes)
+#define SETTINGS_MODE 0x10u        // flags: Windowed Mode, as set_fullscreen (0x13afd30) reads them
+#define MODE_NONEXCLUSIVE 0x80u    // Non-Exclusive Fullscreen (a windowed device the desktop's size)
+#define MODE_EXCLUSIVE 0x04u       // Exclusive Fullscreen; neither: Windowed
+void w32_window_size(uint32_t hwnd, int w, int h);  // win32_user32.c
+
+static pthread_t shape_thread;  // the thread that makes and resets the device
+static _Atomic int shape_thread_set;
+static _Atomic uint64_t res_request;  // hwnd << 32 | width << 16 | height; 0: none
+
+void lp_game_shape(int w, int h) {
+  static double game_16_9;
+  static int have;
+  if (!have) {
+    memcpy(&game_16_9, RC32_H(GAME_16_9), 8);
+    have = 1;
+  }
+  if (!atomic_load(&shape_thread_set)) {
+    shape_thread = pthread_self();
+    atomic_store(&shape_thread_set, 1);
+  }
+  double r = w > 0 && h > 0 && (int64_t)w * 9 != (int64_t)h * 16 ? (double)w / h : game_16_9, was;
+  memcpy(&was, RC32_H(GAME_16_9), 8);
+  if (r == was) return;
+  memcpy(RC32_H(GAME_16_9), &r, 8);
+  fprintf(stderr, "lp: the game draws %dx%d at its own shape (%.4f; 16:9 is %.4f)\n", w, h, r, game_16_9);
+}
+
+void lp_request_resolution(uint32_t hwnd, int w, int h) {
+  if (w <= 0 || h <= 0 || w > 0xffff || h > 0xffff) return;
+  atomic_store(&res_request, (uint64_t)hwnd << 32 | (uint64_t)w << 16 | (uint64_t)h);
+}
+
+void w32_pump(rc_ctx *c) {
+  if (!atomic_load_explicit(&res_request, memory_order_relaxed) || !atomic_load(&shape_thread_set) ||
+      !pthread_equal(pthread_self(), shape_thread))
+    return;
+  uint64_t q = atomic_exchange(&res_request, 0);  // the apply peeks too: it finds none
+  if (!q) return;
+  uint32_t hwnd = (uint32_t)(q >> 32);
+  int w = (int)(q >> 16 & 0xffff), h = (int)(q & 0xffff);
+  uint64_t saved[8];  // PeekMessage's caller sees its registers kept (eax is the shim's)
+  memcpy(saved, c->r, sizeof saved);
+  uint32_t esp = (uint32_t)c->r[4], rec = (esp - 0x100) & ~0xfu;  // below PeekMessage's arguments
+  c->r[4] = rec;
+  c->r[6] = rec;
+  rc32_call(c, SETTINGS_READ, 0, 0, 0, 0, 0);
+  uint32_t ow = ld32(rec), oh = ld32(rec + 4);
+  if (*g8(rec + SETTINGS_MODE) & (MODE_NONEXCLUSIVE | MODE_EXCLUSIVE)) {
+    // the game's full screen shown in a window (RS_FULLSCREEN=0, Control-Command-F): its device stays the
+    // desktop's or its own size whatever the record says, so it keeps it, and the layer fits it to the window
+    memcpy(c->r, saved, sizeof saved);
+    fprintf(stderr, "lp: the game is in full screen (Windowed Mode is not Windowed): its resolution stays\n");
+    return;
+  }
+  st32(rec, (uint32_t)w);
+  st32(rec + 4, (uint32_t)h);
+  w32_window_size(hwnd, w, h);
+  c->r[0] = rec;
+  rc32_call(c, SETTINGS_APPLY, 0, 0, 0, 0, 0);
+  memcpy(c->r, saved, sizeof saved);
+  fprintf(stderr, "lp: the game's resolution %ux%u -> %dx%d, the window's\n", ow, oh, w, h);
+}

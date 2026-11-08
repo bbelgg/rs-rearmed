@@ -77,9 +77,9 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Lower guitar latency | ✅ | ⚠️ |
 | Your own plug-in in place of the game's tones (rearmed-mods' ToneHost add-on) | ✅ played with Helix Native | ✅ the same |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |
-| Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ⚠️ the same renderer, not yet run |
-| A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; full screen not yet run on such a screen | ❌ 16:9 with bars, as on Windows |
-| Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ⚠️ the same renderer, not yet run |
+| Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ✅ the same renderer, run once |
+| A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; full screen not yet run on such a screen | ✅ full screen on a MacBook's screen, a window of any shape; not on Windows, where it keeps 16:9 with bars |
+| Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer, run once |
 | Frame rate follows the display | ✅ 75/120 Hz | ✅ 75 Hz |
 | Metal renderer, shaders prepared at install | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |

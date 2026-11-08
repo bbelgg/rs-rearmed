@@ -40,3 +40,15 @@ void lp_view_to_pixels(double px, double py, double vw, double vh, int w, int h,
   *y = (int32_t)fy;
   *k = s;
 }
+
+int lp_any_shape(const char *env) {
+  return !(env && *env && (*env == '0' || *env == 'n' || *env == 'N' || *env == 'f' || *env == 'F'));
+}
+
+int lp_follow_size(double cw, double ch, double scale, int bw, int bh, int *w, int *h) {
+  if (scale <= 0) scale = 1;
+  double fw = floor(cw * scale + 1e-6), fh = floor(ch * scale + 1e-6);
+  *w = fw < 1 ? 1 : (int)fw;
+  *h = fh < 1 ? 1 : (int)fh;
+  return *w != bw || *h != bh;
+}

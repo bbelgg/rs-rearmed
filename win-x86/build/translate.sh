@@ -50,11 +50,13 @@ wrappers=
 [ -f "$wrap" ] && wrappers="--wrappers $wrap"
 
 echo "=== Translating $img → $gen (jobs=$jobs) ==="
+# The options are the installer's (win-x86/install/lp_build.py, TRANSLATE_OPTS): -mno-outline keeps the
+# machine outliner from splitting the generated code into fragments (docs/windows/PERFORMANCE.md)
 "$py" -I "$recomp/build/gen_image_pe.py" "$img" "$gen" \
   --jobs "$jobs" \
   --obj-dir "$obj" \
   --cflags="-w" \
-  --opt="-O2" \
+  --opt="-O2 -mno-outline" \
   --target win-x86 \
   $skip $wrappers
 

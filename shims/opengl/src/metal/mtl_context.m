@@ -3,6 +3,7 @@
 #include "mtl_internal.h"
 
 #include <ImageIO/ImageIO.h>
+#import <MetalFX/MetalFX.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -370,6 +371,18 @@ static void rsm_init_state(RSMContext *ctx) {
     ctx->dirty = RSM_DIRTY_ALL;
 }
 
+// The game's colours are sRGB, as the screens it was made for. An untagged layer goes to the display as it is,
+// so a wide-gamut (P3) screen, such as a Mac's own, showed them more saturated than meant. Tagged sRGB, macOS
+// matches them to the display. RS_METAL_COLORS=vivid leaves the layer untagged: the look before.
+static void rsm_layer_colors(CAMetalLayer *layer) {
+    const char *e = getenv("RS_METAL_COLORS");
+    if (e && !strcmp(e, "vivid"))
+        return;
+    CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    layer.colorspace = cs;
+    CGColorSpaceRelease(cs);
+}
+
 static RSMContext *rsm_create(int w, int h, CAMetalLayer *layer) {
     id<MTLDevice> dev = layer && layer.device ? layer.device : MTLCreateSystemDefaultDevice();
     if (!dev) {
@@ -397,6 +410,7 @@ static RSMContext *rsm_create(int w, int h, CAMetalLayer *layer) {
         layer.pixelFormat = MTLPixelFormatBGRA8Unorm;
         layer.framebufferOnly = YES;
         layer.drawableSize = CGSizeMake(ctx->w, ctx->h);
+        rsm_layer_colors(layer);
     }
     rsm_default_fb(ctx);
     ctx->vao0 = [RSMVertexArray new];
@@ -497,6 +511,93 @@ void rsmtl_gfx_make_current(rs_gfx_context *c) { rsm_tls = (__bridge RSMContext 
 
 rs_gfx_context *rsmtl_gfx_current(void) { return (__bridge rs_gfx_context *)rsm_tls; }
 
+// The drawable's size: the output size when it is larger than the framebuffer, else the framebuffer's.
+static bool rsm_upscaling(RSMContext *ctx) { return ctx->out_w > ctx->w && ctx->out_h > ctx->h; }
+static CGSize rsm_out_size(RSMContext *ctx) {
+    return rsm_upscaling(ctx) ? CGSizeMake(ctx->out_w, ctx->out_h) : CGSizeMake(ctx->w, ctx->h);
+}
+
+void rsmtl_gfx_set_output_size(rs_gfx_context *c, int w, int h) {
+    RSMContext *ctx = (__bridge RSMContext *)c;
+    if (!ctx || !ctx->layer || (w == ctx->out_w && h == ctx->out_h))
+        return;
+    pthread_mutex_lock(&ctx->lock);
+    ctx->out_w = w > 0 ? w : 0;
+    ctx->out_h = h > 0 ? h : 0;
+    ctx->fx_scaler = nil;
+    ctx->fx_out = nil;
+    ctx->fx_tried = false;
+    ctx->layer.drawableSize = rsm_out_size(ctx);
+    pthread_mutex_unlock(&ctx->lock);
+}
+
+// Upscaling at present: MetalFX's spatial scaler from the framebuffer to the output size, into fx_out, which the
+// present then draws into the drawable (y flip). RS_METAL_UPSCALE=0, or no MetalFX (before macOS 13, a GPU it
+// doesn't support): the present draws the framebuffer with a bilinear sampler instead. Made once per size.
+static void rsm_upscale_setup(RSMContext *ctx) {
+    ctx->fx_tried = true;
+    if (!ctx->linear_sampler) {
+        MTLSamplerDescriptor *sd = [MTLSamplerDescriptor new];
+        sd.minFilter = sd.magFilter = MTLSamplerMinMagFilterLinear;
+        ctx->linear_sampler = [ctx->dev newSamplerStateWithDescriptor:sd];
+    }
+    const char *e = getenv("RS_METAL_UPSCALE");
+    if (e && *e == '0')
+        return;
+    if (@available(macOS 13.0, *)) {
+        if (![MTLFXSpatialScalerDescriptor supportsDevice:ctx->dev])
+            return;
+        MTLFXSpatialScalerDescriptor *d = [MTLFXSpatialScalerDescriptor new];
+        d.inputWidth = (NSUInteger)ctx->w;
+        d.inputHeight = (NSUInteger)ctx->h;
+        d.outputWidth = (NSUInteger)ctx->out_w;
+        d.outputHeight = (NSUInteger)ctx->out_h;
+        d.colorTextureFormat = ctx->def_color.pixelFormat;
+        d.outputTextureFormat = ctx->def_color.pixelFormat;
+        d.colorProcessingMode = MTLFXSpatialScalerColorProcessingModePerceptual;  // sRGB-encoded 8 bits
+        id<MTLFXSpatialScaler> s = [d newSpatialScalerWithDevice:ctx->dev];
+        if (!s)
+            return;
+        MTLTextureDescriptor *td = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:d.outputTextureFormat
+                                                                                      width:d.outputWidth
+                                                                                     height:d.outputHeight
+                                                                                  mipmapped:NO];
+        td.usage = s.outputTextureUsage | MTLTextureUsageShaderRead;
+        td.storageMode = MTLStorageModePrivate;
+        ctx->fx_out = [ctx->dev newTextureWithDescriptor:td];
+        if (!ctx->fx_out)
+            return;
+        ctx->fx_out.label = @"rsgl upscaled frame";
+        s.inputContentWidth = d.inputWidth;
+        s.inputContentHeight = d.inputHeight;
+        ctx->fx_scaler = s;
+        static int told;
+        if (!told++)
+            rsm_log("upscaling %dx%d to %dx%d with MetalFX (RS_METAL_UPSCALE)", ctx->w, ctx->h, ctx->out_w, ctx->out_h);
+    }
+}
+
+// Present into the drawable: the framebuffer as it is, or upscaled.
+static void rsm_present_frame(RSMContext *ctx, id<MTLTexture> drawable) {
+    if (!rsm_upscaling(ctx) || drawable.width == ctx->def_color.width) {
+        rsm_present_draw(ctx, drawable, ctx->def_color, ctx->present_sampler);
+        return;
+    }
+    if (!ctx->fx_tried)
+        rsm_upscale_setup(ctx);
+    if (@available(macOS 13.0, *)) {
+        id<MTLFXSpatialScaler> s = ctx->fx_scaler;
+        if (s && ctx->fx_out.width == drawable.width && ctx->fx_out.height == drawable.height) {
+            s.colorTexture = ctx->def_color;
+            s.outputTexture = ctx->fx_out;
+            [s encodeToCommandBuffer:rsm_cmd(ctx)];
+            rsm_present_draw(ctx, drawable, ctx->fx_out, ctx->present_sampler);
+            return;
+        }
+    }
+    rsm_present_draw(ctx, drawable, ctx->def_color, ctx->linear_sampler);
+}
+
 void rsmtl_gfx_resize(rs_gfx_context *c, int w, int h) {
     RSMContext *ctx = (__bridge RSMContext *)c;
     if (!ctx || w <= 0 || h <= 0 || (w == ctx->w && h == ctx->h))
@@ -509,8 +610,11 @@ void rsmtl_gfx_resize(rs_gfx_context *c, int w, int h) {
         ctx->w = w;
         ctx->h = h;
         rsm_default_fb(ctx);
+        ctx->fx_scaler = nil;  // made again for the new input size
+        ctx->fx_out = nil;
+        ctx->fx_tried = false;
         if (ctx->layer)
-            ctx->layer.drawableSize = CGSizeMake(w, h);
+            ctx->layer.drawableSize = rsm_out_size(ctx);
         if (!ctx->draw_fb)
             ctx->fb_dirty = true;
     }
@@ -620,7 +724,7 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
         if (ctx->layer) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];
             if (d) {
-                rsm_present_draw(ctx, d.texture);
+                rsm_present_frame(ctx, d.texture);
                 [rsm_cmd(ctx) presentDrawable:d];
             }
         }

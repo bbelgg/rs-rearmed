@@ -179,11 +179,21 @@ void lp_window_style(uint32_t hwnd, uint32_t style) {
 void d3d9_platform_windowed(int windowed) { g_windowed = windowed; }
 
 // The game reset its device (d3d9_device.c's Reset) to a w x h back buffer.
+// Not RS_METAL_RETINA: the game renders in points, and libRSOpenGL scales each frame up to the screen's backing
+// pixels (MetalFX) before the layer fits it to the window, as the Mac edition does (rsp_present_metal.m). 1x: nothing.
+static rs_gfx_context *g_ctx;
+static void set_output(int w, int h) {
+  CGFloat s = g_win ? g_win.backingScaleFactor : 1;
+  if (!g_ctx || retina() || s <= 1) return;
+  rs_gfx_set_output_size(g_ctx, (int)(w * s + 0.5), (int)(h * s + 0.5));
+}
+
 void d3d9_platform_resize(uint32_t hwnd, int w, int h) {
   dispatch_async(dispatch_get_main_queue(), ^{
     if (!g_win || (w == g_bw && h == g_bh)) return;
     g_bw = w;
     g_bh = h;
+    set_output(w, h);
     if (!g_full && !native_full()) go_window(1);
     log_mode("reset");
   });
@@ -434,6 +444,11 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
   });
   w32_input_script();
   rs_gfx_context *ctx = rs_gfx_create_layer((__bridge void *)layer, w, h);
+  if (ctx)
+    on_main(^{
+      g_ctx = ctx;
+      set_output(w, h);
+    });
   __block NSSize content;
   on_main(^{ content = g_view.bounds.size; });
   fprintf(stderr, "lp: window for HWND 0x%x: %s %.0fx%.0f points, back buffer %dx%d (desktop %dx%d%s): %s\n", hwnd,

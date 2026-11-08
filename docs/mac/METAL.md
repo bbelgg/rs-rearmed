@@ -157,6 +157,14 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   before the first draw becomes load actions, a later one (or a scissored one) draws a quad. Reads
   (`glReadPixels`, `glGetTexImage`) end the pass, commit and wait. Present ends the pass, draws the default
   colour texture into the drawable (y flip), commits, and limits frames in flight to 2 (semaphore).
+- **Upscaling and colour** (`rs_gfx_set_output_size`): the presenter (the Mac shell, Learn & Play's window) gives the
+  screen's backing-pixel size while the game renders in points; the drawable takes that size, and present runs
+  MetalFX's spatial scaler (`MTLFXSpatialScaler`, perceptual mode for 8-bit sRGB, macOS 13+, the framework weakly
+  linked) from the default colour texture into a texture of the drawable's size, which it then draws flipped. Without
+  MetalFX, or with `RS_METAL_UPSCALE=0`, the frame is drawn bilinearly into the larger drawable, as the screen
+  scaled it before. `RS_METAL_RETINA=1` makes the framebuffer itself the backing size, and nothing is scaled. Layer
+  contexts are tagged sRGB (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the
+  display; `RS_METAL_COLORS=vivid` leaves the layer untagged, as before.
 - **Conventions** (applied by the translator, so the core passes GL state through unchanged):
   - row 0 of every texture and render target is GL's bottom row; the vertex shader epilogue negates
     `y`, so viewport and scissor rectangles map 1:1 and uploads/reads need no flip; only present flips;

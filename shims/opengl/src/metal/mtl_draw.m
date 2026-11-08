@@ -1101,7 +1101,7 @@ void rsmtl_glDrawElementsInstancedARB(GLenum mode, GLsizei count, GLenum type, c
 }
 
 // --- Present -------------------------------------------------------------------------------
-void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target) {
+void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src, id<MTLSamplerState> smp) {
     if (!ctx->present_pipeline || ctx->present_pipeline.label.integerValue != (NSInteger)target.pixelFormat) {
         MTLRenderPipelineDescriptor *d = [MTLRenderPipelineDescriptor new];
         d.vertexFunction = [ctx->internal_lib newFunctionWithName:@"rsm_blit_vs"];
@@ -1121,8 +1121,8 @@ void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target) {
     rp.colorAttachments[0].storeAction = MTLStoreActionStore;
     id<MTLRenderCommandEncoder> e = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
     [e setRenderPipelineState:ctx->present_pipeline];
-    [e setFragmentTexture:ctx->def_color atIndex:0];
-    [e setFragmentSamplerState:ctx->present_sampler atIndex:0];
+    [e setFragmentTexture:src atIndex:0];
+    [e setFragmentSamplerState:smp atIndex:0];
     [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [e endEncoding];
 }

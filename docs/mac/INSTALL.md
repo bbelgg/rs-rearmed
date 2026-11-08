@@ -368,7 +368,8 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 | [Two players](#two-players) on any input | yes | `RS_MODS_MULTIPLAYER=0` |
 | An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
 | [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
-| Retina, Metal only (off by default) | yes | `RS_METAL_RETINA=1` |
+| Retina, Metal only: on a Retina screen each frame is scaled up to the screen's own pixels with MetalFX (macOS 13+; bilinear before), while the game renders in points | yes | `RS_METAL_UPSCALE=0` (a plain bilinear scale, as the screen did before); `RS_METAL_RETINA=1` renders every pixel instead (about 4x the GPU work) |
+| Colours as the game made them (sRGB): the picture is colour-matched to the screen, so a wide-colour (P3) screen, such as a Mac's own, no longer shows it oversaturated | yes | `RS_METAL_COLORS=vivid` (the old, untagged look) |
 | Sharper textures, Metal only: the game's own mipmap bias, and 16x anisotropic filtering where the game asks for 1x to 4x, so the note highway and strings stay sharp into the distance | yes | `RS_METAL_ANISO=N` (1-16; 1 keeps the game's) |
 | Anti-aliasing, Metal only: 4x MSAA on the game's 3D picture (its screen-sized targets with depth) | yes | `RS_METAL_MSAA=N` (1 off, 2, 4, 8) |
 | A window takes any shape, as full screen on a 16:10 or ultrawide screen; the game follows it ([Window modes](#window-modes)) | | `RS_WINDOW_ANY_SHAPE=0` keeps it at 16:9 |

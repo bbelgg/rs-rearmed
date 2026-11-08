@@ -39,7 +39,8 @@ clang++ -O2 -g -arch arm64 -mmacosx-version-min=11.0 -dynamiclib -Wl,-headerpad_
   -Xlinker -reexport_framework -Xlinker OpenGL -install_name @executable_path/libRSOpenGL.dylib \
   -o "$out/libRSOpenGL.dylib" "$o"/rsgl.o "$o"/nsgl_hook.o "$o"/gltrace.o "$o"/rs_gfx.o "$o"/rsmtl_stubs.o \
   "$o"/mtl_*.o "$o"/msl_*.o \
-  -framework OpenGL -framework AppKit -framework ImageIO -framework Metal -framework QuartzCore -framework Foundation
+  -framework OpenGL -framework AppKit -framework ImageIO -framework Metal -framework QuartzCore -framework Foundation \
+  -weak_framework MetalFX
 # The corpus step's translator (tools/metal/build-msl-corpus.sh, as msl.cmake builds it).
 # Without it there is no corpus, which doesn't stop a build.
 clang -O2 -g -arch arm64 -mmacosx-version-min=11.0 -fobjc-arc -w -c "$src/test/msl_verify.m" -o "$o/msl_verify.o" &&

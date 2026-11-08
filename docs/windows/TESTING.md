@@ -522,6 +522,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `RS_D3D9_DISPLAY=WxH` | the desktop size the game sees |
 | `RS_FULLSCREEN=1\|0` | full screen or a window, whatever the game's setting |
 | `RS_METAL_RETINA=1` | render in backing pixels |
+| `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen; the layer left untagged (not sRGB) |
 | `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's); the shared renderer, [Mac](../mac/TESTING.md#diagnostics) |
 | `RS_AUDIO_RS_NAMES=0` | keep CoreAudio's device names |
 | `RS_AUDIO_FRAMES`, `RS_AUDIO_RT`, `RS_AUDIO_INPUT_TRIM`, `RS_AUDIO_SET_RATE` | the audio policy ([INSTALL.md](INSTALL.md#settings-and-switches)) |

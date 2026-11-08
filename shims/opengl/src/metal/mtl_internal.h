@@ -419,6 +419,12 @@ typedef struct {
     rsm_map clear_pipelines;  // formats + mask -> pipeline
     id<MTLRenderPipelineState> present_pipeline;
     id<MTLSamplerState> present_sampler;
+    // Upscaling at present (rsmtl_gfx_set_output_size): the drawable's size when larger than w x h
+    int out_w, out_h;
+    id fx_scaler;                 // id<MTLFXSpatialScaler> for w x h -> out_w x out_h, nil: bilinear
+    id<MTLTexture> fx_out;        // its output, drawn into the drawable
+    id<MTLSamplerState> linear_sampler;
+    bool fx_tried;
     id<MTLTexture> dummy_tex, dummy_cube;
     uint64_t next_uid;
 
@@ -532,7 +538,7 @@ MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunctio
 
 // Draws (mtl_draw.m).
 void rsm_draw_init(RSMContext *ctx);
-void rsm_present_draw(RSMContext *ctx, id<MTLTexture> drawable);
+void rsm_present_draw(RSMContext *ctx, id<MTLTexture> drawable, id<MTLTexture> src, id<MTLSamplerState> smp);
 
 enum { RSM_SWZ_NONE, RSM_SWZ_RGB1, RSM_SWZ_LUM, RSM_SWZ_ALPHA, RSM_SWZ_LUM_ALPHA,
        RSM_SWZ_INTENSITY, RSM_SWZ_RED, RSM_SWZ_RG };

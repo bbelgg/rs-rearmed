@@ -14,6 +14,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
+- **Retina upscaling and sRGB colour**: as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
+  output and the shared renderer scales with MetalFX and tags the layer sRGB. Not yet run in this edition.
 - **Sharper textures and MSAA**: the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
   screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). Not yet run in this edition.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes

@@ -4,6 +4,7 @@
 // lock can be checked without opening anything. Run with RS_GL_BACKEND=metal; with
 // RS_GL_BACKEND=gl it checks that the shell stays on GL. MRC, like the shell.
 #import <Foundation/Foundation.h>
+#include <dlfcn.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
 #import <QuartzCore/CATextLayer.h>
@@ -157,6 +158,34 @@ static int test_metal(void) {
   rsp_mtl_unlock(g_m);
   CHECK(px[0] == 255 && px[1] == 255 && px[2] == 255, "clear after resize %d %d %d", px[0], px[1], px[2]);
   CHECK(glGetError() == GL_NO_ERROR, "no GL errors after resize");
+
+  // Colours: the layer is tagged sRGB (RS_METAL_COLORS=vivid leaves it untagged).
+  CGColorSpaceRef cs = layer.colorspace;
+  CFStringRef csn = cs ? CGColorSpaceCopyName(cs) : NULL;
+  CHECK(csn && CFEqual(csn, kCGColorSpaceSRGB), "layer colorspace sRGB");
+  if (csn) CFRelease(csn);
+
+  // Upscaling: a larger output size makes the drawable that size while the framebuffer stays; frames present
+  // (MetalFX where it runs, else bilinear) and read back as drawn; 0 x 0 goes back.
+  void (*set_out)(void *, int, int);
+  *(void **)&set_out = dlsym(RTLD_DEFAULT, "rs_gfx_set_output_size");
+  CHECK(set_out != NULL, "rs_gfx_set_output_size exported");
+  if (set_out) {
+    rsp_mtl_lock(g_m);
+    set_out(rsp_mtl_context(g_m), 256, 192);
+    CHECK(layer.drawableSize.width == 256 && layer.drawableSize.height == 192, "upscaled drawableSize %gx%g",
+          layer.drawableSize.width, layer.drawableSize.height);
+    for (int i = 0; i < 5; i++) frame(0, 1, 0, w, h, px);
+    rsp_mtl_unlock(g_m);
+    CHECK(px[0] == 0 && px[1] == 255 && px[2] == 0, "frame while upscaling %d %d %d", px[0], px[1], px[2]);
+    rsp_mtl_size(g_m, &w, &h);
+    CHECK(w == 128 && h == 96, "framebuffer still %dx%d", w, h);
+    rsp_mtl_lock(g_m);
+    set_out(rsp_mtl_context(g_m), 0, 0);
+    rsp_mtl_unlock(g_m);
+    CHECK(layer.drawableSize.width == 128 && layer.drawableSize.height == 96, "drawableSize back %gx%g",
+          layer.drawableSize.width, layer.drawableSize.height);
+  }
 
   // Safe load's warm-up: no disk cache outside an app bundle, so nothing to wait for.
   double p0 = now_s();

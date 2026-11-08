@@ -11,7 +11,8 @@ set(ogl_mtl_sources
   src/metal/mtl_cache.m)
 target_sources(opengl PRIVATE ${ogl_mtl_sources})
 set_source_files_properties(${ogl_mtl_sources} PROPERTIES COMPILE_OPTIONS "-fobjc-arc")
-target_link_libraries(opengl PRIVATE "-framework Metal" "-framework QuartzCore" "-framework Foundation")
+target_link_libraries(opengl PRIVATE "-framework Metal" "-framework QuartzCore" "-framework Foundation"
+                                     "-weak_framework MetalFX")  # macOS 13+: upscaling at present
 if(TARGET rsmsl)
   target_link_libraries(opengl PRIVATE rsmsl)
 else()

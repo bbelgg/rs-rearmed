@@ -16,6 +16,7 @@ void rsmtl_gfx_destroy(rs_gfx_context *ctx);
 void rsmtl_gfx_make_current(rs_gfx_context *ctx);
 rs_gfx_context *rsmtl_gfx_current(void);
 void rsmtl_gfx_resize(rs_gfx_context *ctx, int w, int h);
+void rsmtl_gfx_set_output_size(rs_gfx_context *ctx, int w, int h);
 void rsmtl_gfx_present(rs_gfx_context *ctx);
 void rsmtl_gfx_lock(rs_gfx_context *ctx);
 void rsmtl_gfx_unlock(rs_gfx_context *ctx);

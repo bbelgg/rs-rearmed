@@ -26,6 +26,9 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
   the width, so a 16:10 window draws undistorted (checked 2026-11-08, frustums 0.925 x 0.577 at 1153x720 against 1.026 x 0.577 at 16:9).
   Full screen renders at the screen's size the same way; not yet run on a 16:10 or ultrawide screen. A window now takes any shape
   (`RS_WINDOW_ANY_SHAPE`; the original kept 16:9). Learn & Play fits its picture to 16:9 with bars ([Windows plan](../windows/PLAN.md#next-work)).
+- **Retina and colour** (new, Metal): on a Retina screen each frame is scaled up to the screen's pixels with MetalFX while the
+  game renders in points, and the picture is tagged sRGB, so wide-colour screens show the game's colours as made
+  ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer, and the same request from its window, serve Learn & Play.
 - **Sharper picture** (new, Metal): the game's own texture LOD bias, which Metal had dropped, 16x anisotropic filtering where the game asks for
   1x to 4x, and 4x MSAA on its screen-sized 3D targets ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.

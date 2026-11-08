@@ -128,7 +128,10 @@ The 32-bit runtime (`tools/ws7/recomp/runtime/rc32_*`,
 ### Screen and window
 
 The game sees the host's main screen as its desktop (`GetSystemMetrics`, `EnumDisplaySettings`, the D3D9
-display mode): in points, or in backing pixels with `RS_METAL_RETINA=1` (`RS_D3D9_DISPLAY=WxH` overrides).
+display mode): in points, or in backing pixels with `RS_METAL_RETINA=1` (`RS_D3D9_DISPLAY=WxH` overrides). In points on a
+Retina screen, `lp_window.m` asks libRSOpenGL for an output of the back buffer times the backing scale
+(`rs_gfx_set_output_size`), so each frame is scaled up with MetalFX before the layer fits it to the window, as on the Mac
+([Mac METAL.md](../mac/METAL.md#metal-core-shimsopenglsrcmetal)).
 `[Renderer.Win32] Fullscreen` in `Rocksmith.ini` (in the game: Options > Visual Settings > Windowed Mode):
 
 | `Fullscreen` | Device | Window |

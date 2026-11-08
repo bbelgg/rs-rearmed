@@ -300,7 +300,9 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | Switch | Default | What |
 |---|---|---|
 | `RS_FULLSCREEN=1\|0` | the game's setting | force full screen, or a window |
-| `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen |
+| `RS_METAL_RETINA=1` | off | render in backing pixels on a Retina screen (otherwise each frame is scaled up to them with MetalFX) |
+| `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as before |
+| `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour screen shows it more saturated, as before |
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's ([Mac](../mac/INSTALL.md#settings-and-switches)) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's screen-sized targets with depth: 1 (off), 2, 4 or 8 |
 | `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames (0 leaves the device's) |

@@ -35,6 +35,7 @@ static struct {
   int (*prepare)(rs_gfx_context *, double);  // optional: older libRSOpenGL builds lack it
   int (*prepare_progress)(rs_gfx_context *, int *, int *);  // optional too
   int (*warm_only)(double, double, FILE *);  // warm-only mode
+  void (*set_output)(rs_gfx_context *, int, int);  // optional: upscaling to the backing pixels
 } gfx;
 static int gfx_ok;
 
@@ -54,6 +55,7 @@ static void gfx_load(void) {
   *(void **)&gfx.prepare = dlsym(RTLD_DEFAULT, "rs_gfx_prepare");
   *(void **)&gfx.prepare_progress = dlsym(RTLD_DEFAULT, "rs_gfx_prepare_progress");
   *(void **)&gfx.warm_only = dlsym(RTLD_DEFAULT, "rs_gfx_warm_only");
+  *(void **)&gfx.set_output = dlsym(RTLD_DEFAULT, "rs_gfx_set_output_size");
 }
 
 struct rsp_mtl {
@@ -159,6 +161,18 @@ static void view_size(NSView *view, int *w, int *h, CGFloat *scale) {
   *h = s.height >= 1 ? (int)(s.height + 0.5) : 1;
 }
 
+// Not RS_METAL_RETINA: the game renders in points and libRSOpenGL scales each frame up to the view's backing
+// pixels (MetalFX), so a Retina screen gets a sharp picture for a fraction of the native cost. 1x screens: nothing.
+static void set_output(rsp_mtl *m, NSView *view) {
+  if (!gfx.set_output || rsp_mtl_retina()) return;
+  NSSize s = [view convertRectToBacking:[view bounds]].size;
+  int ow = (int)(s.width + 0.5), oh = (int)(s.height + 0.5);
+  gfx.lock(m->ctx);
+  if (ow > m->w && oh > m->h) gfx.set_output(m->ctx, ow, oh);
+  else gfx.set_output(m->ctx, 0, 0);
+  gfx.unlock(m->ctx);
+}
+
 rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
   CAMetalLayer *layer = [CAMetalLayer layer];
   layer.opaque = YES;
@@ -182,6 +196,7 @@ rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
     NSLog(@"Metal: no layer context and no restart with OpenGL; aborting");
     abort();
   }
+  set_output(m, view);
   fprintf(stderr, "[rsp] Metal drawable %dx%d (%s), %d drawables, display sync %s\n", w, h,
           rsp_mtl_retina() ? "backing pixels" : "points", rsp_mtl_drawables(swap_interval),
           swap_interval ? "on" : "off");
@@ -219,6 +234,7 @@ void rsp_mtl_view_resized(rsp_mtl *m, NSView *view) {
     [CATransaction commit];
   }
   rsp_mtl_resize(m, w, h);
+  set_output(m, view);
 }
 
 double rsp_mtl_scale(rsp_mtl *m) { return rsp_mtl_retina() ? m->layer.contentsScale : 1.0; }

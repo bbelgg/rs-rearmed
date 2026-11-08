@@ -22,22 +22,24 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - **Installer**: decrypting is static (`tools/steamless/decrypt.py`): no Rosetta, no launch of the game, and Steam only has to have installed it.
 - **Performance**: about the CPU of the original under Rosetta. 6.1 ms a frame on [Learn & Play's route](PERFORMANCE.md#learn--plays-route), 45% of a core, against its 7.2 ms.
   The 12 functions relaxed and the renderer's change of 2026-11-06 played well with a guitar; an install of them by the installer app is still to do.
-- **Screen shape**: the game sets its cameras from its resolution (their height kept, the width the resolution's) and lays out its menus to
+- **Screen shape** (new in 1.10.0): the game sets its cameras from its resolution (their height kept, the width the resolution's) and lays out its menus to
   the width, so a 16:10 window draws undistorted (checked 2026-11-08, frustums 0.925 x 0.577 at 1153x720 against 1.026 x 0.577 at 16:9).
   Full screen renders at the screen's size the same way; not yet run on a 16:10 or ultrawide screen. A window now takes any shape
   (`RS_WINDOW_ANY_SHAPE`; the original kept 16:9). Learn & Play now draws at any shape too, its 16:9 fit taken out ([Windows plan](../windows/PLAN.md#status)).
-- **Retina and colour** (new, Metal): on a Retina screen each frame is scaled up to the screen's pixels with MetalFX while the
+- **Retina and colour** (new in 1.10.0, Metal): on a Retina screen each frame is scaled up to the screen's pixels with MetalFX while the
   game renders in points, and the picture is tagged sRGB, so wide-colour screens show the game's colours as made
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer, and the same request from its window, serve Learn & Play.
-- **Sharper picture** (new, Metal): the game's own texture LOD bias, which Metal had dropped, 16x anisotropic filtering where the game asks for
+- **Sharper picture** (new in 1.10.0, Metal): the game's own texture LOD bias, which Metal had dropped, 16x anisotropic filtering where the game asks for
   1x to 4x, and 4x MSAA on its screen-sized 3D targets ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
+  1.10.0's build was played with a guitar (an HX Stomp) by the maintainer on 2026-11-08, full screen on the 75 Hz 16:9 display: 74.9 fps, a game frame
+  of about 4 ms, once the song's first-play stutters (pipelines built on first use, gone on a second play) were done.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 
 - **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native, with the game's gear mapped onto it. Its open work is kept with it.
 
 ## Open issues
 
-- **The published installer**: 1.9.1's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs. The last full install from a published installer was 1.6.0's.
+- **The published installer**: 1.10.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs. The last full install from a published installer was 1.6.0's.
 - **The title screen's own Auto Save call**: in Learn & Play the title has a second call of the dialog ([Windows plan](../windows/PLAN.md#open-issues)). This game's counterpart has not been read.
 - The cable screen's Direct Connect button hasn't been checked.
 

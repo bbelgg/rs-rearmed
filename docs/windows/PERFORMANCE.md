@@ -271,6 +271,11 @@ A batch is one rebuild and one run, so within a batch the shares below come from
   has them inline (the FFT's butterflies, the analysis window's cosine), so 16 more relaxed, 33 in all: the Vorbis decoder's Huffman and bit
   reader, the stereo mixer, the FFT, the room reverb's second network, FutzBox's filters and the note detection's analysis
   window. Eight of the 17 by address are now named.
+- **1.10.0, a short check** (2026-11-08, one run each, not this table's setup: the built-in 60 Hz Retina screen, so MetalFX upscaling and 4x MSAA on,
+  DISCONNECTED with no interface, so no note detection; 60 s of Cherub Rock in a 1280x720 window): 37.1% of a core, 6.33 ms a frame at 58.6 fps,
+  game thread 27.4%, Wwise 3.4%, 1.54 GB; the Mac build on the same route 5.83 ms and 1.24 GB ([Mac](../mac/PERFORMANCE.md#learn--plays-route)).
+  The first run stalled 0.3-0.6 s a few times in the song, the game thread waiting on 63 shader library compiles; a second run of the same
+  route had none (a test build is a new path to macOS's shader cache, and wasn't warmed). With a guitar the note detection took its usual 6%.
 
 The binary is 122 MB, from 107: the inline lookups and `-mno-outline`. Audio buffers and the audio path were not changed; the song played with the highway and lyrics up, not checked by ear.
 

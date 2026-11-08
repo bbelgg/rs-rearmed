@@ -191,6 +191,12 @@ fell from 4.0% of the thread to 0.9%. The encoder itself stays: `renderCommandEn
 
 From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame. Learn & Play draws through the same code and played fine with it, by the maintainer's own check; its route was not measured with it.
 
+1.10.0, a short check (2026-11-08, one run each, not the table's setup: the built-in 60 Hz Retina screen, so MetalFX upscaling and 4x MSAA on, DISCONNECTED
+with no interface, so no note detection; 60 s of Cherub Rock in a 1280x720 window): 34.5% of a core, 5.83 ms a frame at 59.5 fps, 1.24 GB; Learn & Play 6.33 ms and
+1.54 GB on the same route ([Learn & Play](../windows/PERFORMANCE.md#toward-the-mac-edition)). The first run had two stalls of about 0.3 s at the song's tone switch, in
+the game frame: pipelines built on first use, the new MSAA variants among them. A second run found 282 of 285 in the cache and had none. Full screen on the 75 Hz
+display with a guitar, by the maintainer: 74.9 fps and a game frame of about 4 ms once a new song's first-play stutters were done.
+
 ## Hook points
 
 Unchanged for this edition: the hook table is built in as it always was, and a function without hooks is called as

@@ -14,17 +14,19 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
-- **Retina upscaling and sRGB colour**: as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
+- **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
   output and the shared renderer scales with MetalFX and tags the layer sRGB. First run here 2026-11-08, full screen on a built-in Retina screen:
   `upscaling 1470x956 to 2940x1912 with MetalFX`, a song played. The upscaled picture itself wasn't looked at (snapshots are the back buffer).
-- **Sharper textures and MSAA**: the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
+- **Sharper textures and MSAA** (new in 1.10.0): the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
   screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). First run here in the same song, `MSAA 4x` in the log; not compared with them off.
-- **Screen shape** (new): the game draws at its screen's or window's own shape, with no bars, as the Mac edition does; the original fits a 16:9
+- **Screen shape** (new in 1.10.0): the game draws at its screen's or window's own shape, with no bars, as the Mac edition does; the original fits a 16:9
   picture into the screen itself ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed mode becomes the game's resolution.
   Checked 2026-11-08 full screen on a MacBook's built-in screen (1470x956 points, 1.54:1): the cameras' frustums 1.430 x 0.930 at the title and
   1.120 x 0.728 and 1.776 x 1.154 in a song, against 1.654, 1.294 and 2.052 wide at 16:9, the heights the same; the menus, the song list and the
   highway undistorted. A window resized to 1200x600 by the window script became the game's resolution, drawn at 2:1. `RS_WINDOW_ANY_SHAPE=0`
   keeps the original. Not run: an ultrawide screen, a drag by hand, macOS full screen from a window.
+- **1.10.0's build with a guitar**: played by the maintainer on 2026-11-08, in a window, on an HX Stomp: the note detection ran at its usual 6% of a core with
+  its analysis window now relaxed, the Wwise thread at 6.5-7%, and no audio errors. A song's first play stutters while its shaders compile; a second play didn't.
 - **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
@@ -41,7 +43,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 ## Open issues
 
-- **The published installer**: 1.9.1's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs.
+- **The published installer**: 1.10.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs.
 - **The title screen's own Auto Save call** (`0x12bd061`): read from the code, not seen in a run. The title listens for the same `OnSignInFlowComplete` (`0x12bdd00`), and with
   slot 0 of the object at `[[0x1ee0bfc] + 0x30]` and its byte `+0x14` set, its tick (`0x12bcfd0`) shows the warning for 4 s. What sets that byte isn't known, so whether a player can
   reach it isn't either. If so, the skip needs the tick wrapped too, to clear its timer.
@@ -56,7 +58,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   memory (`win32_guestobj.c`), but the audio and D3D9 faces still each keep their own table of objects and
   their own `IUnknown` (D3D9's also has internal references and forwarded counts).
 - Guitar latency against the Mac port has not been measured.
-- **CPU and memory**: about 1.1 ms a frame over the Mac edition on one route, and 1.3 GB against 0.9 GB. The memory order costs about 1 ms a frame at the display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
+- **CPU and memory**: about 1.1 ms a frame over the Mac edition on one route, and 1.3 GB against 0.9 GB; with 1.10.0's 4x MSAA, 1.5 GB against 1.2 GB
+  ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition), 2026-11-08). The memory order costs about 1 ms a frame at the display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
 - **Shaders the list doesn't have**: the corpus has the programs seen in runs, and the Guitarcade's games wait for a guitar at
   calibration, so of them it has only their effects, and of the venues (Venue Mode) one was seen, with four programs of its own. Run them
   with `LP_SHADER_LOG` and add them ([TESTING.md](TESTING.md#shaders-of-a-run)). A program not in it stalls about 0.25 s the first time, as before.

@@ -267,6 +267,10 @@ A batch is one rebuild and one run, so within a batch the shares below come from
   the game thread to 1.3%, the dispatcher's `run` from 2.8% to 0.9%. The relaxed functions dropped by a factor of five in the profile (`F_1ab4100`
   13.7% of the Wwise thread to 2.6%), but the thread by 0.7 points: most of what they took now sits in functions they are inlined into, or wasn't fences.
 - **Final**: 6 more relaxed.
+- **Since** (2026-11-08, not measured): the Mac's relaxed kernels proved here by name (`symbols.map`), with the helpers they call where the Mac
+  has them inline (the FFT's butterflies, the analysis window's cosine), so 16 more relaxed, 33 in all: the Vorbis decoder's Huffman and bit
+  reader, the stereo mixer, the FFT, the room reverb's second network, FutzBox's filters and the note detection's analysis
+  window. Eight of the 17 by address are now named.
 
 The binary is 122 MB, from 107: the inline lookups and `-mno-outline`. Audio buffers and the audio path were not changed; the song played with the highway and lyrics up, not checked by ear.
 
@@ -282,8 +286,9 @@ note detection threads 1.9 ms against 1.1. What is left, by what the profiles sh
 ## Opportunities, by expected payoff
 
 1. **The note detection and the rest of the Wwise thread**: what is left of [Toward the Mac edition](#toward-the-mac-edition)'s audio threads. Three
-   functions as hot as those in `relaxed.map` set a static's guard (`0x1a35660`, `0x1a35ba0`, `0x1a08300`), and the note detection's `F_105f420` and `F_13f3690`
-   call out. A relaxed form that allows those, or a native note detection window, would take part of the 0.5 ms a frame the fences cost there. Medium.
+   functions as hot as those in `relaxed.map` set a static's guard (`0x1a35660` the Mac's `peak_limiter_follower`, `0x1a35ba0`, `0x1a08300` its
+   `expander_gain`, and `0x1a01550` its `compressor_gain` too), three more call the CRT (`memset`, `floor`: the Mac's `meter_peak_rms`,
+   `ak_buffer_zero_pad`, `level_shaper`), and the note detection's `F_105f420` and `F_13f3690` call out. A relaxed form that allows those, or a native note detection window, would take part of the 0.5 ms a frame the fences cost there. Medium.
 2. **The D3D9 layer's bookkeeping**: `d3d9_obj_get`, `d3d9_dev_lock`, the buffer sync, about a tenth of the game thread besides Metal's own work.
    The layer has one lock and a table lookup per call, on a device only the game thread uses.
 3. **Index-range scan** (D3D9 layer): the draw-time upload reads every index of an indexed draw

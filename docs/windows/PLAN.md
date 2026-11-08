@@ -22,8 +22,11 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
 - **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
   (`win-x86/harvest/rsharvest2.exe`), and Rocksmith 1 DLC songs in a game run (`test_steam32` covers `RS_STEAM_OWNED`; the test account owns none).
-- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 966 of the 1,165 symbols and 78 of the 99 offsets are read from
+- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 987 of the 1,178 symbols and 79 of the 100 offsets are read from
   the Windows code; the map says why for the rest. 88 names have `custom` conventions (LTCG register arguments), which their overrides read by hand.
+  No entry is left "not proved" (2026-11-08): of the 42, 20 have their address, from the Wwise plug-ins' registration (`0x17c4ab0`, the Mac's order and ids) down
+  to each kernel's call site, and the Vorbis, mixer, FFT and efd code by their tables and callers. The other 22 are inlined, folded or specialised by LTCG, have no
+  counterpart, are called only by the Mac's differential tests, or are found but left out because they can't be relaxed (a static's guard, a CRT call).
 - **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build without one
   ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for its relocation sites, which nothing reads out of the capture VM yet.
 
@@ -72,8 +75,6 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 **Parity (P4):**
 
-- The 30 symbols not proved (the Wwise plug-in DSP, small efd helpers): they have candidates in the map, and a wrong address would be
-  worse than the gap.
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).

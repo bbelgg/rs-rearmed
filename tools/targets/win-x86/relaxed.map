@@ -1,22 +1,23 @@
 # Learn & Play's functions translated without per-access fences (tools/ws7/recomp/xlat/relaxed.py says why and how), by
-# address: names/relaxed.list has the Mac's kernels, which aren't all matched here. These are the hottest functions of the
-# Wwise thread (0x1a823c0) and the note detection in a song (Time Profiler, 2026-11-06). Each was read for what relaxed.py
-# asks: a loop counted over buffers or the effect's own state, no write to a global, no wait on memory, no lock prefix.
-# 0x1a35660, 0x1a35ba0 and 0x1a08300 are as hot but set a static's guard (0x1ed2598), so they stay fenced.
-0x1a03d60   Wwise: SSE filter over a buffer (prefetchnta, counted loops)
-0x1a05bf0   Wwise: delay line and SSE mix over a buffer
+# address, for what names/relaxed.list doesn't name: the list's kernels are in symbols.map where this build has them (eight of
+# this file's first entries are now there by name). These are hot functions of the Wwise thread (0x1a823c0) and the note
+# detection in a song (Time Profiler, 2026-11-06), and the helpers named kernels call here where the Mac has them inline (the
+# FFT's butterflies, 0x106c130): the 32-bit front end relaxes a function only when what it calls is relaxed too. Each was read for
+# what relaxed.py asks: a loop counted over buffers or the effect's own state (or no loop), no write to a global, no wait on
+# memory, no lock prefix. 0x1a35660 (peak_limiter_follower), 0x1a35ba0 and 0x1a08300 (expander_gain) are as hot but set a
+# static's guard (0x1ed2598), so they stay fenced.
+0x1a05bf0   Wwise: the FFT's radix-4 butterfly (SSE), which fft_work calls; inline in the Mac's
 0x1a0ab70   Wwise: scalar SSE resampler loop
-0x1a17d30   Wwise: SSE effect over a buffer, parameters from its own object
-0x1a0c7b0   Wwise: SSE kernel of 0x1a0d120
-0x1a0d120   Wwise: SSE mix over channels, calls 0x1a0c7b0
-0x1a34ae0   Wwise: counted mix of two buffers
-0x1a3ccd0   Wwise: SSE delay network
-0x1a3d420   Wwise: SSE delay network, the Mac's roomverb_fdn by shape, not proved
-0x1a3e3e0   Wwise: counted loops over a delay line
-0x1a8fa60   Wwise: counted copy with gain
+0x1a05a10   Wwise: the FFT's radix-2 butterfly, which fft_work calls; inline in the Mac's
+0x1a05aa0   Wwise: the FFT's fixed radix-4 butterfly (one column, stride 256), straight-line, which fft_work calls
+0x1a05f90   Wwise: the FFT's fixed step for a 1024-point plan (radix 4, straight-line), which fft_work calls; inline in the Mac's
+0x1a06360   Wwise: the FFT's radix-3 butterfly, which fft_work calls; inline in the Mac's
+0x1a064c0   Wwise: the FFT's radix-5 butterfly, which fft_work calls; inline in the Mac's
+0x1a8fa60   Wwise: one channel mixed into another with a linear gain ramp; mix_stereo_ramp calls it per channel
 0x1aaade0   Wwise: inner loop of 0x1aaaf00
 0x1aaaf00   Wwise: SSE transform with a fixed table, calls 0x1aaade0
 0x1ab4100   Wwise: x87 filter over a buffer
 0x10622d0   note detection: x87 scan of a spectrum, counted
 0x13f23e0   note detection: SSE FFT pass
 0x13f2d50   note detection: bit reversal and packing of the FFT's data
+0x106c130   note detection: SSE cosine of four floats in xmm0, registers and constants only (dsp_analysis_window's vcosf)

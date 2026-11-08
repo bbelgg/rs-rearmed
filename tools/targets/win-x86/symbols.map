@@ -370,32 +370,36 @@ mach_header                                                      unsupported  Ma
 objc_classref_MessageBox                                         unsupported  Mac-only (Objective-C class reference)
 
 # --- names/relaxed.list
-roomverb_fdn                                                     unsupported  not proved: Wwise plug-in code without strings; 0x1a3d420, 0x1a3d8a0, 0x1a3dd90 share one constant
-roomverb_fdn_lr                                                  unsupported  not proved: Wwise plug-in code without strings; 0x1a3d420, 0x1a3d8a0, 0x1a3dd90 share one constant
-roomverb_early_reflections                                       unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-roomverb_allpass                                                 unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-parametric_eq_biquad                                             unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-peak_limiter_follower                                            unsupported  not proved: Wwise plug-in code without strings; 0x1a01550, 0x1a01850, 0x1a08300 share its constants
-expander_gain                                                    unsupported  not proved: Wwise plug-in code without strings; 0x1a01550, 0x1a01850, 0x1a08300 share its constants
-meter_peak_rms                                                   unsupported  not proved: Wwise plug-in code without strings; 0x1a1fb50 shares two constants
-ak_buffer_zero_pad                                               unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-vorbis_codebook_decode_vq                                        unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-vorbis_huffman_decode                                            unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-vorbis_bits_look                                                 unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-vorbis_bits_adv                                                  unsupported  not proved: Wwise plug-in code without strings; no candidate yet
-dsp_analysis_window                                              unsupported  not proved: Wwise plug-in code without strings; 0x1a14780 shares two constants
-compressor_gain                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-delay_network_wide                                               unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-biquad_block                                                     unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-biquad_scalar                                                    unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-biquad_direct                                                    unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-biquad_cascade                                                   unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-level_shaper                                                     unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-mix_stereo_ramp                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-fft_work                                                         unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-fft_bfly_generic                                                 unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-fft_complex_mac                                                  unsupported  not proved: Wwise plug-in code without strings; this edition's are by address in relaxed.map
-dsp_fft                                                          unsupported  not proved: 0x13f23e0 and 0x13f2d50 have its parts, by address in relaxed.map
+# The Wwise plug-ins are found from their registration 0x17c4ab0 (the Mac's order, the same type, company and plug-in ids): each
+# create function gives the vtable (MSVC's has one destructor, so Init is slot 6, Execute 7, the Mac's 7 and 8), and the kernels sit
+# at the Mac's places in those. One the 32-bit front end can't relax (a call of msvcr100, or a static's guard written) is left out
+# with its address in the reason; relaxed.map has what the list doesn't name.
+roomverb_fdn                                                     0x01a3d420  thiscall  -  # RoomVerb (plug-in 0x76, vtable 0x1ca1c28): Execute 0x1a3bab0 sends masks 3, 4, 8, 0xb, 0xc to 0x1a39bb0 (the Mac's 0x100a9ff9a), which calls it where the Mac's does, after the allpass; ret 0xc
+roomverb_fdn_lr                                                  0x01a3d8a0  thiscall  -  # RoomVerb: the same place in 0x1a3a270 (masks 7, 0xf, 0x33: the Mac's 0x100aa0714), the one call the process functions don't share; ret 0x10
+roomverb_early_reflections                                       0x01a3ccd0  thiscall  -  # RoomVerb: the first kernel of all three process functions (0x1a39bb0, 0x1a3a270, 0x1a3ac40), before the two biquad_block calls, as on the Mac; ret 0x10
+roomverb_allpass                                                 0x01a3e3e0  thiscall  -  # RoomVerb: after the biquads in all three process functions, as on the Mac; ret 8
+parametric_eq_biquad                                             0x01a34ae0  custom    -  # eax = a band's coefficients, edi = its memory, stack = (buffer, channels): ParametricEQ's Execute (plug-in 0x69, vtable 0x1c9af24, 0x1a34e00) calls it for its three bands at the Mac's three sites; direct form I, 5 coefficients and 4 floats of memory per channel
+peak_limiter_follower                                            unsupported  0x1a35660, left out: the PeakLimiter's Init helper 0x1a36660 stores it for unlinked channels or a centre-only mask, as the Mac's 0x100a9a8ba does, but it sets a static's guard (0x1ed2598), a write to a global, so it stays fenced
+expander_gain                                                    unsupported  0x1a08300, left out: the Expander's Init (plug-in 0x6d, vtable 0x1c99a68, 0x1a08a10) stores it for unlinked channels, as the Mac's 0x100a6a114 does, but it sets a static's guard (0x1ed2598), so it stays fenced
+meter_peak_rms                                                   unsupported  its counterpart is the Meter's Execute 0x1a20250 (plug-in 0x81, vtable 0x1c9a000), left out: it calls ZeroPadToMaxFrames 0x1a03620, which calls msvcr100's memset, so the 32-bit front end can't relax it; the peak and RMS loops the Mac has inline are 0x1a1ff00 and 0x1a1fb50
+ak_buffer_zero_pad                                               unsupported  0x1a03620 (thiscall: the same channel count and a memset of each channel's tail, then valid frames = max frames, at +0xc/+0xe for the Mac's +0x10/+0x12; the Meter's Execute calls it), left out: it calls msvcr100's memset, which the 32-bit front end doesn't relax
+vorbis_codebook_decode_vq                                        unsupported  inlined by LTCG into its two callers, 0x1aae490 and 0x1aae5e0 (the Mac's 0x100b2e7b0 and 0x100b2e910): each calls vorbis_huffman_decode and dequantises in line
+vorbis_huffman_decode                                            0x01aae2c0  custom    -  # eax = the codebook, stack = the bit reader: vorbis_bits_look by the book's longest code (+0xc), the byte, word or dword decode table (+0x14), then vorbis_bits_adv by the bits read + 1, as the Mac's; the only function calling both
+vorbis_bits_look                                                 0x01aac170  cdecl     -  # the codec's mask table 0x1ddab30 (33 masks, read only here) and the same byte assembly as the Mac's
+vorbis_bits_adv                                                  0x01aac1f0  cdecl     -  # bit position, pointer +4, bytes left +8 (the Mac's +0, +8, +0x10); called by vorbis_huffman_decode
+dsp_analysis_window                                              0x0106c320  custom    -  # eax = frames, edx = the buffer: LTCG folded the window type to the Mac's type 2, 0.5 - 0.5 cos(2 pi i / (n - 1)), four samples a step; its cosine is 0x106c130 (relaxed.map); its two callers are the Mac's two (0x105f420 = 0x1002213b0, 0x13f3690 = 0x10010bbc0)
+compressor_gain                                                  unsupported  0x1a01550, left out: the Compressor's Init (plug-in 0x6c, vtable 0x1c997f8, 0x1a01c40) stores it for unlinked channels, as the Mac's 0x100a6439c does, but it sets a static's guard (0x1ed2598), so it stays fenced
+delay_network_wide                                               0x01a17d30  thiscall  -  # MatrixReverb (plug-in 0x73): its setup 0x1a1e200 stores it for a stereo mask with 16 delay lines (tables 0x1a1e614 and 0x1a1e68c), as the Mac's 0x100a73b72 does; ret 4
+biquad_block                                                     0x01a0d120  thiscall  -  # the same aligned SSE loop, state at +0xa0, coefficients +0..+0x70, head and tail to biquad_scalar; the RoomVerb process functions call it in pairs as on the Mac, and 0x1a9b659 and 0x1a0c75a; ret 0xc
+biquad_scalar                                                    0x01a0c7b0  thiscall  -  # coefficients +0x80..+0x90, state +0xa0..+0xac as the Mac's, unrolled by 4; biquad_block calls it for its head and tail; ret 0xc
+biquad_direct                                                    0x01acad20  custom    -  # stack = (state, in), ecx = out, edx = frames: FutzBox's third stage (plug-in 0x6e of company 0x100, Execute 0x1ac8ef0), whose wrapper 0x1acae00 returns state + 0x30 as the Mac's function does; the same coefficient and state offsets
+biquad_cascade                                                   0x01ac9580  custom    -  # stack = (state, in), ecx = frames, edx = out: FutzBox's first stage, whose wrapper 0x1ac98e0 returns state + 0xc0 as the Mac's function does; the same state offsets (+0x60..+0xb4)
+level_shaper                                                     unsupported  0x1ac9dc0, left out: FutzBox's second stage (its wrapper 0x1aca000 returns state + 0x498, as the Mac's function does), but it calls msvcr100's floor, which the 32-bit front end doesn't relax
+mix_stereo_ramp                                                  0x01a8fc00  thiscall  -  # the mixer's stereo case (mask 3 in 0x1a75cf0's table, as in the Mac's 0x100b12e70); each channel's ramp is a call of 0x1a8fa60 (relaxed.map), inline on the Mac; ret 8
+fft_work                                                         0x01a06af0  cdecl     -  # Kiss FFT's work: the same 1024-point and radix-2 special cases, recursion, radix 2-5 switch and generic butterfly; the butterflies the Mac has inline are calls here (0x1a05a10, 0x1a05aa0, 0x1a05bf0, 0x1a05f90, 0x1a06360, 0x1a064c0: relaxed.map); ConvolutionReverb's FFT 0x1a06ea0 calls it
+fft_bfly_generic                                                 0x01a06830  custom    -  # eax = the FFT state, ecx = the output, stack = (fstride, m, p): fft_work's default radix, its tail call on the Mac
+fft_complex_mac                                                  0x01a03d60  thiscall  -  # ConvolutionReverb's block 0x1a03c00 (the Mac's 0x100a68d14) calls it between the forward and inverse FFT; the same SSE3 flag test and loops of 8 complex values; ret 0x10
+dsp_fft                                                          unsupported  no counterpart: this build's FFT has a precomputed twiddle table and is split in 0x13f23e0 (radix-4 passes) and 0x13f2d50 (bit reversal, packing), both in relaxed.map; 0x13f3ab0 calls them where the Mac's 0x10010c150 calls dsp_fft
 
 # --- names/overrides/audio.list
 ak_lengine_thread                                                unsupported  Mac-only: the thread that waits on the CoreAudio sink's mach semaphore; Wwise renders from the PortAudio callback here (docs/windows/DESIGN.md)
@@ -414,18 +418,18 @@ rsg_cryptopp_aes_cfb_decrypt                                     0x019be040  cus
 
 # --- names/overrides/efd.list
 rsg_ak_get_id_from_string                                        0x1a422b0  cdecl     uint32_t(const char *)
-rsg_efd_msghelper_on_init                                        0x0fc70c0  cdecl     int(void *)  # medium confidence
-rsg_efd_msghelper_on_tick                                        unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_msghelper_on_init                                        0x0fc70c0  cdecl     int(void *)  # return 2, the Mac's body: the image's one such function (/OPT:ICF), shared with rsg_efd_msghelper_on_tick
+rsg_efd_msghelper_on_tick                                        0x0fc70c0  cdecl     int(void *)  # return 2, the Mac's body (the same as on_init's): /OPT:ICF folds every such virtual into 0xfc70c0, the image's only function that is mov eax, 2; ret (176 references, MainService's vtable 0x1d4c894 among them)
 rsg_efd_msghelper_display_name                                   0x1479310  cdecl     const char *(void *)  # medium confidence
-rsg_efd_category_init_u0                                         unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
-rsg_efd_category_init_u2                                         unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_category_init_u0                                         unsupported  inlined and folded by LTCG: the Mac's call with (0x7001002, 0xffe) at 0x101243acd is the constant ID 0xc000007f:f7001002 at 0x14cf593 here; no call of a constructor
+rsg_efd_category_init_u2                                         unsupported  inlined by LTCG: 0x14cf69d-0x14cf6c8 builds the category of 0x7001002 and a net id with usage 2 (high word 0xd0000000) in line; no call of a constructor
 rsg_efd_path_standardize                                         0x014827c0  custom    bool(char *)  # edi = the path: the same loop, with the Windows separator: '/' becomes '\', double separators go, then tolower
-efd_sqrt_table_new                                               unsupported  not proved: 0x149c9b0 shares the masks but is much larger (inlined into start-up?)
-rsg_efd_id_set_type                                              unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
-rsg_efd_id_set_usage                                             unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
-rsg_efd_id_set_shard                                             unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
-rsg_efd_id_set_net_id                                            unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
-rsg_efd_id_set_base_id                                           unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+efd_sqrt_table_new                                               0x0147ebf0  cdecl     -  # 0x400 bytes from the allocator (efd_malloc in line: slot 1 with 5), then the Mac's 128 square roots of 1.x and 2.x, mantissas only; its one caller, the efd start-up 0x14b1ee0, stores the table at 0x1ee1934, which the normaliser 0x149c9b0 reads
+rsg_efd_id_set_type                                              unsupported  inlined by LTCG: its one Mac caller, 0x1011ec7d0 (type 1 on the global ID), is in line at 0x14cf5b9 and 0x14cf6e9 (and 0xbfffffff, or 0x20000000 on the high word of 0x1eff2f0)
+rsg_efd_id_set_usage                                             unsupported  inlined or folded by LTCG (1,662 calls on the Mac): e.g. the category constructors' usage 0 is in the constant ID at 0x14cf56a; no function with the Mac's body was found
+rsg_efd_id_set_shard                                             unsupported  specialised by LTCG: 0x147ece0 sets the shard (ecx) of the global ID 0x1eff2f0 only, the ID of its Mac caller 0x1011ec7d0 (in line at 0x14cf5d3 and 0x14cf703); the same masks, no logging, no form that takes an ID
+rsg_efd_id_set_net_id                                            unsupported  specialised by LTCG: 0x147ed40 sets the net id (eax) of the global ID 0x1eff2f0 only, right after 0x147ece0 at the same two sites; the same forms for types 1-3, no form that takes an ID
+rsg_efd_id_set_base_id                                           unsupported  specialised by LTCG: 0x147edf0 sets the base of *eax from the ID counter 0x1ee1998, as the Mac's ID allocator 0x1011ec830 passes it, which is in line at its five callers (e.g. 0x14e0400); no form that takes a base
 rsg_efd_utf8_units_at                                            unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
 rsg_efd_utf8_units                                               unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
 rsg_efd_utf8_tail_missing                                        unsupported  inlined by LTCG: the UTF-8 length table (0x1d10f50, the same 256 bytes) is read at the call sites
@@ -443,8 +447,8 @@ rsg_efd_datastream_write                                         0x0147c090  cus
 rsg_efd_datastream_seek                                          unsupported  inlined by LTCG at the call sites
 rsg_efd_datastream_write_stream                                  0x0147c120  custom    -  # edi = this (in eax), esi = the source: the size swapped per the flags, then the bytes
 rsg_efd_datastream_read_stream                                   0x0147c190  custom    -  # esi = this, ret 4: the size swapped per the flags, then the bytes
-rsg_efd_datastream_write_id                                      unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
-rsg_efd_datastream_read_id                                       unsupported  not proved: the only candidates are a name-table match and 0x147ed40/0x147edf0 (shared masks only); the Mac bodies log through strings this build dropped
+rsg_efd_datastream_write_id                                      unsupported  inlined by LTCG: callers copy the ID, swap it with 0xf8fb00 (the 8-byte swap every 8-byte field shares, 65 callers) and call rsg_efd_datastream_write with 8 (e.g. 0x13ba43a)
+rsg_efd_datastream_read_id                                       unsupported  inlined by LTCG: callers copy 8 bytes out of the stream in line and swap them with 0xf8fb00 (e.g. 0xf902cd)
 
 # --- names/overrides/efd_qi.list
 GRCamera_QueryInterface                                          0x13b46e0  thiscall  -
@@ -1195,7 +1199,7 @@ rs_connect_ext_call_slot25                                       unsupported  no
 rs_connect_ext_call_slot28                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
 rs_connect_ext_call_slot29                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
 rs_connect_ext_call_slot36                                       unsupported  not needed: only the Mac differential tests call it; the online layer patches the RDV vtable (win-x86/online)
-rsg_efd_category_init_svc                                        unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_category_init_svc                                        unsupported  not needed: only the Mac differential tests call it (shims/game/harness/difftest.c); this build's other category constructors are in line (rsg_efd_category_init_u0, _u2)
 rsg_efd_fixedstring_assign                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
 rsg_efd_fixedstring_c_str                                        unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
 rsg_efd_fixedstring_equals                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
@@ -1205,10 +1209,10 @@ rsg_efd_fixedstring_init_copy                                    unsupported  in
 rsg_efd_fixedstring_init_cstr                                    unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
 rsg_efd_fixedstring_length                                       unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
 rsg_efd_fixedstring_release                                      unsupported  inlined by LTCG: callers go to the string table directly (0x149b430 add, 0x149b760 remove)
-rsg_efd_msghelper_init                                           unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
-rsg_efd_msghelper_on_net_id                                      unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
-rsg_efd_msghelper_on_preinit                                     unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
-rsg_efd_msghelper_on_shutdown                                    unsupported  not proved: no string, name or class anchor; small efd helpers LTCG may have folded
+rsg_efd_msghelper_init                                           unsupported  not needed: only the Mac differential tests call it (shims/game/harness/difftest.c)
+rsg_efd_msghelper_on_net_id                                      unsupported  not needed: only the Mac differential tests call it (shims/game/harness/difftest.c)
+rsg_efd_msghelper_on_preinit                                     unsupported  not needed: only the Mac differential tests call it (shims/game/harness/difftest.c)
+rsg_efd_msghelper_on_shutdown                                    unsupported  not needed: only the Mac differential tests call it (shims/game/harness/difftest.c)
 rsg_pkgconfig_decrypt                                            0x0130aa80  cdecl     -  # the package config callback (the file on the stack, stored by 0x130ac70): decoder and verifier calls as the Mac's
 rsg_profile_encrypt                                              0x0134f270  fastcall  -  # key_profile through rsg_rijndael_key_setup_enc and rsg_rijndael_encrypt; one caller as on the Mac
 # The mods library (names/refs.list). Each read from the function it is used in; the Wwise functions are also RSMods' addresses for this build

@@ -12,7 +12,7 @@ tools/targets/
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 966 of 1,165 symbols read, the rest `unsupported`
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 987 of 1,178 symbols read, the rest `unsupported`
                      with the reason; target.toml also has the install pins
   names/             shared by every target
     overrides/*.list the functions each override module replaces

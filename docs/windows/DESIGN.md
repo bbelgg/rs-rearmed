@@ -80,8 +80,8 @@ are not needed. `win-x86/build/` also has the scripts to do each step by hand
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (966 of the Mac's 1,156 symbols read, an
-`unsupported` line with the reason for the rest), and in its `target.toml` the pins (the depot, manifest, exe
+`tools/targets/win-x86` has the Learn & Play image's names (987 of the 1,178 symbols read, an
+`unsupported` line with the reason for the rest: inlined, folded or specialised by LTCG, or no counterpart), and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). Addresses it needs are in `win-x86/imports/*.tsv`
 (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac
 counterparts). The build uses them for the hook points and what a mod asks for by name; the built-in fixes name their addresses in

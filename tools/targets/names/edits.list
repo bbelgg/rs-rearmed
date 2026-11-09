@@ -1,3 +1,7 @@
 # Edit groups: instructions the build translates twice, as the game has them and as each target's edits.map
 # changes them (GROUP ADDRESS OLDHEX NEWHEX); a mod switches a group on with rc_edit_enable before the game runs
 # (runtime/rc_mid.h). The generated code and the runtime number the groups by their place here.
+# --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
+seven_string  # Seven-String Guitar: the native layouts
+plain_packages  # Plain Packages: unencrypted song archives
+# --- Seven-String Guitar: end

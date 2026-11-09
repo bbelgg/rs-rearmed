@@ -243,7 +243,9 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A mod built for 1.4.x keeps working here as it
   was, and is left out on Learn & Play. The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) is
   built this way: its names are under "the mods library" in `tools/targets/names`. Its song search check knows the key
-  from the tables (`song_search_key`), as a game binding: `/` here, Shift in Learn & Play.
+  from the tables (`song_search_key`), as a game binding: `/` here, Shift in Learn & Play. Edits and mid points
+  (`rc_mid.h`, [recompiler](../recompiler/README.md#overrides-and-hook-points)) are in this front end too, with no
+  entries in the Mac's tables yet: rearmed-mods' Seven-String Guitar and Plain Packages run in Learn & Play only.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the

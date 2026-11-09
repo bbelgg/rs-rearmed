@@ -126,3 +126,237 @@ input_slot                        0xc     # 0x11decca: [eax + 0xc]
 autosave_menu                     0x14    # 0x120aece: the slot's reference at +4 (0x120aedd), not the Mac's +8
 autosave_timer                    0x20    # 0x120af2f: 4.0 from 0x1d18d48
 autosave_query_slot               0x1e    # 0x120ae5a: [edx + 0x78]
+# --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
+guitar_headstock            0x18    # Rnd_Guitar: its Rnd_Headstock (the tuner's colour reset 0x1131dea: [+0x2c]+0x18, then +0xc)
+headstock_pegs              0xc     # Rnd_Headstock: its PegSet (0x1131df0)
+guitar_strings_ghost        0x1c    # GuitarStrings: the game's six ghost strings, a pointer each (ctor 0x111b0d1; the native layout keeps them for strings 0-5)
+guitar_string_loaded        0x50    # string object: u8, its model loaded (Rnd_FindStringBaseShape 0x111ac77; GSLD 0x111b516)
+guitar_string_shader        0x3c    # string object: its v_positionString shader parameter (0x111ada2 stores it at +0x2c +0x10)
+string_shader_v             0x14    # shader parameter: float, its value (rs7string's ShapeDone; the value 0x111ad54 reads from the six-row table)
+guitar_string_dim           0x70    # string object: u8, section dimming on (set at song start 0x136079b, cleared at song end 0x1360a3c)
+instrument_size             0x38    # InstrumentInfo: the game's size (the guitar ctor's allocation 0x1113cb2)
+instrument_inline           0xa     # InstrumentInfo: u8, the in-line headstock (from the profile's +0x13 at 0x110c2dc)
+instrument_string_mode      0x20    # InstrumentInfo: u32[6] perStringMode, a string's bend side (0x110c375 writes them from the count; BD1 0x1320db3 reads)
+guitar_manager_holders      0x10    # guitar manager: the guitar holder of player 0 and 1, a pointer each (GKM's function 0x11172b3)
+guitar_holder_guitar        0x4     # guitar holder: its Rnd_Guitar (0x1032fe5)
+guitar_holder_profile       0x8     # guitar holder: its guitar profile (0x1032fd1)
+guitar_profile_type         0x18    # guitar profile: int, the instrument class (GuitarProfile_Load 0x1115091, from 0x1115620): 2 bass (its branch 0x1115158), 1 guitar
+guitar_profile_strings      0x38    # guitar profile: u8, the string count (GuitarProfile_Load's guitar branch 0x11151c3; copied to the InstrumentInfo at 0x110c2df)
+string_renderer_strings     0x4     # string renderer: its GuitarStrings (Rnd_StringRenderer_Setup 0x10c2a5e)
+tuner_manager_tuners        0x10    # tuner manager: the player tuners, four pointers (UI_TunerMenu_Enter 0x12be8e5)
+player_tuner_player         0x8     # UI_PlayerTuner: u32, its player (SetPegColorAnim 0x1131e0f passes it on)
+pegs_count                  0x4     # PegSet: u16, the active pegs (Rnd_PegSet_Load 0x111d8b8)
+pegs_loaded                 0x8     # PegSet: u8, loaded (0x111d9f1)
+pegs_slots                  0xc     # PegSet: the slots, peg_slot_size each (0x111d8d6)
+peg_slot_size               0x28    # PegSet slot (0x111d8d3: index * 5 * 8): +0 u8 taken, +4 entity, +8 locator
+peg_slot_rgb                0x10    # PegSet slot: float[3], the cached tuner colour (rs7string's pegset.h; 0x111d360 writes it)
+peg_slot_named              0x1c    # PegSet slot: u32, its colour name (0 reset, 1 success, 2-9 strings 0-7)
+pegs_colours                0xfc    # PegSet: pegColor[6] where the game's ctor writes them (0x111d6a4..0x111d6ce)
+peg_colour_size             0x10    # PegSet: a pegColor entry
+note_lane_pos               0x3c    # R3a-c, R4: the lane position vec3 from the register the lea adds (`lea eax,[ecx+eax+0x3c]`, 0xf8ccb1)
+note_head_lane_z            0x44    # R2: a note head's lane z from its row (0x131f639)
+gem_lane_y                  0x40    # R6: a gem's lane y from its row (0x1329a3c)
+seven_gs_main               0x40    # GuitarStrings: main[8], a pointer each (strings 0-5 also at guitar_strings_string)
+seven_gs_ghost              0x60    # GuitarStrings: ghost[8] (0-5 also at guitar_strings_ghost)
+seven_gs_glow               0x80    # GuitarStrings: float glow[8], the renderer's glow ramp (GSGL's edits)
+seven_gs_tail               0xa0    # GuitarStrings: u8[4], zero (rs7string's frame / generation bytes, unused here)
+seven_gs_guitar             0xa4    # GuitarStrings: its Rnd_Guitar
+seven_gs_info               0xa8    # GuitarStrings: its InstrumentInfo
+seven_gs_size               0xb0    # GuitarStrings: bytes
+seven_info_active           0x40    # InstrumentInfo: u8, the strings shown (the build count)
+seven_info_loaded           0x41    # InstrumentInfo: u8, the strings loaded (the build count)
+seven_info_size             0x48    # InstrumentInfo: bytes (its perStringMode reaches strings 6 / 7 at +0x38 / +0x3c)
+seven_pegs_colours          0x14c   # PegSet: pegColor[8] (the game's six moved from pegs_colours, where slots 6 / 7 are)
+seven_pegs_tail             0x1cc   # PegSet: u8 capacity (8), u8 loaded, u8 colour player, u8 0
+seven_pegs_colour_player    0x1ce   # PegSet: u8, the player of its last tuner colour (whose colour mode the refresh uses)
+seven_pegs_size             0x1d4   # PegSet: bytes
+game_color_mode     0x348   # GameColorManager: u32, player 0's colour mode (0 normal, 1 colourblind), player 1's at +4: the constructor zeroes both (0x1098f3a), 0x12d8e41 reads it
+game_color_uv       0x890   # GameColorManager: the stock V table, a float (an index for a few kinds) per kind and string, six columns, two modes of 0xa8 (the constructor's loop, 0x1098f46)
+seven_color_table   0xdd0   # Seven-String: the eight-column colour pointer table appended to GameColorManager, 2 modes x 28 kinds x 8 (rs7string's kPtr)
+seven_color_uv      0x14d0  # Seven-String: the eight-column V table appended, 2 x 28 x 8 floats (rs7string's kUV); the manager is 0x1bd0 bytes with them (the edits)
+fretgrid_guitar             0x0     # FretGrid: the Rnd_Guitar that owns it (Rnd_FretBars_ApplyTransforms 0x11111db: its info's bar count)
+fretgrid_bars               0x5c40  # FretGrid: the fret-bar records, 26 of fretbar_size (the same in both layouts; 0x11111eb, 0x1111284)
+fretbar_size                0x38    # fret-bar record: the loops of 0x11111d0 step by it
+fretbar_valid               0x0     # fret-bar record: u8, nonzero when placed (0x111152b)
+fretbar_a_local             0x4     # fret-bar record: vec3, the locator at the top end (guitar-local; 0x11111f4)
+fretbar_b_local             0x10    # fret-bar record: vec3, the locator at the bottom end (0x1111237)
+fretbar_b_world             0x28    # fret-bar record: vec3, b_local + the guitar's offset (written at 0x1111267): the highway floor
+guitar_strings              0xc     # Rnd_Guitar: its GuitarStrings (Rnd_Guitar_ApplyTransforms 0x11146e2)
+guitar_info                 0x24    # Rnd_Guitar: its InstrumentInfo (0x11111dd)
+instrument_fret_bars        0xd     # InstrumentInfo: u8, the fret bars (25; 0x11111e0)
+guitar_strings_string       0x4     # GuitarStrings: the string objects, string 0 first, a pointer each (0x111bd70; the native layout keeps it for strings 0-5)
+guitar_string_attach        0x8     # string object: vec3, its attach point (guitar-local; + the offset -> +0x14, 0x111bd7a)
+guitar_head_frame           0x4     # the headstock part (Rnd_Guitar +0x18, the mid value head): the frame entity (0x11146ee)
+inlays_entity               0x4     # inlay set: its entity (Rnd_Inlays_ApplyTransforms 0x111cee5)
+entity_flags                0xd8    # Entity: u32, bit 0 = its root scene node is at entity_root_node (Entity_SetScale 0x132f37b)
+entity_root_node            0xdc    # Entity: the root scene node, when bit 0 of entity_flags (0x132f384)
+render_world_scene          0x10c   # the render world (render_world): nonzero when it has its scene; the entity setters test it first (0x132f372)
+ni_world_translate          0xa4    # NiAVObject: vec3, the world translation (rotation +0x80, scale +0xb0: ni_world_scale)
+seven_fretgrid_cells        0x8     # FretGrid: cell (row 0, string 0); 26 rows from +0x4, each a valid byte padded to 4, then its cells
+seven_fretgrid_row          0x264   # FretGrid: a cell row, 4 + 8 * 0x4c (the game's 0x1cc: 6 cells)
+seven_fretgrid_rows         0x1a    # FretGrid: cell rows (frets 1-26)
+seven_fretgrid_cell         0x4c    # FretGrid: a cell (the game's size)
+seven_fretgrid_cell_local   0x4     # FretGrid cell: three local points (vec3 each); +0x0 is its valid byte
+seven_fretgrid_cell_world   0x28    # FretGrid cell: three world points (local + the guitar's offset)
+seven_fretgrid_wires        0x72a0  # FretGrid: the fret-wire rows (the game's +0x2ec0), 26 of seven_fretgrid_wire_row
+seven_fretgrid_wire_row     0x220   # FretGrid: a fret-wire row, 0xa0 + 8 * 0x30 (the game's 0x1c0)
+seven_fretgrid_size         0xa9e0  # FretGrid: bytes (the game's 0x72a0); the tail +0x5c40.. (bars, spans) is where it was
+seven_nextgrid_time         0xd1c   # next-note grid: time[8][26] (row 0x68), behind the time-set tree (the game's time[6][26] at +0xa90)
+seven_nextgrid_size         0x105c  # next-note grid: bytes (the game's 0xd1c); it lives at ebp-0x1060 of the neck targets' Update
+detection_lowest_open       0x11f8  # detection: s32, the lowest open MIDI note (Play_Detector_SetTuning 0x1063230)
+detection_tuning            0x1340  # detection: int16[6], the tuning offsets (0x1063208; 0x13f5281 passes it to 0x13f3d60)
+detector_matcher            0x8     # Play_DetectInput: its matcher (Play_DetectInput_Init 0x106ba82)
+matcher_detection           0x4     # matcher: the detection (0x106ba4f)
+matcher_tuning              0x44    # matcher: int16[6], the tuning offsets (Play_Matcher_SetTuning 0x106923b)
+tracker_detector            0x4c19c # note tracker: its Play_DetectInput (0x13f4f0b, 0x13f502c)
+tracked_note_string         0xc0    # tracked note (tracker + i * 0xc28): u8, its string (0x13f4fc4)
+tracked_note_fret           0xc1    # tracked note: u8, its fret (0x13f503a)
+tracked_note_played_fret    0x14    # tracked note: s32, the fret it was played at (0x13f4ff5)
+tracked_note_played_string  0x18    # tracked note: s32, the string it was played on (0x13f4fd5)
+session_guitar              0x37c   # play session: its Rnd_Guitar (Play_Session_SetupDetection 0x135fa6c; 0x1367ca9)
+guitar_offset               0x2c    # Rnd_Guitar: vec3, the offset local points get (Rnd_FretGrid_ApplyOffset 0x11113d9)
+guitar_string_entity        0x4     # string object: its entity (Rnd_FretGrid_Build 0x1110f8d)
+instrument_strings          0xb     # InstrumentInfo: u8, the string count (Rnd_FretGrid_Build 0x1110f5f; C-lite's built count)
+instrument_frets            0xc     # InstrumentInfo: u8, the frets (0x1110f62)
+std_vector_begin            0x0     # std::vector: the first entry (Play_Detector_SetTuning 0x10631f3)
+std_vector_end              0x4     # std::vector: past the last (0x10631f5)
+seven_detection_tuning8     0x13b8  # detection: int16[8], the tuning of 8 strings (slots 0-5 = detection_tuning)
+seven_detection_open8       0x13c8  # detection: int16[8], the open MIDI notes of 8 strings (slots 0-5 = the game's +0x134c)
+seven_detection_count       0x13d8  # detection: u32, the strings it scores: 6, a bass's 4, a widened song's 7/8
+seven_detection_magic       0x13dc  # detection: u32 0x38503752 once the tail is written
+seven_matcher_tuning8       0x58    # matcher: int16[8], the tuning of 8 strings (slots 0-5 = matcher_tuning)
+seven_matcher_magic         0x68    # matcher: u32 0x38503752 once the tail is written
+player_tuner_input        0xc     # UI_PlayerTuner: u32, its detection input id (ApplyTuning 0x1130796 hands it to 0x106a020)
+player_tuner_guitar       0x2c    # UI_PlayerTuner: its Rnd_Guitar (bound at 0x11304fe; the methods read [+0x2c]+0x24)
+player_tuner_open         0x38    # UI_PlayerTuner: int32[6], each string's target MIDI note (ResetStandard 0x112fe29, ApplyTuning 0x113077f)
+player_tuner_offset       0x50    # UI_PlayerTuner: int32[6], each string's tuning offset (ApplyTuning 0x1130786)
+player_tuner_string       0x74    # UI_PlayerTuner: int32, the string being tuned (the arrow keys 0x1131930, 0x113194b)
+player_tuner_note_tuner   0xd0    # UI_PlayerTuner: its NoteTuner (SelectString 0x1131a72 hands it to UI_NoteTuner_Initialize in EDX)
+detection_detector        0x1238  # detection: its Play_DetectInput (0x105c6bc; rs7string's kDetOwner)
+json_value_find_slot      0x5     # JSON value vtable: the member of an object by name (Play_Tuning_ReadStringOffsets 0x1139a2f, [+0x14])
+json_value_number_slot    0x14    # JSON value vtable: its number object or null (0x1139a3c, [+0x50])
+seven_tuner_tail          0x278   # the tail's start (the game's size)
+seven_tuner_size          0x380   # the session's size with the tail
+seven_tuner_open          0x280   # int32[8] each string's target MIDI note
+seven_tuner_offset        0x2a0   # int32[8] each string's tuning offset
+seven_tuner_peak          0x2c8   # float[8] each string's peak level (seven_tuner_open + 0x48, as the game's +0x80 is +0x38's)
+seven_tuner_letters       0x2e8   # {letter, sharp}[8] the peg letters (two pointers a string)
+seven_tuner_picks         0x328   # pointer[8] the pick markers
+seven_tuner_last_pick     0x348   # int32[8] each pick's state (-2: none)
+seven_tuner_count         0x368   # u8 the session's string count (4, 6, 7, 8)
+seven_tuner_target        0x36a   # u8 7 / 8 for a 7/8-string target (TK's manifest keys), else 0: the guitar's count
+seven_tuner_edge          0x36b   # u8 the tuner camera's reference string, min(count, 6) - 1 (TF1)
+seven_tuner_order         0x36c   # u8[8] the order the tuner goes through the strings (low strings first)
+sng_song_levels                0x40    # SNG_Song: std::vector of levels, sng_level_size each (PostProcessNotes 0x10dc804: [esi+0x40] / [esi+0x44])
+sng_song_templates             0x94    # SNG_Song: std::vector of chord templates, sng_template_size each (SNG_Song_GetChord 0x10d9db7)
+sng_song_chord_notes           0xac    # SNG_Song: std::vector of ChordNotes records, sng_chord_notes_size each (SNG_Song_GetChordNotes 0x10d9df7)
+sng_song_tuning                0x110   # SNG_Song: std::vector<int16_t>, the MetaData tuning (SNG_Song_Load 0x10da58b; the destructor frees it 0x10d9aab)
+sng_song_capo                  0x11c   # SNG_Song: u8, the capo fret, 0xff none (PostProcessNotes 0x10dc7fa, 0x10dc862: a template fret equal to it becomes 0)
+sng_level_size                 0x64    # SNG level (PostProcessNotes 0x10dc83c)
+sng_level_notes                0x30    # SNG level: std::vector of notes, sng_note_size each (0x10dc817, 0x10dcdcf)
+sng_note_size                  0x1c8   # SNG note (0x10dc832)
+sng_note_mask                  0x0     # SNG note: u32 mask (0x10dc82b, 0x10dcdbb)
+sng_note_chord                 0x14    # SNG note: int32 chord template id, -1 none (DS1's loop 0x10dcd6e)
+sng_note_chord_notes           0x18    # SNG note: int32 ChordNotes id, -1 none (PostProcessNotes 0x10dccd6)
+sng_template_size              0x48    # chord template (the stride of TP1-TP12: id * 9 * 8)
+sng_template_frets             0x4     # chord template: int8 frets[6] (DS1 0x10dcda2, DM1 0xfe0c63)
+sng_template_fingers           0xa     # chord template: int8 fingers[6] (rs7string's kTplFingers)
+sng_template_midi              0x10    # chord template: int32 midi[6] (Play_Eval_Build 0x13f40e5 copies them to the eval's targets)
+sng_template_name              0x28    # chord template: char name[32]; name[31] is the old format's string-6 column (rs7string's kTplName / kTplExt)
+sng_chord_notes_size           0x948   # ChordNotes record (the stride of CP1 0x10d9e20, CP2 0x1366f23)
+sng_chord_notes_mask           0x0     # ChordNotes: u32 mask[6]
+sng_chord_notes_bends          0x18    # ChordNotes: BendData32 bends[6], sng_bend_data_size each
+sng_chord_notes_slide_to       0x930   # ChordNotes: int8 slideTo[6]
+sng_chord_notes_slide_unpitch_to 0x936 # ChordNotes: int8 slideUnpitchTo[6]
+sng_chord_notes_vibrato        0x93c   # ChordNotes: int16 vibrato[6] (to the record's end, 0x948)
+sng_bend_data_size             0x184   # BendData32: 32 values of 12 bytes ({float time, float step, u32}), then u32 used
+sng_bend_data_used             0x180   # BendData32: u32, the values used
+seven_t8_size                  0x80    # T8: the game's template (0x48), then the eight-slot arrays
+seven_t8_frets                 0x48    # T8: int8 frets[8] (-1 none)
+seven_t8_fingers               0x50    # T8: int8 fingers[8] (-1 none, 0 thumb, 1-4)
+seven_t8_midi                  0x58    # T8: int32 midi[8] (-1 none)
+seven_t8_slots                 0x78    # T8: u8, the arrangement's slots (6, 7 or 8)
+seven_t8_used                  0x79    # T8: u8, the strings in the chord as bits
+seven_c8_size                  0x15a8  # C8: the game's ChordNotes record (0x948), then the eight-slot arrays
+seven_c8_mask                  0x948   # C8: u32 mask[8]
+seven_c8_slide_to              0x968   # C8: int8 slideTo[8] (-1 none)
+seven_c8_slide_unpitch_to      0x970   # C8: int8 slideUnpitchTo[8] (-1 none)
+seven_c8_vibrato               0x978   # C8: int16 vibrato[8]
+seven_c8_bends                 0x988   # C8: BendData32 bends[8], sng_bend_data_size each
+seven_eval_midi8               0x284   # eval: int32 midi[8]: the template copy's midi[6], then the tails' two
+seven_eval_tail_midi           0x29c   # eval: int32 midi of strings 6, 7 (-1 none)
+seven_eval_tail_mask           0x2a4   # eval: u32 ChordNotes mask of strings 6, 7
+seven_eval_tail_fret           0x2ac   # eval: int8 fret of strings 6, 7 (-1 none)
+seven_eval_tail_finger         0x2ae   # eval: int8 finger of strings 6, 7
+seven_eval_tail_slide          0x2b0   # eval: int8 slideTo of strings 6, 7
+seven_eval_tail_unpitch        0x2b2   # eval: int8 slideUnpitchTo of strings 6, 7
+seven_eval_tail_vibrato        0x2b4   # eval: int16 vibrato of strings 6, 7 (then 4 bytes to +0x2bc, cleared with them)
+seven_eval_child67             0xc1e   # eval: u8 child eval slot of strings 6, 7, 0xff none (Play_Eval_ClearState leaves +0xc1e..+0xc1f: it writes +0xc1c as a word, +0xc20 as a dword)
+matcher_detector            0x0     # matcher: its Play_DetectInput (Play_DetectInput_Init 0x106ba62); the matcher reads its frames through it (0x10689b4)
+matcher_octave_dyads        0x54    # matcher: u8, a bass's octave dyad passes on one note (0x1068ef3; 0 at 0x106ba77)
+detection_frames            0xdb8   # detection: the ring of analysis frames, detection_frame_size each (0x10689e3)
+detection_frame_write       0xdbc   # detection: s32, the ring's next index (0x10689c4)
+detection_frame_capacity    0xdc0   # detection: s32, the ring's frames (0x10689d3)
+detection_frame_count       0xdc8   # detection: s32, frames written so far (0x10689b9)
+detection_frame_size        0x7d0   # detection frame (0x10689dd; the copy of 0x1f4 dwords 0x10689e9)
+frame_level                 0x700   # frame: float, its level in dB (0x10689f6: below -55 it gives no strength)
+frame_peak_count            0xbc    # frame: s32, its peaks (0x1068a09)
+frame_peaks                 0x1c    # frame: its peaks {int32 MIDI bin, float strength}, frame_peak_size each (0x1068a15)
+frame_peak_size             0x8     # (0x1068a15)
+frame_peak_strength         0x4     # peak: float, its strength (0x1068a28)
+matcher_candidate_size      0xc     # the matcher's candidate {int32 MIDI bin, float strength, u8}: 128, one per bin (0x1068a7d)
+matcher_candidate_bin       0x0     # candidate: int32, its MIDI bin (0x1068a75)
+matcher_candidate_strength  0x4     # candidate: float, its summed strength (0x1068a77; the comparator 0x1067ad6)
+tracker_evals               0x8     # note tracker: its evals, eval_size apart from slot 0 (the release 0x13f4437; the child query 0x13f55db)
+eval_size                   0xc28   # Play_NoteEval with its slot's id (0x13f441b, 0x13f55d1)
+eval_children               0xc04   # eval: int32[6], the child eval slots of a chord's strings 0-5, -1 none (0x13f55c4; Play_Eval_ClearState 0x13f41f9)
+eval_is_chord               0xc1c   # eval: u8, a chord's (0x13f556a; the release 0x13f4452 reads it at its slot's +0xc24)
+eval_whole                  0xc1d   # eval: u8, the chord is judged as a whole (0x13f5578)
+eval_judge_a                0x54    # eval: u8[3], the first judgement's three flags (the child queries 0x13f57f0 +0x54, 0x13f5a70 +0x55, 0x13f5560 +0x56)
+eval_judge_a_on             0x64    # eval: u8, the first judgement is on (0x13f5580)
+eval_judge_b                0x74    # eval: u8[3], the second judgement's flags (0x13f583b +0x74, 0x13f55ab +0x76)
+eval_judge_b_on             0x84    # eval: u8, the second judgement is on (0x13f5587)
+eval_string_masks           0x2bc   # eval: u32[6], its ChordNotes copy's masks (Play_Eval_Build 0x13f4118; the checks 0x13f7b05, 0x13f7b46)
+eval_slide_to               0xbec   # eval: int8[6], its ChordNotes copy's slideTo (+0x2bc + 0x930; 0x13f7bf6)
+chord_render_template       0x30    # chord render object: its chord template (a T8 record while a song plays): the chord render object's ctor 0x131f0b0 stores its template argument there (0x131f1d8); rs7string's chordObj +30h (B1)
+guitar_fretgrid             0x10    # Rnd_Guitar: its FretGrid (the chord pluck 0x13638de: [session +0x37c] +0x10, whose [+0] -> +0x24 is the InstrumentInfo, as fretgrid_guitar says; rs7string's kGuitarGrid, 0x593043)
+json_node_member_slot          0x6     # JSON value vtable: an object's member by name, or null (the manifest chord's diagram serializer 0x12d7b44, [+0x18] "Frets"; rs7string's Find)
+json_node_number_slot          0x15    # JSON value vtable: its number object, or null (0x12d7d13, [+0x54], then the double at json_number_value)
+json_node_object_slot          0x17    # JSON value vtable: the object (dictionary) it is, or null (0x12d7b2c, [+0x5c]; rs7string's Dictionary)
+json_node_add_ref_slot         0x0     # JSON value vtable: AddRef (0x12d7b7a on the Frets array)
+json_node_release_slot         0x1     # JSON value vtable: Release (0x12d7b91)
+json_array_items               0x10    # JSON array: std::vector of its values, a pointer each (0x12d7b7c: [+0x14] - [+0x10], shifted by 2)
+json_number_size               0x10    # JSON number object: the allocation num_intern makes (efd_alloc(0x10, 0) at 0x140008f): vtable, refs, double
+ni_ref_count                0x4     # NiRefObject: int32 reference count (AddRef 0xf914d0: InterlockedIncrement of this + 4); the memory IFile and its blob have it there too
+ni_node_children            0xd8    # NiNode: its children array (NiTObjectArray at +0xd4: +0x4 base, +0x8 u16 slots, +0xa u16 used; AttachChild 0x155e9eb)
+ni_node_child_slots         0xdc    # NiNode: u16, the array's slots (some may be empty)
+ni_node_attach_slot         0x28    # NiNode vtable slot of AttachChild(child, first_free) (+0xa0, 0x155e9a0, thiscall, ret 8)
+ni_stream_top               0x15c   # NiStream: its top objects, a pointer each (0x156dd40)
+ni_stream_top_count         0x164   # NiStream: u32, their count (0x156dd36)
+ni_av_properties            0xb8    # NiAVObject: the head of its property list (GetProperty 0x1560ec8)
+ni_property_node_next       0x0     # property list node: the next node (0x1560ed9)
+ni_property_node_item       0x8     # property list node: the property (0x1560ed3)
+ni_property_type_slot       0x12    # NiProperty vtable slot of its type (+0x48, 0x1560ee1, thiscall)
+noteway_layer_type          0xc     # the type of the noteway draw-layer property (the layer setter 0x132ef1a asks GetProperty for it)
+noteway_layer_value         0x20    # the draw-layer property: u16 layer (0x132efb9)
+ni_extra_value              0x14    # a mesh's float extra data: its float; the colour extra data: its RGBA (rs7string's kColourRgb; 0x13307b4 makes a 0x18-byte float one, 0x13309bc a 0x24-byte colour one)
+nif_resource_stream         0xc     # nif resource (0x102a7c0's): its NiStream (stored at 0x1028bf3)
+headstock_seg_params        0x20    # Rnd_Headstock: the params of its six string segments, a pointer each (GSHC 0x110fbdd; each nine value pointers, Rnd_SetStringShaderParams 0x111acc0; +0xc the colour)
+instrument_inverted         0x8     # InstrumentInfo: u8 InvertGuitarStrings, the profile's +0x12 (0x110c2cf); the binder picks Locator_Invert_Peg_%d by it (0x111de15, the guitar's +0x24)
+instrument_lefty            0x9     # InstrumentInfo: u8 left-handed, the profile's +0x11 (0x110c2d5; rs7string's kInfoLefty)
+peg_slot_entity             0x4     # PegSet slot: the peg entity (Rnd_PegSet_Load 0x111d933)
+peg_slot_locator            0x8     # PegSet slot: its locator node, a counted pointer (the binder 0x111defe)
+mem_blob_data               0x8     # a memory IFile's blob: its bytes (the file job 0x102826f; Read 0x141b16a)
+mem_blob_size               0x10    # the blob: u32 size (0x102826c; Read 0x141b157)
+mem_blob_size64             0x18    # the blob: u64 size (Size64 0x141b1e3)
+mem_blob_size_bytes         0x20    # the blob as the library makes one (the fields above)
+mem_file_blob               0x8     # memory IFile: its blob (0x1020c20)
+mem_file_pos                0xc     # memory IFile: u32 position (0x1020c30)
+mem_file_size               0x10    # memory IFile (the base class whose vtable is mem_file_vtable): bytes
+nf_adapter_pos              0x4     # NiFile adapter (Res_NiFileAdapter, 0x1c bytes): u32 position (the ctor 0x1020608)
+nf_adapter_read             0x8     # the adapter: its read function (0x1020633)
+nf_adapter_write            0xc     # the adapter: its write function (0x102063a)
+nf_adapter_good             0x10    # the adapter: u8, its file is good (0x1020630)
+nf_adapter_file             0x18    # the adapter: its IFile, one reference (0x1020614)
+nf_adapter_size             0x1c    # the adapter: bytes (the ctor writes +0x0..+0x18; rs7string's kNiFileSize)
+# --- Seven-String Guitar: end

@@ -68,6 +68,8 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | DLC and custom songs | ✅ | ✅ ¹ |
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 17 of the 20 hook points, the overlay API and the render API |
 | [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
+| Edits and mid points: a mod changes a function from the inside | ⚠️ in the recompiler, no tables yet | ✅ |
+| 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ❌ not yet | ✅ played with a guitar |
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |

@@ -1,0 +1,154 @@
+# Seven-String Guitar and Plain Packages (rearmed-mods, after rs7string by SomeeName, MIT): their callbacks.
+# NAME ADDRESS (TYPE value@LOCATION, ...) [-> CONT=ADDRESS, ...] (tools/targets/README.md).
+
+# strings
+seven_gkc           0x011151c7  (void *profile@esi)                                                    # GKC
+seven_gke           0x01117711  (void *profile@esi, void *other@edi) -> differ=0x01117928                # GKE
+seven_gkm           0x0111729b  (void *manager@ebx, int player@[ebp+0x0c])                             # GKM
+seven_gkl           0x012fdbbb  (int count@ecx, int player@[esp+0x0c])                                 # GKL
+seven_gkt           0x011375d6  (int player@esi, void *tuning@[ebp+0x08], uint32_t caller@[ebp+0x04])  # GKT
+seven_gkh1          0x0110f86d  (uint8_t count@eax)                                                    # GKH1
+seven_gkh2          0x0110fa23  (uint8_t count@eax)                                                    # GKH2
+seven_gia1          0x01113ccc  (void *info@eax)                                                       # GIA1
+seven_gsc1          0x01113cea  (void *strings@eax, void *guitar@esi)                                  # GSC1
+seven_info_counts   0x0110c381  (void *info@ecx)                                                       # (new)
+seven_gsld_shape1   0x0111b530  (void *string@edi, uint8_t index@[esp+0x1c])                           # GSLD call-in Shape (0x1cb)
+seven_gsld_shape2   0x0111b6c4  (void *string@edi, uint8_t index@[esp+0x14])                           # GSLD call-in Shape (0x35f)
+seven_gsld_shape3   0x0111ba7d  (void *strings@esi, uint8_t index@ebx)                                 # GSLD call-in Shape (0x718)
+seven_gshc_loaded   0x0110fbc6  (int string@ecx, void *guitar@edi) -> next=0x0110fc0b, loaded=0x0110fbcd  # GSHC call-in HsLoaded  (headstock)
+seven_gshc_segment  0x0110fbdd  (int string@ecx, void *segment@ecx, void *guitar@edi) -> done=0x0110fbe4  # GSHC call-in HsSeg  (headstock)
+seven_grm1          0x010c2a54  (int meshes@[ebp-0x14], void *renderer@[ebp+0x08]) -> skip=0x010c2a5b                     # GRM1: in place of the store of 6 (the loop goes back to 0x10c2a5b, below it)
+seven_grm3          0x010c2bfe  (int row@[ebp+0x10], float v@st0)                                      # GRM3
+seven_psc1          0x0111d6d4  (void *pegs@edi)                                                       # PSC1
+seven_psl1          0x0111d8b4  (int count@eax, void *pegs@ebx, void *info@edi)                        # PSL1  (headstock)
+seven_psn1          0x01131dbd  (int index@ebx, void *tuner@esi, void *name@ecx) -> done=0x01131dc4  # PSN1
+seven_psn2          0x01131e16  (void *slot@[esp], uint32_t sp@esp) -> skip=0x01131e1b                 # PSN2 (before)
+seven_psn2_after    0x01131e1b  (int index@ebx, void *tuner@esi)                                       # PSN2 (after)
+seven_n5            0x01114164  (void *guitar@ebx)                                                     # N5
+seven_r3a           0x00f8ccb1  (uint32_t cells@eax, int string_at@ecx)                               # R3a
+seven_r3b           0x00f8ccf0  (uint32_t cells@eax, int string_at@ecx)                               # R3b
+seven_r3c           0x00f8cd2e  (uint32_t cells@eax, int string_at@ecx)                               # R3c
+seven_r4            0x01327f2e  (uint32_t cells@eax, int string_at@ecx)                               # R4
+seven_r2            0x0131f63d  (void *row@edx, int string_at@ebx, float z@st0)                        # R2
+seven_r6            0x01329a40  (void *row@eax, int string_at@ecx, float y@st0)                        # R6
+
+# colours
+seven_cmuv     0x01099630 (int entry@eax, void *manager@ecx, uint32_t v_bits@[ebp+0x14]) -> skip=0x01099637  # CMUV
+seven_cmix     0x01099714 (int kind@edx, int entry@eax, void *manager@ecx, uint32_t value_bits@[ebp+0xc]) -> skip=0x01099719  # CMIX
+seven_cminit   0x01098f8d (void *manager@esi)  # CMINIT
+seven_cmbuild  0x0109a0dc (void *manager@esi)  # CMBUILD
+seven_cmfall   0x012d8e2a (int string@edx, uint32_t rgb@eax) -> skip=0x012d8e2e  # CMFALL
+
+# grid
+seven_f1          0x01111284  (void *grid@edi)  # F1 Rnd_FretBars_ApplyTransforms, after the bars' world ends are written: the shift and scale of this run
+seven_f1_bar      0x011112f2  (float *pos@eax)  # F1 before each bar's Entity_SetTranslation(entity, pos): pos moves by the shift
+seven_f1_scale    0x011112f7  (uint32_t scale_bits@ecx, void *entity@[esi+0xc])  # F1 after it, the start of the scale edit: ecx = the scale's float bits, 0 for no Entity_SetScale
+seven_f1_floor    0x01111300  ()  # F1 the function's end (every path): the highway floor of inverted strings
+seven_in1         0x01114709  (void *guitar@edi, void *head@esi, void *inlays@[esi+0x10])  # IN1 Rnd_Guitar_ApplyTransforms, after Rnd_Inlays_ApplyTransforms: the inlay entity to the centre of 7 strings
+
+# pitch
+seven_pm0         0x0106ba6d  (void *matcher@eax)  # PM0 Play_DetectInput_Init, the new matcher (before its +0x40 = -1): its tail zeroed, registered
+seven_pr0         0x0105ccfb  (void *detection@ebx)  # PR0 Play_Detector_Reset, after the open-MIDI writers: the tail zeroed, the song's count dropped
+seven_s3          0x010632a2  (void *detection@eax, void *tuning@esi, uint32_t from@[esp])  # S3 Play_Detector_SetTuning, the guitar exit's ret (after the game's last store): tail, lowest open note
+seven_pt1         0x01063321  (void *detection@eax, void *tuning@esi, uint32_t from@[esp])  # PT1 Play_Detector_SetTuning, the bass exit's ret: the tail
+seven_pm1         0x01069255  (void *matcher@esi, void *tuning@edx, uint32_t from@[ebp+0x4])  # PM1 Play_Matcher_SetTuning, after its six-entry copy: the tail
+seven_s4          0x0135facc  (void *detection@eax, void *tuning@esi, void *session@ebx)  # S4 Play_Session_SetupDetection, before its Play_Detector_SetTuning with the SNG tuning: the song's count
+seven_s1          0x013f3e00  (void *tuning@ecx, int instrument2@edx, int string@esi, int pitch@eax)  # S1 (PC1-PC4, PUBZ0-PUBZ6) 0x13f3d60's out-of-table join: guitar strings 6/7 over the tail
+seven_i1          0x013f3e36  (int instrument@eax, int midi@ecx, int string@edx, void *tuning@esi, int fret@eax) -> done=0x013f3e48  # I1 (PUBAN's ReverseTail) Play_MidiToFret: guitar strings 6/7 over the tail
+seven_pubcl_base  0x013f4fdc  (int fret@eax, uint32_t string@ecx) -> done=0x013f4fe3  # PUBCL (PubBaseG) 0x13f4ea0's near-note fret: the base of guitar strings 6/7 from the 8-entry table
+seven_pubcl       0x013f500c  (void *tracker@edi, void *record@esi, int midi@[ebp-0x40], int result@[ebp-0x38]) -> classified=0x013f51b2  # PUBCL (PubClassify) its string search over the detection's 7/8 strings
+seven_pubwu       0x0110fe52  (void *grid@edi, uint32_t count@[ebp+0x8]) -> done=0x0110fe59  # PUBWU (PubWireCount) 0x110fe40's fret-wire loop over the built count
+seven_pubgb       0x011110d5  (void *grid@[ebp+0x8], void *guitar@[ebp+0xc], int status@eax) -> done=0x011110da  # PUBGB Rnd_FretGrid_Build's complete exit: cells 6/7 once the strings are loaded
+seven_pubga       0x01115960  (void *info@ecx, uint8_t string@[esp+0x4], float *out@[esp+0x8], int point@eax) -> ret=0x011159fe  # PUBGA Rnd_GetStringAttachPoint entry: strings 6/7 from the strings part
+seven_pubedge     0x01367cc0  (void *info@eax, uint8_t first@ecx, uint32_t edge@eax) -> done=0x01367ccd  # PUBEDGE 0x1367b30 (TU8A's StringAction): the edge string over the built count
+
+# tuner
+seven_tu8init        0x0112f7d3  (void *session@esi)  # TU8INIT the constructor's end: the tail of a new session (count 6, order 0..7)
+seven_ts8rs          0x0112fc8d  (void *session@esi)  # TS8RS after the standard tuning: the tail's targets and peaks
+seven_ts8bind        0x0113052a  (void *session@esi)  # the guitar is bound (+2Ch): the session's count, order and camera string from it
+seven_ts             0x011307a2  (void *session@[ebp+0x8], const int *offsets@edi)  # TS Play_TunerSession_ApplyTuning's exit: the targets, 7/8 strings from TK's key
+seven_tk             0x011399d0  (int *offsets@ecx, void *holder@[esp+0x4], uint32_t eax@eax, uint32_t edx@edx)  # TK Play_Tuning_ReadStringOffsets: the manifest keys Rs7String6 / Rs7String7 of that offset array
+seven_ts8fin_letter  0x01130118  (void *session@esi, int string@edi, void *letter@eax) -> done=0x0113011f  # TS8FIN FadeIn: the string's letter from the tail
+seven_ts8f1          0x01131039  (void *session@ebx, int string@esi)  # TS8F1 mode 0 starts at the first string of the order
+seven_ts8f2          0x01131235  (void *session@ebx)  # TS8F2 the capo step starts at the first string of the order
+seven_ts8m2e         0x01131655  (void *session@ebx, int submode@edi, int string@[ebp+0xc])  # TS8M2E a menu start (sub mode 0, string 0) at the first string of the order
+seven_ts8f3          0x011317c7  (void *session@esi, int string@edi)  # TS8F3 mode 3 starts at the first string of the order (the reverse pass keeps 5)
+seven_ts8sta_next    0x01131929  (void *session@esi, int string@edi) -> none=0x01131953, select=0x01131933  # TS8STA arrow key, inverted strings: the next string of the order
+seven_ts8sta_prev    0x0113193c  (void *session@esi, int string@edi) -> none=0x01131953, select=0x0113194e  # TS8STA arrow key: the previous string of the order
+seven_ts8stb_prev    0x01131974  (void *session@esi, int string@edi) -> none=0x011319a3, select=0x01131986  # TS8STB arrow key, inverted strings: the previous string of the order
+seven_ts8stb_next    0x01131994  (void *session@esi, int string@edi) -> none=0x011319a3, select=0x0113199e  # TS8STB arrow key: the next string of the order
+seven_ts8sel         0x01131a7d  (void *session@esi, int string@edi, uint32_t eax@eax, uint32_t ecx@ecx, uint32_t edx@edx)  # TS8SEL SelectString's exit: low range (the detector's lowest open note)
+seven_lt1            0x01133075  (const void *info@edi) -> done=0x01133078  # LT1 PlacePegLetters: the in-line rule for the 7-string headstock on a 3+3 frame
+seven_w              0x011342fc  (void *session@esi, double mean@st0)  # W CheckWrongInstrument: the low-range threshold of a 7/8-string session
+seven_ts8sn1         0x01134330  (int string@ecx, void *session@[esp+0x4])  # TS8SN1 PlayTunedSound: the string before its clamp to the six colours
+seven_ts8sn2         0x011343c5  (void *session@[ebp-0x24], int note@eax) -> done=0x011343cc  # TS8SN2 PlayTunedSound: the note of that string, from the tail
+seven_ts8md2_prev    0x01134b00  (void *session@ebx) -> none=0x01134b55, moved=0x01134b05  # TS8MD2 precision mode, reverse step along the order
+seven_ts8md2_next    0x01134b30  (void *session@ebx) -> none=0x01134b55, moved=0x01134b35  # TS8MD2 precision mode, forward step along the order
+seven_ts8md0         0x01134e24  (void *session@esi) -> none=0x01134e49, moved=0x01134e28  # TS8MD0 check mode: the next string of the order
+seven_ts8md1         0x01134fa1  (void *session@esi) -> none=0x01134fbe, moved=0x01134fa5  # TS8MD1 capo mode: the next string of the order
+seven_ts8md3_prev    0x01135023  (void *session@ebx) -> none=0x01135079, moved=0x01135029  # TS8MD3 mode 3, reverse step along the order
+seven_ts8md3_next    0x01135054  (void *session@ebx) -> none=0x01135079, moved=0x01135059  # TS8MD3 mode 3, forward step along the order
+seven_ts8nti_label   0x013ddc44  (int string@ebx, const char *label@edx, void *note_tuner@[ebp-0x4c]) -> done=0x013ddc4b  # TS8NTI UI_NoteTuner_Initialize: the label of string 6 / 7
+seven_ts8nti_label2  0x013ddd05  (int string@ebx, const char *label@ecx, void *note_tuner@[ebp-0x4c]) -> done=0x013ddd0c  # TS8NTI the same label for StartNoteTuner
+
+# chords
+seven_xb1   0x010da5dc  (void *song@[ebp+0x8], const void *body@[esp+0x24], uint32_t position@[esp+0x28], uint32_t size@[esp+0x2c])  # XB1
+seven_pp1   0x010ea96c  (void *song@[ebp+0x8])  # PP1
+seven_sf1   0x010d9a36  (void *song@esi)  # SF1
+seven_tp1   0x010d9dde  (void *templates@esi, uint32_t chord@edi, void *template@eax, uint32_t chord9@ecx) -> done=0x010d9de4  # TP1 SNG_Song_GetChord 0x10d9db0
+seven_tp2   0x00fe0c2c  (void *templates@ebx, uint32_t chord@edi, void *template@edi, uint32_t chord9@edx) -> done=0x00fe0c32  # TP2 Rnd_GuitarStrings_UpdateSectionDimming 0xfe0900 (its loop reads frets[8] at +0x48: DM1)
+seven_tp3   0x0110da7d  (void *templates@edi, uint32_t chord@ebx, void *template@ebx, uint32_t chord9@ecx) -> done=0x0110da83  # TP3 the neck's finger keep pass 0x110d9f0
+seven_tp4   0x0110e3c7  (void *templates@ebx, uint32_t chord@edi, void *template@edx, uint32_t chord9@ecx) -> done=0x0110e3cd  # TP4 the neck's finger display 0x110e370
+seven_tp5   0x0131debe  (void *templates@ecx, uint32_t chord@edi, void *template@edi, uint32_t chord9@edx) -> done=0x0131dec4  # TP5 the chord render 0x131dd00
+seven_tp6   0x01320f4f  (void *templates@ebx, uint32_t chord@edi, void *template@edx, uint32_t chord9@ecx) -> done=0x01320f55  # TP6 the chord box 0x1320e40
+seven_tp7   0x0132241b  (void *templates@ebx, uint32_t chord@esi, void *template@ebx, uint32_t chord9@ecx, uint32_t zero@esi) -> done=0x01322423  # TP7 the chord name 0x13223b0 (the range's `xor esi,esi` too)
+seven_tp8   0x01366eb1  (void *templates@ebx, uint32_t chord@edi, void *template@edx, uint32_t chord9@ecx) -> done=0x01366eb7  # TP8 the chord render's spawn 0x1366dd0
+seven_tp11  0x010ddfcc  (void *templates@esi, uint32_t chord@ecx, void *template@edx, uint32_t chord9@ecx) -> done=0x010ddfd2  # TP11 SNG_Song_PostProcessNotes 0x10dc7e0, the section string mask
+seven_tp12  0x01363850  (void *templates@edi, uint32_t chord@ebx, void *frets@edi, uint32_t chord9@edx) -> done=0x01363857  # TP12 the chord pluck 0x13637b0 (edi = the record's frets, +0x4)
+seven_cp1   0x010d9e20  (void *chord_notes@esi, uint32_t id@eax, void *record@eax) -> done=0x010d9e28  # CP1 SNG_Song_GetChordNotes 0x10d9df0
+seven_cp2   0x01366f23  (void *chord_notes@ebx, uint32_t id@esi, void *record@ebx, uint32_t offset@esi) -> done=0x01366f2b  # CP2 the chord render's spawn 0x1366dd0
+seven_ds1   0x010dcd9d  (void *templates@esi, uint32_t chord@ecx, void *frets@eax, uint32_t count@ecx, uint32_t played@edx) -> done=0x010dcda9  # DS1
+seven_bt1   0x013f4120  (void *eval@ebx, void *template@[ebp+0x14], void *chord_notes@[ebp+0x18])  # BT1
+seven_cs1   0x013f421d  (void *eval@eax)  # CS1
+
+# chdetect
+seven_md1   0x010687a0  (void *matcher@[esp+0x4], int32_t *targets@[esp+0x8], int tolerance@[esp+0xc], int history@[esp+0x10], uint32_t matched@eax) -> ret=0x01069040  # MD1 Play_Matcher_DetectChord's entry (stdcall, ret 0x10): up to six targets compacted into a scratch int32[6] for the game's body, seven or eight judged here (al), on at its ret
+seven_am1   0x013f545d  (int32_t *targets@[esp], void *chord@[ebp-0x44], int shift@edi)  # AM1 Play_AnalyzeChordMistake 0x13f53a0, its call of the wrapper 0x10676b0: the six shifted targets + the T8's strings 6/7 shifted as an int32[8]
+seven_ch3   0x013f4b7c  (int child@eax, uint32_t string@[ebp-0xe0c], int parent@[ebp-0xe00], void *tracker@ebx) -> done=0x013f4b89  # CH3 Play_Tracker_AddNoteOrChord 0x13f4890: the child eval slot of string 6/7 into the parent's byte +0xc1e/+0xc1f (strings 0-5: the game's store)
+seven_rl1   0x013f445b  (void *slot@esi, void *tracker@edi)  # RL1 the eval release 0x13f43f0 (a chord's): its children of strings 6/7 released first, then the game's `add esi, 0xc0c` and its six
+seven_rl2   0x013f44ed  (void *slot@esi, void *tracker@edi)  # RL2 the eval release 0x13f44b0: the same
+seven_ag1   0x013f5560  (void *eval@esi, void *tracker@edi, uint8_t *string@edx, uint8_t result@eax) -> ret=0x013f572f  # AG1 the child query 0x13f5560 (flags +0x56 / +0x76; an empty child fails the chord; edx unread, there for the shared callback) over eight strings
+seven_ag2   0x013f57f0  (void *eval@esi, void *tracker@edi, uint8_t *string@edx, uint8_t result@eax) -> ret=0x013f59ed  # AG2 the child query 0x13f57f0 (+0x54 / +0x74; empty children skipped; edx one string or 0)
+seven_ag3   0x013f5a70  (void *eval@esi, void *tracker@edi, uint8_t *string@edx, uint8_t result@eax) -> ret=0x013f5c6d  # AG3 the child query 0x13f5a70 (+0x55 / +0x75): the same
+seven_up1   0x013f5f66  (void *eval@edi, uint8_t all_unpitched@ecx)  # UP1 Play_Tracker_Update 0x13f5eb0, the all-unpitched-slide loop's exit
+seven_up2   0x013f67b4  (void *eval@edi, uint8_t all_unpitched@edx)  # UP2 0x13f6760, the same loop's exit
+seven_up3   0x013f6a55  (void *eval@esi, uint8_t all_unpitched@edx)  # UP3 0x13f6a00, the same loop's exit
+seven_pd2   0x013f7b34  (void *masks_end@esi, uint8_t result@eax, uint8_t last_test@edx)  # PD2 0x13f7b00, its loop's exit (esi = eval + 0x2bc + 24): result = every sounding string slides (0x800), dl its last test
+seven_pd3   0x013f7ba0  (void *masks_end@esi, uint8_t result@eax, uint8_t last_test@ecx)  # PD3 0x13f7b40, its loop's exit: result = no sounding string bends, slides, slides unpitched or tremolos, cl its last test
+seven_pd4   0x013f7be1  (void *masks_end@esi, uint8_t result@eax, uint8_t last_test@edx)  # PD4 0x13f7bb0, its loop's exit: result = every sounding string tremolos (byte 0x10), dl its last test
+seven_pd5   0x013f7c3e  (void *slides_end@esi, int extreme@eax, int distance@ecx, uint32_t fret@edx)  # PD5 0x13f7bf0 (the extreme slide distance), its loop's exit: esi = eval + 0xbec + 6
+
+# chdraw
+seven_b1   0x01323ada  (void *geom@eax, void *chord@[ebp+0x8], void *session@[ebp+0xc])                                       # B1
+seven_b2   0x0132fff2  (void *component@edi, float *scale@[esp], float *translate@[esp+0x4], uint32_t from@[ebp+0x4])  # B2
+
+# diagrams
+seven_dgb    0x010db3dc  (void *song@[ebp+0x8], void *attributes@[esp+0x50])                                  # DGB
+seven_dgm    0x012d8168  (void *object@[esp+0x50], void *frets@[esp+0x5c], void *fingers@[esp+0x58], uint8_t capo@[esp+0x3f], void *attributes@[ebp+0xc], void *chord@[ebp+0x10])  # DGM
+seven_dgs    0x012d8baf  (void *holder@[ebp+0x8], void *template@[ebp+0xc])                                    # DGS
+seven_tp13   0x012d8398  (void *template@eax, void *templates@edx, uint32_t id@[ebp+0xc])                     # TP13
+
+# names
+seven_tj             0x010ee100  (void *raw@ecx, void *display@edx, void *tuning@[esp+0x4], int cents@[esp+0x8], uint32_t sp@esp)  # TJ the manifest resolver's entry: the 7-string key and the six offsets, before the Tuning is released
+seven_tj_ret         0x010ee85f  (uint32_t sp@esp)  # TJ its return: the raw token and the display text of a 7-string tuning
+seven_tut            0x010edbb8  (void *tuning@edi, void *attributes@[ebp-0x88], void *out@[ebp-0x94], uint32_t frame@ebp)  # TUT the arrangement's Tuning and Attributes (CentOffset) and the output, for its return
+seven_tu_ret         0x010ee036  (void *out@eax, uint32_t sp@esp)  # TU its return: the display text of a 7-string tuning
+seven_tn_ret         0x01138ffe  (void *out@eax, const int *offsets@[esp+0x8])  # TN its return with a matched name: the 7-string name
+seven_tn_ret_custom  0x0113911e  (void *out@eax, const int *offsets@[esp+0x8])  # TN its return without one: the 7-string name, or CUSTOM TUNING marked
+
+# headstock
+seven_al1           0x01028bf6  (void *res@eax, const char *name@[ebp+0x08], const void *buf@[ebp+0x0c], uint32_t size@[ebp+0x10])  # AL1
+seven_pgh1          0x010c3eec  (void *mesh@ebx) -> skip=0x010c409a                                    # PGH1
+
+# plain
+plain_pp_sngd  0x010da084  (const uint8_t *src@[esp], uint32_t len@[esp+0x4], uint8_t *out@[esp+0x10], uint32_t out_len@[esp+0x14], uint8_t ok@eax) -> done=0x010da089  # PP_SNGD the song file loader 0x10d9f80's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, cdecl: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped

@@ -1185,3 +1185,51 @@ game_color_manager                                               0x1018fa868  da
 detection_service                                                0x1018e8da0  data  void *  # set by its constructor 0x10021ab70, cleared by its destructors 0x10021abb0 and 0x10021abd0
 nicamera_vtable                                                  0x101841d60  data  void *[]
 efd_str_destroy                                                  0x10000a060  sysv  void(void *s)  # unless +0x18 is the string's +0x10: efd_free of the text and its size, the flag 0x10193a8d0 set around it, as in every inlined copy; Learn & Play's 0x14d5910 is the same; here it is the static strings' destructor (__cxa_atexit)
+# --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
+guitar_rebuild_player0 unsupported Seven-String Guitar: not ported to the Mac game yet
+guitar_string_attach_point unsupported Seven-String Guitar: not ported to the Mac game yet
+tuner_manager unsupported Seven-String Guitar: not ported to the Mac game yet
+tuner_peg_names unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_song_select unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_guitarcade unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_guitarcade2 unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_lessons unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_session_tuner unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_session_tuner2 unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_session_start unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_session_start2 unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_technique_hub unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_tuner_menu unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_store_tuner_menu2 unsupported Seven-String Guitar: not ported to the Mac game yet
+entity_set_translation unsupported Seven-String Guitar: not ported to the Mac game yet
+entity_set_scale unsupported Seven-String Guitar: not ported to the Mac game yet
+render_world unsupported Seven-String Guitar: not ported to the Mac game yet
+world_entity_root unsupported Seven-String Guitar: not ported to the Mac game yet
+fretgrid_ctor unsupported Seven-String Guitar: not ported to the Mac game yet
+efd_allocator unsupported Seven-String Guitar: not ported to the Mac game yet
+standard_tuning unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_apply_matcher_ret unsupported Seven-String Guitar: not ported to the Mac game yet
+tuning_apply_detection_ret unsupported Seven-String Guitar: not ported to the Mac game yet
+play_get_detection unsupported Seven-String Guitar: not ported to the Mac game yet
+player_tuner_low_note_limit unsupported Seven-String Guitar: not ported to the Mac game yet
+matcher_sort unsupported Seven-String Guitar: not ported to the Mac game yet
+matcher_candidate_less unsupported Seven-String Guitar: not ported to the Mac game yet
+matcher_subharmonics unsupported Seven-String Guitar: not ported to the Mac game yet
+tracker_eval_release unsupported Seven-String Guitar: not ported to the Mac game yet
+gemgeom_build_span_ret unsupported Seven-String Guitar: not ported to the Mac game yet
+json_key_intern unsupported Seven-String Guitar: not ported to the Mac game yet
+json_object_set unsupported Seven-String Guitar: not ported to the Mac game yet
+localize_texts unsupported Seven-String Guitar: not ported to the Mac game yet
+service_holder unsupported Seven-String Guitar: not ported to the Mac game yet
+nif_mem_handler unsupported Seven-String Guitar: not ported to the Mac game yet
+dds_stream_handler unsupported Seven-String Guitar: not ported to the Mac game yet
+nf_adapter_dtor unsupported Seven-String Guitar: not ported to the Mac game yet
+nf_adapter_vtable unsupported Seven-String Guitar: not ported to the Mac game yet
+nf_adapter_read_fn unsupported Seven-String Guitar: not ported to the Mac game yet
+nf_adapter_write_fn unsupported Seven-String Guitar: not ported to the Mac game yet
+mem_file_vtable unsupported Seven-String Guitar: not ported to the Mac game yet
+fixed_string_create unsupported Seven-String Guitar: not ported to the Mac game yet
+mesh_float_extra unsupported Seven-String Guitar: not ported to the Mac game yet
+mesh_colour_extra unsupported Seven-String Guitar: not ported to the Mac game yet
+pegs_apply_transforms unsupported Seven-String Guitar: not ported to the Mac game yet
+# --- Seven-String Guitar: end

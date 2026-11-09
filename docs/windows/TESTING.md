@@ -217,6 +217,17 @@ The route (`key` left out; `front` before each one, `HOME` and `CFFIXED_USER_HOM
   account owns no DLC, so Down to the first song with no DLC tag (Brannan Street Blues here), Return, Return on Play Song. The tuner is up about 35 s later;
   `fwddelete`, Return, and the note highway about 25 s after that.
 
+**Leaving a song.** A scripted run that starts a song mostly ends with it playing, so the code that frees a song isn't run. Esc in a
+song opens the pause menu: RESUME, RESTART, TUNER, MIXER, CHORDS, EXIT (TUNER and MIXER greyed without an input); Down to EXIT and
+Return leave the song. With rearmed-mods' Seven-String Guitar, `RS_MODS_LOG=1` logs `chords: SNG ... freed` for each song file
+freed. On a loaded machine a song may end by itself a few seconds in ([PLAN.md](PLAN.md#open-issues)): look at `uptime` before
+taking it for a change's doing.
+
+**7-string charts** (rearmed-mods' Seven-String Guitar, 2026-11-09): the log has `[rc] edits seven_string: on (735)` and
+`seven-string: on, 128 mid points` at the start; a chart then logs its RS7X block (`chords: SNG ...: RS7X v1 block`), its tuning's
+name (`names: ... -> "B STANDARD 7STR"`), the guitar rebuilt with 7 strings and the headstock bound. The snapshots show the seventh
+string, grey, above the low E.
+
 **Title logo** (`RS_REARMED`, as on the Mac): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026"
 tag across REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. No keys are needed: with
 `RS_GL_SNAPSHOT_SECS=3` the title is in the snapshots by about 30 s, on a busy Mac too. `static.psarc` in

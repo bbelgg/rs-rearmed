@@ -69,6 +69,10 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
+- **7-string charts**: rearmed-mods' Seven-String Guitar and Plain Packages on this edition, as they run in Learn & Play
+  ([Windows plan](../windows/PLAN.md#status)). The 64-bit front end's edits and mid points need a test of their own first;
+  then the Mac's tables. Fewer places than Learn & Play's: here the string colors and the fret grid's cells go through a few
+  functions of their own, where the Windows build inlines them, though some of the six-string loops are unrolled.
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
   hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

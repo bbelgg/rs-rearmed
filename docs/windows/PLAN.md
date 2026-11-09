@@ -17,6 +17,15 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **The note counts and the grey-note time** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status). Here the counts' fields are matched by the code that counts a hit and a miss (0xfd4459, 0xfd4a82: hits +0x30, misses +0x40, the track +0xc). The track's times (the song position +0x3d0, the grey-note time +0x3dc) were read in runs (2026-11-09): the grey-note time is RSMods' and is raised to the song position at each pause. A path to the counts from a song's menu (+0x2c, +0x78, +0x24) held in two runs and not in a third, so the counts are reached as RSMods reaches them, from the UI manager (`ui_note_stats_0` to `_3`: +0xb0, +0x18, +0x4, +0x84), the same counts in the runs, in Learn a Song, playing and paused. Score Attack counts in another object here (RSMods' ScoreAttackNoteData), which that path doesn't reach: not matched yet.
 - **A hook on the tone change** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); here `tone_change` takes its `this` in ecx and the player in eax, the tone on the stack (`ret 4`), at the function RSMods patches (0x1352620): checked against its code (2026-11-09). This edition's build of 2026-11-09 wraps it, and the game ran on it to Learn a Song with rearmed-mods loaded and no refusal; no mod hooked it there yet.
 - **A hook on the song lists' names** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); here `song_list_name` takes the name's string in edi and the list in ecx, at the function RSMods patches (0x10d2470), and `efd_str_destroy` is 0x14d5910 (`thiscall`). The registers checked against the code (2026-11-09), and the same build wraps it; played on the Mac with Custom Song List Titles, not yet here.
+- **Edits and mid points** (new after 1.11.0): a mod changes a function from the inside ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)).
+  The tables carry rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string) (`seven_string`: 735 edits,
+  127 mid points), and Plain Packages (`plain_packages`: 2 edits, 1 mid point). Run 2026-11-09 with rearmed-mods' branch: a six-string song
+  played and was freed as before; DotCharter's 7-string chart showed seven strings and chord frames over the low B, named its tuning
+  B STANDARD 7STR in the song list, on the song's page and in the tuner, and loaded from an unencrypted copy. Played with a guitar by the
+  maintainer the same day, a chart played through several times: it works; that session's log has the song's 7-string chord diagrams
+  and the seven-peg headstock shown, and no fault.
+  Those runs found a hook's game call leaving ecx changed for the code after its point (a crash freeing a song's vocals): a point now puts
+  back the registers its hooks didn't set.
 - **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does. A start with the intro skip switched off in the file played the intro (2026-11-09).
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
@@ -63,6 +72,10 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   memory (`win32_guestobj.c`), but the audio and D3D9 faces still each keep their own table of objects and
   their own `IUnknown` (D3D9's also has internal references and forwarded counts).
 - Guitar latency against the Mac port has not been measured.
+- **A song ending a few seconds in** (2026-11-09): with the machine loaded (load average about 30, other builds running), a song went back
+  to its page soon after it started in most runs, with Seven-String Guitar and Plain Packages switched off too, and the profile was saved
+  as at a song's end. No game exception came with it (`RC32_LOG_RAISE`). Other runs at the same load played the same songs. Not looked
+  into further.
 - **CPU and memory**: about 1.1 ms a frame over the Mac edition on one route, and 1.3 GB against 0.9 GB; with 1.10.0's 4x MSAA, 1.5 GB against 1.2 GB
   ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition), 2026-11-08). The memory order costs about 1 ms a frame at the display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
 - **Shaders the list doesn't have**: the corpus has the programs seen in runs, and the Guitarcade's games wait for a guitar at

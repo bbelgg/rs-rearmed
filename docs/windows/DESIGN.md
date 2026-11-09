@@ -470,6 +470,13 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   fields and the search key. A mod finds its settings in the game folder: with mods the installed app goes to `LP_GAME_DIR`,
   the Mac's working directory, before it loads them. A mod's strings and results are memory from `rc_guest_alloc`.
 
+  Where a hook point would take a whole function, a mod can change one from the inside: edit groups it switches on in
+  its constructor, and mid points it hooks (`tools/targets/win-x86/edits.map` and `mids.map`,
+  [recompiler](../recompiler/README.md#overrides-and-hook-points)). The tables have two groups, both for rearmed-mods:
+  `seven_string`, its Seven-String Guitar after rs7string (735 edits and 127 mid points: the game's arrays for six
+  strings grown to eight, the chord records, the tuner, the tuning names, the headstock), and `plain_packages`, its
+  Plain Packages (2 edits and a mid point on the song file's decrypt). The Mac's tables have none yet.
+
   The network rule holds with mods in the folder. `win32_net.c` answers the game's own calls, but a mod is
   native code, so before anything else the app looks whether it has mods to load and, if so, starts itself again
   with `libnetguard.dylib` inserted (from its own `Contents/MacOS`; dyld inserts only at a start), which is

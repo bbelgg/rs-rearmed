@@ -416,3 +416,51 @@ nicamera_vtable            # NiCamera's vtable, as an object's first word holds 
 game_color_manager         # GameColorManager, the game's colors by name: the string colors are in its table (game_color_table)
 detection_service          # DetectionService, the guitar's pitch detection: its detector has the note the player plays (detection_note)
 efd_str_destroy            # efd string's destructor (string *): frees its text when it isn't inline (efd_str_inline); the fields stay as they were
+# --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
+guitar_rebuild_player0
+guitar_string_attach_point
+tuner_manager
+tuner_peg_names
+tuning_store_song_select
+tuning_store_guitarcade
+tuning_store_guitarcade2
+tuning_store_lessons
+tuning_store_session_tuner
+tuning_store_session_tuner2
+tuning_store_session_start
+tuning_store_session_start2
+tuning_store_technique_hub
+tuning_store_tuner_menu
+tuning_store_tuner_menu2
+entity_set_translation
+entity_set_scale
+render_world
+world_entity_root
+fretgrid_ctor
+efd_allocator
+standard_tuning
+tuning_apply_matcher_ret
+tuning_apply_detection_ret
+play_get_detection
+player_tuner_low_note_limit
+matcher_sort
+matcher_candidate_less
+matcher_subharmonics
+tracker_eval_release
+gemgeom_build_span_ret
+json_key_intern
+json_object_set
+localize_texts
+service_holder
+nif_mem_handler
+dds_stream_handler
+nf_adapter_dtor
+nf_adapter_vtable
+nf_adapter_read_fn
+nf_adapter_write_fn
+mem_file_vtable
+fixed_string_create
+mesh_float_extra
+mesh_colour_extra
+pegs_apply_transforms
+# --- Seven-String Guitar: end

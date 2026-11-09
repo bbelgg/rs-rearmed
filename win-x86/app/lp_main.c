@@ -51,6 +51,7 @@
 // ~/Library/Caches/rs-rearmed/learn-play/metal), beside the Mac edition's .../rs-rearmed/metal.
 #include <CoreFoundation/CoreFoundation.h>
 #include <dirent.h>
+#include <dlfcn.h>
 #include <errno.h>
 #include <limits.h>
 #include <mach-o/dyld.h>
@@ -368,9 +369,10 @@ static int installed_defaults(void) {
   return 1;
 }
 
-// a fault in translated code: say where in the guest window it was
+// a fault in translated code: say where in the guest window it was, and the host stack from the fault: the pc, the
+// link register, then the frame-pointer chain (the translated functions are F_<guest address>: `atos -o rs2014_lp
+// -l LOAD PC...` names them)
 static void on_fault(int sig, siginfo_t *si, void *uc) {
-  (void)uc;
   uint8_t *a = si->si_addr;
   char m[160];
   int n;
@@ -379,6 +381,20 @@ static void on_fault(int sig, siginfo_t *si, void *uc) {
   else
     n = snprintf(m, sizeof m, "\nlp: signal %d: host address %p\n", sig, (void *)a);
   write(2, m, (size_t)n);
+  const ucontext_t *u = uc;
+  if (u && u->uc_mcontext) {
+    const uint64_t *fp = (const uint64_t *)u->uc_mcontext->__ss.__fp;
+    Dl_info self = {0};
+    dladdr((const void *)on_fault, &self);  // this executable's load address (not image 0: libnetguard is inserted)
+    n = snprintf(m, sizeof m, "lp: stack (atos -l %p): %llx %llx", self.dli_fbase,
+                 (unsigned long long)u->uc_mcontext->__ss.__pc, (unsigned long long)u->uc_mcontext->__ss.__lr);
+    write(2, m, (size_t)n);
+    for (int k = 0; k < 48 && fp && !((uintptr_t)fp & 7) && fp[1]; k++, fp = (const uint64_t *)fp[0]) {
+      n = snprintf(m, sizeof m, " %llx", (unsigned long long)fp[1]);
+      write(2, m, (size_t)n);
+    }
+    write(2, "\n", 1);
+  }
   signal(sig, SIG_DFL);
 }
 

@@ -86,7 +86,12 @@ def main():
         if a.list or not a.out_dir:
             print(f"{ent[1]:12d}  {name}")
             continue
-        dst = os.path.join(a.out_dir, name.lstrip("/"))
+        # an archive's names are its maker's: one that leads out of OUT_DIR (`..`) is not written
+        root = os.path.realpath(a.out_dir)
+        dst = os.path.realpath(os.path.join(root, name.lstrip("/")))
+        if os.path.commonpath([root, dst]) != root or dst == root:
+            print(f"skipped (outside {a.out_dir}): {name}", file=sys.stderr)
+            continue
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         with open(dst, "wb") as o:
             o.write(read_entry(f, bs, zsizes, ent))

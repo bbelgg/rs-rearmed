@@ -32,7 +32,7 @@
 #      and no image from an earlier run, it stops before this step and says how to make a capture.
 #   4. The build (win-x86/install/lp_build.py): the game and the DLLs translated to C and compiled,
 #      libRSOpenGL, the Win32 seam, the runtime and the app linked into one arm64 binary, in
-#      $RS_BUILD_DIR/win-x86/lp. About 26 minutes the first time on an M2 (most of it translating the game)
+#      $RS_BUILD_DIR/win-x86/lp. About 25 minutes the first time on an M2 (most of it translating the game)
 #      and about 2 GB free; a stopped run continues where it was, and each translation is redone only
 #      when its input or the translator changed. It also makes the "Re-ARMed 2026" title logo in the copy,
 #      game/static.psarc.rearmed (tools/loadscreen, RS_REARMED=0 not; its Python packages need the network once).

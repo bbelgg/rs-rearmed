@@ -21,7 +21,7 @@ src="$RS_GAME_DIR/static.psarc"
 [[ -f "$RS_GAME_DIR/static.psarc.original" ]] && src="$RS_GAME_DIR/static.psarc.original"
 
 if [[ -z "${RS_PY:-}" ]]; then
-    venv="${TMPDIR:-/tmp}/rs-loadscreen-venv"
+    venv="${RS_BUILD_DIR:-$RS_ROOT/build}/loadscreen-venv"  # the build's own folder, not one others can write
     [[ -x "$venv/bin/python" ]] || python3 -m venv "$venv"
     "$venv/bin/python" -c "import PIL, numpy, etcpak" 2>/dev/null || "$venv/bin/pip" -q install 'pillow<13' 'numpy<3' 'etcpak<1'
     RS_PY="$venv/bin/python"

@@ -1102,6 +1102,7 @@ class InstallerWindow: NSWindow {
     let stepLabel = NSTextField(labelWithString: "Ready")
     let progressLabel = NSTextField(labelWithString: "")
     let logView = NSTextView()
+    var shownLog = ""   // what logView has of the runner's log (updateUI)
     // What the user has to do now, between the progress and the log (runner.guideCode).
     let guideBox = NSBox()
     let guideTitle = NSTextField(labelWithString: "")
@@ -1667,9 +1668,19 @@ class InstallerWindow: NSWindow {
         rendererPopup.isEnabled = !runner.isRunning && selectedGame == "mac"
         showLogButton.isHidden = runner.logFileURL == nil
 
+        // Ten times a second: only what the log grew by is added (a build's log is thousands of lines, and
+        // setting all of it lays all of it out again); a log that is another one (a new build) is set whole.
         let logText = runner.log
-        if logView.string != logText {
-            logView.string = logText
+        if logText != shownLog {
+            if !shownLog.isEmpty, logText.hasPrefix(shownLog), let storage = logView.textStorage {
+                let more = String(logText[logText.index(logText.startIndex, offsetBy: shownLog.count)...])
+                storage.append(NSAttributedString(string: more, attributes: [
+                    .font: logView.font ?? NSFont.monospacedSystemFont(ofSize: 11, weight: .regular),
+                    .foregroundColor: logView.textColor ?? NSColor.textColor]))
+            } else {
+                logView.string = logText
+            }
+            shownLog = logText
             logView.scrollToEndOfDocument(nil)
         }
     }

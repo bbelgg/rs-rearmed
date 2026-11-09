@@ -108,9 +108,11 @@ printf '%s\n' "$renderer" > "$home/renderer"
 rm -f "$home/metal-session"  # a new build: Metal's crash count starts again
 
 # The launcher app: launch.sh, run by a small program of its own (launch-stub.c says why).
+# Compiled before the old launcher goes: a compiler that fails leaves the app the player starts in place.
+clang -O2 -o "$home/launch.new" "$here/launch-stub.c"
 rm -rf "$launcher"
 mkdir -p "$launcher/Contents/MacOS" "$launcher/Contents/Resources"
-clang -O2 -o "$launcher/Contents/MacOS/launch" "$here/launch-stub.c"
+mv -f "$home/launch.new" "$launcher/Contents/MacOS/launch"
 cp "$here/launch.sh" "$launcher/Contents/Resources/launch.sh"
 chmod +x "$launcher/Contents/Resources/launch.sh"
 [[ -f "$RS_GAME_APP/Contents/Resources/RS2014.icns" ]] && cp "$RS_GAME_APP/Contents/Resources/RS2014.icns" "$launcher/Contents/Resources/"

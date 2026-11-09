@@ -46,6 +46,13 @@ for k in "${settings_keys[@]}"; do [[ -n ${!k:-} ]] && echo "$k=${!k}"; done
 [[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}"
 echo "RS_NETGUARD=${RS_NETGUARD-unset}"
 """
+# The Mac launcher's --env pairs: what open gives the game besides launchd's environment, one word a line.
+MAC_ARGS = r"""
+set -u
+eval "$SNIPPET"
+settings_env "$1"
+[[ ${#settings_args[@]} == 0 ]] || printf '%s\n' "${settings_args[@]}"
+"""
 
 
 def read(path):
@@ -110,16 +117,23 @@ class Readers(unittest.TestCase):
     def tearDownClass(cls):
         shutil.rmtree(cls.tmp, ignore_errors=True)
 
-    def run_both(self, content, env=None):
-        """Both readers on a file with CONTENT (None: no file), with ENV; their outputs, which must agree."""
+    def write(self, content):
+        """The made-up settings.env with CONTENT (None: no file); its path."""
         path = os.path.join(self.tmp, "settings.env")
         if os.path.exists(path):
             os.unlink(path)
         if content is not None:
             with open(path, "w", newline="") as f:
                 f.write(content)
-        base = {"PATH": "/usr/bin:/bin", "HOME": self.tmp}
-        base.update(env or {})
+        return path
+
+    def env(self, env=None):
+        return dict({"PATH": "/usr/bin:/bin", "HOME": self.tmp}, **(env or {}))
+
+    def run_both(self, content, env=None):
+        """Both readers on a file with CONTENT (None: no file), with ENV; their outputs, which must agree."""
+        path = self.write(content)
+        base = self.env(env)
         mac = subprocess.run(["/bin/bash", "-c", BASH, "test", path], capture_output=True, text=True,
                              env=dict(base, SNIPPET=launch_snippet()))
         self.assertEqual(mac.returncode, 0, mac.stderr)
@@ -175,6 +189,19 @@ class Readers(unittest.TestCase):
     def test_on_is_allowed(self):
         self.assertEqual(self.run_both("RS_MODS_BYPASS=1\n"),
                          ["RS_MODS_BYPASS=1", "[settings] RS_MODS_BYPASS=1", "RS_NETGUARD=unset"])
+
+    def test_mac_game_gets_what_is_logged(self):
+        # open starts the game with launchd's environment and the --env pairs, not the launcher's environment: a
+        # value the launcher was given another way (open --env, a Terminal) reaches the game only as a pair, so
+        # the value the log says is used, the file's or the environment's, is always one. Learn & Play's reader
+        # sets its own process's environment, which the game is.
+        r = subprocess.run(["/bin/bash", "-c", MAC_ARGS, "test",
+                            self.write("RS_MODS_INTRO=0\nRS_MODS_OVERLAY=0\nRS_MODS_FIXES=0\nRS_NETGUARD=log\n")],
+                           capture_output=True, text=True,
+                           env=dict(self.env({"RS_MODS_INTRO": "1", "RS_MODS_OVERLAY": "0"}), SNIPPET=launch_snippet()))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stdout.splitlines(), ["--env", "RS_MODS_INTRO=1", "--env", "RS_MODS_OVERLAY=0",
+                                                 "--env", "RS_MODS_FIXES=0"])
 
 
 if __name__ == "__main__":

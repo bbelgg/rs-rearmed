@@ -68,10 +68,12 @@ mkdir -p "$logs" "$HOME_DIR/steam"
 # settings.env (docs/mac/INSTALL.md "Settings and switches"): the built-in mods switched off in the installer
 # (Built-in Mods...). Lines KEY=0 or KEY=1 of the keys below, whitespace ignored, # a comment; each is passed
 # to the game unless the environment has another value (launchctl setenv wins), and what was used goes at the
-# top of last-run.log. Learn & Play reads its own the same way (win-x86/app/lp_settings.c); the installer
-# writes both, and tools/play-native/test_settings.py checks the three lists agree.
+# top of last-run.log. A value that wins is passed too: open starts the game with launchd's environment, so one
+# this launcher was given some other way (open --env, a Terminal) would not reach it, though the log says it won.
+# Learn & Play reads its own the same way (win-x86/app/lp_settings.c); the installer writes both, and
+# tools/play-native/test_settings.py checks the three lists agree.
 settings_keys=(RS_MODS_BYPASS RS_MODS_FIXES RS_MODS_INTRO RS_MODS_AUTOSAVE RS_MODS_OVERLAY RS_MODS_MULTIPLAYER RS_REARMED)
-settings_env() {  # FILE -> settings_args (--env K=V for open, and K set here) and settings_log
+settings_env() {  # FILE -> settings_args (--env K=V for open, the value used) and settings_log; K set here
     settings_args=() settings_log=()
     local line k v seen=" "
     [[ -f $1 ]] || return 0
@@ -85,6 +87,7 @@ settings_env() {  # FILE -> settings_args (--env K=V for open, and K set here) a
             settings_log+=("[settings] ignored: $line (repeated)")
         elif [[ -n ${!k:-} && ${!k} != "$v" ]]; then
             seen+="$k "
+            settings_args+=(--env "$k=${!k}")
             settings_log+=("[settings] $k=$v not used: the environment has $k=${!k}")
         else
             seen+="$k "

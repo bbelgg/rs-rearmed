@@ -382,7 +382,7 @@ with `rc_mod.h`; the same dylib then runs in the Mac edition. How mods hook the 
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - It has had far less testing than the Mac port. Not tested yet: the Workshop
   beyond the tone designer, the DLC preview ([PLAN.md](PLAN.md#status)).
-- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 16 of the 19 hook
+- Mods: a mod has to be built with `rc_mod.h` (a library built without it is left out, with a line in the log). 17 of the 20 hook
   points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the Mac app exports beyond `rc_mod.h`, such as
   `ov_fn` (the mod then fails to load, with the reason in the log); change an event's arguments in `input_sink` (it can keep the
   event from the game); pass floating point arguments to `rc_call_guest` (`rc_call_name_f` can); call a

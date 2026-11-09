@@ -212,6 +212,7 @@ input_manager                                                    0x10133ddc0  sy
 input_by_name                                                    0x10131b9c0  sysv  void *(void *manager, const char *name)
 autosave_warning                                                 0x1005e7e10  sysv  void(void *, const char *, const char *)
 tone_change                                                      0x1002bebc0  sysv  void(void *self, int player, int tone)  # reads Meter_Tone_Balance's caller 0x1002be5a8; the same as Learn & Play's 0x1352620
+song_list_name                                                   0x1005dd8d0  sysv  bool(void *lists, void *out, int id)  # "$[36969]SONG LIST" built in line (0x1005dd999), localized, then " " and id - 1 appended, as Learn & Play's 0x10d2470 does; "$[36972]ALL SONGS" for 0, "$[36990]FAVORITES" for 1; six callers there and here
 autosave_signin_query                                            0x100a05a50  sysv  void *(void)
 steam_dlc_owned                                                  0x100a07800  sysv  bool(void *steam, int app)
 GCPauseManager_QueryInterface                                    0x1003e09a0  sysv  -
@@ -1183,3 +1184,4 @@ ui_manager                                                       0x1018ef7c8  da
 game_color_manager                                               0x1018fa868  data  void *  # set by its init at 0x1006e8d02, cleared by 0x1006e8d10, its destructor
 detection_service                                                0x1018e8da0  data  void *  # set by its constructor 0x10021ab70, cleared by its destructors 0x10021abb0 and 0x10021abd0
 nicamera_vtable                                                  0x101841d60  data  void *[]
+efd_str_destroy                                                  0x10000a060  sysv  void(void *s)  # unless +0x18 is the string's +0x10: efd_free of the text and its size, the flag 0x10193a8d0 set around it, as in every inlined copy; Learn & Play's 0x14d5910 is the same; here it is the static strings' destructor (__cxa_atexit)

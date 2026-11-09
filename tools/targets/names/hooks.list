@@ -22,3 +22,4 @@ input_mode_is_cable # (int player) -> bool: the player is in Real Tone mode; the
 input_bind          # (int input, int force): finds a slot for an input (0 Player 1's guitar, 2 Player 2's); mods.c (Player 2's saved input)
 autosave_warning    # UI event handler (menu, category, event): shows the Auto Save warning dialog; mods.c skips it
 tone_change         # (tone system, int player, int tone): asks for a player's tone; waits while a change is under way (tone_change_busy); rearmed-mods' Prevent Buggy Tones
+song_list_name      # (song lists, efd string *out, int id) -> bool: names a song list for the menus ("SONG LIST 1"; 0 All Songs, 1 Favorites, 2 the first of the profile's lists); rearmed-mods' Custom Song List Titles

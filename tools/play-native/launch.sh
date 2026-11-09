@@ -5,9 +5,9 @@
 #     tools/play-native/gamefiles.py; complete when .rearmed/manifest.json is there, else this asks for a
 #     refresh; for a game on another drive game/ is a link to the copy on that drive, and when the drive is
 #     not connected this says so), with this build's Rocksmith2014.app (the shell takes the folder that holds the .app as the
-#     game root), an offline Rocksmith.ini made from the copy of the install's ([Net] AutoLogin=0,
-#     [Renderer.MacOS] DisableBrowser=1, [Audio] LatencyBuffer from $RS_LATENCY_BUFFER or the game's own
-#     saved choice) and static.psarc linked to the "Re-ARMed 2026" title logo (static.psarc.rearmed) when
+#     game root), an offline Rocksmith.ini (the game's own saved one, else the copy of the install's, else
+#     a new one, with [Net] AutoLogin=0 and [Renderer.MacOS] DisableBrowser=1 forced in it, and [Audio]
+#     LatencyBuffer from $RS_LATENCY_BUFFER or the game's own saved choice) and static.psarc linked to the "Re-ARMed 2026" title logo (static.psarc.rearmed) when
 #     it is there, else to the original. A Steam update, uninstall or library move changes none of it;
 #   - the Steam shim runs in stub mode with its cloud in $HOME_DIR/steam: on the first launch it is
 #     seeded with a copy of the real Steam/userdata/<account>/221680/remote (profiles,
@@ -31,7 +31,9 @@ stage=$HOME_DIR/game
 logs=$HOME_DIR/logs
 
 fail() {
-    /usr/bin/osascript -e "display alert \"RS Re-ARMed\" message \"$1\" as critical" >/dev/null 2>&1
+    # the text as an argument, not as script: it can have a drive's or a folder's name, quotes and all
+    /usr/bin/osascript -e 'on run a' -e 'display alert "RS Re-ARMed" message (item 1 of a) as critical' -e 'end run' \
+        -- "$1" >/dev/null 2>&1
     echo "launch: $1" >&2
     exit 1
 }
@@ -113,20 +115,25 @@ lb=${RS_LATENCY_BUFFER:-}
               sec == "[Audio]" && sub(/^LatencyBuffer=/, "") { print; exit }' "$stage/Rocksmith.ini" 2>/dev/null)
 [[ $lb =~ ^([1-9]|1[0-6])$ ]] || lb=
 # What the game saved stays (a run showed the game writes all of its settings to this file): the copy's ini from
-# Steam's folder is only the start. The keys below are forced either way.
+# Steam's folder is only the start. The keys below are forced either way: in a file that lacks the key or its
+# section too, and with no file at all (Steam's folder has none until the game has run there once), where the
+# game would start with its defaults, AutoLogin on. The game takes its defaults for every key a file lacks.
 ini=$stage/Rocksmith.ini
 [[ -f $ini ]] || ini=$stage/.rearmed/Rocksmith.ini
-if [[ -f $ini ]]; then
-    awk -v lb="$lb" '{ sub(/\r$/, "") }
-         /^\[/ { sec = $0 }
-         sec == "[Net]" && /^AutoLogin=/ { next }
-         sec == "[Renderer.MacOS]" && /^DisableBrowser=/ { print "DisableBrowser=1"; next }
-         sec == "[Audio]" && lb != "" && /^LatencyBuffer=/ { next }
-         { print }
-         $0 == "[Net]" { print "AutoLogin=0" }
-         $0 == "[Audio]" && lb != "" { print "LatencyBuffer=" lb }' "$ini" > "$stage/Rocksmith.ini.new" &&
-        mv -f "$stage/Rocksmith.ini.new" "$stage/Rocksmith.ini"
-fi
+[[ -f $ini ]] || ini=/dev/null
+awk -v lb="$lb" '{ sub(/\r$/, "") }
+     /^\[/ { sec = $0 }
+     sec == "[Net]" && /^AutoLogin=/ { next }
+     sec == "[Renderer.MacOS]" && /^DisableBrowser=/ { next }
+     sec == "[Audio]" && lb != "" && /^LatencyBuffer=/ { next }
+     { print }
+     $0 == "[Net]" { print "AutoLogin=0"; net = 1 }
+     $0 == "[Renderer.MacOS]" { print "DisableBrowser=1"; ren = 1 }
+     $0 == "[Audio]" && lb != "" { print "LatencyBuffer=" lb; aud = 1 }
+     END { if (!net) print "[Net]\nAutoLogin=0"
+           if (!ren) print "[Renderer.MacOS]\nDisableBrowser=1"
+           if (!aud && lb != "") print "[Audio]\nLatencyBuffer=" lb }' "$ini" > "$stage/Rocksmith.ini.new" &&
+    mv -f "$stage/Rocksmith.ini.new" "$stage/Rocksmith.ini"
 
 # First launch: seed the offline cloud with a copy of the real Steam saves (every account that has
 # Rocksmith saves), leaving out `crd`, so the shim's own seeding (which copies, then deletes crd)
@@ -159,10 +166,11 @@ else
 fi
 
 # The Steam facts the copy recorded (the installed DLC, the language, the account), unless set already
-# (launchctl setenv).
+# (launchctl setenv). Those four only, as Learn & Play's steam_env_defaults: the file never chooses the Steam
+# layer's mode, folder or library, or keeps the stored credentials (settings.env can't either).
 steam_env=()
 while IFS='=' read -r k v; do
-    [[ $k =~ ^RS_STEAM_[A-Z_]+$ && -n $v && -z ${!k:-} ]] && steam_env+=(--env "$k=$v")
+    [[ $k =~ ^RS_STEAM_(DLC|OWNED|LANGUAGE|ID)$ && -n $v && -z ${!k:-} ]] && steam_env+=(--env "$k=$v")
 done < <(grep -v '^#' "$stage/.rearmed/steam.env" 2>/dev/null)
 # The account: RS_STEAM_ID set, else the one the copy recorded (the account whose license has the Mac game,
 # whoever is logged in to Steam now), else without Steam's list of accounts (Steam uninstalled) the account

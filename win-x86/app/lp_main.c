@@ -176,7 +176,8 @@ static void title_logo(const char *game) {
     fprintf(stderr, "lp: static.psarc not linked to %s: %s\n", want, strerror(errno));
 }
 
-// game/.rearmed/steam.env: KEY=VALUE lines, RS_STEAM_* only, each unless set already. Lines of any
+// game/.rearmed/steam.env: KEY=VALUE lines, the four the copy records only (as the Mac launcher: the file never
+// chooses the Steam layer's folder or keeps the stored credentials), each unless set already. Lines of any
 // length: RS_STEAM_DLC lists every owned DLC and every AppID the song archives carry.
 static void steam_env_defaults(const char *game) {
   char p[PATH_MAX], *line = NULL;
@@ -187,8 +188,11 @@ static void steam_env_defaults(const char *game) {
   while (getline(&line, &cap, f) > 0) {
     line[strcspn(line, "\r\n")] = 0;
     char *eq = strchr(line, '=');
-    if (!eq || strncmp(line, "RS_STEAM_", 9) || !eq[1]) continue;
+    if (!eq || !eq[1]) continue;
     *eq = 0;
+    if (strcmp(line, "RS_STEAM_DLC") && strcmp(line, "RS_STEAM_OWNED") && strcmp(line, "RS_STEAM_LANGUAGE") &&
+        strcmp(line, "RS_STEAM_ID"))
+      continue;
     setenv(line, eq + 1, 0);
   }
   free(line);
@@ -389,9 +393,14 @@ static void on_fault(int sig, siginfo_t *si, void *uc) {
     n = snprintf(m, sizeof m, "lp: stack (atos -l %p): %llx %llx", self.dli_fbase,
                  (unsigned long long)u->uc_mcontext->__ss.__pc, (unsigned long long)u->uc_mcontext->__ss.__lr);
     write(2, m, (size_t)n);
-    for (int k = 0; k < 48 && fp && !((uintptr_t)fp & 7) && fp[1]; k++, fp = (const uint64_t *)fp[0]) {
+    // a caller's frame is above its callee's: a chain that doesn't go up is not one (a register the fault left
+    // as something else), and reading on would fault here
+    for (int k = 0; k < 48 && fp && !((uintptr_t)fp & 7) && fp[1]; k++) {
       n = snprintf(m, sizeof m, " %llx", (unsigned long long)fp[1]);
       write(2, m, (size_t)n);
+      const uint64_t *up = (const uint64_t *)fp[0];
+      if (up <= fp) break;
+      fp = up;
     }
     write(2, "\n", 1);
   }

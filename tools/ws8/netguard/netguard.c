@@ -2,14 +2,22 @@
 // game (and anything loaded into it) from reaching the network. The game's own
 // network imports are connect, gethostbyname, sendto, socket and system (curl
 // for UbiServices, Quazal over UDP, `system("open <url>")` for web pages); the
-// interposed set below also covers the other common entry points.
+// interposed set below also covers the other common entry points of libc. It
+// does not cover the resolver library (res_query), dns_sd (DNSService*) or
+// CFHost: nothing of the game or the port calls them, and whatever address
+// they gave would still be refused at connect and sendto.
 //
 //   allowed   AF_UNIX, loopback (127/8, ::1) and unspecified-destination sends
 //             on already-connected sockets (their connect was checked)
 //   refused   any other connect/connectx/sendto/sendmsg: -1, errno ENETUNREACH
-//             name lookups: gethostbyname* -> NULL (h_errno HOST_NOT_FOUND),
-//             getaddrinfo -> EAI_NONAME, except for literal loopback/localhost
-//             system() and popen() of a command that opens a URL
+//             (an address shorter than its family's is not local)
+//             name lookups: gethostbyname*, getipnodebyname -> NULL
+//             (HOST_NOT_FOUND), getaddrinfo -> EAI_NONAME, except for literal
+//             loopback/localhost; the reverse ones for an address that is not
+//             this machine's: gethostbyaddr -> NULL, getnameinfo answers with
+//             the number and asks nobody
+//             system() and popen() of a command that opens a URL (any
+//             scheme://, www., or the `open` command)
 //
 // Every decision is logged. Environment:
 //   RS_NETGUARD_LOG=<file>   log file (default: stderr)
@@ -69,13 +77,18 @@ __attribute__((constructor)) static void netguard_init(void) {
 // Returns 1 for destinations that stay on this machine.
 static int is_local(const struct sockaddr *sa, socklen_t len, char *desc, size_t dsz) {
     if (!sa) { snprintf(desc, dsz, "(none)"); return 1; }
+    // The caller's length is what the kernel reads: nothing past it is looked at here (a path that fills
+    // sun_path has no NUL), and an address too short for its family is not taken as local.
+    if (len < offsetof(struct sockaddr, sa_data)) { snprintf(desc, dsz, "address of %u bytes", (unsigned)len); return 0; }
     switch (sa->sa_family) {
-    case AF_UNIX:
-        snprintf(desc, dsz, "unix:%s", len > offsetof(struct sockaddr_un, sun_path)
-                                           ? ((const struct sockaddr_un *)sa)->sun_path : "");
+    case AF_UNIX: {
+        size_t at = offsetof(struct sockaddr_un, sun_path);
+        snprintf(desc, dsz, "unix:%.*s", len > at ? (int)(len - at) : 0, ((const struct sockaddr_un *)sa)->sun_path);
         return 1;
+    }
     case AF_INET: {
         const struct sockaddr_in *in = (const void *)sa;
+        if (len < sizeof *in) { snprintf(desc, dsz, "inet address of %u bytes", (unsigned)len); return 0; }
         char a[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &in->sin_addr, a, sizeof a);
         snprintf(desc, dsz, "%s:%u", a, ntohs(in->sin_port));
@@ -83,6 +96,7 @@ static int is_local(const struct sockaddr *sa, socklen_t len, char *desc, size_t
     }
     case AF_INET6: {
         const struct sockaddr_in6 *in6 = (const void *)sa;
+        if (len < sizeof *in6) { snprintf(desc, dsz, "inet6 address of %u bytes", (unsigned)len); return 0; }
         char a[INET6_ADDRSTRLEN];
         inet_ntop(AF_INET6, &in6->sin6_addr, a, sizeof a);
         snprintf(desc, dsz, "[%s]:%u", a, ntohs(in6->sin6_port));
@@ -105,9 +119,9 @@ static void log_bt(void) {
     int n = backtrace(f, 32);
     intptr_t slide = _dyld_get_image_vmaddr_slide(0);
     for (int i = 2; i < n; i++) {
-        Dl_info di;
+        Dl_info di = {0};  // a frame in no image (translated code keeps no frame pointer chain) leaves it so
         const char *img = dladdr(f[i], &di) && di.dli_fname ? strrchr(di.dli_fname, '/') : NULL;
-        if (di.dli_fbase == _dyld_get_image_header(0))
+        if (di.dli_fbase && di.dli_fbase == _dyld_get_image_header(0))
             logf_("    #%d main 0x%lx", i - 2, (unsigned long)((uintptr_t)f[i] - slide));
         else
             logf_("    #%d %s %s+0x%lx", i - 2, img ? img + 1 : "?", di.dli_sname ? di.dli_sname : "",
@@ -189,9 +203,68 @@ static int rs_getaddrinfo(const char *node, const char *serv, const struct addri
 }
 RS_INTERPOSE(rs_getaddrinfo, getaddrinfo);
 
+// The older lookup by name, and the reverse lookups: an address that is not this machine's is not asked about.
+static struct hostent *rs_getipnodebyname(const char *name, int af, int flags, int *err) {
+    if (!lookup_allowed("getipnodebyname", name, __builtin_return_address(0))) {
+        if (err) *err = HOST_NOT_FOUND;
+        return NULL;
+    }
+    return getipnodebyname(name, af, flags, err);
+}
+RS_INTERPOSE(rs_getipnodebyname, getipnodebyname);
+
+static int local_addr(int af, const void *addr, socklen_t len, char *desc, size_t dsz) {
+    snprintf(desc, dsz, "family %d", af);
+    if (!addr) return 0;
+    if (af == AF_INET && len >= sizeof(struct in_addr)) {
+        inet_ntop(AF_INET, addr, desc, (socklen_t)dsz);
+        return *(const uint8_t *)addr == 127;
+    }
+    if (af == AF_INET6 && len >= sizeof(struct in6_addr)) {
+        const struct in6_addr *a6 = addr;
+        inet_ntop(AF_INET6, addr, desc, (socklen_t)dsz);
+        return IN6_IS_ADDR_LOOPBACK(a6) || (IN6_IS_ADDR_V4MAPPED(a6) && a6->s6_addr[12] == 127);
+    }
+    return 0;
+}
+
+static struct hostent *rs_gethostbyaddr(const void *addr, socklen_t len, int af) {
+    char d[INET6_ADDRSTRLEN + 16];
+    if (!local_addr(af, addr, len, d, sizeof d)) {
+        logf_("%s gethostbyaddr %s caller=%p", g_log_only ? "W" : "B", d, __builtin_return_address(0));
+        log_bt();
+        if (!g_log_only) { h_errno = HOST_NOT_FOUND; return NULL; }
+    }
+    return gethostbyaddr(addr, len, af);
+}
+RS_INTERPOSE(rs_gethostbyaddr, gethostbyaddr);
+
+static int rs_getnameinfo(const struct sockaddr *sa, socklen_t salen, char *host, socklen_t hostlen, char *serv,
+                          socklen_t servlen, int flags) {
+    char d[256];
+    if (host && hostlen && !(flags & NI_NUMERICHOST) && !is_local(sa, salen, d, sizeof d)) {
+        logf_("%s getnameinfo %s caller=%p", g_log_only ? "W" : "B", d, __builtin_return_address(0));
+        log_bt();
+        if (!g_log_only) {
+            if (flags & NI_NAMEREQD) return EAI_NONAME;
+            flags |= NI_NUMERICHOST;
+        }
+    }
+    return getnameinfo(sa, salen, host, hostlen, serv, servlen, flags);
+}
+RS_INTERPOSE(rs_getnameinfo, getnameinfo);
+
 // --- shell-outs that open web pages (system("open http://...")) -----------------
+// A URL of any scheme (steam://, ftp://), a bare www. address, or the `open` command, which takes a bare address
+// or a file that is a link to one.
 static int opens_url(const char *cmd) {
-    return cmd && (strstr(cmd, "http://") || strstr(cmd, "https://") || strstr(cmd, "www."));
+    if (!cmd) return 0;
+    if (strstr(cmd, "://") || strstr(cmd, "www.")) return 1;
+    for (const char *p = cmd; (p = strstr(p, "open")); p += 4) {
+        int starts = p == cmd || strchr(" \t;&|(/'\"", p[-1]) != NULL;
+        if (starts && (p[4] == ' ' || p[4] == '\t')) return 1;
+    }
+    return 0;
 }
 
 static int rs_system(const char *cmd) {

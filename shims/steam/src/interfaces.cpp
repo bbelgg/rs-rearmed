@@ -14,6 +14,7 @@
 #include <copyfile.h>
 #include <dirent.h>
 #include <errno.h>
+#include <removefile.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -83,12 +84,24 @@ static std::string remote_dir() {
         std::string src = c.steam_root + "/userdata/" + std::to_string(account_id()) + "/" +
                           std::to_string(c.app_id) + "/remote";
         mkdirs(app_data_dir());
-        if (is_dir(src) && copyfile(src.c_str(), dir.c_str(), nullptr, COPYFILE_ALL | COPYFILE_RECURSIVE) == 0) {
-            shim_log("seeded %s from %s", dir.c_str(), src.c_str());
-            drop_credentials(dir);
-        } else {
-            mkdirs(dir);
+        // Copied beside its place and renamed, the credentials dropped first: a copy that stops half way (no
+        // room, a file that can't be read) is taken away, so the game never has a `crd` or part of the saves,
+        // and the saves start empty as they do without Steam's (the log says why).
+        std::string tmp = dir + ".seedtmp";
+        removefile(tmp.c_str(), nullptr, REMOVEFILE_RECURSIVE);
+        if (is_dir(src)) {
+            if (copyfile(src.c_str(), tmp.c_str(), nullptr, COPYFILE_ALL | COPYFILE_RECURSIVE) == 0) {
+                drop_credentials(tmp);
+                if (rename(tmp.c_str(), dir.c_str()) == 0) {
+                    shim_log("seeded %s from %s", dir.c_str(), src.c_str());
+                    return;
+                }
+            }
+            shim_log("could not seed %s from %s (%s): the saves start empty", dir.c_str(), src.c_str(),
+                     strerror(errno));
+            removefile(tmp.c_str(), nullptr, REMOVEFILE_RECURSIVE);
         }
+        mkdirs(dir);
     });
     return dir;
 }
@@ -191,8 +204,9 @@ public:
             r.m_eResult = k_EResultOK;
         }
         buf.resize(r.m_cubRead);
-        SteamAPICall_t h = shim_post_call_result(r.k_iCallback, &r, sizeof r, true);
+        // the lock before the result is there to see: another thread that finds the call complete finds its bytes
         std::lock_guard<std::recursive_mutex> lock(g_mutex);
+        SteamAPICall_t h = shim_post_call_result(r.k_iCallback, &r, sizeof r, true);
         async_reads_[h].swap(buf);
         return h;
     }

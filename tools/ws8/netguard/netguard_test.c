@@ -53,8 +53,35 @@ int main(void) {
 
     r = system("true https://netguard-test.invalid/");
     CHECK(r == (127 << 8), "system() with a URL blocked (r=%d)", r);
+    r = system("true steam://store/221680");
+    CHECK(r == (127 << 8), "system() with a URL of another scheme blocked (r=%d)", r);
+    r = system("true; open netguard-test.invalid/page");
+    CHECK(r == (127 << 8), "system() with the open command blocked (r=%d)", r);
     r = system("true");
     CHECK(r == 0, "plain system() allowed (r=%d)", r);
+    r = system("true reopened");
+    CHECK(r == 0, "system() with open inside a word allowed (r=%d)", r);
+
+    // the older lookup, and the reverse ones: TEST-NET-1 is not asked about, loopback is this machine
+    int he = 0;
+    CHECK(getipnodebyname("netguard-test.invalid", AF_INET, 0, &he) == NULL && he == HOST_NOT_FOUND,
+          "getipnodebyname refused (err=%d)", he);
+    CHECK(gethostbyaddr(&far.sin_addr, sizeof far.sin_addr, AF_INET) == NULL, "gethostbyaddr of 192.0.2.1 refused");
+    char host[NI_MAXHOST] = "";
+    r = getnameinfo((struct sockaddr *)&far, sizeof far, host, sizeof host, NULL, 0, 0);
+    CHECK(r == 0 && !strcmp(host, "192.0.2.1"), "getnameinfo of 192.0.2.1 answers with the number (r=%d %s)", r, host);
+    r = getnameinfo((struct sockaddr *)&far, sizeof far, host, sizeof host, NULL, 0, NI_NAMEREQD);
+    CHECK(r == EAI_NONAME, "getnameinfo that needs a name refused (r=%d)", r);
+    struct sockaddr_in here = {.sin_len = sizeof here, .sin_family = AF_INET, .sin_addr.s_addr = htonl(INADDR_LOOPBACK)};
+    r = getnameinfo((struct sockaddr *)&here, sizeof here, host, sizeof host, NULL, 0, 0);
+    CHECK(r == 0, "getnameinfo of loopback allowed (r=%d)", r);
+
+    // an address shorter than its family's is not taken as local
+    u = socket(AF_INET, SOCK_DGRAM, 0);
+    errno = 0;
+    n = sendto(u, "x", 1, 0, (struct sockaddr *)&far, 4);
+    CHECK(n == -1 && errno == ENETUNREACH, "sendto with a cut address refused (n=%zd errno=%d)", n, errno);
+    close(u);
 
     printf("%s (%d failures)\n", failures ? "FAILED" : "ok", failures);
     return failures != 0;

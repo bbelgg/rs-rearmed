@@ -26,6 +26,8 @@
 //   RC_LOG_UNRESOLVED  rc_image logs every unresolved bind and its statistics
 //   RC_TRACE_INITS=1   print each initializer before running it
 //   RS_STEAM_MODE      defaults to "stub" (the game must not call home)
+// Network guard: a start without libnetguard in the process (not the launcher's) starts again with the
+// install's inserted (netguard_start; RC_NETGUARD_START marks the second start).
 #include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
 #include <fcntl.h>
@@ -229,6 +231,43 @@ static int renderer_check(char **argv) {
   return 0;
 }
 
+// The network guard on a start that is not the launcher's (the game's app opened from the Finder, a debugger):
+// the launcher inserts libnetguard (launch.sh), and dyld only inserts at a start, so without it in the process
+// this one starts again with the install's guard inserted, as Learn & Play does for its mods (lp_main.c). An
+// install whose guard then still isn't here does not run; a build with no install's guard to find (a build
+// folder's tests) says so and goes on, with the offline Steam layer and the online stub as they are.
+static int netguard_loaded(void) {
+  for (uint32_t k = 0, n = _dyld_image_count(); k < n; k++) {
+    const char *name = _dyld_get_image_name(k);
+    const char *s = name ? strrchr(name, '/') : NULL;
+    if (s && !strcmp(s + 1, "libnetguard.dylib")) return 1;
+  }
+  return 0;
+}
+
+static void netguard_start(char **argv) {
+  if (netguard_loaded()) return;
+  char b[1024], home[1024], guard[1100], log[1100], exe[4096];
+  int have = bundle_path(b, sizeof b);
+  uint32_t n = sizeof exe;
+  if (rsp_renderer_home(home, sizeof home, have ? b : NULL) &&
+      snprintf(guard, sizeof guard, "%s/libnetguard.dylib", home) < (int)sizeof guard && access(guard, R_OK) == 0) {
+    if (!getenv("RC_NETGUARD_START") && _NSGetExecutablePath(exe, &n) == 0) {
+      const char *inserted = getenv("DYLD_INSERT_LIBRARIES");
+      char *both = NULL;
+      if (inserted && *inserted && asprintf(&both, "%s:%s", guard, inserted) < 0) both = NULL;
+      setenv("DYLD_INSERT_LIBRARIES", both ? both : guard, 1);
+      snprintf(log, sizeof log, "%s/logs/netguard.log", home);
+      setenv("RS_NETGUARD_LOG", log, 0);
+      setenv("RC_NETGUARD_START", "1", 1);
+      execv(exe, argv);
+    }
+    fprintf(stderr, "[rc] the network guard (%s) did not load: the game does not run without it\n", guard);
+    exit(1);
+  }
+  fprintf(stderr, "[rc] no network guard in this process, and no install's libnetguard.dylib to start with\n");
+}
+
 // ---------------------------------------------------------------------------
 
 int main(int argc, char **argv, char **envp, char **apple) {
@@ -245,8 +284,10 @@ int main(int argc, char **argv, char **envp, char **apple) {
     else gargv[gargc++] = argv[i];
   }
   gargv[gargc] = 0;
-  // 0. the renderer, before anything heavy: may start this process again with RS_GL_BACKEND set.
+  // 0. the network guard, then the renderer, before anything heavy: each may start this process again
+  // (DYLD_INSERT_LIBRARIES, RS_GL_BACKEND).
   if (!init_only && !bind_only) {
+    netguard_start(argv);
     char b[1024];
     int have = bundle_path(b, sizeof b);
     rsp_renderer_startup(argv, have ? b : NULL, rsp_mtl_loaded_backend(), rsp_mtl_usable, RSP_RENDERER_SESSION);

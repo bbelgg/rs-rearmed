@@ -24,7 +24,7 @@ if [[ ${1:-} == --test ]]; then
         echo "== $arch"
         arch "-$arch" -e RS_NETGUARD_LOG="$log" -e DYLD_INSERT_LIBRARIES="$out/libnetguard.dylib" \
             "$out/netguard_test" || failed=1
-        [[ $(grep -c '^ *[0-9]* B ' "$log") -eq 5 ]] || { echo "FAIL: expected 5 blocked entries in the log"; cat "$log"; failed=1; }
+        [[ $(grep -c '^ *[0-9]* B ' "$log") -eq 12 ]] || { echo "FAIL: expected 12 blocked entries in the log"; cat "$log"; failed=1; }
         rm -f "$log"
     done
     [[ $failed -eq 0 ]] && echo "PASS: netguard blocks and logs on arm64 and x86_64" || { echo FAIL; exit 1; }

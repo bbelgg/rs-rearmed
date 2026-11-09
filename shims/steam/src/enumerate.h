@@ -30,6 +30,7 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
+#include <limits.h>
 #include <pthread.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -182,7 +183,11 @@ static void enumerate_one(EnumerateCopy &e, const std::string &from, const std::
     }
     enumerate_mkdirs(to.substr(0, to.rfind('/')));
     unlink(part.c_str());
-    if (copyfile(from.c_str(), part.c_str(), nullptr, COPYFILE_CLONE) != 0 || rename(part.c_str(), to.c_str()) != 0) {
+    // A link to an archive is copied as the archive: COPYFILE_CLONE copies a link as a link, which a relative
+    // one makes a dangling file here, copied again at every press.
+    char real[PATH_MAX];
+    const char *src = realpath(from.c_str(), real) ? real : from.c_str();
+    if (copyfile(src, part.c_str(), nullptr, COPYFILE_CLONE) != 0 || rename(part.c_str(), to.c_str()) != 0) {
         e.stop = errno == ENOSPC;
         enumerate_say(strerror(errno), rel);
         unlink(part.c_str());

@@ -108,3 +108,11 @@ detection_instrument              0x1300  # set at 0x10021bda0 from the input's 
 detection_note                    0x70c   # 0x10022dd05: compared with the note asked for
 detection_note_bass               0x704   # 0x10022dcf9
 tone_change_busy                  0xfe    # 0x1002bebed: a byte a player; set at 0x1002bec04, cleared at 0x1002bd602
+song_menu_game                    0x58    # read in runs: the same object from LearnASong_Game and _Pause, ScoreAttack_Game and _Pause
+song_game_player                  0x18    # read in runs
+player_note_stats                 0x30    # read in runs: the counts below, in Learn a Song and Score Attack
+note_stats_hits                   0x40    # a hit 0x1002542c5 (incl); the streak +0x44
+note_stats_misses                 0x50    # a miss 0x100254464 (incl); the miss streak +0x54, the streak cleared
+note_stats_track                  0x10    # 0x10025449b: [this + 0x10] after a miss; read in runs: the track below
+track_song_time                   0x4dc   # 0x1004380d5: what the grey time is raised to; read in runs: the song position
+track_grey_time                   0x4ec   # 0x1004380eb: raised to the song time (maxss), reset at 0x100437dd7; read in runs: the time of the last pause

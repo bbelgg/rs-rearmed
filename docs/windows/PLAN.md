@@ -14,6 +14,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
   ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
 - **The note the game hears** (new, not released): as in the [Mac plan](../mac/PLAN.md#status); here the names are RSMods' own chain on this game (`ptr_guitarSpeak`, the note at +0x5fc, a bass's at +0x5f4). Read on the Mac; not yet run here.
+- **The note counts and the grey-note time** (new, not released): as in the [Mac plan](../mac/PLAN.md#status). Here the counts' fields are matched by the code that counts a hit and a miss (0xfd4459, 0xfd4a82: hits +0x30, misses +0x40, the track +0xc); the path to them from a song's menu and the track's times are not yet, so the mods that use them stay off here.
 - **A hook on the tone change** (new, not released): as in the [Mac plan](../mac/PLAN.md#status); here `tone_change` takes its `this` in ecx and the player in eax, at the function RSMods patches (0x1352620). Not yet run.
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel

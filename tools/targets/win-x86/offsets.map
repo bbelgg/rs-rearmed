@@ -110,6 +110,14 @@ detection_instrument              0x11ec  # set at 0x105cbe9; 0x1067189 compares
 detection_note                    0x5fc   # 0x1067190, RSMods' GetCurrentNote
 detection_note_bass               0x5f4   # 0x1067198
 tone_change_busy                  0x82    # 0x1352632 (cmpb $1); set at 0x135264f
+song_menu_game                    unsupported  not matched yet: RSMods reaches the counts another way, *0x1ee062c +0xb0 +0x18 +0x4 +0x84
+song_game_player                  unsupported  not matched yet, with song_menu_game
+player_note_stats                 unsupported  not matched yet, with song_menu_game
+note_stats_hits                   0x30    # a hit 0xfd4459 (addl); the streak +0x34; RSMods' LearnASongNoteData
+note_stats_misses                 0x40    # a miss 0xfd4a82 (addl); the miss streak +0x44, the streak cleared (+0x34)
+note_stats_track                  0xc     # 0xfd4a79: [this + 0xc] after a miss, where the Mac reads +0x10 (0x10025449b)
+track_song_time                   unsupported  not matched yet
+track_grey_time                   unsupported  not matched yet: RSMods' grey note timer is +0x3dc of *0x1ee062c +0x68 +0x10 +0x2c +0x28, not yet shown to be this object
 input_slot                        0xc     # 0x11decca: [eax + 0xc]
 autosave_menu                     0x14    # 0x120aece: the slot's reference at +4 (0x120aedd), not the Mac's +8
 autosave_timer                    0x20    # 0x120af2f: 4.0 from 0x1d18d48

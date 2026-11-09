@@ -120,3 +120,11 @@ detection_instrument        # pitch detection: u32 instrument, 2 = bass
 detection_note              # pitch detection: s32 the note played (MIDI), a guitar's
 detection_note_bass         # pitch detection: s32 the note played (MIDI), a bass's
 tone_change_busy            # the tone system: a byte a player, a tone change under way (tone_change waits on it)
+song_menu_game              # a song's menu, playing or paused (Learn a Song, Score Attack): the song's game object
+song_game_player            # the song's game object: Player 1's
+player_note_stats           # the player: the note counts (RSMods' LearnASongNoteData)
+note_stats_hits             # note counts: s32 notes hit
+note_stats_misses           # note counts: s32 notes missed
+note_stats_track            # note counts: the player's track, the object with the song's times
+track_song_time             # the track: float, the song position it is at, in seconds
+track_grey_time             # the track: float, the time notes before it are grey and not detected (RSMods' grey note timer)

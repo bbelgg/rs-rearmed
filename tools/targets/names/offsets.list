@@ -128,3 +128,7 @@ note_stats_misses           # note counts: s32 notes missed
 note_stats_track            # note counts: the player's track, the object with the song's times
 track_song_time             # the track: float, the song position it is at, in seconds
 track_grey_time             # the track: float, the time notes before it are grey and not detected (RSMods' grey note timer)
+ui_note_stats_0             # RSMods' path to the note counts from the UI manager, where a song's menu doesn't lead to them: 1st
+ui_note_stats_1             # RSMods' path to the note counts: 2nd
+ui_note_stats_2             # RSMods' path to the note counts: 3rd
+ui_note_stats_3             # RSMods' path to the note counts: 4th, the counts (player_note_stats' object)

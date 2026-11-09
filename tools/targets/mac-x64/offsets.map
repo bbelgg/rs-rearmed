@@ -116,3 +116,7 @@ note_stats_misses                 0x50    # a miss 0x100254464 (incl); the miss 
 note_stats_track                  0x10    # 0x10025449b: [this + 0x10] after a miss; read in runs: the track below
 track_song_time                   0x4dc   # 0x1004380d5: what the grey time is raised to; read in runs: the song position
 track_grey_time                   0x4ec   # 0x1004380eb: raised to the song time (maxss), reset at 0x100437dd7; read in runs: the time of the last pause
+ui_note_stats_0                   unsupported  the Mac's counts are reached from the song's menu (song_menu_game)
+ui_note_stats_1                   unsupported  as ui_note_stats_0
+ui_note_stats_2                   unsupported  as ui_note_stats_0
+ui_note_stats_3                   unsupported  as ui_note_stats_0

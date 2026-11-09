@@ -343,9 +343,13 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 The game must never call home.
 
 - `game.offline.no_network` (CTest): the online stub and the crypto import no network function.
-- `tools/ws8/netguard/build.sh --test`: the guard refuses non-local connections, host-name lookups and URL
-  opens.
+- `tools/ws8/netguard/build.sh --test`: the guard refuses non-local connections (a cut address too), host-name
+  lookups (`gethostbyname`, `getaddrinfo`, `getipnodebyname`), reverse lookups of an address that is not this
+  machine's, and URL opens (any scheme, the `open` command); loopback, `localhost` and a plain command pass. 17
+  checks on each architecture, 12 refusals in the log.
 - In a game run, `logs/netguard.log` lists every refused attempt; a run from the title to a song should add
-  nothing unexpected. The launcher refuses to start without `libnetguard.dylib`.
+  nothing unexpected. The launcher refuses to start without `libnetguard.dylib`, and the game's app started
+  directly starts again with the install's guard inserted (not run in the game yet: check `netguard.log` says
+  `mode=block` after opening `game/Rocksmith2014.app` from the Finder).
 - The Steam layer runs in stub mode (`RS_STEAM_MODE=stub` in the launcher): it never loads Valve's library.
   `crd` is never copied into `steam/` and is deleted from a copy before each launch.

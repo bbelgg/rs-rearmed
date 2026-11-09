@@ -62,6 +62,14 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the
   Retina mouse in songs, and a fresh player's first answer to macOS's
   question about another disk with the compiled launcher (an earlier Allow covered the one run).
+- From the code review of 2026-11-09, read from the code and not measured or fixed: on Metal a draw waits
+  without a priority boost for a shader compile a utility-priority worker has started; every draw rebuilds its
+  pipeline key and vertex bindings (the dirty bits are set and never read); pixel data for a
+  `GL_R11F_G11F_B10F` texture is not converted; an import call with a callback argument takes one
+  process-wide lock (`rc_tramp.c`); the Steam layer's `auto` mode (not the app's, which is `stub`) loses
+  callbacks registered before a failed `SteamAPI_Init`; a refresh onto a volume with coarse file times
+  hashes every file again. The standalone installer runs the source it downloads by tag with no check of what
+  it got beyond the archive being whole.
 - The installer keeps its preferences in the user's defaults even when run with a test `HOME`
   ([TESTING.md](TESTING.md#installer-tests)).
 

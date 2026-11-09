@@ -368,7 +368,10 @@ are native (`win32_overrides.c`).
 
 The Win32 seam is offline too: ws2_32, iphlpapi and wininet refuse every connection (`win32_net.c`), and
 `ShellExecuteA` opens nothing. Without mods the Mac port's network guard is not loaded, and has nothing to guard: no
-host socket call is linked into the binary (`nm -u` shows no `socket`, `connect` or `getaddrinfo`).
+host socket call is linked into the binary (`nm -u` shows no `socket`, `connect` or `getaddrinfo`). With mods it is the
+same library with the same rules ([Mac design](../mac/DESIGN.md#online-services)): the lookups and reverse lookups it
+refuses, the shell-outs, and what it does not cover. `select` with no timeout waits 100 ms and finds nothing ready, as
+with one.
 
 ## Input
 
@@ -545,7 +548,7 @@ choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, a
    stopped run and a later refresh fetch only the rest, and one that fails is named and doesn't stop the install.
 1b. **The game files** (`game-copy`, `game-refresh`; `tools/play-native/gamefiles.py`, shared with the Mac install): the app's own copy in `LP_HOME/game`, as Steam may clear its depot
    folder. It is the depot folder plus the PC archives `*_p.psarc` of its `dlc/` and the Mac game's `dlc/`, as APFS clones where it can. `.rearmed/manifest.json`, written last, marks it complete,
-   and `lp_main.c` refuses to start without it. `.rearmed/steam.env` carries the DLC, language, AppIDs and account, which `lp_main.c` sets as `RS_STEAM_*` defaults.
+   and `lp_main.c` refuses to start without it. `.rearmed/steam.env` carries the DLC, language, AppIDs and account, which `lp_main.c` sets as `RS_STEAM_*` defaults: those four keys (`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`) and no others, as the Mac launcher.
 2. **The Microsoft DLLs** (`redist`): from Steam's Common Redistributables on the Mac
    (`Steamworks Shared/_CommonRedist`: `vcredist/2010/vcredist_x86.exe`,
    `DirectX/Jun2010/Aug2009_d3dx9_42_x86.cab`, `Aug2009_D3DCompiler_42_x86.cab`), else Microsoft's two

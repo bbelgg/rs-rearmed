@@ -195,8 +195,24 @@ Enter on the title screen goes straight to the profile list, and requests get th
 when Ubisoft's servers are unreachable. `crd` is never read.
 
 `tools/ws8/netguard` is loaded into the game on every launch (the launcher refuses to start without it). It
-refuses every connection that is not local, every host-name lookup and every attempt to open a web page,
-and logs each to `logs/netguard.log`.
+refuses every connection that is not local (an address shorter than its family's counts as not local), every
+host-name lookup (`gethostbyname`, `gethostbyname2`, `getipnodebyname`, `getaddrinfo`; the reverse lookups
+`gethostbyaddr` and `getnameinfo` for an address that is not this machine's) and every attempt to open a web page
+(`system` and `popen` of a command with a URL of any scheme, a `www.` address or the `open` command), and logs
+each to `logs/netguard.log`. It does not cover the resolver library, dns_sd or CFHost, which nothing of the game
+or the port calls; an address from them would still be refused at the connection.
+
+A start that is not the launcher's (the game's app opened from the Finder or a debugger) has no guard inserted,
+as dyld inserts only at a start: the app then starts itself again with the install's `libnetguard.dylib`
+inserted (`rc_main.c`: `netguard_start`), as Learn & Play does before it loads mods, and does not run when the
+guard still isn't in the process. A build with no install's guard to find (a build folder's tests) says so in
+its log and runs with the other two layers.
+
+The launcher gives the game four keys of `game/.rearmed/steam.env` and no others (`RS_STEAM_DLC`,
+`RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`): the file never chooses the Steam layer's mode, folder or
+library, or keeps the stored credentials. It forces `[Net] AutoLogin=0` and `[Renderer.MacOS] DisableBrowser=1`
+in the game's `Rocksmith.ini` at every launch, also in a file that lacks the key or its section, and with no
+file at all (Steam's folder has none until the game has run there once) it writes one with just those.
 
 ## Libraries
 

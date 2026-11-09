@@ -590,7 +590,8 @@ libRSOpenGL's `RS_GL_*`, `RS_MTL_*` and `RS_METAL_*` switches apply as on the Ma
   (`win-x86/shims/win32_net.c`, `win32_misc.c`); with `LP_LOG=1` the log shows each attempt.
 - The Steam face never loads Valve's library and refuses the Ubisoft and Valve DLLs by name.
 - The online layer never reads `crd`; with `LP_LOG_FILES=1`, no `open "crd"` should appear in a run.
-- Without mods the Mac port's network guard is not loaded; these checks are the seam's own.
+- Without mods the Mac port's network guard is not loaded; these checks are the seam's own. The guard's own test is the
+  Mac's (`tools/ws8/netguard/build.sh --test`, [Mac testing](../mac/TESTING.md#tests-in-the-repository)): the same library is the one beside this app.
 - With a mod in `mods/` the app restarts with `libnetguard.dylib` inserted, and no mod runs without it
   ([Mods](#unattended-runs)); `logs/netguard.log` then lists every refused attempt.
   `tools/ws8/netguard/build.sh --test` tests the guard, as on the Mac.

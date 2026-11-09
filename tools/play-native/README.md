@@ -33,10 +33,11 @@ How it runs, every launch:
   written; native progress stays in `…/steam`. `crd` (stored Ubisoft credentials) is not copied, and
   any `crd` in the copy is deleted before each launch. Copying native progress back to the real saves
   is not planned (do it by hand, with a backup, only if you go back to playing under Rosetta).
-- **Your audio settings.** The `Rocksmith.ini` copy is made from the install's on every launch, but
-  `[Audio] LatencyBuffer` (the audio engine setting in the game's Audio settings, which the game saves
-  to the copy) is kept; `RS_LATENCY_BUFFER=N` (1-16, `launchctl setenv`) overrides it. See the latency
-  FAQ in the main README.
+- **Your audio settings.** The game's `Rocksmith.ini` in the copy is the game's own from its first save on
+  (the install's, when it has one, is only the start), `[Audio] LatencyBuffer` (the audio engine setting in the
+  game's Audio settings) with it; `RS_LATENCY_BUFFER=N` (1-16, `launchctl setenv`) overrides that. Every launch
+  forces `[Net] AutoLogin=0` and `[Renderer.MacOS] DisableBrowser=1` in it, and writes a file with just those
+  when there is none. See the latency FAQ in the main README.
 - **Your mods and assets.** The install's `cache.psarc` and the
   RS Re-ARMed title logo (`static.psarc.rearmed`, `tools/loadscreen`; `RS_REARMED=0` for the
   original) are used; the real Real Tone cable as usual.

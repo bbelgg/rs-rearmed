@@ -95,6 +95,15 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   same. So an install-time converter is simple in itself, but it needs the other platform's key, which is
   not in the game a player has here, and nothing from the game may be in this repository. Left for the
   maintainer to decide.
+- From the code review of 2026-11-09, read from the code and not measured or fixed: a guest thread's stack,
+  TEB and TLS blocks are never given back (`rc32_teb.c`, `win32_ksync.c`; the Mac runtime frees its own), so a
+  session that makes many short threads uses up the guest window; `rc32_alloc` clears every block it hands out,
+  which makes a thread's whole stack and a reserved region resident, under the arena lock; a guest path that
+  starts with `/` is taken as a host path as it is (`win32_kfile.c` `map_path`), past the user folder's
+  confinement; `HeapAlloc` clears a reused block's whole size class; each D3D call takes the process-wide object
+  lock before the device's; the function discovery sorts the whole function set once a candidate
+  (`x86_32.py`), minutes of the translation. The Mac plan lists what the shared renderer, the recompiler's
+  runtime and the installer have open from the same review ([Mac plan](../mac/PLAN.md#open-issues)).
 - D3DX paths not exercised yet: `D3DXCreateEffectCompiler`, `D3DXCreateTextureFromFileExA`, the cube and
   volume loaders, `D3DXSaveSurfaceToFileInMemory`, effects with textures.
 - Fixed function not implemented (logged once): vertex blending, sphere maps, bump mapping, user clip

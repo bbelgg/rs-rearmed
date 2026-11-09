@@ -109,7 +109,9 @@ its built-in fixes still name addresses in `win32_overrides.c`.
     the switch; else the two are branches that both go on at the end of the range. A mod switches a group on with
     `rc_edit_enable` in its constructor. The switches are fixed when the mods folder has loaded (`rc_mods.c`),
     before the game runs, so no object the game makes is seen by both. Off, the game runs as before: an edited
-    number costs a load and a select, a branch form a load and a branch.
+    number costs a load and a select, a branch form a load and a branch. `names/edits.list` holds at most 64
+    groups and `names/mids.list` 1,024 points (`RC_EDIT_GROUPS`, `RC_MID_POINTS`: the switches the generated code
+    indexes); `targets.py` and `check.py` refuse more, as the generators refuse more than 256 hook points.
   - A **mid point** (`mids.map`: `NAME ADDRESS (TYPE value@LOCATION, ...) [-> CONT=ADDRESS, ...]`) is a call before
     the instruction at ADDRESS when a mod has hooked it (`rc_mid_add_name`). The registers go to `rc_ctx` and the
     flags are packed; the hook reads and writes the point's values by name (`rc_mid_get`, `rc_mid_set`, and `_f`
@@ -119,7 +121,9 @@ its built-in fixes still name addresses in `win32_overrides.c`.
     built once reads it on every target. Without hooks a point costs a load and a branch. A hook may call game code
     (`OV_GUEST`), which leaves eax, ecx and edx (the SysV call-clobbered registers on the Mac) as the callee did:
     after the hooks every register and xmm register is put back as the point found it, but those a hook set with
-    `rc_mid_set` or `rc_mid_set_f`, so the code after the point reads its own.
+    `rc_mid_set` or `rc_mid_set_f`, so the code after the point reads its own. A name that is null or not the
+    point's, a point that is none and a hook that is null are refused with a log line, not read; a value is found
+    by its index in the table, so a hook on a busy path pays no walk of the table for each one it reads.
 
   The tables are checked where the function is translated: the old bytes must be the image's, a range must start
   and end on an instruction with no jump into it, the new bytes must decode to whole instructions, a continuation

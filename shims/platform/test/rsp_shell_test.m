@@ -16,8 +16,9 @@
 // failure; a 60 s watchdog exits 2.
 //
 // RSP_TEST_FULLSCREEN=1 also lets the engine go full screen for real (the
-// window goes borderless over the main screen for a moment). Off by default:
-// the request is checked but not honoured.
+// window goes borderless over its display for a moment; with a second display
+// attached, the test moves the window there first). Off by default: the
+// request is checked but not honoured.
 #import "rsp_shell.h"
 
 #include <OpenGL/gl.h>
@@ -339,22 +340,40 @@ static void run_tests(rsp_shell *sh) {
   CHECK(rsp_stub()->width == 1280 && rsp_stub()->height == 720, "timer restores %dx%d", rsp_stub()->width,
         rsp_stub()->height);
   CHECK(collect(base, 1) == 1 && (unsigned)g_rec[base].b == (0x80000000u | 'F'), "the key still reaches the engine");
+  // With a second display, full screen goes to the display the window is on: put the window on one
+  // that is not the primary display (the original went to (0, 0), the primary display's corner).
+  NSScreen *on = [w screen];
+  if (g_real_fullscreen && [[NSScreen screens] count] > 1) {
+    on = [[NSScreen screens] lastObject];
+    NSRect sf = [on frame];
+    [w setFrameOrigin:NSMakePoint(NSMidX(sf) - [w frame].size.width / 2, NSMidY(sf) - [w frame].size.height / 2)];
+    pump(0.3);
+    CHECK([w screen] == on, "window on the second display");
+  }
+  NSPoint windowed_at = [w frame].origin;
   [w sendEvent:key_event(w, NSEventTypeKeyDown, @"F", @"F", 3,
                          NSEventModifierFlagCommand | NSEventModifierFlagShift)];
   CHECK(g_nfs_requests >= 1 && g_fs_requests[0] == 1 && mc->CurrentSetting_FullScreen == YES,
         "second toggle requests full screen");
   if (g_real_fullscreen) {
     wait_for(^int { return mc->isInFullScreenMode; }, 3);
-    NSSize s = [[NSScreen mainScreen] frame].size;
-    CHECK(mc->isInFullScreenMode && [w styleMask] == NSWindowStyleMaskBorderless &&
-              NSEqualSizes([w frame].size, s),
-          "goFullScreen");
+    NSRect sf = [on frame];
+    NSSize s = sf.size;
+    CHECK(mc->isInFullScreenMode && [w styleMask] == NSWindowStyleMaskBorderless && NSEqualRects([w frame], sf),
+          "goFullScreen covers the window's display (%.0f,%.0f %.0fx%.0f)", [w frame].origin.x, [w frame].origin.y,
+          [w frame].size.width, [w frame].size.height);
     wait_for(^int { return rsp_stub()->width == (int)s.width; }, 3);
     CHECK(rsp_stub()->width == (int)s.width, "engine at screen size %d", rsp_stub()->width);
+    pump(0.5);  // a few timer ticks: the refit keeps the window where it is
+    CHECK(NSEqualRects([w frame], sf), "full screen stays on its display");
     [w sendEvent:key_event(w, NSEventTypeKeyDown, @"F", @"F", 3,
                            NSEventModifierFlagCommand | NSEventModifierFlagShift)];
     wait_for(^int { return !mc->isInFullScreenMode; }, 3);
     CHECK(!mc->isInFullScreenMode && ([w styleMask] & 15) == 15, "goWindow restores the style");
+    // Its left edge, on its display; macOS keeps the top of the full-screen frame on the screen, so the window
+    // comes back at the top of the display (the original's order of setFrameOrigin and setContentSize).
+    CHECK([w screen] == on && [w frame].origin.x == windowed_at.x, "goWindow puts the window back on its display (%.0f,%.0f)",
+          [w frame].origin.x, [w frame].origin.y);
     wait_for(^int { return rsp_stub()->width == 1280; }, 3);
   } else {
     rsp_set_display_mode(0, 1280, 720);

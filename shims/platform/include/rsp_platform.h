@@ -254,7 +254,7 @@ int rsp_cursor_policy(double now, double last_input, int *cursor_visible);
 enum { RSP_TIMER_NONE = 0, RSP_TIMER_GO_FULLSCREEN = 1, RSP_TIMER_GO_WINDOW = 2 };
 // 1. Mode switch: isInFullScreenMode != IsFullscreen() -> goFullScreen/goWindow.
 int rsp_timer_mode_switch(int in_fullscreen_mode, int engine_fullscreen);
-// 2. Engine full screen: the window frame differs from the main screen -> goFullScreen.
+// 2. Engine full screen: the window frame differs from its screen (the original: the main screen) -> goFullScreen.
 int rsp_timer_fullscreen_refit(double screen_w, double screen_h, double win_w, double win_h);
 // 3. Windowed: the content size differs from the engine resolution -> re-seat
 //    the view at the content size and push that size to the engine.

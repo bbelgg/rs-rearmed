@@ -157,9 +157,11 @@ static void follow_window(const char *why) {
 
 static void go_full(void) {
   if (g_full || native_full()) return;  // macOS full screen is full screen already
-  NSRect frame, visible;
-  CGFloat sc;
-  screen_info(&frame, &visible, &sc);
+  // The display the window is on, as the Mac edition's full screen (rsp_shell.m's rsp_window_screen): the
+  // main screen is the key window's, which can be another app's on another display.
+  NSScreen *on = g_win.screen;
+  if (!on) on = [NSScreen mainScreen];
+  NSRect frame = on ? on.frame : NSMakeRect(0, 0, 1920, 1080);
   g_win.styleMask = NSWindowStyleMaskBorderless;
   g_win.collectionBehavior = NSWindowCollectionBehaviorFullScreenNone;
   g_win.level = CGWindowLevelForKey(kCGMainMenuWindowLevelKey) + 1;

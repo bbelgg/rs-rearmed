@@ -231,7 +231,8 @@ tuning". Return on the tuner itself is Calibrate, which waits for the guitar.
 The game starts full screen (a borderless window over the main screen). Its own setting picks the mode, at
 once and without a restart: from the main menu, Space (Tools) > Options > Visual Settings > Windowed Mode,
 then Windowed, Non-Exclusive Fullscreen or Exclusive Fullscreen. Resolutions, below it, sets the size. It
-is saved as `[Renderer.Win32] Fullscreen` in `userdata/game/Rocksmith.ini`.
+is saved as `[Renderer.Win32] Fullscreen` in `userdata/game/Rocksmith.ini`. Full screen from a window covers
+the display the window is on, as in the [Mac edition](../mac/INSTALL.md#window-modes).
 
 In a window (Windowed Mode: Windowed), drag the edges to resize: the window takes any shape, and its new size
 becomes the game's resolution, as in the [Mac edition](../mac/INSTALL.md#window-modes). The green button or

@@ -227,6 +227,15 @@ static BOOL rsp_mode_pending(MainController *c) {
   return __atomic_load_n(&c->CurrentSetting_NeedsUpdate, __ATOMIC_ACQUIRE);
 }
 
+// Not in the original, which took the main screen's size (the screen of the key window, which can be another
+// app's) and put the window at (0, 0), the corner of the display with the menu bar: on a second display full
+// screen came out the wrong size or half on the other display. Full screen covers the display the window is on,
+// at that display's origin. With one display nothing changes. The main screen only for a window on none.
+static NSScreen *rsp_window_screen(NSWindow *w) {
+  NSScreen *s = w ? [w screen] : nil;
+  return s ? s : [NSScreen mainScreen];
+}
+
 @implementation OpenGLView
 
 - (NSOpenGLContext *)openGLContext {  // 0x1001841f0
@@ -659,14 +668,16 @@ static BOOL rsp_mode_pending(MainController *c) {
   windowStyleMask = [w styleMask];
   windowOrigin = w ? [w frame].origin : NSZeroPoint;
   windowLevel = [w level];
-  NSSize screen = [NSScreen mainScreen] ? [[NSScreen mainScreen] frame].size : NSZeroSize;
+  NSScreen *on = rsp_window_screen(w);  // before the style change moves the frame
+  NSRect sf = on ? [on frame] : NSZeroRect;
+  NSSize screen = sf.size;
   [w setStyleMask:NSWindowStyleMaskBorderless];
   [w setLevel:CGWindowLevelForKey(kCGMainMenuWindowLevelKey) + 1];
   [w setOpaque:YES];
   [w setHidesOnDeactivate:YES];
   [w setContentView:openGLView];
   [w setContentSize:screen];
-  [w setFrameOrigin:NSZeroPoint];
+  [w setFrameOrigin:sf.origin];
   [openGLView setFrame:NSMakeRect(0, 0, screen.width, screen.height)];
   [openGLView setNeedsDisplay:YES];
   [w makeKeyAndOrderFront:openGLView];
@@ -790,10 +801,12 @@ static BOOL rsp_mode_pending(MainController *c) {
   else if (sw == RSP_TIMER_GO_WINDOW) [self goWindow];
   NSWindow *w = [openGLView window];
   if (rsp_is_fullscreen()) {
-    // 2. full screen: keep the window the size of the main screen
-    NSSize s = [NSScreen mainScreen] ? [[NSScreen mainScreen] frame].size : NSZeroSize;
+    // 2. full screen: keep the window the size of its screen (not the main screen, as the original did: with
+    // another app's window key on another display, that is the other display's size)
+    NSScreen *on = w ? [w screen] : nil;
+    NSSize s = on ? [on frame].size : NSZeroSize;
     NSSize f = w ? [w frame].size : NSZeroSize;
-    if (rsp_timer_fullscreen_refit(s.width, s.height, f.width, f.height)) [self goFullScreen];
+    if (on && rsp_timer_fullscreen_refit(s.width, s.height, f.width, f.height)) [self goFullScreen];
   } else {
     // 3. windowed: a resized window becomes the engine resolution
     NSRect fr = w ? [w frame] : NSZeroRect;

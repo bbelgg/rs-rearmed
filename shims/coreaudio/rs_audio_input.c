@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <math.h>
+#include <os/lock.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -259,6 +260,47 @@ int rs_audio_input_entries(const AudioObjectID *devs, int n, int budget, rs_audi
       for (int c = 0; c < got[i] && k < max; c++, k++) out[k] = (rs_audio_entry){dev[i], got[i] < 2 ? -1 : c};
     }
   return k;
+}
+
+// The ids handed out, kept for the run: the I/O thread reads them without a lock (the count is published after
+// the id it covers), and a new one is added under the lock.
+static _Atomic uint32_t g_ids[RS_AUDIO_ENTRY_MAX_IDS];
+static _Atomic uint32_t g_n_ids;
+static os_unfair_lock g_ids_lock = OS_UNFAIR_LOCK_INIT;
+
+static int handed_out(uint32_t id) {
+  uint32_t n = atomic_load_explicit(&g_n_ids, memory_order_acquire);
+  for (uint32_t i = 0; i < n; i++)
+    if (atomic_load_explicit(&g_ids[i], memory_order_relaxed) == id) return 1;
+  return 0;
+}
+
+uint32_t rs_audio_entry_id(AudioObjectID dev, int channel) {
+  if (dev > RS_AUDIO_ENTRY_MAX_DEV || channel < 0 || channel > RS_AUDIO_ENTRY_MAX_CHANNEL) return 0;
+  uint32_t id = RS_AUDIO_ENTRY_BIT | dev << 8 | (uint32_t)(channel + 1);
+  if (handed_out(id)) return id;
+  os_unfair_lock_lock(&g_ids_lock);
+  uint32_t n = atomic_load_explicit(&g_n_ids, memory_order_relaxed);
+  if (!handed_out(id)) {
+    if (n < RS_AUDIO_ENTRY_MAX_IDS) {
+      atomic_store_explicit(&g_ids[n], id, memory_order_relaxed);
+      atomic_store_explicit(&g_n_ids, n + 1, memory_order_release);
+    } else {
+      static int told;
+      if (!told++) rs_audio_log("input list: %d entry ids handed out, the most for a run: no more channels listed",
+                                RS_AUDIO_ENTRY_MAX_IDS);
+      id = 0;
+    }
+  }
+  os_unfair_lock_unlock(&g_ids_lock);
+  return id;
+}
+
+int rs_audio_entry_of(uint32_t id, AudioObjectID *dev, int *channel) {
+  if (!(id & RS_AUDIO_ENTRY_BIT) || !handed_out(id)) return 0;
+  if (dev) *dev = (id & ~RS_AUDIO_ENTRY_BIT) >> 8;
+  if (channel) *channel = (int)(id & 0xff) - 1;
+  return 1;
 }
 
 // ------------------------------------------------------------------------------------------------

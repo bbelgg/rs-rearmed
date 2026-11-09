@@ -122,7 +122,8 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
 - each channel of an interface is an input of its own (`shims/coreaudio/rs_audio_input.c`, `audio_devs.c`). The game opens
   a device per slot, 10 at most, and lists what it opened, so a channel is a device to it: the list it reads has ids that
   hold the real device and the channel, the import thunks of the calls that take a device reach the real one, and only
-  the name and UID differ. The list is in priority order, as the game stops at 10. Two habits of the game had to be met:
+  the name and UID differ. Only ids the list handed out are taken apart (`rs_audio_entry_id`), as a device's own id can
+  have the same bit set: the test harness's virtual cable has `0x7a7a0001`. The list is in priority order, as the game stops at 10. Two habits of the game had to be met:
   it compares the device its I/O function gets with its own id, so `audio_chan.c` gives it that id, and it starts and
   stops its I/O by the function's address, which is the id only for a function's first registration on a device, so a
   channel's real id is kept and used in its place;

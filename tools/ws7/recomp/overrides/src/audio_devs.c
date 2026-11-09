@@ -18,8 +18,10 @@
 // pointer stays valid and equal pointers mean equal UIDs. RS_AUDIO_STABLE_UIDS=0 turns it off.
 //
 // The list of inputs (rs_audio_input.h): each is a device of its own to the game, which opens one per slot and lists
-// what it opened. A channel's id holds the real device and the channel, so nothing has to be kept; every call the game
-// makes with one reaches the real device (rs_audio_real_dev, in the import thunks) and only its name and UID differ.
+// what it opened. A channel's id holds the real device and the channel (rs_audio_entry_id); every call the game makes
+// with one reaches the real device (rs_audio_real_dev, in the import thunks) and only its name and UID differ. Only ids
+// the list handed out are taken apart: a device's own id can have the entry bit (the test harness's virtual cable,
+// 0x7a7a0001), and its calls then go to the device itself.
 // An I/O function gets the real device from the system: audio_chan.c gives the game its own id there, as it compares
 // them.
 #include <CoreAudio/CoreAudio.h>
@@ -32,13 +34,17 @@
 #include "audio.h"
 #include "rs_audio_input.h"
 
-#define ENTRY_ID 0x40000000u
-#define ENTRY_MAX_DEV 0x3fffffu  // what the id has room for
-#define ENTRY_MAX_CHANNEL 253
 #define MAX_LIST 128
 
-uint32_t rs_audio_real_dev(uint32_t id) { return id & ENTRY_ID ? (id & ~ENTRY_ID) >> 8 : id; }
-int rs_audio_entry_channel(uint32_t id) { return id & ENTRY_ID ? (int)(id & 0xff) - 1 : -1; }
+static int is_entry(uint32_t id) { return rs_audio_entry_of(id, NULL, NULL); }
+uint32_t rs_audio_real_dev(uint32_t id) {
+  AudioObjectID dev;
+  return rs_audio_entry_of(id, &dev, NULL) ? dev : id;
+}
+int rs_audio_entry_channel(uint32_t id) {
+  int channel;
+  return rs_audio_entry_of(id, NULL, &channel) ? channel : -1;
+}
 
 // The game starts and stops its I/O by the function's address, not by the id it was given. That is the same id
 // only for a function's first registration on a device, so a channel's own is kept here.
@@ -53,7 +59,7 @@ int32_t rs_audio_io_create(uint32_t id, void *proc, void *client, void *out) {
   AudioDeviceIOProcID got = NULL;
   OSStatus st = AudioDeviceCreateIOProcID(rs_audio_real_dev(id), proc, client, &got);
   if (out) *(AudioDeviceIOProcID *)out = got;
-  if (st != noErr || !(id & ENTRY_ID)) return st;
+  if (st != noErr || !is_entry(id)) return st;
   os_unfair_lock_lock(&g_procs_lock);
   int free_at = -1, i = 0;
   while (i < MAX_PROCS && g_procs[i].id != id) {
@@ -73,7 +79,7 @@ int32_t rs_audio_io_create(uint32_t id, void *proc, void *client, void *out) {
 
 int32_t rs_audio_io_destroy(uint32_t id, void *given) {
   void *proc = rs_audio_io_id(id, given);
-  if (id & ENTRY_ID) {
+  if (is_entry(id)) {
     os_unfair_lock_lock(&g_procs_lock);
     for (int i = 0; i < MAX_PROCS; i++)
       if (g_procs[i].id == id) g_procs[i].id = 0;
@@ -83,7 +89,7 @@ int32_t rs_audio_io_destroy(uint32_t id, void *given) {
 }
 
 void *rs_audio_io_id(uint32_t id, void *given) {
-  if (!(id & ENTRY_ID)) return given;
+  if (!is_entry(id)) return given;
   void *r = given;
   os_unfair_lock_lock(&g_procs_lock);
   for (int i = 0; i < MAX_PROCS; i++)
@@ -151,12 +157,12 @@ static uint32_t entry_list(AudioObjectID *out, uint32_t max) {
   int n = (int)(size / sizeof *devs);
   rs_audio_entry es[MAX_LIST];
   int m = rs_audio_input_entries(devs, n, rs_audio_entries_budget(), es, MAX_LIST);
-  uint32_t k = 0;
+  uint32_t k = 0, id;
   for (int i = 0; i < m && k < max; i++) {
     if (es[i].channel < 0)
       out[k++] = es[i].dev;
-    else if (es[i].dev <= ENTRY_MAX_DEV && es[i].channel <= ENTRY_MAX_CHANNEL)
-      out[k++] = ENTRY_ID | es[i].dev << 8 | (uint32_t)(es[i].channel + 1);
+    else if ((id = rs_audio_entry_id(es[i].dev, es[i].channel)))
+      out[k++] = id;
   }
   for (int i = 0; i < n && k < max; i++)
     if (!rs_audio_has_input(devs[i])) out[k++] = devs[i];
@@ -194,7 +200,7 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
   }
   uint32_t asked = size ? *size : 0;
   OSStatus st = AudioObjectGetPropertyData(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
-  if (st == noErr && a && obj & ENTRY_ID && size && data) {
+  if (st == noErr && a && is_entry(obj) && size && data) {
     if (a->mSelector == kAudioObjectPropertyName && *size == sizeof(CFStringRef) && *(CFStringRef *)data)
       *(CFStringRef *)data = entry_string(*(CFStringRef *)data, "%s channel %d", obj);
     else if (a->mSelector == kAudioDevicePropertyDeviceUID && *size == sizeof(CFStringRef) && *(CFStringRef *)data)

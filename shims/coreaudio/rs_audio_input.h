@@ -72,6 +72,18 @@ void rs_audio_entry_counts(const int *rank, const int *want, int m, int budget, 
 // 1 for the Real Tone cable.
 int rs_audio_is_cable(AudioObjectID dev);
 
+// An entry's id, for the Mac game, which takes each entry as a device of its own (audio_devs.c): the entry bit, the
+// device and the channel. A device's own id can have that bit too (the test harness's virtual cable is 0x7a7a0001),
+// so only ids handed out here are taken apart, and any other is a device. Up to RS_AUDIO_ENTRY_MAX_IDS in a run.
+#define RS_AUDIO_ENTRY_BIT 0x40000000u
+#define RS_AUDIO_ENTRY_MAX_DEV 0x3fffffu
+#define RS_AUDIO_ENTRY_MAX_CHANNEL 253
+#define RS_AUDIO_ENTRY_MAX_IDS 256
+// The id of channel (from 0) of dev; 0 when it has no room for them, or the run has handed out the most.
+uint32_t rs_audio_entry_id(AudioObjectID dev, int channel);
+// 1, with its device and channel, for an id rs_audio_entry_id handed out; else 0. For the I/O thread.
+int rs_audio_entry_of(uint32_t id, AudioObjectID *dev, int *channel);
+
 // An input's level. The game's calibration is a loop: it raises the level, 0..1, in small steps until its meter
 // reaches the top. It reaches a device through its input volume, which most interfaces don't have and which on the
 // others is the player's own setting. So any input but the cable has a level of ours, as a gain: 0.375, where the

@@ -218,6 +218,31 @@ static void test_clip(void) {
   CHECK(atomic_load(&st.frames) == 4 && atomic_load(&st.clips) == 1);
 }
 
+// Entry ids: only those handed out are taken apart. A device's own id with the entry bit, the test harness's virtual
+// cable's 0x7a7a0001, stays a device, as does one of the same shape the run never handed out.
+static void test_entry_ids(void) {
+  AudioObjectID dev = 0;
+  int ch = -2;
+  uint32_t id = rs_audio_entry_id(123, 4);
+  CHECK(id & RS_AUDIO_ENTRY_BIT);
+  CHECK(rs_audio_entry_of(id, &dev, &ch) && dev == 123 && ch == 4);
+  CHECK(rs_audio_entry_id(123, 4) == id);
+  CHECK(rs_audio_entry_id(123, 0) != id && rs_audio_entry_of(rs_audio_entry_id(123, 0), NULL, &ch) && ch == 0);
+  CHECK(!rs_audio_entry_of(0x7a7a0001u, &dev, &ch));
+  CHECK(!rs_audio_entry_of(RS_AUDIO_ENTRY_BIT | 77u << 8 | 3u, NULL, NULL));
+  CHECK(!rs_audio_entry_of(123, NULL, NULL));
+  CHECK(!rs_audio_entry_id(RS_AUDIO_ENTRY_MAX_DEV + 1, 0));
+  CHECK(!rs_audio_entry_id(5, RS_AUDIO_ENTRY_MAX_CHANNEL + 1));
+  CHECK(!rs_audio_entry_id(5, -1));
+  CHECK(rs_audio_entry_id(RS_AUDIO_ENTRY_MAX_DEV, RS_AUDIO_ENTRY_MAX_CHANNEL));
+  // the most for a run, then none, and those handed out still taken apart
+  int n = 3;
+  for (AudioObjectID d = 1000; rs_audio_entry_id(d, 0); d++) n++;
+  CHECK(n == RS_AUDIO_ENTRY_MAX_IDS);
+  CHECK(rs_audio_entry_id(123, 4) == id && rs_audio_entry_of(id, &dev, &ch) && dev == 123 && ch == 4);
+  CHECK(!rs_audio_entry_id(123, 5));
+}
+
 static void test_entry_counts(void) {
   enum { I = RS_AUDIO_RANK_INTERFACE, O = RS_AUDIO_RANK_OTHER, V = RS_AUDIO_RANK_VIRTUAL, C = RS_AUDIO_RANK_CABLE };
   int got[8];
@@ -299,6 +324,7 @@ int main(void) {
   test_take();
   test_clip();
   test_entry_counts();
+  test_entry_ids();
   test_switches();
   test_level();
   puts("rs_audio_input: ok");

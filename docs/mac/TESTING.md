@@ -129,7 +129,7 @@ user's, with a test profile.
 - **Fallback**: two forced kills (`kill -9`) of Metal starts in a row; the next start must use OpenGL, write
   `opengl` into `renderer` and `renderer-fallback.txt`; a clean quit removes `metal-session`.
 - **Full screen on a second display** (2026-11-09, a test install, a 4K TV at 1x beside the built-in screen): start the
-  executable with the network guard and the input injector, without the virtual cable (see the next point); the title is
+  executable with the network guard and the input injector; the virtual cable is not needed (see the next point); the title is
   enough. Move the window with System Events (`set position of window 1` of the process with the game's pid, to a point on
   the second display): computer use's background drag didn't move it. Keys need the game in front: System Events' `set
   frontmost` of the process, then `keystroke "f" using {command down, shift down}` (a background key from computer use
@@ -138,13 +138,13 @@ user's, with a test profile.
   snapshot; with another app in front the window hides and keeps that frame; Shift-Command-F again gives a 1280x720 window
   on the same display, at its top. The two crashes of the next point had moved that install to OpenGL: write `metal` back
   into its `renderer` and delete `renderer-fallback.txt`.
-- **The virtual cable isn't found** since the per-channel input list (7333a2a): its device id, `0x7a7a0001`, has the
-  bit the list marks its channel entries with (`0x40000000`, `audio_devs.c`), so its reads go to a device that doesn't
-  exist. Real devices' ids are small numbers. Until the device scan skipped a device whose UID can't be read, the game
-  then crashed at the title (`CFRelease() called with NULL`, two runs on 2026-11-09); now `RS_AUDIO_LOG=1` has `device
-  0x7a7a0001: its UID can't be read`, and the scan opens the other inputs. Until the cable takes another id, use a real
-  interface for checks that need input. In that run the title was the stock one, which the injector's reference (the
-  Re-ARMed title) doesn't match (difference 5.1), so `wait-title` never fired: look at a snapshot and go on by hand.
+- **The virtual cable** wasn't found from the per-channel input list (7333a2a) until only the ids the list hands out
+  were taken apart: its device id, `0x7a7a0001`, has the bit the list marks its channel entries with (`0x40000000`), so
+  its reads went to a device that doesn't exist, and the game crashed at the title (`CFRelease() called with NULL`, two
+  runs on 2026-11-09) until the device scan skipped a device whose UID can't be read. Now `RS_AUDIO_LOG=1` has `input
+  device 2054815745 "Rocksmith USB Guitar Adapter" (list entry 0) opened` and the cable's `input started`. In those runs
+  the title was the stock one, which the injector's reference (the Re-ARMed title) doesn't match (difference 5.1), so
+  `wait-title` never fired: look at a snapshot and go on by hand.
 - **No intro screens** (`RS_MODS_INTRO`): boot to the title several times with the original `cache.psarc`
   (a fast-load `cache.psarc` has a short intro of its own and hides problems) and with a fast-load one;
   with the skip, snapshots show white, about three seconds of black, then the title (about 8 s from

@@ -559,7 +559,10 @@ choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, a
 5. **The install** (`app-install`): one ad-hoc signed bundle, `~/Applications/RS Re-ARMed Learn & Play.app`:
    `Contents/MacOS` has `rs2014_lp` and `libRSOpenGL.dylib`, `Contents/Resources` the game image
    (`lp_game.exe`), the DLL images and the game's icon. It sets no environment; `lp_main.c` takes its
-   folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`).
+   folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods
+   switched off from `settings.env` there (`lp_settings.c`, the Mac launcher's rules: only those seven switches,
+   and a value in the environment wins). It reads the file first, before `mods_guard`, so the start again with the
+   network guard keeps them, and logs what it used once the log is set up.
 6. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link. It refuses anything that does not look like a build
    folder.
@@ -569,4 +572,5 @@ choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, a
 `tools/play-native/learn-play.sh` runs all of it in a terminal; `RS Re-ARMed Installer.app` runs the same
 commands with its own steps ("Downloading the Windows game", "Downloading your DLC", "Copying the game files", "Getting Microsoft
 libraries", "Code image", "Building the game", "Installing", "Preparing shaders") and its Refresh Game Files button runs the
-installed `gamefiles.py refresh`. Neither touches the Mac game install or its saves.
+installed `gamefiles.py refresh`. Its Built-in Mods… sheet, with Learn & Play chosen, writes `learn-play/settings.env`, as it
+writes the Mac edition's ([Mac DESIGN](../mac/DESIGN.md#installer-and-build)). Neither touches the Mac game install or its saves.

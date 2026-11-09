@@ -81,7 +81,9 @@ folder that holds the `.app` as the game root, so the game reads only that copy.
 (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-ARMed.app` bundle by `launch-stub.c`) checks the copy is complete,
 links `static.psarc` to the title logo or the original, writes an offline `Rocksmith.ini` from the copy of
 the install's (keeping the player's `LatencyBuffer`), passes the DLC and language Steam's appmanifest had
-(`.rearmed/steam.env`) to the offline Steam layer, seeds the offline Steam saves once, loads the network
+(`.rearmed/steam.env`) to the offline Steam layer, passes the built-in mods switched off in `settings.env` (the
+installer's Built-in Mods…; only those seven switches, and a value in the environment wins, which it passes on too, as
+`open` starts the game with launchd's environment), seeds the offline Steam saves once, loads the network
 guard and starts the game with `open -n -a`. Nothing of Steam's is read while the game runs, except
 `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves are there.
 
@@ -296,7 +298,10 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   environment, the game image (`decrypt.py`), the shims, the
   app, the install and the shader warm-up. What the user has to do is shown in a box above the log, from the
   `guide` lines of `gamefiles.py mac-game`, which finds the game in every Steam library and leads through Steam
-  as Learn & Play's download does ([Windows DESIGN](../windows/DESIGN.md#installer-and-build)).
+  as Learn & Play's download does ([Windows DESIGN](../windows/DESIGN.md#installer-and-build)). Its Built-in Mods…
+  sheet writes the chosen edition's `settings.env` (`KEY=0` lines, no file when every mod is on), which that
+  edition's launcher reads at every start; `tools/play-native/test_settings.py` checks that the installer and both
+  launchers have the same keys.
 - `tools/play-native/install.sh` installs a build: the app and the network guard into
   `~/Library/Application Support/RS Re-ARMed/`, the launcher into `~/Applications` (`launch.sh`, run by the compiled
   `launch-stub.c`, so that macOS holds the app and not the shell responsible for its privacy questions), the renderer

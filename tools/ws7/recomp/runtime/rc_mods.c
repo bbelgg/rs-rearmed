@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "rc_hook.h"
+#include "rc_mid.h"
 
 const char *rc_mods_where(const char *dflt) {
   const char *e = getenv("RS_LOAD_MODS");
@@ -71,6 +72,7 @@ void rc_mods_load(const char *where) {
   int n = scandir(where, &names, dylib_name, alphasort);
   if (n < 0) {
     if (access(where, R_OK) == 0) load_one(where, where);
+    rc_edits_fix();
     return;
   }
   for (int i = 0; i < n; i++) {
@@ -80,4 +82,6 @@ void rc_mods_load(const char *where) {
     free(names[i]);
   }
   free(names);
+  // the mods' constructors have run: the edit groups they switched on are the game's for this run (rc_mid.h)
+  rc_edits_fix();
 }

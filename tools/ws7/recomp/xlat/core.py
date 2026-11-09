@@ -53,8 +53,9 @@ import macho  # noqa: E402
 TRACE = os.environ.get("RC_EMIT_TRACE") == "1"
 
 from .calls import CallsMixin  # noqa: E402
-from .common import COND, CTYPE, MASK, NOPS, NORETURN, REGS, Unsupported  # noqa: E402,F401
+from .common import COND, CTYPE, MASK, NOPS, NORETURN, REGS, TableError, Unsupported  # noqa: E402,F401
 from .emit_int import IntMixin  # noqa: E402
+from .inner import InnerMixin  # noqa: E402
 from .emit_sse import SseMixin  # noqa: E402
 from .jumptab import JumpTableMixin  # noqa: E402
 from .relaxed import PURE_IMPORTS, RELAXED  # noqa: E402
@@ -68,7 +69,7 @@ RO_SECTS = {("__DATA", "__const"), ("__DATA", "__got"), ("__DATA", "__nl_symbol_
 # RC_RELAXED=0: translate the RELAXED functions with the fences like everything else.
 RELAXED_ON = os.environ.get("RC_RELAXED", "1") != "0"
 
-class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
+class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
     # mnemonics after which a path ends (x86_32.py adds int3 and the far returns)
     STOP = ("ret", "ud2", "hlt")
     LOOPS = ()     # branches Capstone does not put in X86_GRP_JUMP (x86_32.py: loop*, jecxz)
@@ -119,6 +120,8 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
                 i = self.insn(a)
                 seen[a] = i
                 path.append(i)
+                if a in self.mids or a in self.edits:   # their targets are the function's (inner.py)
+                    self.inner_discover(a, entry, labels, work)
                 m = i.mnemonic
                 nxt = a + i.size
                 if m in self.STOP:
@@ -421,7 +424,9 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
         seen, labels = self.discover(entry)
         self.rbp_frame = self.frame_pointer(entry, seen)
         self.relaxed = False
-        if RELAXED_ON and entry in RELAXED:
+        self.inner_done = set()      # the edits and mid points placed (inner.py)
+        has_mid = any(a in self.mids for a in seen)   # a call into native code: not in a relaxed function
+        if RELAXED_ON and entry in RELAXED and not has_mid:
             why = self.relax_ok(entry, seen)
             if why:
                 print("warning: 0x%x stays fenced (not relaxed): %s" % (entry, why), file=sys.stderr)
@@ -429,10 +434,21 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin):
         body = []
         order = sorted(seen)
         bad = []
+        skip_to = None
         for k, a in enumerate(order):
             i = seen[a]
+            if skip_to is not None and a < skip_to:   # inside an edit's range, which its start emitted
+                continue
             if a in labels:
                 body.append("L_%x:" % a)
+            if a in self.mids:
+                body.append(self.mid_block(a, seen))
+                self.inner_done.add(a)
+            if a in self.edits:
+                lines, skip_to = self.edit_block(a, labels)
+                body += lines
+                self.inner_done.add(self.edit_parent.get(a, a))
+                continue
             stmts = []
             try:
                 self.emit(i, stmts)

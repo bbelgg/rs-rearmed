@@ -353,6 +353,20 @@ class Translator32(X87Mixin, core.Translator):
             return i
         raise Unsupported("undecodable at 0x%x" % a)
 
+    # --- edits (inner.py) ----------------------------------------------------
+    def image_bytes(self, a, n):
+        o = self.img.foff(a)
+        if o is None or not self.img.is_code(a) or self.img.foff(a + n - 1) != o + n - 1:
+            raise core.TableError("0x%x: not code of the image" % a)
+        return bytes(self.img.data[o:o + n])
+
+    def decode_at(self, code, a):
+        out = []
+        for i in self.md.disasm(code, a):
+            m = i.mnemonic
+            out.append(_Insn(i, m.split()[-1]) if m.startswith(("bnd ", "repz ret", "rep ret", "notrack ")) else i)
+        return out
+
     # --- operands ----------------------------------------------------------
     def gea(self, i, op):
         """Guest (32-bit) address of a memory operand, without its segment."""

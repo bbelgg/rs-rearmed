@@ -1,0 +1,3 @@
+# Mid points: a mod's hook before one instruction inside a game function, with its values by name and the places it
+# may continue at (each target's mids.map: NAME ADDRESS (TYPE value@LOCATION, ...) [-> CONT=ADDRESS, ...];
+# runtime/rc_mid.h). The generated code and the runtime number the points by their place here.

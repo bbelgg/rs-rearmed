@@ -37,6 +37,7 @@ Capstone and Unicorn (Unicorn is for maintainers only and not in `requirements.t
 ```sh
 cd tools/ws7/recomp
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.handcases --out DIR                    # no DLL needed
+UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.innercases --out DIR                   # edits and mid points, no DLL needed
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.difftest IMAGE.dll --out DIR --cases 6 --jobs 8
 ```
 

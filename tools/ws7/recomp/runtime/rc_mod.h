@@ -31,6 +31,7 @@
 
 #define RC_MOD 1
 #include "rc_hook.h"
+#include "rc_mid.h"
 #include "rc_ov.h"
 
 // Marks this library as built for every target (rc_mods.c): Learn & Play loads no other

@@ -4,6 +4,7 @@
 #define RC_GEN_H
 #include "rc.h"
 #include "rc_int.h"
+#include "rc_mid.h"
 #include "rc_sse.h"
 #include "rc_call.h"
 // the wrappers of hook points (gen_image.py `wrap`, rc_hook.h)

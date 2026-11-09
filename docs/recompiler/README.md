@@ -93,6 +93,39 @@ its built-in fixes still name addresses in `win32_overrides.c`.
 - **Native code on the guest's own context** (the overrides): `OV_ARGS_OF(name, a, c)` reads by the name's
   convention, `OV_ARGS_CC(a, c, cc)` is the same for a helper that serves several functions, and neither compiles
   for a `custom` function: those are read by hand. `ov32_ret` and `ov32_ret_f` end an override.
+- **Inside a function: edits and mid points** (`xlat/inner.py`, `runtime/rc_mid.h`, which `rc_mod.h` includes). A
+  hook point takes a whole function. A change that has to reach into one (a mod that gives the guitar a seventh
+  string widens arrays the game sizes for six, in hundreds of places) has two finer tools, each a table per target
+  and a list of names in `tools/targets/names`:
+  - An **edit** (`edits.map`: `GROUP ADDRESS LEN:CHECK EDIT`) is a range of whole instructions the function has
+    twice, as the game has them and as the edit makes them; the group's switch, `rc_edit_on[group]`, picks one. The
+    table holds no bytes of the game: the translator reads the range from the image and compares it with the check
+    (the first 8 hex digits of its SHA-256). The edit is patches inside the range (`+2=6402`), or instructions that
+    replace it (`=HEX`, any length, decoded from the range's address; flow goes on at its end, a branch in them may
+    not land inside the range, and a call in them pushes an address of the new code). Patches that keep every
+    instruction of the range where it was become one edit per changed instruction, so a jump into the range
+    stays a jump to an instruction. When both are one instruction that translates to the same C but for its
+    numbers (a stride, a displacement, a count: most edits), it is one statement with each such number chosen by
+    the switch; else the two are branches that both go on at the end of the range. A mod switches a group on with
+    `rc_edit_enable` in its constructor. The switches are fixed when the mods folder has loaded (`rc_mods.c`),
+    before the game runs, so no object the game makes is seen by both. Off, the game runs as before: an edited
+    number costs a load and a select, a branch form a load and a branch.
+  - A **mid point** (`mids.map`: `NAME ADDRESS (TYPE value@LOCATION, ...) [-> CONT=ADDRESS, ...]`) is a call before
+    the instruction at ADDRESS when a mod has hooked it (`rc_mid_add_name`). The registers go to `rc_ctx` and the
+    flags are packed; the hook reads and writes the point's values by name (`rc_mid_get`, `rc_mid_set`, and `_f`
+    for floats: a register, `st0`-`st7` or `xmm0`-`xmm15`, or memory at a register plus an offset; a pointer as a
+    host pointer), may change the flags, and either lets the instruction run or goes on at one of the
+    continuations. Each target's table gives a point the same values and continuations in its own places, so a mod
+    built once reads it on every target. Without hooks a point costs a load and a branch. A hook may call game code
+    (`OV_GUEST`), which leaves eax, ecx and edx (the SysV call-clobbered registers on the Mac) as the callee did:
+    after the hooks every register and xmm register is put back as the point found it, but those a hook set with
+    `rc_mid_set` or `rc_mid_set_f`, so the code after the point reads its own.
+
+  The tables are checked where the function is translated: the old bytes must be the image's, a range must start
+  and end on an instruction with no jump into it, the new bytes must decode to whole instructions, a continuation
+  must be an instruction of the function. A failure there, or an entry no translated function reached, stops the
+  build (`TableError`), where an unsupported function would only become a stub. A function with a mid point is not
+  translated as a relaxed one.
 - **Windows.** The 32-bit runtime overrides an export of a translated DLL by name
   (`rc32_override_add(dll, name, fn)`, used for msvcr100's math) and replaces virtual methods by writing
   host thunk cells into game vtables (the online layer).
@@ -249,7 +282,19 @@ transcendental, and Unicorn's own results for partial `fprem`, out-of-domain `fs
 Hook points have a test of their own that needs no game (`tools/ws7/recomp/test/hooks`, ctest `recomp.hooks`): one mod
 dylib, built once, runs in the 64-bit and the 32-bit runtime and reads the same call in both, for each
 convention (cdecl, stdcall, thiscall, fastcall, register arguments, floats, 64-bit values, stack arguments past
-the sixth, folded ones), changes arguments and results, does the call itself and calls game code first.
+the sixth, folded ones), changes arguments and results, does the call itself and calls game code first. The same mod
+switches edit groups on and hooks a mid point in its constructor; the test checks the refusals (no such group, none on
+this game, too late) and the hook's values (a register, a pointer in a register and on the stack, a float in `xmm0` and
+`st0`), flags and continuation, and that registers the hook changed without setting them are put back, on both
+runtimes.
+
+Edits and mid points in translated code: `test/x86/innercases.py` builds a small PE and translates it with edits and
+mid points of its own (`gen_image_pe.py --inner`). It runs the edited snippets (a stride, displacements, an x87
+operand, a loop count, a branch made unconditional and one taken out, a range of other instructions) against Unicorn
+twice: switches off against the image, on against a copy with the new bytes (and a patch over two instructions with a
+loop jumping to the second). `test/x86/midrun.c` runs the mid points
+with and without hooks against the answers in the test, and the test checks that bad tables are refused. The 64-bit
+front end shares the code (`xlat/inner.py`); no test of its own covers it yet.
 
 The 64-bit front end is checked by the Mac build itself: the whole image regenerates byte for byte across
 runs and scheduling, and the shims' differential tests compare replaced functions against the original

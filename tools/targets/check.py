@@ -83,7 +83,8 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
                 errs.append("names/%s.list: %s listed twice" % (key, n))
             seen.add(n)
     off_names = set(lists.get("offsets", []))
-    sym_names = set(n for k, v in lists.items() if k != "offsets" for n in v)
+    inner = ("edits", "mids")   # edits.map and mids.map, not symbols (targets.py)
+    sym_names = set(n for k, v in lists.items() if k != "offsets" and k not in inner for n in v)
     func_names = set(n for k, v in lists.items() if k.startswith("overrides/") or k == "hooks" for n in v)
     for t in tgts:
         for n in sorted(sym_names):
@@ -110,6 +111,23 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
             errs.append("target %s: offsets.map has %s, which names/offsets.list does not have" % (t.id, n))
         for n in sorted(set(t.unsupported) - sym_names - off_names):
             errs.append("target %s: %s is marked unsupported but no list in names/ has it" % (t.id, n))
+        # edit groups and mid points: each name has entries here or a reason it has none, and each entry a name
+        groups = set(e[0] for e in t.edits)
+        for g in lists.get("edits", []):
+            if g not in groups and g not in t.inner_unsupported:
+                errs.append("target %s: edit group %s has no edits (add them to %s/edits.map, or `%s unsupported REASON`)"
+                            % (t.id, g, t.id, g))
+        for n in lists.get("mids", []):
+            if n not in t.mids and n not in t.inner_unsupported:
+                errs.append("target %s: no mid point %s (add it to %s/mids.map, or `%s unsupported REASON`)"
+                            % (t.id, n, t.id, n))
+        for n in sorted((groups | set(t.mids) | set(t.inner_unsupported)) - set(lists.get("edits", []))
+                        - set(lists.get("mids", []))):
+            errs.append("target %s: %s is in edits.map or mids.map but not in names/edits.list or mids.list" % (t.id, n))
+        try:
+            targets.inner_points(t, lists)
+        except targets.TargetError as e:
+            errs.append(str(e))
     if scan_sources:
         syms, offs, hooks = source_uses(root)
         for n, where in sorted(syms.items()):

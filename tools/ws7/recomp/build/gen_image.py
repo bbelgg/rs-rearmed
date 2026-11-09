@@ -50,25 +50,28 @@ SYM_RE = re.compile(r"\b([FI]_[0-9a-f]+)\(c\)")
 _tr = None
 
 
-def _init(img, noret):
+def _init(img, noret, inner=None):
     global _tr
     from xlat.core import Translator
     _tr = Translator(img)
     _tr.set_noreturn_table(noret)
+    _tr.set_inner(*(inner or ({}, {})))
 
 
 def _work(batch):
-    from xlat.common import Unsupported
+    from xlat.common import TableError, Unsupported
     out = []
     for f in batch:
         try:
             lines = _tr.function(f)
             n = int(re.search(r": (\d+) instructions", lines[0]).group(1))
-            out.append((f, "ok", "", n, "\n".join(lines), sorted(_tr.callees)))
+            out.append((f, "ok", "", n, "\n".join(lines), sorted(_tr.callees), sorted(_tr.inner_done)))
+        except TableError as e:   # an edit or mid point as the tables have it: the build stops (main)
+            out.append((f, "table", "0x%x: %s" % (f, e), 1, None, [], []))
         except Unsupported as e:
-            out.append((f, "stub", str(e).split(": ", 1)[-1][:300], 1, None, []))
+            out.append((f, "stub", str(e).split(": ", 1)[-1][:300], 1, None, [], []))
         except Exception as e:  # translator bug: still must link
-            out.append((f, "stub", "internal error: %s: %s" % (type(e).__name__, e), 1, None, []))
+            out.append((f, "stub", "internal error: %s: %s" % (type(e).__name__, e), 1, None, [], []))
     return out
 
 
@@ -190,6 +193,30 @@ def write_ninja(args, outdir, chunks):
     write_if_changed(os.path.join(outdir, "build.ninja"), "\n".join(L) + "\n")
 
 
+def inner_tables(tid):
+    """The target's edits and mid points (tools/targets: edits.map, mids.map), as xlat/inner.py takes them."""
+    sys.path.insert(0, os.path.join(ROOT, "tools", "targets"))
+    import targets
+    try:
+        return targets.inner_points(targets.Target(tid), targets.name_lists())
+    except targets.TargetError as e:
+        sys.exit("gen_image.py: %s" % e)
+
+
+def check_inner(inner, placed, errors, only=None):
+    """Every edit and mid point has to be in the translated code: a missing one (its function a stub, an override,
+    or no function reaching it) or one a table error refused stops the build. With --only, those outside it aside."""
+    edits, mids = inner
+    want = lambda a: only is None or only[0] <= a < only[1]  # noqa: E731
+    bad = list(errors)
+    bad += ["edit %s at 0x%x: no translated function has it" % (e[4], a) for a, e in sorted(edits.items())
+            if a not in placed and want(a)]
+    bad += ["mid point %s at 0x%x: no translated function has it" % (m[2], a) for a, m in sorted(mids.items())
+            if a not in placed and want(a)]
+    if bad:
+        sys.exit("gen_image.py: the target's edits and mid points:\n  " + "\n  ".join(bad))
+
+
 def check_target(tid, image):
     """The target's front end must be this translator's; warn when the image is not the one its tables are for."""
     sys.path.insert(0, os.path.join(ROOT, "tools", "targets"))
@@ -277,14 +304,21 @@ def main():
         status[a] = [st, reason, n, None]
         callees.update(cs)
 
-    with mp.Pool(args.jobs, _init, (args.image, noret)) as pool:
+    inner = inner_tables(args.target)
+    placed, table_errors = set(), []
+    with mp.Pool(args.jobs, _init, (args.image, noret, inner)) as pool:
         done = 0
         for res in pool.imap(_work, batches):
-            for a, st, reason, n, text, cs in res:
+            for a, st, reason, n, text, cs, ins in res:
+                placed.update(ins)
+                if st == "table":
+                    table_errors.append(reason)
+                    st = "stub"
                 place(a, st, reason, n, text, cs)
             done += len(res)
             if (done // args.batch) % 100 == 0:
                 print("  %d/%d functions, %.0fs" % (done, len(todo), time.time() - t0), file=sys.stderr)
+    check_inner(inner, placed, table_errors, (lo, hi) if args.only else None)
     # every F_x referenced must be defined: callees that are not function
     # starts (or are outside the generated set) get a stub
     known = set(status) | skip | drop

@@ -18,6 +18,9 @@ Usage: venv/bin/python -I gen_image_pe.py IMAGE OUTDIR [options]
                     translated as the `call/jmp [slot]` it replaced; an import the image's IAT
                     lacks gets a thunk of its own (after the IAT's), one whose name the table
                     leaves empty fails at run time (rc32_wrapper_unresolved)
+  --inner JSON      edits and mid points (xlat/inner.py) in place of the target's, for the tests
+                    (test/x86/innercases.py): {"edits": [[addr, group, "LEN:CHECK", "EDIT"]], "mids": [[addr,
+                    point, [continuation addrs], name]]}, the edits as edits.map has them
   --module NAME     an image that shares the process with others (a DLL beside the game):
                     every global this tree defines is prefixed NAME_ (NAME_rc32_table,
                     NAME_rc32_imports, NAME_rc32_mod, NAME_I_<slot>), so several trees link into
@@ -67,10 +70,11 @@ G.PRELUDE = PRELUDE
 _tr = None
 
 
-def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix="", inline_interlocked=False):
+def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix="", inline_interlocked=False, inner=None):
     global _tr
     from xlat.x86_32 import Translator32
     _tr = Translator32(img, functions=funcs, wrappers=wrappers)
+    _tr.set_inner(*(inner or ({}, {})))
     _tr.thunk_prefix = prefix + "I_"
     _tr.inline_interlocked = inline_interlocked
     _tr.resume = resume
@@ -79,18 +83,21 @@ def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix="", inli
 
 
 def _work(batch):
-    from xlat.common import Unsupported
+    from xlat.common import TableError, Unsupported
     out = []
     for f in batch:
         try:
             lines = _tr.function(f, _tr.img.exports.get(f))
             n = int(re.search(r": (\d+) instructions", lines[0]).group(1))
             info = convention(_tr, f)
-            out.append((f, "ok", "", n, "\n".join(lines), sorted(_tr.callees), sorted(_tr.imports_used), info))
+            out.append((f, "ok", "", n, "\n".join(lines), sorted(_tr.callees), sorted(_tr.imports_used), info,
+                        sorted(_tr.inner_done)))
+        except TableError as e:   # an edit or mid point as the tables have it: the build stops (main)
+            out.append((f, "table", "0x%x: %s" % (f, e), 1, None, [], [], None, []))
         except Unsupported as e:
-            out.append((f, "stub", str(e).split(": ", 1)[-1][:300], 1, None, [], [], None))
+            out.append((f, "stub", str(e).split(": ", 1)[-1][:300], 1, None, [], [], None, []))
         except Exception as e:  # translator bug: still must link
-            out.append((f, "stub", "internal error: %s: %s" % (type(e).__name__, e), 1, None, [], [], None))
+            out.append((f, "stub", "internal error: %s: %s" % (type(e).__name__, e), 1, None, [], [], None, []))
     return out
 
 
@@ -130,6 +137,28 @@ def convention(tr, f):
     conv = "fastcall" if {"ecx", "edx"} <= live else "thiscall" if "ecx" in live else \
         ("stdcall" if pops else "cdecl")
     return {"pops": pops, "conv": conv}
+
+
+def inner_tables(target):
+    """The target's edits and mid points (tools/targets: edits.map, mids.map), as xlat/inner.py takes them."""
+    sys.path.insert(0, os.path.join(RECOMP, "..", "..", "targets"))
+    import targets
+    try:
+        return targets.inner_points(targets.Target(target), targets.name_lists())
+    except targets.TargetError as e:
+        sys.exit("gen_image_pe.py: %s" % e)
+
+
+def check_inner(inner, placed, tables):
+    """Every edit and mid point has to be in the translated code: a missing one (its function a stub, or no
+    function reaching it) or one a table error refused stops the build."""
+    edits, mids = inner
+    bad = list(tables)
+    bad += ["edit %s at 0x%x: no translated function has it" % (e[4], a) for a, e in sorted(edits.items()) if a not in placed]
+    bad += ["mid point %s at 0x%x: no translated function has it" % (m[2], a) for a, m in sorted(mids.items())
+            if a not in placed]
+    if bad:
+        sys.exit("gen_image_pe.py: the target's edits and mid points:\n  " + "\n  ".join(bad))
 
 
 def hook_points(target):
@@ -204,6 +233,7 @@ def main():
     ap.add_argument("--wrappers", default=None)
     ap.add_argument("--module", default=None)
     ap.add_argument("--target", default=None)
+    ap.add_argument("--inner", default=None)
     args = ap.parse_args()
     if args.module is not None and not re.match(r"^[A-Za-z_][A-Za-z0-9_]*$", args.module):
         ap.error("--module: a C identifier")
@@ -261,11 +291,24 @@ def main():
         status[a] = [st, reason, n, None]
 
     print("  0/%d functions, %.0fs" % (len(todo), time.time() - t0), file=sys.stderr, flush=True)
+    inner = inner_tables(args.target) if args.target and not P else ({}, {})
+    if args.inner:     # the tests' own (test/x86/innercases.py): JSON {"edits": [[addr, group, "LEN:CHECK", "EDIT"]],
+        # "mids": [[addr, point, [continuations], name]]}, in place of a target's
+        sys.path.insert(0, os.path.join(RECOMP, "..", "..", "targets"))
+        import targets
+        d = json.load(open(args.inner))
+        inner = ({e[0]: (e[1],) + targets.parse_edit(e[2], e[3], "edit %x" % e[0]) + ("edit %x" % e[0],)
+                  for e in d.get("edits", [])}, {m[0]: (m[1], m[2], m[3]) for m in d.get("mids", [])})
+    placed, table_errors = set(), []
     with mp.Pool(args.jobs, _init, (args.image, starts, resume, flag_callees, data_code, wrappers, P,
-                                    bool(args.target))) as pool:
+                                    bool(args.target), inner)) as pool:
         done = 0
         for res in pool.imap(_work, batches):
-            for a, st, reason, n, text, cs, us, info in res:
+            for a, st, reason, n, text, cs, us, info, ins in res:
+                placed.update(ins)
+                if st == "table":
+                    table_errors.append(reason)
+                    st = "stub"
                 place(a, st, reason, n, text)
                 callees.update(cs)
                 used.update(us)
@@ -275,6 +318,7 @@ def main():
             # progress as gen_image.py prints it (the installer reads "  N/M functions")
             if (done // args.batch) % 50 == 0 or done == len(todo):
                 print("  %d/%d functions, %.0fs" % (done, len(todo), time.time() - t0), file=sys.stderr, flush=True)
+    check_inner(inner, placed, table_errors)
     known = set(status) | skip
     for t in sorted(callees - known):
         place(t, "stub", "callee 0x%x is not a function start" % t, 1, None)

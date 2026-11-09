@@ -44,3 +44,8 @@ NORETURN = {"_exit", "_abort", "___cxa_throw", "___cxa_rethrow", "__Unwind_Resum
 
 class Unsupported(Exception):
     pass
+
+
+class TableError(Exception):
+    """An edit or a mid point of the target's tables (tools/targets: edits.map, mids.map) that can't be built as
+    written: the build stops, where an Unsupported function becomes a stub."""

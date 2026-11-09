@@ -25,6 +25,7 @@
 #include <unistd.h>
 
 #include "rc32.h"
+#include "rc_mid.h"
 
 extern void rc32_resume_reset(void);
 
@@ -68,6 +69,8 @@ typedef struct { double st[8]; uint64_t mm[8]; uint16_t cw, sw; uint8_t top, tag
 int main(int argc, char **argv) {
   verbose = getenv("RC32_RUNNER_VERBOSE") != 0;
   if (argc < 2 || rc32_mem_init() || rc32_image_load(argv[1])) return 1;
+  // test/x86/innercases.py: the edits' side of the image (rc_mid.h)
+  if (getenv("RC32_RUNNER_EDITS")) memset(rc_edit_on, 1, sizeof rc_edit_on);
   // the image as loaded, to reset it before every case
   const uint8_t *d = rc_mem;
   uint32_t o, base, size;

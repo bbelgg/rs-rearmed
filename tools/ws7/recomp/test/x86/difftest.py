@@ -45,7 +45,7 @@ GDT = 0x00380000
 FS_SEL = 0x08
 PORT_IO = {"in", "out", "insb", "insw", "insd", "outsb", "outsw", "outsd"}
 WIRE_FPU = struct.Struct("<8d8QHHBB2x")
-RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_main.c", "rc32_teb.c", "rc32_seh.c", "rc32_wrappers.c"]
+RUNTIME = ["rc32_mem.c", "rc32_image.c", "rc32_main.c", "rc32_teb.c", "rc32_seh.c", "rc32_wrappers.c", "rc_mid.c"]
 F2XM1_MIN = 2.0 ** -13     # below this, pow(2.0, x) - 1.0 has lost more than the comparison's 1e-12
 TRANSCENDENTAL = {(0xd9, 0xf0), (0xd9, 0xf1), (0xd9, 0xf2), (0xd9, 0xf3), (0xd9, 0xf9), (0xd9, 0xfb),
                   (0xd9, 0xfe), (0xd9, 0xff), (0xd9, 0xfd), (0xd9, 0xf5), (0xd9, 0xf8),
@@ -345,12 +345,12 @@ class Unicorn:
 
 
 class Runner:
-    def __init__(self, exe, image):
-        self.exe, self.image = exe, image
+    def __init__(self, exe, image, env=None):
+        self.exe, self.image, self.env = exe, image, env
         self.start()
 
     def start(self):
-        self.p = subprocess.Popen([self.exe, self.image], stdin=subprocess.PIPE, stdout=subprocess.PIPE)
+        self.p = subprocess.Popen([self.exe, self.image], stdin=subprocess.PIPE, stdout=subprocess.PIPE, env=self.env)
         h = self.p.stdout.read(16)
         magic, self.imp_area, self.base, self.size = struct.unpack("<4I", h)
         assert magic == 0x314e5552, "runner did not start"
@@ -547,14 +547,14 @@ def compare(case, c, u, tol):
 
 
 # --- build ------------------------------------------------------------------------------
-def build(image, out, jobs, cflags, trace=False, wrappers=None):
+def build(image, out, jobs, cflags, trace=False, wrappers=None, extra=()):
     cflags = "-DRC32_KEEP_LOADS " + cflags
     gen = os.path.join(out, "gen-trace" if trace else "gen")
     py = sys.executable
     env = dict(os.environ, RC_EMIT_TRACE="1" if trace else "0")
     subprocess.check_call([py, "-I", os.path.join(RECOMP, "build", "gen_image_pe.py"), image, gen,
                            "--jobs", str(jobs), "--opt=-O1", "--cflags=-w " + cflags + (" -DRC_TRACE" if trace else "")] +
-                          (["--wrappers", wrappers] if wrappers else []),
+                          (["--wrappers", wrappers] if wrappers else []) + list(extra),
                           stdout=subprocess.DEVNULL, env=env)
     subprocess.check_call(["ninja", "-C", gen, "-j", str(jobs)], stdout=subprocess.DEVNULL)
     rt = os.path.join(RECOMP, "runtime")

@@ -22,10 +22,10 @@ $(OUT)/plain/plain_mod.dylib: plain_mod.c | $(OUT)
 	mkdir -p $(OUT)/plain && $(MOD) $< -o $@
 $(OUT)/probe_mod.dylib: probe_mod.c $(wildcard $(runtime)/rc_*.h) | $(OUT)
 	$(MOD) $< -o $@
-$(OUT)/test_hooks64: test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c $(wildcard $(runtime)/rc_*.h) | $(OUT)
-	$(CC) $(CFLAGS) test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c -o $@
+$(OUT)/test_hooks64: test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c $(runtime)/rc_mid.c $(wildcard $(runtime)/rc_*.h) | $(OUT)
+	$(CC) $(CFLAGS) test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c $(runtime)/rc_mid.c -o $@
 $(OUT)/test_hooks32: test_hooks.c $(OUT)/target/rc_target_names.h $(wildcard $(runtime)/*.c) $(wildcard $(runtime)/rc*.h) | $(OUT)
-	$(CC) $(CFLAGS) -DRC_GUEST32 -I$(OUT)/target test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c $(runtime)/rc32_hook.c \
+	$(CC) $(CFLAGS) -DRC_GUEST32 -I$(OUT)/target test_hooks.c $(runtime)/rc_hook.c $(runtime)/rc_mods.c $(runtime)/rc_mid.c $(runtime)/rc32_hook.c \
 	    $(runtime)/rc32_mem.c $(runtime)/rc32_teb.c -o $@
 $(OUT):
 	mkdir -p $@

@@ -17,6 +17,7 @@
 #endif
 #include "rc_call.h"
 #include "rc_hook.h"
+#include "rc_mid.h"
 
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); exit(1); } } while (0)
 #define CHECK_EQ(a, b) do { uint64_t a_ = (a), b_ = (b); if (a_ != b_) { \
@@ -65,6 +66,23 @@ const rc_hook_name rc_target_hooks[] = {
     {0, 0, 0},
 };
 #endif
+// edit groups and mid points (rc_mid.h): one of each here, one of each not on this game; the same values on both,
+// in each one's own places
+const rc_edit_name rc_target_edits[] = {{"grp_here", 3, 0}, {"grp_gone", 0, "no edits on this target"},
+                                        {"grp_late", 1, 0}, {0, 0, 0}};
+#ifdef RC_GUEST32
+const rc_mid_name rc_target_mids[] = {
+    {"mid_here", 0x401800, 0, 3, {{"count", 'i', 6, 0}, {"obj", 'p', RC_MID_MEM | 4, 8}, {"scale", 'd', 32, 0}}, 2,
+     {"again", "done"}},
+    {"mid_gone", 0, "not in this build"},
+    {0}};
+#else
+const rc_mid_name rc_target_mids[] = {
+    {"mid_here", 0x401800, 0, 3, {{"count", 'i', 6, 0}, {"obj", 'p', 7, 0}, {"scale", 'f', 16, 0}}, 2, {"again", "done"}},
+    {"mid_gone", 0, "not in this build"},
+    {0}};
+#endif
+
 const uint64_t rc_hook_points[] = {ADDR(MIX), ADDR(TWO), ADDR(OBJ), ADDR(FAST), ADDR(REG), ADDR(FLT), ADDR(MANY), ADDR(FOLD),
                                    ADDR(HIDE), ADDR(RATIO), ADDR(UNSAID), ADDR(WRONG), ADDR(OTHER), 0};
 const int rc_hook_npoints = 13;
@@ -632,6 +650,61 @@ static void cost(void) {
 }
 #endif
 
+// Edits and mid points: what the mod's constructor got, the switches fixed once the folder has loaded, and the mid
+// hook on its values (a register, a pointer in a register or on the stack, a float in xmm0 or st0), flags and
+// continuation; the registers the hook changed without setting them (as a call into the game does) put back
+static void inner(void) {
+  int *edit = dlsym(RTLD_DEFAULT, "hm_edit"), *point = dlsym(RTLD_DEFAULT, "hm_mid_point"),
+      *gone = dlsym(RTLD_DEFAULT, "hm_mid_gone");
+  CHECK(edit && point && gone);
+  CHECK_EQ(edit[0], 0);
+  CHECK_EQ((uint32_t)edit[1], (uint32_t)-1);
+  CHECK_EQ((uint32_t)edit[2], (uint32_t)-1);
+  CHECK(rc_edit_on[0] && !rc_edit_on[1] && !rc_edit_on[2] && rc_edit_is_on("grp_here") && !rc_edit_is_on("grp_late"));
+  CHECK_EQ((uint32_t)rc_edit_enable("grp_late"), (uint32_t)-1);  // the folder has loaded: fixed
+  CHECK(!rc_edit_on[2]);
+  CHECK_EQ(*point, 0);
+  CHECK_EQ((uint32_t)*gone, (uint32_t)-1);
+  CHECK(rc_mid_on[0] && !rc_mid_on[1]);
+  CHECK_EQ((uint32_t)rc_mid_value(0, "nothing"), (uint32_t)-1);
+  CHECK_EQ(rc_mid_cont(0, "again"), 1);
+  ctx->r[6] = 41;
+  ctx->r[0] = 10, ctx->r[1] = 11, ctx->r[2] = 12;
+  ctx->x[1][0] = 13;
+#ifdef RC_GUEST32
+  uint32_t *word = RC32_H(block);
+  *word = 5;
+  uint32_t slot = (uint32_t)ctx->r[4] - 0x40;
+  *(uint32_t *)RC32_H(slot + 8) = (uint32_t)block;
+  uint64_t esp = ctx->r[4];
+  ctx->r[4] = slot;
+  rc87_push(ctx, 1.5);
+#else
+  uint32_t *word = (uint32_t *)(uintptr_t)block;
+  *word = 5;
+  ctx->r[7] = block;
+  float f = 1.5f;
+  memcpy(&ctx->x[0], &f, 4);
+#endif
+  uint32_t flags = 0x41;
+  CHECK_EQ(rc_mid_call(0, ctx, &flags), 2);
+  CHECK_EQ(ctx->r[6], 42);
+  CHECK_EQ(ctx->r[0], 10);  // what the callback's game call left in them is undone, what it set is kept
+  CHECK_EQ(ctx->r[1], 11);
+  CHECK_EQ(ctx->r[2], 12);
+  CHECK_EQ(ctx->x[1][0], 13);
+  CHECK_EQ(*word, 7);
+  CHECK_EQ(flags, 0x1);
+#ifdef RC_GUEST32
+  CHECK(ctx->fpu.st[ctx->fpu.top] == 3.0);
+  rc87_pop(ctx);
+  ctx->r[4] = esp;
+#else
+  memcpy(&f, &ctx->x[0], 4);
+  CHECK(f == 3.0f);
+#endif
+}
+
 // The folder: a library without rc_mod.h is left out on a 32-bit guest, nothing of it run
 static void folder(const char *out) {
   char p[1024];
@@ -677,6 +750,7 @@ int main(int argc, char **argv) {
   SYM(off, "hm_off"); SYM(no_off, "hm_no_off"); SYM(slot, "hm_slot"); SYM(target, "hm_target");
   SYM(ptr_at, "hm_ptr_at"); SYM(host_of, "hm_host"); SYM(guest_of, "hm_guest"); SYM(missing, "hm_missing");
   names();
+  inner();
 #ifdef RC_GUEST32
   zero_result();
 #endif

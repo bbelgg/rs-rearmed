@@ -5,6 +5,9 @@
     tools/targets/<id>/symbols.map   NAME ADDRESS CONVENTION PROTOTYPE   (functions and data the build touches)
     tools/targets/<id>/offsets.map   NAME OFFSET                         (struct fields native code reads)
     tools/targets/<id>/drops.map     MODULE ADDRESS                      (dead code once MODULE replaces a library)
+    tools/targets/<id>/edits.map     GROUP ADDRESS LEN:CHECK EDIT        (instructions a mod can switch to others)
+    tools/targets/<id>/mids.map      NAME ADDRESS (VALUES) [-> CONT=ADDRESS, ...]   (mid points: hooks before an
+                                                                          instruction inside a function)
     tools/targets/names/             which names are overridden, hooked, called or read (shared by all targets)
 
 A map line `NAME unsupported REASON...` says the target has no counterpart; the name then resolves to
@@ -71,9 +74,14 @@ class Target:
         self.offsets = {}      # name -> int
         self.unsupported = {}  # name -> reason (symbols and offsets)
         self.drops = []        # (module, addr)
+        self.edits = []        # (group, addr, length, check, patches, where): parse_edit
+        self.mids = {}         # name -> (addr, [(kind, name, loc, mem, off)], [(cont name, addr)])
+        self.inner_unsupported = {}  # edit group or mid point -> reason
         self._read_symbols()
         self._read_offsets()
         self._read_drops()
+        self._read_edits()
+        self._read_mids()
 
     def _lines(self, fname):
         path = os.path.join(self.dir, fname)
@@ -119,6 +127,41 @@ class Target:
     def _read_drops(self):
         for where, p in self._lines("drops.map"):
             self.drops.append((p[0], int(p[1], 16)))
+
+    def _read_edits(self):
+        seen = {}
+        for where, p in self._lines("edits.map"):
+            if not IDENT.match(p[0]):
+                raise TargetError("%s: bad group name %r" % (where, p[0]))
+            if len(p) > 1 and p[1] == "unsupported":
+                if p[0] in self.inner_unsupported or any(e[0] == p[0] for e in self.edits):
+                    raise TargetError("%s: group %s is unsupported and has edits" % (where, p[0]))
+                self.inner_unsupported[p[0]] = " ".join(p[2:]) or "(no reason given)"
+                continue
+            if p[0] in self.inner_unsupported:
+                raise TargetError("%s: group %s is unsupported and has edits" % (where, p[0]))
+            if len(p) != 4:
+                raise TargetError("%s: expected GROUP ADDRESS LEN:CHECK EDIT" % where)
+            a, n, check, patches = int(p[1], 16), *parse_edit(p[2], p[3], where)
+            for b, e in seen.items():   # one edit per range, in any group
+                if b < a + n and a < e[0]:
+                    raise TargetError("%s: overlaps the edit at 0x%x (%s)" % (where, b, e[1]))
+            seen[a] = (a + n, where)
+            self.edits.append((p[0], a, n, check, patches, where))
+
+    def _read_mids(self):
+        for where, p in self._lines("mids.map"):
+            if not IDENT.match(p[0]):
+                raise TargetError("%s: bad name %r" % (where, p[0]))
+            if p[0] in self.mids or p[0] in self.inner_unsupported:
+                raise TargetError("%s: %s defined twice" % (where, p[0]))
+            if len(p) > 1 and p[1] == "unsupported":
+                self.inner_unsupported[p[0]] = " ".join(p[2:]) or "(no reason given)"
+                continue
+            if len(p) < 3:
+                raise TargetError("%s: expected NAME ADDRESS (VALUES) [-> CONT=ADDRESS, ...]" % where)
+            vals, conts = parse_mid(" ".join(p[2:]), self.info.get("abi", "sysv"), where)
+            self.mids[p[0]] = (int(p[1], 16), vals, conts)
 
     def addr(self, name):
         if name in self.symbols:
@@ -318,6 +361,135 @@ def hook_abi(t, name, mac=None):
     return d
 
 
+# Mid points (runtime/rc_mid.h): where each value of a point is. A location is a register (an x86 encoding index:
+# 0-15 rax..r15 / eax..edi, 16-31 xmm0..15, 32-39 st0..st7, an x87 register counted from the top), or memory at a
+# register plus an offset (`[esp+0x18]`), which RC_MID_MEM marks.
+GPR64 = ["rax", "rcx", "rdx", "rbx", "rsp", "rbp", "rsi", "rdi"] + ["r%d" % k for k in range(8, 16)]
+GPR32 = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
+MID_MEM = 0x80      # RC_MID_MEM
+MAX_MID_VALUES = 8  # RC_MID_MAXVALUES
+MAX_MID_CONTS = 8   # RC_MID_MAXCONTS
+
+
+def _mid_reg(r, abi, where, mem=False):
+    gpr = GPR32 if abi == "win32" else GPR64
+    if r in gpr:
+        return gpr.index(r)
+    if mem:
+        raise TargetError("%s: memory at %r: a general register only" % (where, r))
+    m = re.match(r"(xmm|st)(\d+)$", r)
+    if m and int(m.group(2)) < (8 if m.group(1) == "st" or abi == "win32" else 16):
+        if m.group(1) == "st" and abi != "win32":
+            raise TargetError("%s: %s: x87 values are a 32-bit guest's" % (where, r))
+        return (16 if m.group(1) == "xmm" else 32) + int(m.group(2))
+    raise TargetError("%s: no register %r on %s" % (where, r, abi))
+
+
+def parse_mid(text, abi, where):
+    """`(TYPE name@LOC, ...) [-> CONT=ADDRESS, ...]` -> ([(kind, name, loc, mem, off)], [(cont, addr)])."""
+    m = re.match(r"\s*\((.*)\)\s*(?:->\s*(.*))?$", text)
+    if not m:
+        raise TargetError("%s: expected (VALUES) [-> CONT=ADDRESS, ...], got %r" % (where, text))
+    vals, names = [], set()
+    for v in [x.strip() for x in m.group(1).split(",") if x.strip() and x.strip() != "void"]:
+        decl, at, loc = v.rpartition("@")
+        if not at:
+            raise TargetError("%s: value %r: TYPE NAME@LOCATION" % (where, v))
+        kind, _ = _kind(decl, where)
+        vname = re.search(r"(\w+)\s*$", decl).group(1)
+        if vname in names:
+            raise TargetError("%s: value %s twice" % (where, vname))
+        names.add(vname)
+        loc = loc.strip().lower()
+        mm = re.match(r"\[\s*(\w+)\s*(?:([+-])\s*(0x[0-9a-f]+|\d+))?\s*\]$", loc)
+        if mm:
+            off = int(mm.group(3), 0) * (-1 if mm.group(2) == "-" else 1) if mm.group(3) else 0
+            vals.append((kind, vname, _mid_reg(mm.group(1), abi, where, mem=True), 1, off))
+        else:
+            r = _mid_reg(loc, abi, where)
+            if (r >= 16) != (kind in "fd"):
+                raise TargetError("%s: value %s: a float in a float register, an integer in another" % (where, vname))
+            vals.append((kind, vname, r, 0, 0))
+    conts = []
+    for c in [x.strip() for x in (m.group(2) or "").split(",") if x.strip()]:
+        n, eq, a = c.partition("=")
+        if not eq or not IDENT.match(n.strip()) or n.strip() in [x for x, _ in conts]:
+            raise TargetError("%s: continuation %r: NAME=ADDRESS, each name once" % (where, c))
+        conts.append((n.strip(), int(a, 16)))
+    if len(vals) > MAX_MID_VALUES or len(conts) > MAX_MID_CONTS:
+        raise TargetError("%s: at most %d values and %d continuations" % (where, MAX_MID_VALUES, MAX_MID_CONTS))
+    return vals, conts
+
+
+def parse_edit(span, edit, where):
+    """`LEN:CHECK` and `+OFF=HEX[,+OFF=HEX...]` or `=HEX` -> (length, check, patches). The table holds no bytes of
+    the game: CHECK is the first 8 hex digits of the SHA-256 of the LEN bytes at the address, which the translator
+    reads from the image. Patches are (offset, bytes) inside the range; (None, bytes) replaces the whole range by
+    instructions of any length (flow goes on at the range's end)."""
+    m = re.match(r"(\d+):([0-9a-f]{8})$", span)
+    if not m or not 0 < int(m.group(1)) <= 64:
+        raise TargetError("%s: expected LEN:CHECK (a length up to 64, the first 8 hex digits of the bytes' SHA-256)" % where)
+    n, patches = int(m.group(1)), []
+    try:
+        if edit.startswith("="):
+            patches.append((None, bytes.fromhex(edit[1:])))
+            if not patches[0][1]:
+                raise ValueError
+        else:
+            for part in edit.split(","):
+                off, eq, hx = part.partition("=")
+                if not eq or not off.startswith("+"):
+                    raise ValueError
+                patches.append((int(off[1:], 0), bytes.fromhex(hx)))
+    except ValueError:
+        raise TargetError("%s: expected the edit as =HEX or +OFF=HEX[,+OFF=HEX...]" % where)
+    taken = set()
+    for off, b in patches:
+        if off is None:
+            continue
+        r = set(range(off, off + len(b)))
+        if not b or off + len(b) > n or r & taken:
+            raise TargetError("%s: a patch outside the range, empty, or over another" % where)
+        taken |= r
+    return n, m.group(2), patches
+
+
+def edit_check(old):
+    """The CHECK of an edit's bytes (parse_edit)."""
+    import hashlib
+    return hashlib.sha256(old).hexdigest()[:8]
+
+
+def edit_bytes(old, patches):
+    """The bytes an edit puts in place of old."""
+    if patches and patches[0][0] is None:
+        return patches[0][1]
+    new = bytearray(old)
+    for off, b in patches:
+        new[off:off + len(b)] = b
+    return bytes(new)
+
+
+def inner_points(t, lists):
+    """What the generators put inside functions: ({addr: (group index, length, check, patches, where)} of
+    names/edits.list's groups, {addr: (point index, [continuation addrs], name)} of names/mids.list's points). The
+    index is the name's place in its list, the same on every target."""
+    groups, points = lists.get("edits", []), lists.get("mids", [])
+    edits = {}
+    for g, a, n, check, patches, where in t.edits:
+        if g not in groups:
+            raise TargetError("%s: group %s is not in names/edits.list" % (where, g))
+        edits[a] = (groups.index(g), n, check, patches, where)
+    mids = {}
+    for name, (a, _, conts) in t.mids.items():
+        if name not in points:
+            raise TargetError("%s/mids.map: %s is not in names/mids.list" % (t.id, name))
+        if a in mids:
+            raise TargetError("%s/mids.map: %s and %s at the same address" % (t.id, name, mids[a][2]))
+        mids[a] = (points.index(name), [c for _, c in conts], name)
+    return edits, mids
+
+
 def _c_string(s):
     return '"%s"' % s.replace("\\", "\\\\").replace('"', '\\"')
 
@@ -326,7 +498,7 @@ def gen_runtime_c(t, lists):
     """The target's name tables for the runtime (rc_hook_add_name, rc_off, rc_addr, rc_target)."""
     mac = t if t.id == DEFAULT_TARGET else Target(DEFAULT_TARGET, t.base)
     L = ["// Generated by tools/targets/targets.py for target %s. Do not edit." % t.id,
-         '#include "rc_hook.h"', "",
+         '#include "rc_hook.h"', '#include "rc_mid.h"', "",
          'const char rc_target_id[] = "%s";' % t.id, "",
          "// names/hooks.list: this target's address of each hook point and the mac-x64 address of the same",
          "// point (rc_hook_add with a mac-x64 address keeps working on every target); a target without the",
@@ -355,6 +527,27 @@ def gen_runtime_c(t, lists):
     L += ["  {0, 0},", "};", "const rc_target_value rc_target_symbols[] = {"]
     L += ['  {"%s", 0x%x, %d},' % (n, t.symbols[n][0], CC_IDS.get(t.symbols[n][1], -1)) for n in sorted(t.symbols)]
     L += ["  {0, 0},", "};", ""]
+    # edit groups and mid points, in their lists' order (the generated code's indexes)
+    L += ["// names/edits.list: how many edits each group has here, or why it has none (rc_edit_enable)",
+          "const rc_edit_name rc_target_edits[] = {"]
+    for g in lists.get("edits", []):
+        n = sum(1 for e in t.edits if e[0] == g)
+        why = t.inner_unsupported.get(g) or (None if n else "no edits on this target")
+        L.append('  {"%s", %d, %s},' % (g, n, _c_string(why) if why else "0"))
+    L += ["  {0, 0, 0},", "};", "",
+          "// names/mids.list: each point's address, values and continuations, or why this target has none (rc_mid.h)",
+          "const rc_mid_name rc_target_mids[] = {"]
+    for name in lists.get("mids", []):
+        if name not in t.mids:
+            why = t.inner_unsupported.get(name, "not in %s/mids.map" % t.id)
+            L.append('  {"%s", 0, %s},' % (name, _c_string(why)))
+            continue
+        a, vals, conts = t.mids[name]
+        L.append("  {\"%s\", 0x%xull, 0, %d, {%s}, %d, {%s}}," % (
+            name, a, len(vals), ", ".join("{\"%s\", '%s', %d, %d}" % (vn, k, loc | (MID_MEM if mem else 0), off)
+                                          for k, vn, loc, mem, off in vals),
+            len(conts), ", ".join('"%s"' % c for c, _ in conts)))
+    L += ["  {0, 0, 0},", "};", ""]
     return "\n".join(L)
 
 

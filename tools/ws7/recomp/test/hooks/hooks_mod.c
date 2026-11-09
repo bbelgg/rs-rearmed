@@ -107,7 +107,28 @@ static int first(rc_ctx *c, void *user) {
   return 0;
 }
 
+// Edits and mid points (rc_mid.h): what the constructor got, and what the mid hook does: count + 1, the word the
+// pointer value points to + 2, scale doubled, ZF flipped, on at the continuation `done`; and eax, ecx, edx and xmm1
+// changed as a call into the game changes them, which the point puts back
+int hm_edit[3], hm_mid_point, hm_mid_gone;
+static void mid(rc_mid_frame *f, void *user) {
+  int n = rc_mid_value(f->point, "count"), o = rc_mid_value(f->point, "obj"), x = rc_mid_value(f->point, "scale");
+  f->c->r[0] = 0xdead, f->c->r[1] = 0xbeef, f->c->r[2] = 0xf00d;
+  f->c->x[1][0] = 0xfeed;
+  rc_mid_set(f, n, rc_mid_get(f, n) + 1);
+  uint32_t *p = (uint32_t *)(uintptr_t)rc_mid_get(f, o);
+  if (p) *p += 2;
+  rc_mid_set_f(f, x, rc_mid_get_f(f, x) * 2);
+  f->flags ^= 0x40;
+  f->go = rc_mid_cont(f->point, "done");
+}
+
 __attribute__((constructor)) static void init(void) {
+  hm_edit[0] = rc_edit_enable("grp_here");
+  hm_edit[1] = rc_edit_enable("grp_gone");
+  hm_edit[2] = rc_edit_enable("no_such_group");
+  hm_mid_point = rc_mid_add_name("mid_here", mid, 0);
+  hm_mid_gone = rc_mid_add_name("mid_gone", mid, 0);
   for (int k = 0; hm_points[k].name; k++)
     if (rc_hook_add_name(hm_points[k].name, pre, post, (void *)(intptr_t)k)) hm_refused[7]++;
   rc_hook_add_name("many_cdecl", first, 0, 0);

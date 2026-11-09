@@ -5,6 +5,7 @@
 #define RC32_GEN_H
 #include "rc32.h"
 #include "rc_int.h"
+#include "rc_mid.h"
 #include "rc_sse.h"
 #include "rc32_sse.h"
 #include "rc32_x87.h"

@@ -129,7 +129,7 @@ class HookAbi(unittest.TestCase):
             self.abi("custom", "int(int a@xmm0)")
 
 
-class Synthetic(unittest.TestCase):
+class Tree:
     """A scratch tree: names/ plus a second target that lacks one name."""
 
     def setUp(self):
@@ -156,6 +156,9 @@ class Synthetic(unittest.TestCase):
     def errs(self):
         return check.check(self.base, scan_sources=False)
 
+
+
+class Synthetic(Tree, unittest.TestCase):
     def test_missing_name_fails(self):
         self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nframe 0x401020 cdecl -\nglob 0x500000 data int\n")
         e = self.errs()
@@ -188,6 +191,68 @@ class Synthetic(unittest.TestCase):
         self.assertIn("names/refs.list: glob listed twice", "\n".join(self.errs()))
         self.write("win-x86/symbols.map", "f_one 0x401000 pascal -\n")
         self.assertIn("expected NAME ADDRESS CONVENTION", "\n".join(self.errs()))
+
+
+class Inner(Tree, unittest.TestCase):
+    """Edit groups and mid points: edits.map and mids.map against names/edits.list and mids.list."""
+
+    def setUp(self):
+        Tree.setUp(self)
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two 0x401010 cdecl -\nframe 0x401020 cdecl -\n"
+                                          "glob 0x500000 data int\n")
+        self.write("names/edits.list", "wide  # a group\n")
+        self.write("names/mids.list", "pick\n")
+        self.write("mac-x64/target.toml", 'id = "mac-x64"\nfront_end = "x"\nabi = "sysv64"\n')
+        self.write("win-x86/target.toml", 'id = "win-x86"\nfront_end = "x"\nabi = "win32"\n')
+        self.write("mac-x64/edits.map", "wide 0x1004 6:0123abcd +2=6402  # a stride\nwide 0x1010 2:89abcdef =ebfe9090\n")
+        self.write("mac-x64/mids.map", "pick 0x1008 (int n@rsi, void *o@[rsp+0x10], float x@xmm1) -> skip=0x100c, out=0x1010\n")
+        self.write("win-x86/edits.map", "wide unsupported not found here\n")
+        self.write("win-x86/mids.map", "pick 0x401008 (int n@esi, void *o@[esp+0x10], double x@st0) -> skip=0x40100c, out=0x401010\n")
+
+    def test_tables_pass_and_generate(self):
+        self.assertEqual(self.errs(), [])
+        lists = targets.name_lists(self.base)
+        mac, win = targets.Target("mac-x64", self.base), targets.Target("win-x86", self.base)
+        edits, mids = targets.inner_points(mac, lists)
+        self.assertEqual(edits[0x1004][:4], (0, 6, "0123abcd", [(2, b"\x64\x02")]))
+        self.assertEqual(edits[0x1010][3], [(None, bytes.fromhex("ebfe9090"))])
+        old = bytes.fromhex("69c0cc010000")
+        self.assertEqual(targets.edit_bytes(old, edits[0x1004][3]), bytes.fromhex("69c064020000"))
+        self.assertEqual(targets.edit_check(old), __import__("hashlib").sha256(old).hexdigest()[:8])
+        self.assertEqual(mids[0x1008], (0, [0x100c, 0x1010], "pick"))
+        self.assertEqual(mac.mids["pick"][1], [("i", "n", 6, 0, 0), ("p", "o", 4, 1, 0x10), ("f", "x", 17, 0, 0)])
+        self.assertEqual(win.mids["pick"][1][2], ("d", "x", 32, 0, 0))
+        c = targets.gen_runtime_c(win, lists)
+        self.assertIn('{"wide", 0, "not found here"},', c)
+        self.assertIn("{\"pick\", 0x401008ull, 0, 3, {{\"n\", 'i', 6, 0}, {\"o\", 'p', 132, 16}, {\"x\", 'd', 32, 0}}, 2, "
+                      "{\"skip\", \"out\"}},", c)
+        self.assertIn('{"wide", 2, 0},', targets.gen_runtime_c(mac, lists))
+
+    def test_missing_and_stale(self):
+        self.write("win-x86/edits.map", "")
+        self.write("win-x86/mids.map", "other 0x401008 ()\n")
+        e = "\n".join(self.errs())
+        self.assertIn("target win-x86: edit group wide has no edits", e)
+        self.assertIn("target win-x86: no mid point pick", e)
+        self.assertIn("target win-x86: other is in edits.map or mids.map but not in names/edits.list or mids.list", e)
+
+    def test_bad_lines(self):
+        for text, want in (("wide 0x1004 6:0123abcd +5=6402\n", "a patch outside the range"),
+                           ("wide 0x1004 6:0123abcd +2=6402,+3=02\n", "over another"),
+                           ("wide 0x1004 6:0123abcd\n", "expected GROUP ADDRESS LEN:CHECK EDIT"),
+                           ("wide 0x1004 6:0123abcd +2=zz\n", "=HEX or +OFF=HEX"),
+                           ("wide 0x1004 69c0cc010000 +2=64\n", "expected LEN:CHECK"),
+                           ("wide 0x1004 6:0123abcd +2=6402\nwide 0x1006 2:00000000 =9090\n", "overlaps the edit at 0x1004")):
+            self.write("mac-x64/edits.map", text)
+            self.assertIn(want, "\n".join(self.errs()))
+        self.write("mac-x64/edits.map", "wide 0x1004 6:0123abcd +2=6402\n")
+        for text, want in (("pick 0x1008 (int n@st0)\n", "x87 values are a 32-bit guest's"),
+                           ("pick 0x1008 (float x@rax)\n", "a float in a float register"),
+                           ("pick 0x1008 (int n@[xmm0+4])\n", "a general register only"),
+                           ("pick 0x1008 (int n@rax) -> skip\n", "NAME=ADDRESS"),
+                           ("pick 0x1008 int n@rax\n", "expected (VALUES)")):
+            self.write("mac-x64/mids.map", text)
+            self.assertIn(want, "\n".join(self.errs()))
 
 
 class Sources(unittest.TestCase):

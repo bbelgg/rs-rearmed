@@ -170,6 +170,10 @@ the game files (`lp_install.py game-copy GAME --dest <folder>/game`, clones on t
 `--env LP_GAME_DIR=<game folder>`, which reads that folder as it is (no copy check); `--env` passes any
 other variable.
 
+**Full screen on a second display**: not run on Learn & Play. The Mac edition's way of moving the window, sending the
+keys and reading the frame is in [Mac TESTING](../mac/TESTING.md#game-runs); here the game's own full screen comes from
+its Windowed Mode setting.
+
 **An interface's channel and gain**, as on the Mac ([Mac TESTING](../mac/TESTING.md#game-runs)): the same steps, with
 `RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log has `guitar input "<device>": channel N, gain G dB` when the capture
 stream opens, and a peak for each open input every five seconds, the microphones among them.

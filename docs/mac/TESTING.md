@@ -128,6 +128,22 @@ user's, with a test profile.
   times on a second play.
 - **Fallback**: two forced kills (`kill -9`) of Metal starts in a row; the next start must use OpenGL, write
   `opengl` into `renderer` and `renderer-fallback.txt`; a clean quit removes `metal-session`.
+- **Full screen on a second display** (2026-11-09, a test install, a 4K TV at 1x beside the built-in screen): start the
+  executable with the network guard and the input injector, without the virtual cable (see the next point); the title is
+  enough. Move the window with System Events (`set position of window 1` of the process with the game's pid, to a point on
+  the second display): computer use's background drag didn't move it. Keys need the game in front: System Events' `set
+  frontmost` of the process, then `keystroke "f" using {command down, shift down}` (a background key from computer use
+  doesn't reach it). Read the window's frame from `CGWindowListCopyWindowInfo` (the bounds of the pid's windows, a few lines of
+  Swift) and the render size from a snapshot. Full screen is the display's frame at window level 25 and a 3840x2160
+  snapshot; with another app in front the window hides and keeps that frame; Shift-Command-F again gives a 1280x720 window
+  on the same display, at its top. The two crashes of the next point had moved that install to OpenGL: write `metal` back
+  into its `renderer` and delete `renderer-fallback.txt`.
+- **The virtual cable crashes the game at the title** since the per-channel input list (7333a2a): its device id,
+  `0x7a7a0001`, has the bit the list marks its channel entries with (`0x40000000`, `audio_devs.c`), so its reads go to a
+  device that doesn't exist, and the game's device scan, after a failed UID read, releases a NULL string (`CFRelease()
+  called with NULL`). Real devices' ids are small numbers. Until the cable takes another id, use a real interface, or no
+  cable for checks that don't need input. In that run the title was the stock one, which the injector's reference (the
+  Re-ARMed title) doesn't match (difference 5.1), so `wait-title` never fired: look at a snapshot and go on by hand.
 - **No intro screens** (`RS_MODS_INTRO`): boot to the title several times with the original `cache.psarc`
   (a fast-load `cache.psarc` has a short intro of its own and hides problems) and with a fast-load one;
   with the skip, snapshots show white, about three seconds of black, then the title (about 8 s from

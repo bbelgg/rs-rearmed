@@ -390,7 +390,8 @@ class IntMixin:
                      "if (rdx == (uint64_t)((int64_t)rax >> 63) && !(d == -1 && rax == (1ull << 63))) { "
                      "int64_t q = (int64_t)rax / d, r = (int64_t)rax %% d; rax = (uint64_t)q; rdx = (uint64_t)r; } else { "
                      "__int128 x = (__int128)(((unsigned __int128)rdx << 64) | rax); "
-                     "if (d == -1) %s __int128 q = x / d; if (q != (int64_t)q) %s "
+                     "if (d == -1 && x == (__int128)((unsigned __int128)1 << 127)) %s "  # the one x / -1 C can't do
+                     "__int128 q = x / d; if (q != (int64_t)q) %s "
                      "rax = (uint64_t)(int64_t)q; rdx = (uint64_t)(int64_t)(x %% d); } }" % (b, de, de, de))
         out.append(s)
 
@@ -496,8 +497,10 @@ class IntMixin:
             self.xchg(i, out)
         elif base in ("adc", "sbb", "neg", "not"):
             b = "b = %s & %s" % (self.rd(i, ops[1], n), M) if len(ops) > 1 else "b = 0"
-            out.append("{ %s *p_ = %s; %s o = __atomic_load_n(p_, __ATOMIC_SEQ_CST); uint64_t %s; "
-                       "for (;;) { uint64_t a = o; %s if (__atomic_compare_exchange_n(p_, &o, (%s)t, 0, "
+            # the carry in is the instruction's at every try: alu leaves the carry out in cf, and a try that
+            # lost the exchange must not feed its own into the next (adc, sbb)
+            out.append("{ %s *p_ = %s; %s o = __atomic_load_n(p_, __ATOMIC_SEQ_CST); uint64_t %s; int cf0_ = cf; "
+                       "for (;;) { uint64_t a = o; cf = cf0_; %s if (__atomic_compare_exchange_n(p_, &o, (%s)t, 0, "
                        "__ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)) break; } }"
                        % (ct, p, ct, b, self.alu(base, n), ct))
         else:

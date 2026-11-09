@@ -188,6 +188,8 @@ def hook_table(hooks, native, conv):
     and a branch more than the function: a hot one must not show on the game thread."""
     if not hooks:
         return []
+    if len(hooks) > 256:   # runtime/rc_hook.c: MAX_POINTS, what rc_hook_on[] and the slots are indexed up to
+        sys.exit("gen_image_pe.py: %d hook points, and the runtime has room for 256 (rc_hook.c: MAX_POINTS)" % len(hooks))
     L = ['#include "rc_hook.h"', ""]
     for k, a in enumerate(hooks):
         fn = "%s_%x" % ("N" if a in native else "W", a)

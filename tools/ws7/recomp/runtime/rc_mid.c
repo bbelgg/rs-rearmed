@@ -24,7 +24,7 @@ static int g_fixed;
 
 int rc_edit_enable(const char *group) {
   int k = 0;
-  for (const rc_edit_name *e = rc_target_edits; e->name; e++, k++) {
+  for (const rc_edit_name *e = rc_target_edits; group && e->name && k < RC_EDIT_GROUPS; e++, k++) {
     if (strcmp(e->name, group)) continue;
     if (!e->nedits) {
       fprintf(stderr, "[rc] edits %s: not on this game (%s): %s\n", group, target(), e->why);
@@ -35,7 +35,6 @@ int rc_edit_enable(const char *group) {
               group);
       return -1;
     }
-    if (k >= RC_EDIT_GROUPS) return -1;
     if (!rc_edit_on[k]) fprintf(stderr, "[rc] edits %s: on (%d)\n", group, e->nedits);
     rc_edit_on[k] = 1;
     return 0;
@@ -46,7 +45,7 @@ int rc_edit_enable(const char *group) {
 
 int rc_edit_is_on(const char *group) {
   int k = 0;
-  for (const rc_edit_name *e = rc_target_edits; e->name && k < RC_EDIT_GROUPS; e++, k++)
+  for (const rc_edit_name *e = rc_target_edits; group && e->name && k < RC_EDIT_GROUPS; e++, k++)
     if (!strcmp(e->name, group)) return rc_edit_on[k];
   return 0;
 }
@@ -62,11 +61,17 @@ typedef struct {
 } mid_slot;
 static mid_slot g_mid[RC_MID_POINTS];
 
+// The table's entry of a point. A hook reads its values through this (rc_mid_get: value_of), on whatever path its
+// point is on, so the table is counted once and indexed, not walked for each value. The count is the same from
+// any thread.
 static const rc_mid_name *mid_of(int point) {
-  int k = 0;
-  for (const rc_mid_name *m = rc_target_mids; m->name; m++, k++)
-    if (k == point) return m;
-  return 0;
+  static int n = -1;
+  int have = __atomic_load_n(&n, __ATOMIC_RELAXED);
+  if (have < 0) {
+    for (have = 0; have < RC_MID_POINTS && rc_target_mids[have].name;) have++;
+    __atomic_store_n(&n, have, __ATOMIC_RELAXED);
+  }
+  return point >= 0 && point < have ? &rc_target_mids[point] : 0;
 }
 
 int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user) {
@@ -81,6 +86,10 @@ int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user) {
       fprintf(stderr, "[rc] mid point %s: its %d hooks are taken\n", name, MAX_MID_HOOKS);
       return -1;
     }
+    if (!fn) {
+      fprintf(stderr, "[rc] mid point %s: no function given\n", name);
+      return -1;
+    }
     g_mid[k].user[g_mid[k].n] = user;
     g_mid[k].fn[g_mid[k].n++] = fn;
     rc_mid_on[k] = 1;
@@ -92,17 +101,18 @@ int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user) {
 
 int rc_mid_value(int point, const char *value) {
   const rc_mid_name *m = mid_of(point);
-  for (int i = 0; m && i < m->nvalues; i++)
+  for (int i = 0; m && value && i < m->nvalues; i++)
     if (!strcmp(m->value[i].name, value)) return i;
-  fprintf(stderr, "[rc] mid point %s: no value %s here (%s)\n", m ? m->name : "?", value, target());
+  fprintf(stderr, "[rc] mid point %s: no value %s here (%s)\n", m ? m->name : "?", value ? value : "(null)", target());
   return -1;
 }
 
 int rc_mid_cont(int point, const char *cont) {
   const rc_mid_name *m = mid_of(point);
-  for (int i = 0; m && i < m->nconts; i++)
+  for (int i = 0; m && cont && i < m->nconts; i++)
     if (!strcmp(m->cont[i], cont)) return i + 1;
-  fprintf(stderr, "[rc] mid point %s: no continuation %s here (%s)\n", m ? m->name : "?", cont, target());
+  fprintf(stderr, "[rc] mid point %s: no continuation %s here (%s)\n", m ? m->name : "?", cont ? cont : "(null)",
+          target());
   return -1;
 }
 

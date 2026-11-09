@@ -668,6 +668,14 @@ static void inner(void) {
   CHECK(rc_mid_on[0] && !rc_mid_on[1]);
   CHECK_EQ((uint32_t)rc_mid_value(0, "nothing"), (uint32_t)-1);
   CHECK_EQ(rc_mid_cont(0, "again"), 1);
+  // a name that is not there, a point that is not one, a hook that is none: refused, not read
+  CHECK_EQ((uint32_t)rc_edit_enable(0), (uint32_t)-1);
+  CHECK(!rc_edit_is_on(0));
+  CHECK_EQ((uint32_t)rc_mid_value(0, 0), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_cont(0, 0), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_value(-1, "x"), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_value(RC_MID_POINTS, "x"), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_add_name(rc_target_mids[0].name, 0, 0), (uint32_t)-1);
   ctx->r[6] = 41;
   ctx->r[0] = 10, ctx->r[1] = 11, ctx->r[2] = 12;
   ctx->x[1][0] = 13;

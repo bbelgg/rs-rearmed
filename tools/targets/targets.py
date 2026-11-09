@@ -369,6 +369,8 @@ GPR32 = ["eax", "ecx", "edx", "ebx", "esp", "ebp", "esi", "edi"]
 MID_MEM = 0x80      # RC_MID_MEM
 MAX_MID_VALUES = 8  # RC_MID_MAXVALUES
 MAX_MID_CONTS = 8   # RC_MID_MAXCONTS
+MAX_EDIT_GROUPS = 64    # RC_EDIT_GROUPS: the switches the generated code indexes
+MAX_MID_POINTS = 1024   # RC_MID_POINTS
 
 
 def _mid_reg(r, abi, where, mem=False):
@@ -448,7 +450,7 @@ def parse_edit(span, edit, where):
         if off is None:
             continue
         r = set(range(off, off + len(b)))
-        if not b or off + len(b) > n or r & taken:
+        if not b or off < 0 or off + len(b) > n or r & taken:
             raise TargetError("%s: a patch outside the range, empty, or over another" % where)
         taken |= r
     return n, m.group(2), patches
@@ -475,6 +477,9 @@ def inner_points(t, lists):
     names/edits.list's groups, {addr: (point index, [continuation addrs], name)} of names/mids.list's points). The
     index is the name's place in its list, the same on every target."""
     groups, points = lists.get("edits", []), lists.get("mids", [])
+    if len(groups) > MAX_EDIT_GROUPS or len(points) > MAX_MID_POINTS:
+        raise TargetError("names/edits.list and mids.list: at most %d groups and %d points (rc_mid.h: RC_EDIT_GROUPS, "
+                          "RC_MID_POINTS)" % (MAX_EDIT_GROUPS, MAX_MID_POINTS))
     edits = {}
     for g, a, n, check, patches, where in t.edits:
         if g not in groups:

@@ -189,7 +189,7 @@ static void run_tests(rsp_shell *sh) {
   CHECK([NSApp delegate] == (id)sh->delegate && sh->delegate.window == w, "delegate wiring");
   CHECK([w contentView] == v, "content view");
   CHECK(([w styleMask] & 15) == 15, "style mask %lx", (unsigned long)[w styleMask]);
-  CHECK([[w title] isEqualToString:@"Rocksmith 2014"], "title");
+  CHECK([[w title] hasPrefix:@"Rocksmith 2014 Re-ARMed "], "title %s", [[w title] UTF8String]);
   NSSize cs = [w contentRectForFrameRect:[w frame]].size;
   CHECK(cs.width == 1280 && cs.height == 720, "content %gx%g", cs.width, cs.height);
   CHECK(rsp_g_main_controller == mc && v->controller == mc && mc->openGLView == v, "controller wiring");

@@ -220,6 +220,7 @@ user's, with a test profile.
   Return (no match: the box stays open), `i`; a click, `i`. The same dylib ran the same route in Learn & Play ([Windows
   testing](../windows/TESTING.md#unattended-runs)), with the same SHA-256 in both logs and the same results but for the lyrics (Learn & Play's test song has no lyric steps). Keep a copy of
   `steam/`: Return on ProfileSelect with no profile starts the first-time screens, and `fwddelete` there deletes the profile.
+- **Decoded song audio** (`ak_src_submit`, 2026-11-09): a test mod on the hook point wrote each stereo block, its file ID and position to a file, and its `Play_` events to a log; by keyfifo as for the rearmed-mods library (LearnASong_PreSongTuner: `fwddelete`, Return), 30 s of the song, then `z` (rearmed-mods' rewind, `AllowRewind = on`). The song's file ID is the `.wem` in its archive (a custom song in `dlc/wrz/` here; the archive search has to go into `dlc/`'s folders). Its blocks against vgmstream's decode of that `.wem`: -92 dB at worst, the rewind's next block -98 dB.
 - **Sharper picture and screen shape** (2026-11-08, a test install, the colors run's profile on DISCONNECTED, `RS_MODS_LOG=1`,
   `RS_GL_SNAPSHOT_SECS=5`): the log has `MSAA 4x on the game's screen-sized targets`. By keyfifo, Return on TitleScreen, ProfileSelect,
   SelectionListDialog, ProfileSelect, MainMenu, LearnASong_Songs and LearnASong_SongOptions (each a few seconds after its `menu:` line)

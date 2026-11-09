@@ -416,6 +416,7 @@ nicamera_vtable            # NiCamera's vtable, as an object's first word holds 
 game_color_manager         # GameColorManager, the game's colors by name: the string colors are in its table (game_color_table)
 detection_service          # DetectionService, the guitar's pitch detection: its detector has the note the player plays (detection_note)
 efd_str_destroy            # efd string's destructor (string *): frees its text when it isn't inline (efd_str_inline); the fields stay as they were
+ak_vorbis_codebooks        # the Vorbis decoder's codebook library (aoTuV 6.03's, as Wwise packs them): a table of ak_vorbis_codebook_count pointers, one a codebook, in one block; Song Stems' helper rebuilds a song's Vorbis setup with them
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
 guitar_rebuild_player0
 guitar_string_attach_point

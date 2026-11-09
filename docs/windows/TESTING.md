@@ -418,6 +418,8 @@ SPEED; `key fwddelete` resumes. A Disconnected song ends on LearnASong_SongOptio
 Hotkeys in the search, all quiet, then firing again after Esc: `lpshift`, then `i`, `l`, `5`, `f`; `lpshift`, `qq`, Return (no match: the box
 stays open), `i`; a click, `i`. In a text entry dialog (a new profile's name) too. `song timer`, `volume:`, `lyrics` and `enumeration:` lines are what firing looks like.
 
+**Decoded song audio** (`ak_src_submit`, 2026-11-09): the [Mac's](../mac/TESTING.md#game-runs) test mod, the same dylib, in `mods/` of a clone of the test home (`LP_GAME_DIR`, `LP_USER_DIR`, `RS_STEAM_DATA_DIR`, `RS_MODS_PATH`; the build's `out/rs2014_lp` started directly with keyfifo, and it starts itself again with its `libnetguard.dylib` because there are mods). By keyfifo on the `menu:` lines: Return on TitleScreen, ProfileSelect, MainMenu, LearnASong_Songs (the first row) and LearnASong_SongOptions, Return on TUNE UP! (SelectionListDialog), LearnASong_Game; 30 s of the song, then `z` (`AllowRewind = on`). Its blocks against vgmstream's decode of the song's `.wem` (`audio/windows/` in `dlc/<song>_p.psarc`): -94 dB at worst, the rewind's next block -104 dB.
+
 **Keep a test profile**: without one, Return on ProfileSelect starts a new profile and every key after it goes through the first-time
 screens; and `fwddelete` on ProfileSelect deletes the profile. Copy `steam/` before a run, restore it after one that went astray, and let
 a route stop when the screen it expects doesn't come.

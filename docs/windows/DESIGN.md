@@ -440,7 +440,7 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
   log line: built for the Mac alone, it would misread this game's memory.
 
-  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Fifteen of the 20
+  A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Sixteen of the 21
   are functions of this game. Eight of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,
   its `this` hidden, and answers the Mac's "quit" from the service's state (7 ends the Run loop here, as in the
   Mac function); `ui_event` gets its two folded arguments as their one value; `rr_speed_ratio` shows and takes 100 /

@@ -118,6 +118,11 @@ note_stats_misses                 0x40    # a miss 0xfd4a82 (addl); the miss str
 note_stats_track                  0xc     # 0xfd4a79: [this + 0xc] after a miss, where the Mac reads +0x10 (0x10025449b)
 track_song_time                   0x3d0   # read in runs: RSMods' song timer (*0x1ee062c +0xb0 +0x538 +0x8) to the millisecond, playing and paused
 track_grey_time                   0x3dc   # read in runs: RSMods' grey note timer (*0x1ee062c +0x68 +0x10 +0x2c +0x28 +0x3dc) is this, note_stats_track's; raised to the song time at each pause
+ak_src_pbi                        0xc     # ak_src_submit 0x1a98f10; the stream setup 0x1a99466 reads it
+ak_pbi_src_info                   0x64    # 0x1a9946d; the file ID at +4 (-1 when none), its name at +0x14
+ak_src_info_file_id               0x4     # 0x1a994bf: the ID the stream is opened by
+ak_src_position                   0x18    # ak_src_submit: the block's position (to the buffer's +0x18), then += frames (0x1a98f33)
+ak_vorbis_codebook_count          599     # 0x1ddabc8 to 0x1ddb524, as the Mac's
 ui_note_stats_0                   0xb0    # RSMods' ptr_noteDataOffsets from *0x1ee062c (ui_manager), Learn a Song's; read in runs: the counts below, playing and paused
 ui_note_stats_1                   0x18    # RSMods' path, read in runs
 ui_note_stats_2                   0x4     # RSMods' path, read in runs

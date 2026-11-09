@@ -192,6 +192,7 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
     *(float *)data = *soft_slot(obj);
     return noErr;
   }
+  uint32_t asked = size ? *size : 0;
   OSStatus st = AudioObjectGetPropertyData(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
   if (st == noErr && a && obj & ENTRY_ID && size && data) {
     if (a->mSelector == kAudioObjectPropertyName && *size == sizeof(CFStringRef) && *(CFStringRef *)data)
@@ -202,6 +203,20 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
   if (st == noErr && a && a->mSelector == kAudioDevicePropertyDeviceUID && size && *size == sizeof(CFStringRef) &&
       data && *(CFStringRef *)data && rs_audio_env_on("RS_AUDIO_STABLE_UIDS", 1))
     *(CFStringRef *)data = rs_audio_stable_uid(*(CFStringRef *)data);
+  // Not in the original: the device scan (0x10133ccb0) releases the UID it asked for even when the read failed
+  // (0x10133d840). Its variable then holds nothing, a crash in CFRelease, or the previous device's string, released a
+  // second time (with stable UIDs, the kept copy, freed while kept). A UID that can't be read, or reads as nothing,
+  // comes back as a constant empty string, which CFRelease leaves alone; the scan goes on to the next device, as the
+  // original meant (one read as nothing is kept, with the empty UID). RS_AUDIO_LOG says which device, once in a row.
+  if (a && a->mSelector == kAudioDevicePropertyDeviceUID && asked == sizeof(CFStringRef) && data &&
+      (st != noErr || !*(CFStringRef *)data)) {
+    *(CFStringRef *)data = CFSTR("");
+    static _Atomic uint32_t last_unread;
+    if (atomic_exchange(&last_unread, obj) != obj) {
+      if (st != noErr) rs_audio_log("device 0x%x: its UID can't be read (%d): the device scan skips it", obj, (int)st);
+      else rs_audio_log("device 0x%x: its UID reads as nothing: an empty one in its place", obj);
+    }
+  }
   rs_audio_trace_get(obj, addr, st, size ? *size : 0, data);
   if (st != noErr || obj != kAudioObjectSystemObject || a->mSelector != kAudioHardwarePropertyDevices ||
       !size || !data || !rs_audio_env_on("RS_AUDIO_INPUTS_FIRST", 1))

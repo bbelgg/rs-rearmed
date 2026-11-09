@@ -385,6 +385,7 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 | [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
 | [Two players](#two-players) on any input | yes | Built-in Mods…, `RS_MODS_MULTIPLAYER=0` |
 | An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
+| A device whose identifier can't be read is skipped, where the game crashed at the title | not needed: its own device list | always on |
 | [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
 | Retina, Metal only: on a Retina screen each frame is scaled up to the screen's own pixels with MetalFX (macOS 13+; bilinear before), while the game renders in points | yes | `RS_METAL_UPSCALE=0` (a plain bilinear scale, as the screen did before); `RS_METAL_RETINA=1` renders every pixel instead (about 4x the GPU work) |
 | Colours as the game made them (sRGB): the picture is colour-matched to the screen, so a wide-colour (P3) screen, such as a Mac's own, no longer shows it oversaturated | yes | `RS_METAL_COLORS=vivid` (the old, untagged look) |

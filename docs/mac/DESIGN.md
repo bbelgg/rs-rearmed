@@ -135,7 +135,10 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
   The game reads the list about 26 times at the start and not again in play, so its device reads cost nothing there;
 - devices get stable identifiers, so an interface is not dropped from Direct Connect after another device
   fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`; `RS_AUDIO_INPUTS_FIRST` applies with the
-  list of inputs off, as the list has its own order).
+  list of inputs off, as the list has its own order);
+- a device whose identifier can't be read is skipped rather than crashing the game: the device scan releases the
+  identifier even when the read failed (NULL, or the previous device's, released twice), so a failed read hands back a
+  constant empty string, which a release leaves alone (`audio_devs.c`; `RS_AUDIO_LOG=1` names the device).
 
 The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the
 input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which the Windows port shares. `RS_AUDIO_LOG=1` logs the setup.

@@ -138,11 +138,12 @@ user's, with a test profile.
   snapshot; with another app in front the window hides and keeps that frame; Shift-Command-F again gives a 1280x720 window
   on the same display, at its top. The two crashes of the next point had moved that install to OpenGL: write `metal` back
   into its `renderer` and delete `renderer-fallback.txt`.
-- **The virtual cable crashes the game at the title** since the per-channel input list (7333a2a): its device id,
-  `0x7a7a0001`, has the bit the list marks its channel entries with (`0x40000000`, `audio_devs.c`), so its reads go to a
-  device that doesn't exist, and the game's device scan, after a failed UID read, releases a NULL string (`CFRelease()
-  called with NULL`). Real devices' ids are small numbers. Until the cable takes another id, use a real interface, or no
-  cable for checks that don't need input. In that run the title was the stock one, which the injector's reference (the
+- **The virtual cable isn't found** since the per-channel input list (7333a2a): its device id, `0x7a7a0001`, has the
+  bit the list marks its channel entries with (`0x40000000`, `audio_devs.c`), so its reads go to a device that doesn't
+  exist. Real devices' ids are small numbers. Until the device scan skipped a device whose UID can't be read, the game
+  then crashed at the title (`CFRelease() called with NULL`, two runs on 2026-11-09); now `RS_AUDIO_LOG=1` has `device
+  0x7a7a0001: its UID can't be read`, and the scan opens the other inputs. Until the cable takes another id, use a real
+  interface for checks that need input. In that run the title was the stock one, which the injector's reference (the
   Re-ARMed title) doesn't match (difference 5.1), so `wait-title` never fired: look at a snapshot and go on by hand.
 - **No intro screens** (`RS_MODS_INTRO`): boot to the title several times with the original `cache.psarc`
   (a fast-load `cache.psarc` has a short intro of its own and hides problems) and with a fast-load one;

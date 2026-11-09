@@ -63,6 +63,8 @@ let lpHome = nativeHome + "/learn-play"  // lp_install.py app-install's folder (
 // Steam's folders; "Refresh Game Files" syncs it again. The copy's tool is installed next to it.
 func gameCopy(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/game" }
 func gameCopyTool(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/gamefiles.py" }
+// The built-in mods switched off (Built-in Mods…), which the edition's launcher reads at every start.
+func settingsFile(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/settings.env" }
 func gameCopyExists(_ game: String) -> Bool {
     (FileManager.default.fileExists(atPath: gameCopy(game) + "/.rearmed/source.json") || gameCopyElsewhere(game) != nil)
         && FileManager.default.fileExists(atPath: gameCopyTool(game))
@@ -1113,6 +1115,8 @@ class InstallerWindow: NSWindow {
     let refreshButton = NSButton(title: "Refresh Game Files", target: nil, action: nil)
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
     let rendererPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let modsButton = NSButton(title: "Built-in Mods…", target: nil, action: nil)
+    var modsSheet: BuiltInModsSheet?  // while it is shown
     let gamePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let gameDirLabel = NSTextField(labelWithString: "Rocksmith 2014 game folder:")
     var macGameDir = ""  // the Mac game folder field, kept while Learn & Play is chosen
@@ -1265,6 +1269,15 @@ class InstallerWindow: NSWindow {
         rendererHint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         rendererHint.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(rendererHint)
+
+        // Built-in mods to switch off, for the game chosen above (the sheet says which).
+        modsButton.bezelStyle = .rounded
+        modsButton.target = self
+        modsButton.action = #selector(showBuiltInMods)
+        modsButton.toolTip = "Switch off built-in mods, such as custom songs or the intro skip. Takes effect the next "
+            + "time the game starts; nothing to reinstall."
+        modsButton.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(modsButton)
 
         // Source info
         let sourceLabel = NSTextField(labelWithString: "Source:")
@@ -1463,7 +1476,11 @@ class InstallerWindow: NSWindow {
 
             rendererHint.centerYAnchor.constraint(equalTo: rendererPopup.centerYAnchor),
             rendererHint.leadingAnchor.constraint(equalTo: rendererPopup.trailingAnchor, constant: 10),
-            rendererHint.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -20),
+            rendererHint.trailingAnchor.constraint(lessThanOrEqualTo: modsButton.leadingAnchor, constant: -10),
+
+            modsButton.centerYAnchor.constraint(equalTo: rendererPopup.centerYAnchor),
+            modsButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            modsButton.widthAnchor.constraint(equalToConstant: 140),
 
             sourceLabel.topAnchor.constraint(equalTo: rendererPopup.bottomAnchor, constant: 12),
             sourceLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
@@ -1655,6 +1672,13 @@ class InstallerWindow: NSWindow {
             logView.string = logText
             logView.scrollToEndOfDocument(nil)
         }
+    }
+
+    @objc func showBuiltInMods() {
+        guard modsSheet == nil else { return }
+        let s = BuiltInModsSheet(game: selectedGame)
+        modsSheet = s
+        beginSheet(s.sheet) { [weak self] _ in self?.modsSheet = nil }
     }
 
     @objc func browseGameDir() {
@@ -1889,6 +1913,203 @@ class InstallerWindow: NSWindow {
     }
 }
 
+// MARK: - Built-in mods
+
+// The built-in mods a player can switch off: KEY=0 lines in each edition's settings.env, which its launcher reads
+// at every start (tools/play-native/launch.sh; Learn & Play: win-x86/app/lp_settings.c), so a change needs no
+// reinstall. The keys are switches of docs/mac/INSTALL.md and docs/windows/INSTALL.md, "Settings and switches",
+// and the same list as both launchers' (tools/play-native/test_settings.py checks it); nothing that touches the
+// offline layer can be set this way. No file is every mod on, as before there was one.
+struct BuiltInMod {
+    let key: String
+    let title: String
+    let detail: String
+    var lpDetail: String? = nil  // Learn & Play's, where it has less
+}
+let builtInMods: [BuiltInMod] = [
+    BuiltInMod(key: "RS_MODS_BYPASS", title: "Custom songs (CDLC)",
+               detail: "Songs without the game's signature load, as with RSBypass. Off: custom songs are not listed."),
+    BuiltInMod(key: "RS_MODS_FIXES", title: "Faster loading and other fixes (rs-mac-fixes)",
+               detail: "Large song libraries load faster; more keyboard keys, the End key in menus, more open files.",
+               lpDetail: "Large song libraries load faster; more open files."),
+    BuiltInMod(key: "RS_MODS_INTRO", title: "Skip the intro screens",
+               detail: "The logos and the intro video at start-up."),
+    BuiltInMod(key: "RS_MODS_AUTOSAVE", title: "Skip the Auto Save warning",
+               detail: "The notice after choosing a profile."),
+    BuiltInMod(key: "RS_MODS_OVERLAY", title: "Menu additions",
+               detail: "DIRECT CONNECT for audio interfaces, ENUMERATE in place of SHOP, EXIT GAME in place of UPLAY."),
+    BuiltInMod(key: "RS_MODS_MULTIPLAYER", title: "Two players on any input",
+               detail: "Off: Player 2 needs a Real Tone cable, as in the original game."),
+    BuiltInMod(key: "RS_REARMED", title: "Re-ARMed title logo",
+               detail: "Off: the game's own logo."),
+]
+
+// The mods an edition's settings.env switches off, read as the launchers read it: whitespace ignored, # a comment,
+// KEY=0 or KEY=1 of the keys above, the first of a key counts.
+func modsSwitchedOff(_ game: String) -> Set<String> {
+    guard let text = try? String(contentsOfFile: settingsFile(game), encoding: .utf8) else { return [] }
+    var seen = Set<String>(), off = Set<String>()
+    for raw in text.components(separatedBy: "\n") {
+        let line = raw.filter { !$0.isWhitespace }
+        guard !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
+        let key = String(line[..<eq]), value = String(line[line.index(after: eq)...])
+        guard builtInMods.contains(where: { $0.key == key }), value == "0" || value == "1", !seen.contains(key)
+        else { continue }
+        seen.insert(key)
+        if value == "0" { off.insert(key) }
+    }
+    return off
+}
+
+// The installer writes the whole file: the mods switched off, or no file when none is.
+func saveModsSwitchedOff(_ game: String, _ off: Set<String>) throws {
+    let path = settingsFile(game)
+    if off.isEmpty {
+        if FileManager.default.fileExists(atPath: path) { try FileManager.default.removeItem(atPath: path) }
+        return
+    }
+    try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,
+                                            withIntermediateDirectories: true)
+    let docs = game == "learnplay" ? "docs/windows/INSTALL.md" : "docs/mac/INSTALL.md"
+    let text = """
+        # The built-in mods switched off, written by the RS Re-ARMed Installer (Built-in Mods…) and read at every
+        # start of the game. KEY=0 is off; the switches are in \(docs), "Settings and switches".
+
+        """ + builtInMods.filter { off.contains($0.key) }.map { "\($0.key)=0\n" }.joined()
+    try text.write(toFile: path, atomically: true, encoding: .utf8)
+}
+
+// A value `launchctl setenv` gives every app started from now on: it wins over the file.
+func launchctlValue(_ key: String) -> String? {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+    p.arguments = ["getenv", key]
+    let out = Pipe()
+    p.standardOutput = out
+    p.standardError = FileHandle.nullDevice
+    guard (try? p.run()) != nil else { return nil }
+    let data = out.fileHandleForReading.readDataToEndOfFile()
+    p.waitUntilExit()
+    let value = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+    return value.isEmpty ? nil : value
+}
+
+// The sheet: one checkbox per mod for the game chosen in the window, every one on unless the file says off.
+@MainActor
+final class BuiltInModsSheet: NSObject {
+    let game: String
+    let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 200), styleMask: [.titled],
+                         backing: .buffered, defer: false)
+    private var checks: [(key: String, box: NSButton)] = []
+
+    init(game: String) {
+        self.game = game
+        super.init()
+        let lp = game == "learnplay"
+        let width: CGFloat = 480  // inside the margins
+        let off = modsSwitchedOff(game)
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .leading
+        stack.spacing = 0
+        stack.edgeInsets = NSEdgeInsets(top: 20, left: 20, bottom: 20, right: 20)
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        func label(_ text: String, size: CGFloat, indent: CGFloat = 0, color: NSColor = .secondaryLabelColor) -> NSView {
+            let l = NSTextField(wrappingLabelWithString: text)
+            l.font = .systemFont(ofSize: size)
+            l.textColor = color
+            l.isSelectable = false
+            l.translatesAutoresizingMaskIntoConstraints = false
+            l.widthAnchor.constraint(equalToConstant: width - indent).isActive = true
+            guard indent > 0 else { return l }
+            let row = NSStackView(views: [l])
+            row.edgeInsets = NSEdgeInsets(top: 0, left: indent, bottom: 0, right: 0)
+            return row
+        }
+
+        let title = NSTextField(labelWithString: "Built-in mods: \(lp ? gameLP : gameMac)")
+        title.font = .boldSystemFont(ofSize: 14)
+        stack.addArrangedSubview(title)
+        stack.setCustomSpacing(6, after: title)
+        let intro = label("Uncheck what you don't want. A change takes effect the next time the game starts, with "
+                          + "nothing to reinstall.", size: 12)
+        stack.addArrangedSubview(intro)
+        stack.setCustomSpacing(16, after: intro)
+
+        for mod in builtInMods {
+            let box = NSButton(checkboxWithTitle: mod.title, target: nil, action: nil)
+            box.state = off.contains(mod.key) ? .off : .on
+            box.toolTip = "\(mod.key) in \((settingsFile(game) as NSString).abbreviatingWithTildeInPath)"
+            stack.addArrangedSubview(box)
+            stack.setCustomSpacing(2, after: box)
+            let detail = label((lp ? mod.lpDetail : nil) ?? mod.detail, size: 11, indent: 20)
+            stack.addArrangedSubview(detail)
+            stack.setCustomSpacing(10, after: detail)
+            checks.append((mod.key, box))
+        }
+
+        // A switch set with launchctl setenv (the earlier way, docs' "Settings and switches") wins over these.
+        let overridden = builtInMods.compactMap { m in launchctlValue(m.key).map { "\(m.key)=\($0)" } }
+        if !overridden.isEmpty {
+            let note = label("Set with launchctl setenv, which wins over this page until you log out: "
+                             + overridden.joined(separator: ", ") + ". launchctl unsetenv clears it.",
+                             size: 11, color: .systemOrange)
+            stack.addArrangedSubview(note)
+            stack.setCustomSpacing(10, after: note)
+        }
+        stack.setCustomSpacing(16, after: stack.arrangedSubviews.last!)
+
+        let restore = NSButton(title: "Turn All On", target: self, action: #selector(allOn))
+        let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelled))
+        cancel.keyEquivalent = "\u{1b}"
+        let save = NSButton(title: "Save", target: self, action: #selector(saved))
+        save.keyEquivalent = "\r"
+        for b in [restore, cancel, save] { b.bezelStyle = .rounded }
+        let buttons = NSStackView()
+        buttons.orientation = .horizontal
+        buttons.addView(restore, in: .leading)
+        buttons.addView(cancel, in: .trailing)
+        buttons.addView(save, in: .trailing)
+        buttons.translatesAutoresizingMaskIntoConstraints = false
+        stack.addArrangedSubview(buttons)
+        buttons.widthAnchor.constraint(equalToConstant: width).isActive = true
+        save.widthAnchor.constraint(greaterThanOrEqualToConstant: 90).isActive = true
+        cancel.widthAnchor.constraint(equalTo: save.widthAnchor).isActive = true
+
+        let content = NSView()
+        content.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: content.topAnchor),
+            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+        ])
+        sheet.contentView = content
+        content.layoutSubtreeIfNeeded()
+        sheet.setContentSize(content.fittingSize)
+    }
+
+    @objc func allOn() { for c in checks { c.box.state = .on } }
+
+    @objc func cancelled() { sheet.sheetParent?.endSheet(sheet, returnCode: .cancel) }
+
+    @objc func saved() {
+        let off = Set(checks.filter { $0.box.state == .off }.map { $0.key })
+        do {
+            try saveModsSwitchedOff(game, off)
+        } catch {
+            _ = showAlert(title: "The settings could not be saved",
+                          message: "\((settingsFile(game) as NSString).abbreviatingWithTildeInPath): "
+                              + error.localizedDescription,
+                          buttons: ["OK"])
+            return
+        }
+        sheet.sheetParent?.endSheet(sheet, returnCode: .OK)
+    }
+}
+
 // MARK: - Update check
 
 func checkForUpdate() async -> (tag: String, url: String)? {
@@ -1983,6 +2204,8 @@ func makeMainMenu() -> NSMenu {
     let main = NSMenu()
 
     let appMenu = NSMenu()
+    appMenu.addItem(withTitle: "Built-in Mods…", action: #selector(InstallerWindow.showBuiltInMods), keyEquivalent: ",")
+    appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide RS Re-ARMed Installer", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Quit RS Re-ARMed Installer", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")

@@ -76,4 +76,7 @@ if(Python3_FOUND)
   # The Direct Connect overlay (tools/play-native/cache_overlay.py): made-up archives; the real cache.psarc
   # when there is one.
   add_test(NAME play-native.cache_overlay COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_cache_overlay.py)
+  # settings.env, the built-in mods switched off in the installer: the Mac launcher's and Learn & Play's readers on
+  # the same made-up files, and the same list of keys in both and in the installer.
+  add_test(NAME play-native.settings COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_settings.py)
 endif()

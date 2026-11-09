@@ -94,6 +94,10 @@ folder. (Learn & Play has a step for it, as its download comes without Steam's i
   default library.
 - **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy of the game files
   with that folder: after new DLC or custom songs, or a Steam update ([Game files](#game-files)).
+- **Built-in Mods…** (also ⌘,) switches off built-in mods of the game chosen above: custom songs, the
+  rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title
+  logo. A change takes effect the next time the game starts, with nothing to reinstall
+  ([Settings and switches](#settings-and-switches)).
 - Quitting the installer while it works stops the build (it asks first); Build & Install starts it again.
   The log of every run is kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 
@@ -213,8 +217,8 @@ it adds DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. I
 
 ### The title logo
 
-The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` shows the original. A
-refresh that brings a new `static.psarc` removes it, and the next install makes it again.
+The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` (or the logo off in the installer's
+Built-in Mods…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next install makes it again.
 
 ## Where things are
 
@@ -227,6 +231,7 @@ refresh that brings a new `static.psarc` removes it, and the next install makes 
 | `…/steam/<account>/221680/remote/` | your profiles and progress for the native build |
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
 | `…/mods/` | mods loaded at startup |
+| `…/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
 | `…/renderer`, `…/renderer-fallback.txt` | `metal` or `opengl`, and why a fallback changed it ([Renderer](#renderer)) |
 | `…/guitar-input.ini` | if you made one: the guitar input's channel and gain ([Guitar input](#guitar-input)) |
 | `…/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
@@ -338,8 +343,19 @@ For two channels of one interface, leave `Channel` out of `guitar-input.ini` for
 
 ## Settings and switches
 
-The launcher starts the game through macOS, so variables set in a Terminal do not reach it. Set them for
-the login session:
+The rows below that say **Built-in Mods…** can be switched off in the installer. It writes them to `settings.env`
+in `~/Library/Application Support/RS Re-ARMed/`, which the launcher reads at every start, so a change needs no
+reinstall; without the file every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches:
+other lines are ignored, and the top of `logs/last-run.log` says what was used. Learn & Play has its own file, read
+the same way ([its switches](../windows/INSTALL.md#settings-and-switches)).
+
+```
+RS_MODS_INTRO=0
+RS_REARMED=0
+```
+
+The other switches are environment variables. The launcher starts the game through macOS, so variables set in a
+Terminal do not reach it. Set them for the login session; they win over `settings.env` too:
 
 ```bash
 launchctl setenv RS_MODS_BYPASS 0     # takes effect on the next launch
@@ -351,21 +367,21 @@ are [its own](../windows/INSTALL.md#settings-and-switches). `RS_MODS_LOG=1` writ
 
 | What | LP | Switch |
 |---|---|---|
-| [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit | loading, open files | `RS_MODS_FIXES=0`; `RS_MODS_BUDGET_MS=N`: time per frame for mounting DLC archives (default 50; 0 mounts one per frame, as the game does) |
-| CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass) | yes | `RS_MODS_BYPASS=0` |
-| No intro screens; no game file changed | yes | `RS_MODS_INTRO=0` |
-| DIRECT CONNECT in the INPUT setting and on the cable screen, from an overlay of your own `cache.psarc` | yes | `RS_MODS_OVERLAY=0` |
-| ENUMERATE in place of SHOP: adds new songs, with no restart. Changed and removed songs need **Refresh Game Files** | yes | `RS_MODS_OVERLAY=0` |
-| EXIT GAME in place of UPLAY | yes | `RS_MODS_OVERLAY=0` |
+| [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit | loading, open files | Built-in Mods…, `RS_MODS_FIXES=0`; `RS_MODS_BUDGET_MS=N`: time per frame for mounting DLC archives (default 50; 0 mounts one per frame, as the game does) |
+| CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass) | yes | Built-in Mods…, `RS_MODS_BYPASS=0` |
+| No intro screens; no game file changed | yes | Built-in Mods…, `RS_MODS_INTRO=0` |
+| DIRECT CONNECT in the INPUT setting and on the cable screen, from an overlay of your own `cache.psarc` | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
+| ENUMERATE in place of SHOP: adds new songs, with no restart. Changed and removed songs need **Refresh Game Files** | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
+| EXIT GAME in place of UPLAY | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
 | Uplay sign-in prompt skipped | yes | none |
-| Auto Save warning skipped | yes | `RS_MODS_AUTOSAVE=0` |
+| Auto Save warning skipped | yes | Built-in Mods…, `RS_MODS_AUTOSAVE=0` |
 | Offline Steam layer: `libsteam_api` with no client, cloud saves in a local folder | yes | none |
 | Song ownership: the base game, your DLC, the AppID of every archive in the copy's `dlc/`, and the Rocksmith 1 songs you own (a copy or refresh asks Steam, with your account logged in) | yes | `RS_STEAM_DLC=all`, or a list of AppIDs |
-| Title logo, from your own `static.psarc` | yes | `RS_REARMED=0`, or delete `static.psarc.rearmed` |
+| Title logo, from your own `static.psarc` | yes | Built-in Mods…, `RS_REARMED=0`, or delete `static.psarc.rearmed` |
 | Frame rate follows the display; a fixed rate turns vsync off | | `RS_FPS=N` |
 | Lower guitar latency: a smaller output buffer, a real-time audio thread, stale guitar audio dropped | | `RS_AUDIO_FRAMES=N` (0 leaves the system's), `RS_LATENCY_BUFFER=N` (1-16), `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_LOG=1` |
 | [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
-| [Two players](#two-players) on any input | yes | `RS_MODS_MULTIPLAYER=0` |
+| [Two players](#two-players) on any input | yes | Built-in Mods…, `RS_MODS_MULTIPLAYER=0` |
 | An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
 | [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
 | Retina, Metal only: on a Retina screen each frame is scaled up to the screen's own pixels with MetalFX (macOS 13+; bilinear before), while the game renders in points | yes | `RS_METAL_UPSCALE=0` (a plain bilinear scale, as the screen did before); `RS_METAL_RETINA=1` renders every pixel instead (about 4x the GPU work) |

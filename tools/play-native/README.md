@@ -9,6 +9,7 @@ tools/play-native/install.sh --refresh-game   # sync the install's copy of the g
 tools/play-native/warm-shaders.sh [APP]       # compile the Metal shaders again (after a macOS update)
 python3 tools/play-native/test_gamefiles.py   # the copy's tests
 python3 tools/play-native/test_cache_overlay.py   # the Direct Connect overlay's tests
+python3 tools/play-native/test_settings.py   # settings.env, read by both editions' launchers
 ```
 
 `APP` defaults to the build-m4.sh output under `$RS_BUILD_DIR` (default `build/` in the repo). Then start

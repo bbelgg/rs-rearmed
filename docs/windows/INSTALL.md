@@ -118,6 +118,11 @@ is done. **Stop** in the box ends the run; what is done is kept, and Build & Ins
 Once it is installed, **Refresh Game Files** (with Game: Learn & Play chosen) has Steam fetch DLC you bought since,
 and syncs the app's copy of the game files with Steam's folders again.
 
+**Built-in Mods…** (also ⌘,), with Game: Learn & Play chosen, switches off built-in mods: custom songs, the
+rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title logo. A
+change takes effect the next time the game starts, with nothing to reinstall
+([Settings and switches](#settings-and-switches)).
+
 ## Install from a clone
 
 ```bash
@@ -164,6 +169,7 @@ The steps one at a time: `python3 win-x86/install/lp_install.py --help`.
 | `…/learn-play/steam/` | your profiles and progress |
 | `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
 | `…/learn-play/mods/` | mods loaded at startup |
+| `…/learn-play/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
 | `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 | `~/Library/Application Support/RS Re-ARMed/learn-play/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
@@ -195,8 +201,8 @@ DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. If the ca
 
 ### The title logo
 
-The build makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` shows the original. A
-refresh that brings a new `static.psarc` removes it, and the next build makes it again.
+The build makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` (or the logo off in the installer's
+Built-in Mods…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next build makes it again.
 
 ## Playing
 
@@ -295,7 +301,19 @@ For two channels of one interface, leave `Channel` out of `guitar-input.ini` for
 
 ## Settings and switches
 
-The app sets no environment. To pass a switch, start it with `open`:
+The rows below that say **Built-in Mods…** can be switched off in the installer. It writes them to `settings.env`
+in `~/Library/Application Support/RS Re-ARMed/learn-play/`, which the app reads at every start, so a change needs no
+reinstall; without the file every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches:
+other lines are ignored, and the top of `logs/last-run.log` says what was used. The Mac edition has its own file,
+read the same way ([its switches](../mac/INSTALL.md#settings-and-switches)).
+
+```
+RS_MODS_INTRO=0
+RS_REARMED=0
+```
+
+The other switches are environment variables, which the app sets none of. To pass one, start it with `open`; it
+wins over `settings.env` too, and so does one set with `launchctl setenv`:
 
 ```bash
 open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
@@ -317,16 +335,16 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_AUDIO_CHANNEL_ENTRIES=N` | 10 | the inputs the game lists; 0: one per device, in the system's order |
 | `RS_AUDIO_INPUT_LEVEL=0` | on | the game's level stays a volume of up to 100%, with no boost |
 | `RS_AUDIO_INPUT_FILE=PATH`, `RS_AUDIO_INPUT=0` | `guitar-input.ini`, on | another settings file; none of this |
-| `RS_MODS_MULTIPLAYER=0` | any input | [two players](#two-players): Player 2 on a Real Tone cable only |
+| `RS_MODS_MULTIPLAYER=0` | any input | [two players](#two-players): Player 2 on a Real Tone cable only (Built-in Mods…) |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
-| `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed |
-| `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off |
+| `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed (Built-in Mods…) |
+| `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off (Built-in Mods…) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC |
-| `RS_MODS_INTRO=0` | on | the intro screens play |
-| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
+| `RS_MODS_INTRO=0` | on | the intro screens play (Built-in Mods…) |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Built-in Mods…) |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files)) |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Built-in Mods…) |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Built-in Mods…); set for the build, no logo is made |
 | `LP_NATIVE_MATH=0` | on | the CRT's math translated instead of the host's libm |
 | `LP_NATIVE_MEM=0` | on | the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` translated instead of the host's |
 | `LP_QOS=0` | on | the default thread priority for the game's threads |

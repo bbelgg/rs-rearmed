@@ -32,7 +32,8 @@ it better. The priorities:
   without a restart. No intro screens, and mods load from a `mods/` folder, such as [rearmed-mods](https://github.com/glebb/rearmed-mods), RSMods' features and more with an app to set them up.
 
 Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can be
-switched off: [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
+switched off, and the built-in mods with a checkbox in the installer (**Built-in Mods…**):
+[Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
 
 ## Requirements
 
@@ -69,6 +70,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
+| Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |

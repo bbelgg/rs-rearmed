@@ -65,6 +65,37 @@ if pgrep -x Rocksmith2014 >/dev/null || pgrep -x Rocksmith2014_x64_plain >/dev/n
 fi
 mkdir -p "$logs" "$HOME_DIR/steam"
 
+# settings.env (docs/mac/INSTALL.md "Settings and switches"): the built-in mods switched off in the installer
+# (Built-in Mods...). Lines KEY=0 or KEY=1 of the keys below, whitespace ignored, # a comment; each is passed
+# to the game unless the environment has another value (launchctl setenv wins), and what was used goes at the
+# top of last-run.log. Learn & Play reads its own the same way (win-x86/app/lp_settings.c); the installer
+# writes both, and tools/play-native/test_settings.py checks the three lists agree.
+settings_keys=(RS_MODS_BYPASS RS_MODS_FIXES RS_MODS_INTRO RS_MODS_AUTOSAVE RS_MODS_OVERLAY RS_MODS_MULTIPLAYER RS_REARMED)
+settings_env() {  # FILE -> settings_args (--env K=V for open, and K set here) and settings_log
+    settings_args=() settings_log=()
+    local line k v seen=" "
+    [[ -f $1 ]] || return 0
+    while IFS= read -r line || [[ -n $line ]]; do
+        line=${line//[[:space:]]/}
+        [[ -z $line || $line == \#* ]] && continue
+        k=${line%%=*} v=${line#*=}
+        if [[ $line != *=* || " ${settings_keys[*]} " != *" $k "* || ! $v =~ ^[01]$ ]]; then
+            settings_log+=("[settings] ignored: $line")
+        elif [[ $seen == *" $k "* ]]; then
+            settings_log+=("[settings] ignored: $line (repeated)")
+        elif [[ -n ${!k:-} && ${!k} != "$v" ]]; then
+            seen+="$k "
+            settings_log+=("[settings] $k=$v not used: the environment has $k=${!k}")
+        else
+            seen+="$k "
+            printf -v "$k" %s "$v"
+            settings_args+=(--env "$k=$v")
+            settings_log+=("[settings] $k=$v")
+        fi
+    done < "$1"
+}
+settings_env "$HOME_DIR/settings.env"
+
 # The title logo: static.psarc is a link to one of the two copies.
 if [[ -f "$stage/static.psarc.rearmed" && "${RS_REARMED:-1}" != 0 ]]; then
     ln -sfn static.psarc.rearmed "$stage/static.psarc"
@@ -144,6 +175,8 @@ if [[ -z ${RS_STEAM_ID:-} && " ${steam_env[*]-} " != *" RS_STEAM_ID="* &&
 fi
 
 [[ -f "$logs/last-run.log" ]] && mv -f "$logs/last-run.log" "$logs/previous-run.log"
+# The game's output is added after these lines (open --stdout appends).
+[[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}" > "$logs/last-run.log"
 # Started through LaunchServices as an app of its own: exec'ing the game from this (LSUIElement)
 # launcher leaves it without a window when the launcher itself was opened from the Finder. The
 # environment comes from launchd plus --env, so nothing else of this shell's leaks in.
@@ -152,5 +185,5 @@ exec /usr/bin/open -n -a "$stage/Rocksmith2014.app" \
     --env RS_NETGUARD_LOG="$logs/netguard.log" \
     --env DYLD_INSERT_LIBRARIES="$HOME_DIR/libnetguard.dylib" \
     --env RS_NATIVE_HOME="$HOME_DIR" ${renderer_env[@]+"${renderer_env[@]}"} \
-    ${steam_env[@]+"${steam_env[@]}"} \
+    ${steam_env[@]+"${steam_env[@]}"} ${settings_args[@]+"${settings_args[@]}"} \
     --stdout "$logs/last-run.log" --stderr "$logs/last-run.log"

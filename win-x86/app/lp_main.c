@@ -41,6 +41,7 @@
 //   game/.rearmed/steam.env  RS_STEAM_* defaults (the installed DLC and the AppIDs the dlc/
 //                archives carry, the language, the account: the one whose license has Learn & Play)
 //                for the offline Steam layer, recorded from Steam when the copy was made
+//   settings.env the built-in mods switched off in the installer (lp_settings.h), as the Mac launcher's
 //   userdata/    LP_USER_DIR: Rocksmith.ini and the game's other writes
 //   steam/       RS_STEAM_DATA_DIR: the offline Steam layer's saves (profiles, progress)
 //   logs/        last-run.log and previous-run.log (stderr; LP_LOG_TO overrides it)
@@ -63,6 +64,7 @@
 #include <unistd.h>
 
 #include "../online/online32.h"
+#include "lp_settings.h"
 #include "rc32.h"
 #include "rc_hook.h"
 #include "win32_shims.h"
@@ -422,6 +424,15 @@ int main(int argc, char **argv) {
   if (sl) *sl = 0;
   for (int i = 1; i < argc; i++)
     if (!strcmp(argv[i], "--warm-shaders")) return warm_shaders();
+  // An installed app's settings.env, before anything reads a switch (RS_LOAD_MODS in mods_guard, RS_REARMED, the
+  // mods' own); logged once the log is set up.
+  static char settings[PATH_MAX];
+  if (in_bundle()) {
+    char home[PATH_MAX];
+    user_home(home, sizeof home);
+    snprintf(settings, sizeof settings, "%s/settings.env", home);
+    lp_settings_apply(settings);
+  }
   mods_guard(argv);  // may start this process again: before the log is turned over
   int installed = installed_defaults();
   const char *image = dflt_env("LP_IMAGE", "lp_game.exe");
@@ -432,6 +443,7 @@ int main(int argc, char **argv) {
   if (log_to && *log_to && freopen(log_to, "a", stderr)) setvbuf(stderr, 0, _IOLBF, 0);
   fprintf(stderr, "lp: game folder %s, user folder %s\n", getenv("LP_GAME_DIR"), getenv("LP_USER_DIR"));
   if (installed) fprintf(stderr, "lp: installed app, settings and saves in %s\n", getenv("LP_HOME"));
+  if (*settings) lp_settings_log(settings, stderr);
   title_logo(getenv("LP_GAME_DIR"));
   lp_mods_init();
 

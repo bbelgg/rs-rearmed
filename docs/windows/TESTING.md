@@ -13,6 +13,7 @@ where you point them and never copied into the repository.
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md) |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
+| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): `settings.env`, the built-in mods switched off in the installer. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launcher's read the same made-up files and must set and log the same; the same keys in both and in the installer |
 | Kernel32 waits, input hooks | `make -C win-x86/shims/tests test OUT=DIR` | `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game); events, mutexes, semaphores, wait-any and wait-all, timeouts; an idle waiter is not woken by other objects; a wait keeps objects whose handles are closed; `PulseEvent`; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); the open-file limit from 256 (`rc_nofile.h`, shared with the Mac port) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
 | Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
@@ -119,6 +120,12 @@ Every message of the box can be seen without touching Steam, with a stand-in:
   Build Again takes under a minute and leaves it there. `app_click` on Skip answers `cannotComplete` when the finish sheet opens before it returns:
   the click worked. The sheet says the shaders are not prepared. A finished run, then Build Again and Skip, is the case to try: the note went by what the run before found.
 
+- Built-in Mods…: the button on the Renderer row (`app_click` by element index), or the app menu's item through
+  `app_menu`. The game comes from `-Game learnplay` (or `-Game mac`) on the command line, which leaves the real
+  defaults alone. The checkboxes and the sheet's buttons are plain AX elements; Save writes `settings.env` in the test
+  home's `RS Re-ARMed/` or `RS Re-ARMed/learn-play/`, and Turn All On with Save removes it. Checked this way for both
+  games.
+
 - `RS_XCODEBUILD=<script>` with `RS_XCODE_SELECT` printing a path in a `.app`: Xcode not set up. Exit 69 until a
   file is there. Stop before the run goes on: with the real Steam the next step would fetch DLC.
 
@@ -176,7 +183,12 @@ quit with the game's own Exit: a kill loses it. Calibration settled at +6.1 dB w
 **No intro screens** (`RS_MODS_INTRO`, as on the Mac, [Mac TESTING](../mac/TESTING.md#game-runs)): the
 game should reach the title without the logos and legal screens, and with `RS_MODS_INTRO=0` play them. The
 failure to look for is the title never coming (an empty screen after the loading screen). The scripts
-below wait for the title on a log line, so they need no change.
+below wait for the title on a log line, so they need no change. This app logs nothing about the intro: to see
+it, start with `RS_GL_SNAPSHOT_DIR` and `RS_GL_SNAPSHOT_SECS=3` (`open -n -a <app> --env ...`). Switched off
+through `settings.env` (2026-11-09, a relinked test copy of the app beside the installed one): the log starts with
+`[settings] RS_MODS_INTRO=0`, and the snapshots show the Ubisoft logo at about 6 s, the ESRB line, the brand
+screen and the title at about 30 s. A test copy has the installed app's bundle id, so the computer-use tools find
+no window of it: the snapshots are the way to see it.
 
 **Auto Save warning** (`RS_MODS_AUTOSAVE`), as on the Mac ([Mac TESTING](../mac/TESTING.md#game-runs)): with the skip, profile select goes
 straight on with no warning dialog and `RS_MODS_LOG=1` logs `auto save warning skipped`. With `RS_MODS_AUTOSAVE=0` there is no such line, and

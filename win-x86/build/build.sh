@@ -70,6 +70,7 @@ $CC -Wall -I"$root/win-x86/shims" -c "$root/win-x86/app/lp_main.c" -o "$obj/lp_m
 clang -arch arm64 -dynamiclib -O1 -mmacosx-version-min=11.0 -o "$out/libnetguard.dylib" "$root/tools/ws8/netguard/netguard.c"
 codesign -f -s - "$out/libnetguard.dylib" 2>/dev/null
 $CC -Wall -c "$root/win-x86/app/lp_screen.c" -o "$obj/lp_screen.o"
+$CC -Wall -c "$root/win-x86/app/lp_settings.c" -o "$obj/lp_settings.o"
 clang -arch arm64 -O2 -g -Wall -fobjc-arc -DLP_VERSION="\"$(cat "$root/VERSION")\"" -I"$root/shims/opengl/src" -c "$root/win-x86/app/lp_window.m" -o "$obj/lp_window.o"
 
 clang -arch arm64 -O2 -g -Wall -I"$root/win-x86/shims/d3d9" "$root/win-x86/shaders/lp_shaders.c" \
@@ -77,7 +78,7 @@ clang -arch arm64 -O2 -g -Wall -I"$root/win-x86/shims/d3d9" "$root/win-x86/shade
   echo "no lp_shaders: this build has no shader corpus"
 
 echo "===== Link ====="
-clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$obj/rsp_overlay.o" "$obj"/rt/*.o \
+clang -arch arm64 -g "$obj/lp_main.o" "$obj/lp_window.o" "$obj/lp_screen.o" "$obj/lp_settings.o" "$obj/rsp_overlay.o" "$obj"/rt/*.o \
   "$b/game/obj/libgame_rc.a" \
   "$b/modules/msvcr100/obj/libgame_rc.a" "$b/modules/msvcp100/obj/libgame_rc.a" \
   "$b/modules/d3dx9_42/obj/libgame_rc.a" $dcomp $bink \

@@ -973,9 +973,10 @@ static const void *rsm_unpack(RSMContext *ctx, const void *data, int w, int h, G
     for (int y = 0; y < h; y++) {
         const uint8_t *s = src + (size_t)y * sp;
         uint8_t *d = out + (size_t)y * (size_t)w * tb;
-        if ((fmt == MTLPixelFormatRGBA8Unorm || fmt == MTLPixelFormatBGRA8Unorm) && type == GL_UNSIGNED_BYTE &&
+        if ((fmt == MTLPixelFormatRGBA8Unorm || fmt == MTLPixelFormatRGBA8Unorm_sRGB ||
+             fmt == MTLPixelFormatBGRA8Unorm) && type == GL_UNSIGNED_BYTE &&
             (format == GL_RGB || format == GL_BGR || format == GL_RGBA || format == GL_BGRA)) {
-            // Fast paths: 8-bit RGB(A)/BGR(A) into RGBA8/BGRA8.
+            // Fast paths: 8-bit RGB(A)/BGR(A) into RGBA8/BGRA8 (sRGB takes the same bytes).
             int n = format == GL_RGB || format == GL_BGR ? 3 : 4;
             bool swap = (format == GL_BGR || format == GL_BGRA) != (fmt == MTLPixelFormatBGRA8Unorm);
             for (int x = 0; x < w; x++, s += n, d += 4) {
@@ -1534,7 +1535,8 @@ void rsmtl_glTexImage2D(GLenum target, GLint level, GLint internalformat, GLsize
     RSMTexture *t = rsm_bound_texture(ctx, target, &face);
     if (!t)
         return;
-    if (level < 0 || width < 0 || height < 0 || border != 0 || width > 16384 || height > 16384) {
+    // level: 16384 texels have 15 levels; one past them would be a shift past the size's bits (rsm_tex_define)
+    if (level < 0 || level > 14 || width < 0 || height < 0 || border != 0 || width > 16384 || height > 16384) {
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
@@ -1642,7 +1644,7 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
         rsm_error(ctx, GL_INVALID_ENUM);
         return;
     }
-    if (level < 0 || width <= 0 || height <= 0 || border != 0) {
+    if (level < 0 || level > 14 || width <= 0 || height <= 0 || border != 0 || width > 16384 || height > 16384) {
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }

@@ -53,10 +53,18 @@ void rsm_names_set(rsm_names *t, GLuint n, id obj) {
     if (n >= t->cap) {
         if (!obj)
             return;
+        // A name far past any the tables hand out (an id never set, bound as it is) is not given a table that
+        // reaches it: the doubling would not end for one of 2^31 up, and below that be gigabytes. The object is
+        // not kept, and the name stays unbound.
+        if (n >= RSM_NAMES_MAX)
+            return;
         uint32_t cap = t->cap ? t->cap : 64;
         while (cap <= n)
             cap *= 2;
-        t->objs = realloc(t->objs, cap * sizeof(void *));
+        void **objs = realloc(t->objs, cap * sizeof(void *));
+        if (!objs)
+            return;
+        t->objs = objs;
         memset(t->objs + t->cap, 0, (cap - t->cap) * sizeof(void *));
         t->cap = cap;
     }

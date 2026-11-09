@@ -1034,16 +1034,23 @@ static void rsm_run_job(RSMJob *j) {
         if (mine)
             e->state = RSM_BUILDING;
         pthread_mutex_unlock(&c->m);
+        bool failed = false;
         if (mine) {
             if (!j->warm)
                 st.lib_async++;
             rsm_build_library(c, e, !j->warm);
+            failed = e->lib == nil;
             rsm_publish_lib(c, e, !j->warm);
         }
-        for (NSData *kd in j->keys) {
-            if (c->closing)
-                break;
-            rsm_pipeline_for(c, e, kd.bytes, false);
+        // A library that did not compile here has no pipelines to make: each key would compile it again
+        // (rsm_pipeline_for waits for the library, and a failed warm build is left to be tried again), once a
+        // recorded pipeline, on a compiler that is most likely busy already. A draw that needs it tries again.
+        if (!failed) {
+            for (NSData *kd in j->keys) {
+                if (c->closing)
+                    break;
+                rsm_pipeline_for(c, e, kd.bytes, false);
+            }
         }
     }
     rsm_job_done(j);

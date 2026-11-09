@@ -84,6 +84,7 @@ static inline void *rsm_get_(const rsm_names *t, GLuint n) {
 }
 #define rsm_get(t, n) ((__bridge id)rsm_get_((t), (n)))
 GLuint rsm_names_alloc(rsm_names *t);
+#define RSM_NAMES_MAX (1u << 22)                     // names from here up are not kept (rsm_names_set)
 void rsm_names_set(rsm_names *t, GLuint n, id obj);  // nil frees the name
 void rsm_names_clear(rsm_names *t);
 

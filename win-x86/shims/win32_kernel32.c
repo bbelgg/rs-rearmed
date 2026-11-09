@@ -172,7 +172,12 @@ static void k_VirtualFree(rc_ctx *c) {
   pthread_mutex_lock(&v_mu);
   vres *v = vfind(a);
   if (v && (type & 0x8000)) w32_vfree_calls++;  // MEM_RELEASE
-  if (v && (type & 0x4000)) memset(RC32_H(a & ~0xfffu), 0, ((w32_arg(c, 1) + 0xfff) & ~0xfffu));  // MEM_DECOMMIT reads as zero again
+  if (v && (type & 0x4000)) {  // MEM_DECOMMIT reads as zero again: its pages of the reservation, no further
+    uint64_t lo = a & ~0xfffu, hi = ((uint64_t)a + w32_arg(c, 1) + 0xfff) & ~0xfffull, end = (uint64_t)v->g + v->size;
+    if (!w32_arg(c, 1) || hi > end) hi = end;  // a size of 0: the whole of it
+    if (lo < v->g) lo = v->g;
+    if (hi > lo) memset(RC32_H((uint32_t)lo), 0, (size_t)(hi - lo));
+  }
   pthread_mutex_unlock(&v_mu);
   w32_ret(c, v != 0, 3);  // released memory is not handed out again (the arena never shrinks)
 }

@@ -117,10 +117,11 @@ static void n_getpeername(rc_ctx *c) { wsa_err = WSAENOTCONN; w32_ret(c, SOCKET_
 static void n_select(rc_ctx *c) {  // nothing is ever ready: clear the sets, wait out the timeout
   for (int k = 1; k <= 3; k++)
     if (w32_arg(c, k)) w32_wr32(w32_arg(c, k), 0);
+  // no timeout is a wait for as long as it takes: the same 100 ms at most, not none (a loop on it would spin)
   uint32_t tv = w32_arg(c, 4);
-  if (tv) {
-    uint64_t us = (uint64_t)w32_rd32(tv) * 1000000 + w32_rd32(tv + 4);
-    if (us > 100000) us = 100000;
+  uint64_t us = tv ? (uint64_t)w32_rd32(tv) * 1000000 + w32_rd32(tv + 4) : 100000;
+  if (us > 100000) us = 100000;
+  if (us) {
     struct timespec t = {0, (long)us * 1000};
     nanosleep(&t, 0);
   }

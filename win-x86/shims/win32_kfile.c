@@ -594,12 +594,17 @@ static void mk_temp(void) {
 }
 static void k_GetTempPathA(rc_ctx *c) { mk_temp(); w32_ret(c, put_a(w32_arg(c, 1), w32_arg(c, 0), TEMP_WIN), 2); }
 static void k_GetTempPathW(rc_ctx *c) { mk_temp(); w32_ret(c, put_w(w32_arg(c, 1), w32_arg(c, 0), TEMP_WIN), 2); }
+// out: 1024 bytes; a name longer than a path (MAX_PATH, the caller's buffer) is refused as on Windows
 static uint32_t temp_name(rc_ctx *c, const char *dir, const char *pre, uint32_t uniq, char *out) {
   static uint32_t seq;
   for (int tries = 0; tries < 65535; tries++) {
     uint32_t u = uniq ? uniq : (__atomic_add_fetch(&seq, 1, __ATOMIC_RELAXED) + (uint32_t)getpid()) & 0xffff;
     if (!u) continue;
-    sprintf(out, "%s%s%.3s%X.tmp", dir, dir[0] && dir[strlen(dir) - 1] != '\\' ? "\\" : "", pre, u);
+    int len = snprintf(out, 1024, "%s%s%.3s%X.tmp", dir, dir[0] && dir[strlen(dir) - 1] != '\\' ? "\\" : "", pre, u);
+    if (len >= 260) {
+      w32_set_error(c, 111);  // ERROR_BUFFER_OVERFLOW
+      return 0;
+    }
     if (uniq) return u;
     char host[PATH_MAX];
     int fd = open(w32_path(out, host, sizeof host), O_CREAT | O_EXCL | O_WRONLY, 0644);

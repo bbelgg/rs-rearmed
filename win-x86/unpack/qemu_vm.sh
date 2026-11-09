@@ -114,7 +114,7 @@ case "$cmd" in
     echo "    python3 -I win-x86/unpack/qemu_capture.py /path/to/Rocksmith2014.exe capture.bin"
     echo ""
     echo "  The VM stays paused until that connects. The steps are at the top of qemu_capture.py."
-    start_qemu -accel tcg $shared_drive -gdb tcp::1234 -S
+    start_qemu -accel tcg $shared_drive -gdb tcp:127.0.0.1:1234 -S
     ;;
 
   *)

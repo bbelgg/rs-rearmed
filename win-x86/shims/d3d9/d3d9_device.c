@@ -1187,6 +1187,11 @@ static uint64_t m_stretch_rect(rc_ctx *c, uint32_t self, const uint32_t *a) {
     float sn[4] = {(float)sr[0] / src->width, (float)sr[1] / src->height, (float)sr[2] / src->width,
                    (float)sr[3] / src->height};
     d3d9_dev_blit(d, tex, dn, sn, a[5] == 2 || a[5] == 3);
+    // the blit set the source's filters and wraps: a texture's are set again at its next use, bound now or not
+    // (kept as they were, a later LINEAR / WRAP sampler would count as no change and the texture stay as the
+    // blit left it)
+    if (src->container)
+        src->container->s_min = src->container->s_mag = src->container->s_wrap_s = src->container->s_wrap_t = -1;
     END;
 }
 

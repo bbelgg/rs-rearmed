@@ -11,7 +11,7 @@ where you point them and never copied into the repository. `OUT=DIR` is a build 
 | Area | Command | What it checks |
 |---|---|---|
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
-| Offline unpack | `python3 -m unittest discover -s win-x86/unpack -p 'test_*.py'` | the seed container and the QEMU capture against a fake GDB stub. With `RS_UNPACK_EXE`, `RS_UNPACK_SEED` (and `RS_UNPACK_SHA256`) also a whole unpack; skipped without them. In no CTest test or release suite: run it for a change to `win-x86/unpack` |
+| Offline unpack | `python3 -m unittest discover -s win-x86/unpack -p 'test_*.py'` | the seed container and the QEMU capture against a fake GDB stub. With `RS_UNPACK_EXE`, `RS_UNPACK_SEED` (and `RS_UNPACK_SHA256`) also a whole unpack; skipped without them. The release suite `lp.unpack`; not a CTest test |
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md#tests-in-the-repository) |
 | Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac port: the app's own copy of the game files, for both editions, on made-up game folders |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
@@ -491,7 +491,7 @@ The game must never call home.
 As on the Mac ([Mac testing](../mac/TESTING.md#release-checks), [Making a release](../release/README.md)):
 `tools/release/scope.py` says which of the suites in [Tests in the repository](#tests-in-the-repository) and
 which game runs a release's changes call for, and `tools/release/check.py` runs the suites. The CRT, D3DX and
-Bink probes, the 32-bit difftest on real DLLs and the offline unpack's tests are not among them: run them by
+Bink probes and the 32-bit difftest on real DLLs are not among them: run them by
 hand for a change to what they cover.
 
 Learn & Play's run for a release is `tools/release/smoke.sh --lp`: the first input script of

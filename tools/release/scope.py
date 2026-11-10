@@ -51,6 +51,8 @@ SUITES = {
     "steam":         ("the Mac Steam layer", "cmd", "make -C shims/steam check && make -C shims/steam test"),
     "lp.install":    ("Learn & Play's installer", "cmd",
                       "{py} -m unittest discover -s win-x86/install -p 'test_*.py'"),
+    "lp.unpack":     ("Learn & Play's offline unpack and seed capture", "cmd",
+                      "{py} -m unittest discover -s win-x86/unpack -p 'test_*.py'"),
     "lp.shaders":    ("Learn & Play's shader corpus sources", "cmd",
                       "{py} -m unittest discover -s win-x86/shaders -p 'test_*.py'"),
     "lp.shims":      ("Learn & Play's kernel32 waits and input hooks", "cmd",
@@ -142,7 +144,7 @@ RULES = {
     # Learn & Play alone.
     "win-x86/": rule([LP], build=[LP], run=[LP], suites=["lp.shims"]),
     "win-x86/install/": rule([LP], suites=["lp.install"], installer=True),
-    "win-x86/unpack/": rule([LP], suites=["lp.install"], installer=True),
+    "win-x86/unpack/": rule([LP], suites=["lp.install", "lp.unpack"], installer=True),
     "win-x86/harvest/": NOTHING,
     "win-x86/shaders/": rule([LP], run=[LP], suites=["lp.shaders"]),
     "win-x86/shims/audio/": rule([LP], build=[LP], run=[LP], suites=["lp.audio"]),

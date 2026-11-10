@@ -30,9 +30,9 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
   points have their own test (`recomp.inner64`, [TESTING.md](TESTING.md#tests-in-the-repository)). Run 2026-11-10 by scripted input with rearmed-mods'
   branch, with no fault: a six-string song; DotCharter's 7-string chart with its tuner, the pause menu's TUNER and CHORDS pages; a six-string song and the
   chart again in one run; a bass arrangement. The snapshots show seven strings, the low B's lane and notes, chord frames over the low B, the seven-peg
-  headstock and B STANDARD 7STR in the tuner; leaving a song rebuilt the guitar with six strings, and four for the bass. Not yet played with a guitar here,
-  so the low B's detection and scoring, the tuner's reading of it and a seven-row chord diagram (the chart's chords on the low B have no name, and the
-  CHORDS page lists only named ones) are unchecked. One difference from Learn & Play: there the edits let the game's list of a chord's expected notes
+  headstock and B STANDARD 7STR in the tuner; leaving a song rebuilt the guitar with six strings, and four for the bass. Played with a guitar by the maintainer
+  the same day, from the launcher: it works. What that play covered was not written down, so the tuner's reading of the low B and a seven-row chord
+  diagram (the chart's chords on the low B have no name, and the CHORDS page lists only named ones) are not checked off one by one. One difference from Learn & Play: there the edits let the game's list of a chord's expected notes
   hold eight; here that list is in the same function as chord detection, with arrays for six, and keeps six. A chord of seven or eight notes is judged by
   the mod's own chord detection in both editions, before that list is filled, so here it never gets more than six and such a chord loses nothing. Where Guitarcade, Session Mode and the tuner menu store a tuning was read from the code,
   not visited in a run. A chart published for Windows (`_p.psarc`) has to be a Mac archive first; RS Re-ARMed does not convert it ([Next work](#next-work)).
@@ -94,8 +94,8 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **7-string charts**: the tables are in ([Status](#status)). Left: a run with a guitar (the low B's notes and chords
-  scored, the tuner on it, a seven-row diagram). DotCharter publishes its 7-string charts as
+- **7-string charts**: the tables are in and played with a guitar ([Status](#status)). Left: the tuner on the low B and
+  a seven-row diagram, each looked at on its own. DotCharter publishes its 7-string charts as
   Windows archives (`_p.psarc`, unencrypted); the Mac game reads `_m.psarc`, with the song files under `songs/bin/macos/`,
   the audio under `audio/mac/`, the graph naming them so and the song files encrypted with the Mac's key. The other files
   are the same bytes. RS Re-ARMed has no converter for that and will not get one: it would need the archives' keys, and

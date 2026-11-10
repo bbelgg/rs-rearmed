@@ -101,7 +101,7 @@ folder. (Learn & Play has a step for it, as its download comes without Steam's i
 - Quitting the installer while it works stops the build (it asks first); Build & Install starts it again.
   The log of every run is kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 
-When it is done it offers to start the game. Later, start **RS Re-ARMed** from `~/Applications`
+When it is done the box above the log says so and offers to start the game, and Close ends the installer. Later, start **RS Re-ARMed** from `~/Applications`
 (double-click, Launchpad or Spotlight).
 
 ## Build by hand

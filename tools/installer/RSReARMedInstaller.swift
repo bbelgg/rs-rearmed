@@ -1130,9 +1130,24 @@ class InstallerWindow: NSWindow {
     let guideAction = NSButton(title: "", target: nil, action: nil)
     let guideStop = NSButton(title: "Stop", target: nil, action: nil)
     var guideClosed: NSLayoutConstraint!
+    var startAtEdge: NSLayoutConstraint!
+    var startBesideClose: NSLayoutConstraint!
     var guideShown = 0
     let showLogButton = NSButton(title: "Show Log File", target: nil, action: nil)
-    let playButton = NSButton(title: "Start RS Re-ARMed", target: nil, action: nil)
+    let closeButton = NSButton(title: "Close", target: nil, action: nil)
+    let updateButton = NSButton(title: "", target: nil, action: nil)
+    var updateURL = ""
+    // How the last run ended, in the box above the log until the next one starts: what the alerts said before,
+    // in the window, with what to do next as its buttons and Close beside Build Again.
+    struct RunResult {
+        var good: Bool
+        var title: String
+        var text: String
+        var primary = ""    // the box's buttons ("" : none)
+        var secondary = ""
+        var reveal = ""     // what Show in Finder shows
+    }
+    var result: RunResult?
     let refreshButton = NSButton(title: "Refresh Game Files", target: nil, action: nil)
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
     let rendererPopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -1190,6 +1205,14 @@ class InstallerWindow: NSWindow {
         versionLabel.textColor = .tertiaryLabelColor
         versionLabel.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(versionLabel)
+
+        // A newer release: said here, where it does not stand in the way of this one (AppDelegate asks GitHub).
+        updateButton.bezelStyle = .inline
+        updateButton.isHidden = true
+        updateButton.target = self
+        updateButton.action = #selector(openUpdate)
+        updateButton.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(updateButton)
 
         let subtitleLabel = NSTextField(labelWithString: "Builds Rocksmith 2014 natively for Apple Silicon from your Steam copy.")
         subtitleLabel.font = .systemFont(ofSize: 12)
@@ -1424,7 +1447,6 @@ class InstallerWindow: NSWindow {
         showLogButton.target = self
         showLogButton.action = #selector(revealLog)
         showLogButton.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(showLogButton)
 
         refreshButton.bezelStyle = .rounded
         refreshButton.isHidden = true
@@ -1432,14 +1454,21 @@ class InstallerWindow: NSWindow {
         refreshButton.action = #selector(refreshGameFiles)
         refreshButton.toolTip = "Copy new DLC, custom songs and game updates from Steam into RS Re-ARMed's own copy of the game files"
         refreshButton.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(refreshButton)
+        let leftButtons = NSStackView(views: [showLogButton, refreshButton])
+        leftButtons.orientation = .horizontal
+        leftButtons.spacing = 8
+        leftButtons.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(leftButtons)
 
-        playButton.bezelStyle = .rounded
-        playButton.isHidden = true
-        playButton.target = self
-        playButton.action = #selector(startGame)
-        playButton.translatesAutoresizingMaskIntoConstraints = false
-        content.addSubview(playButton)
+        // Close, once a run has ended: the window's own close button does the same, but the last thing an
+        // installer shows should have a way out where the eye is. Escape presses it.
+        closeButton.bezelStyle = .rounded
+        closeButton.isHidden = true
+        closeButton.keyEquivalent = "\u{1b}"
+        closeButton.target = self
+        closeButton.action = #selector(closeInstaller)
+        closeButton.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(closeButton)
 
         // The cleanup checkbox goes between the source field and the progress bar.
         let checkTopAnchor = runner.embeddedInRepo
@@ -1462,12 +1491,20 @@ class InstallerWindow: NSWindow {
             ])
         }
 
+        // Build & Install is at the window's edge until Close takes that place.
+        startAtEdge = startButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20)
+        startBesideClose = startButton.trailingAnchor.constraint(equalTo: closeButton.leadingAnchor, constant: -8)
+
         NSLayoutConstraint.activate([
             titleLabel.topAnchor.constraint(equalTo: content.topAnchor, constant: 20),
             titleLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
 
             versionLabel.lastBaselineAnchor.constraint(equalTo: titleLabel.lastBaselineAnchor),
             versionLabel.leadingAnchor.constraint(equalTo: titleLabel.trailingAnchor, constant: 8),
+
+            updateButton.centerYAnchor.constraint(equalTo: titleLabel.centerYAnchor),
+            updateButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            updateButton.leadingAnchor.constraint(greaterThanOrEqualTo: versionLabel.trailingAnchor, constant: 12),
 
             subtitleLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 4),
             subtitleLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
@@ -1534,22 +1571,20 @@ class InstallerWindow: NSWindow {
             scrollView.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             scrollView.bottomAnchor.constraint(equalTo: startButton.topAnchor, constant: -12),
 
+            closeButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            closeButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            closeButton.widthAnchor.constraint(equalToConstant: 100),
+
             startButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            startButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
+            startAtEdge,
             startButton.widthAnchor.constraint(equalToConstant: 140),
 
-            showLogButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            showLogButton.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+            // (a stack: the one that is hidden leaves no gap)
+            leftButtons.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
+            leftButtons.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
             showLogButton.widthAnchor.constraint(equalToConstant: 140),
-
-            refreshButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            refreshButton.leadingAnchor.constraint(equalTo: showLogButton.trailingAnchor, constant: 8),
             refreshButton.widthAnchor.constraint(equalToConstant: 160),
-            playButton.leadingAnchor.constraint(greaterThanOrEqualTo: refreshButton.trailingAnchor, constant: 8),
-
-            playButton.bottomAnchor.constraint(equalTo: content.bottomAnchor, constant: -16),
-            playButton.trailingAnchor.constraint(equalTo: startButton.leadingAnchor, constant: -8),
-            playButton.widthAnchor.constraint(equalToConstant: 160),
+            startButton.leadingAnchor.constraint(greaterThanOrEqualTo: leftButtons.trailingAnchor, constant: 8),
         ])
 
         applyGame()
@@ -1597,6 +1632,14 @@ class InstallerWindow: NSWindow {
     }
 
     @objc func guideActionClicked() {
+        if !runner.isRunning, let r = result {
+            switch r.primary {
+            case "Try Again": if runner.refreshOnly { refreshGameFiles() } else { startBuild() }
+            case "Show in Finder": NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.reveal)])
+            default: startGame()
+            }
+            return
+        }
         switch runner.guideCode {
         case "steam-missing":
             if let url = URL(string: steamDownloadPage) { NSWorkspace.shared.open(url) }
@@ -1615,7 +1658,33 @@ class InstallerWindow: NSWindow {
         }
     }
 
-    @objc func guideStopClicked() { runner.stop() }
+    @objc func guideStopClicked() {
+        if !runner.isRunning, let r = result {
+            if r.secondary == "Show Log File" { revealLog() }
+            else { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: r.reveal)]) }
+            return
+        }
+        runner.stop()
+    }
+
+    @objc func closeInstaller() { performClose(nil) }
+
+    @objc func openUpdate() {
+        if let url = URL(string: updateURL) { NSWorkspace.shared.open(url) }
+    }
+
+    // A newer release than this installer: a button in the title row that opens its page.
+    func showUpdate(tag: String, url: String) {
+        updateURL = url
+        updateButton.title = "Version \(tag.hasPrefix("v") ? String(tag.dropFirst()) : tag) is available: get it"
+        updateButton.toolTip = "You are running v\(rsVersion). Opens the download page of \(tag)."
+        updateButton.isHidden = false
+    }
+
+    private func boxColor(_ c: NSColor) {
+        guideBox.borderColor = c
+        guideBox.fillColor = c.withAlphaComponent(0.1)
+    }
 
     private func updateGuide() {
         // Nothing moved for a while and nobody has said why: it may be a system window waiting for an answer.
@@ -1625,6 +1694,22 @@ class InstallerWindow: NSWindow {
                             + "your password, which may be behind this one or another app: answer it and this goes "
                             + "on. If there is none, this step is simply taking its time.")
         }
+        // After a run the same box says how it ended.
+        if !runner.isRunning, let r = result {
+            guideBox.isHidden = false
+            guideClosed.isActive = false
+            boxColor(r.good ? .systemGreen : .systemOrange)
+            guideTitle.stringValue = r.title
+            guideText.stringValue = r.text
+            guideAction.title = r.primary
+            guideAction.isHidden = r.primary.isEmpty
+            guideStop.title = r.secondary
+            guideStop.isHidden = r.secondary.isEmpty
+            return
+        }
+        boxColor(.controlAccentColor)
+        guideStop.title = "Stop"
+        guideStop.isHidden = false
         let show = runner.isRunning && !runner.guideCode.isEmpty
         guideBox.isHidden = !show
         guideClosed.isActive = !show
@@ -1675,11 +1760,18 @@ class InstallerWindow: NSWindow {
         startButton.isEnabled = !runner.isRunning || canSkip
         startButton.title = canSkip ? "Skip" : runner.isFinished ? "Build Again" : "Build & Install"
         updateGuide()
-        let lpInstalled = !lp || runner.lpStopped.isEmpty
-        playButton.isHidden = !runner.isFinished || runner.isRunning || !lpInstalled
+        // Once a run has ended: Close at the edge, Return on what the box offers (Start the Game, Try Again).
+        let ended = !runner.isRunning && result != nil
+        closeButton.isHidden = !ended
+        if startBesideClose.isActive != ended {
+            startAtEdge.isActive = !ended
+            startBesideClose.isActive = ended
+        }
+        let boxDefault = ended && !(result?.primary.isEmpty ?? true)
+        guideAction.keyEquivalent = boxDefault ? "\r" : ""
+        startButton.keyEquivalent = boxDefault ? "" : "\r"
         refreshButton.isHidden = runner.isRunning || !gameCopyExists(selectedGame)
         gamePopup.isEnabled = !runner.isRunning
-        if runner.isFinished && !runner.isRunning && lpInstalled { playButton.keyEquivalent = "\r"; startButton.keyEquivalent = "" }
         browseButton.isEnabled = !runner.isRunning
         gameDirField.isEditable = !runner.isRunning
         buildBrowseButton.isEnabled = !runner.isRunning
@@ -1760,6 +1852,7 @@ class InstallerWindow: NSWindow {
             }
             return
         }
+        result = nil
         runner.refreshOnly = false
         runner.game = selectedGame
         UserDefaults.standard.set(runner.game, forKey: gameDefaultsKey)
@@ -1802,6 +1895,7 @@ class InstallerWindow: NSWindow {
     // Refresh Game Files: the chosen game's own copy synced with Steam's folders again.
     @objc func refreshGameFiles() {
         guard !runner.isRunning else { return }
+        result = nil
         runner.refreshOnly = true
         runner.game = selectedGame
         runner.lpStopped = ""
@@ -1812,123 +1906,103 @@ class InstallerWindow: NSWindow {
         }
     }
 
-    // Say plainly what happened and where things are, instead of leaving it to the log.
+    // Say plainly what happened and where things are, instead of leaving it to the log: in the box above the
+    // log (result), with what one needs to know before the first start; the rest, where everything is and how
+    // to uninstall, is the log's last lines.
     private func finished() {
         let logPath = runner.logFileURL.map { ($0.path as NSString).abbreviatingWithTildeInPath } ?? logsDir
-        if runner.refreshOnly {
-            if runner.isFinished {
-                _ = showAlert(
-                    title: "Game files refreshed",
-                    message: """
-                        \((gameCopy(runner.game) as NSString).abbreviatingWithTildeInPath) now matches the game \
-                        folder it is copied from: new DLC, custom songs and updates are in, and files the game \
-                        folder no longer has are gone. Your settings and saves were not touched.\(runner.notes.isEmpty ? "" : "\n\n" + runner.notes.joined(separator: "\n"))
+        let notes = runner.notes.isEmpty ? "" : "\n\n" + runner.notes.joined(separator: "\n")
+        let shaders = { (ready: Bool) in ready ? "" : " The game's Metal shaders are not prepared: the first play "
+            + "stalls while it compiles them. Build & Install again prepares them." }
+        var where_ = ""
+        if runner.failed, let error = runner.failure {
+            if error is CancellationError { return }
+            if case InstallerError.userCancelled = error { return }
+            let why = runner.log.contains(deniedByMacOS) && !runner.refreshOnly ? deniedHelp
+                : runner.lastError.isEmpty ? error.localizedDescription : runner.lastError
+            result = runner.refreshOnly
+                ? RunResult(good: false, title: "The game files could not be refreshed",
+                            text: "\(why)\n\nFiles copied so far are kept, and Try Again continues from there.",
+                            primary: "Try Again", secondary: "Show Log File")
+                : RunResult(good: false, title: "\(runner.stepTitle) didn't work",
+                            text: "\(why)\n\nTry Again goes on from where it stopped: what is done is kept. If it "
+                                + "stops at the same place again, the log says why; please attach it when you ask "
+                                + "for help.",
+                            primary: "Try Again", secondary: "Show Log File")
+            where_ = "The full log is in \(logPath)."
+        } else if !runner.isFinished {
+            return
+        } else if runner.refreshOnly {
+            result = RunResult(good: true, title: "Game files refreshed",
+                               text: "\((gameCopy(runner.game) as NSString).abbreviatingWithTildeInPath) now matches "
+                                   + "the game folder it is copied from: new DLC, custom songs and updates are in, "
+                                   + "and files the game folder no longer has are gone. Your settings and saves "
+                                   + "were not touched.\(notes)")
+            where_ = "The installer log is in \(logPath)."
+        } else if runner.game == "learnplay" && !runner.lpStopped.isEmpty {
+            let dlls = runner.repoRoot + "/" + lpDLLDir
+            result = RunResult(good: false, title: "Stopped before the build",
+                               text: "The Windows game and the libraries it needs are in place; this copy of the "
+                                   + "installer has no seed.bin (the released installer has one), so the build needs "
+                                   + "the game's code, captured once on a Windows PC (\(runner.lpStopped)). Run the "
+                                   + "installer again with the harvest folder; what is done is kept.",
+                               primary: "Show in Finder", reveal: dlls)
+            where_ = "The libraries are in \((dlls as NSString).abbreviatingWithTildeInPath). The installer log is "
+                + "in \(logPath)."
+        } else if runner.game == "learnplay" {
+            result = RunResult(good: true, title: "RS Re-ARMed Learn & Play is installed",
+                               text: "Start it any time from Applications in your home folder, or with Launchpad or "
+                                   + "Spotlight. It runs offline.\n\n\(macOSQuestions("learnplay"))"
+                                   + "\(shaders(runner.shadersReady))\(notes)",
+                               primary: "Start the Game", secondary: "Show in Finder", reveal: lpApp)
+            where_ = """
+                The app is ~/Applications/RS Re-ARMed Learn & Play.app. Its own copy of the game files, your \
+                settings, saves and logs are in ~/Library/Application Support/RS Re-ARMed/learn-play: the game no \
+                longer needs Steam's download folder. After new DLC in Steam, click Refresh Game Files. To \
+                uninstall, delete the app and that folder.\(gameCopyElsewhereNote("learnplay"))
+                The installer log is in \(logPath).
+                """
+        } else {
+            result = RunResult(good: true, title: "RS Re-ARMed is installed",
+                               text: "Start it any time from Applications in your home folder, or with Launchpad or "
+                                   + "Spotlight.\n\n\(macOSQuestions("mac"))"
+                                   + "\(shaders(runner.renderer != "metal" || runner.shadersReady))\(notes)",
+                               primary: "Start the Game", secondary: "Show in Finder", reveal: launcherApp)
+            where_ = """
+                The app is ~/Applications/RS Re-ARMed.app. The game build, its own copy of the game files and your \
+                saves are in ~/Library/Application Support/RS Re-ARMed/: Steam updates or moving the Steam game do \
+                not change it. After new DLC or custom songs, click Refresh Game Files. To uninstall, delete both \
+                (keep the folder learn-play in there if you have Learn & Play).\(gameCopyElsewhereNote("mac"))
+                The installer log is in \(logPath).
+                """
+        }
+        runner.appendLog("\n" + where_)
+        updateUI()
+        // The installer may be behind other windows by now: the Dock icon says it is done.
+        NSApp.requestUserAttention(.informationalRequest)
+    }
 
-                        The installer log is in \(logPath).
-                        """,
-                    buttons: ["OK"])
-            } else if runner.failed, let error = runner.failure {
-                if case InstallerError.userCancelled = error { return }
-                let choice = showAlert(
-                    title: "The game files could not be refreshed",
-                    message: """
-                        \(runner.lastError.isEmpty ? error.localizedDescription : runner.lastError)
-
-                        The log (\(logPath)) says more. Files copied so far are kept, and Refresh Game Files \
-                        continues from there.
-                        """,
-                    buttons: ["Show Log File", "Close"])
-                if choice == "Show Log File" { revealLog() }
-            }
+    // The window after a run that did not happen (RS_INSTALLER_PREVIEW): for looking at it.
+    func preview(_ what: String) {
+        runner.game = selectedGame
+        switch what {
+        case "installed":
+            runner.isFinished = true
+            runner.shadersReady = true
+            runner.progress = 1
+        case "failed":
+            runner.failed = true
+            runner.failure = InstallerError.commandFailed("ninja", 1)
+            runner.stepTitle = "Building the game"
+            runner.lastError = "The build stopped: no space left on the disk."
+        case "update":
+            showUpdate(tag: "v99.0.0", url: repoWebURL + "/releases")
+            return
+        default:
             return
         }
-        if runner.isFinished && runner.game == "learnplay" && !runner.lpStopped.isEmpty {
-            let dlls = runner.repoRoot + "/" + lpDLLDir
-            let choice = showAlert(
-                title: "Stopped before the build",
-                message: """
-                    The Windows game and the libraries it needs are in place; this copy of the installer has no \
-                    seed.bin (the released installer has one), so the build needs the game's code, captured once \
-                    on a Windows PC (\(runner.lpStopped)). Run the installer again with the harvest folder; what \
-                    is done is kept.
-
-                    The libraries are in \((dlls as NSString).abbreviatingWithTildeInPath). The installer log is \
-                    in \(logPath).
-                    """,
-                buttons: ["Close", "Show in Finder"]
-            )
-            if choice == "Show in Finder" {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: dlls)])
-            }
-        } else if runner.isFinished && runner.game == "learnplay" {
-            let choice = showAlert(
-                title: "RS Re-ARMed Learn & Play is installed",
-                message: """
-                    Start it any time from Applications in your home folder \
-                    (~/Applications/RS Re-ARMed Learn & Play.app), or with Launchpad or Spotlight. It runs offline.
-
-                    \(macOSQuestions("learnplay"))
-
-                    Its own copy of the game files, your settings, saves and logs are in \
-                    ~/Library/Application Support/RS Re-ARMed/learn-play: the game no longer needs Steam's \
-                    download folder. After new DLC in Steam, click Refresh Game Files. To uninstall, delete the \
-                    app and that folder.\(gameCopyElsewhereNote("learnplay"))\(runner.shadersReady ? "" : """
-
-
-                    The game's Metal shaders are not prepared: the first play stalls while it compiles them. \
-                    Build & Install again prepares them.
-                    """)\(runner.notes.isEmpty ? "" : "\n\n" + runner.notes.joined(separator: "\n"))
-
-                    The installer log is in \(logPath).
-                    """,
-                buttons: ["Start the Game", "Show in Finder", "Close"]
-            )
-            if choice == "Start the Game" { startGame() }
-            if choice == "Show in Finder" {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: lpApp)])
-            }
-        } else if runner.isFinished {
-            let choice = showAlert(
-                title: "RS Re-ARMed is installed",
-                message: """
-                    Start it any time from Applications in your home folder (~/Applications/RS Re-ARMed.app), \
-                    or with Launchpad or Spotlight.
-
-                    \(macOSQuestions("mac"))
-
-                    The game build, its own copy of the game files and your saves are in \
-                    ~/Library/Application Support/RS Re-ARMed/: Steam updates or moving the Steam game do not \
-                    change it. After new DLC or custom songs, click Refresh Game Files. To uninstall, delete both \
-                    (keep the folder learn-play in there if you have Learn & Play).\(gameCopyElsewhereNote("mac"))\(runner.renderer != "metal" || runner.shadersReady ? "" : """
-
-
-                    The game's Metal shaders are not prepared: the first play stalls while it compiles them. \
-                    Build & Install again prepares them.
-                    """)
-
-                    The installer log is in \(logPath).
-                    """,
-                buttons: ["Start RS Re-ARMed", "Show in Finder", "Close"]
-            )
-            if choice == "Start RS Re-ARMed" { startGame() }
-            if choice == "Show in Finder" {
-                NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: launcherApp)])
-            }
-        } else if runner.failed, let error = runner.failure, !(error is CancellationError) {
-            if case InstallerError.userCancelled = error { return }
-            let choice = showAlert(
-                title: "\(runner.stepTitle) didn't work",
-                message: """
-                    \(runner.log.contains(deniedByMacOS) ? deniedHelp : runner.lastError.isEmpty ? error.localizedDescription : runner.lastError)
-
-                    Try Again goes on from where it stopped: what is done is kept. If it stops at the same place \
-                    again, the full log, \(logPath), says why; please attach it when you ask for help.
-                    """,
-                buttons: ["Try Again", "Show Log File", "Close"]
-            )
-            if choice == "Try Again" { startBuild() }
-            if choice == "Show Log File" { revealLog() }
-        }
+        runner.log = "(a preview: nothing was run)\n"
+        finished()
     }
 
     @objc func startGame() {
@@ -2186,11 +2260,21 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         window.makeKeyAndOrderFront(nil)
 
+        // RS_INSTALLER_PREVIEW=installed|failed|update: the window as it is after such a run, with nothing run
+        // (docs/mac/TESTING.md, Installer tests). No update check then.
+        if let preview = ProcessInfo.processInfo.environment["RS_INSTALLER_PREVIEW"] {
+            window.preview(preview)
+            return
+        }
         Task {
             if let update = await checkForUpdate() {
+                // Asked once, since this installer builds its own version, not the newest; and it stays in the
+                // window's title row for whoever chose Later.
+                window.showUpdate(tag: update.tag, url: update.url)
                 let choice = showAlert(
                     title: "Update Available",
-                    message: "A newer version (\(update.tag)) is available. You are running v\(rsVersion).",
+                    message: "A newer version (\(update.tag)) is available. You are running v\(rsVersion), and "
+                        + "this installer installs v\(rsVersion).",
                     buttons: ["Open Download Page", "Later"]
                 )
                 if choice == "Open Download Page", let url = URL(string: update.url) {

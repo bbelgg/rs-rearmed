@@ -92,6 +92,8 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
   yet. Delete `.installer-version` in the source folder to make it unpack a new one. It has to be the commit the
   app was built at: the app checks the download against the digest `build.sh` built in
   ([Mac testing](../mac/TESTING.md#installer-tests)).
+- `RS_INSTALLER_PREVIEW=installed|failed|update`: the window as such a run leaves it, with nothing run (the same
+  section). A run's end is the box above the log now, not a sheet: its buttons and Close are in the window.
 - `-BuildFolder`: typing into the field does not work from the background (`app_click` then `app_type` is refused),
   so the folder comes as a launch argument. Starting a run writes it to the real defaults: note
   `defaults read io.github.bbelgg.rs-rearmed.installer` first and put `BuildFolder` back afterwards.
@@ -123,8 +125,8 @@ Every message of the box can be seen without touching Steam, with a stand-in:
 - `hdiutil attach` is refused in the agent's sandbox, so a really small disk was not tried.
 
 - Skip on Preparing shaders: the step is 16 s on Learn & Play, so for a test put a `sleep` at the top of the build folder's copy of `warm-shaders.sh`;
-  Build Again takes under a minute and leaves it there. `app_click` on Skip answers `cannotComplete` when the finish sheet opens before it returns:
-  the click worked. The sheet says the shaders are not prepared. A finished run, then Build Again and Skip, is the case to try: the note went by what the run before found.
+  Build Again takes under a minute and leaves it there. `app_click` on Skip answered `cannotComplete` when the finish sheet opened before it returned
+  (the click worked; the end of a run is a box in the window since the rework, so this may be gone). The box says the shaders are not prepared. A finished run, then Build Again and Skip, is the case to try: the note went by what the run before found.
 
 - Built-in Mods…: the button on the Renderer row (`app_click` by element index), or the app menu's item through
   `app_menu`. The game comes from `-Game learnplay` (or `-Game mac`) on the command line, which leaves the real

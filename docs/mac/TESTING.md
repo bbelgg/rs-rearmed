@@ -72,6 +72,12 @@ messages). The Built-in Mods sheet was checked the same way for both games: the 
 unchecked, Save writing the file into the test home, Turn All On and Save removing it. `tools/steamless/test_decrypt.py` (ctest `steamless.decrypt`) tries the decryption on a made-up Mach-O;
 with `RS_DEPOT_GAME` set to the clean Mac depot folder it also checks the real output against the pin.
 
+The window as a run leaves it, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed` or `update` in the
+app's environment shows the box of a finished install with Start the Game and Show in Finder, of a failed step with
+Try Again and Show Log File, or the title row's button for a newer release. Close (Escape) is at the bottom right
+once a run has ended, with Build Again beside it. The three were looked at this way after the window's rework (not
+released); the same window after a real run has not been.
+
 The standalone installer's check of its download: `build.sh` prints `source digest:` and builds it in, and the app
 logs `The source is the one this installer was made from` before it runs anything. An archive of another commit in
 `RS_SOURCE_URL` must stop it at Downloading source. Tried by hand on two unpackings of one commit (the same digest)
@@ -80,7 +86,7 @@ and a changed file (another); not yet through the app.
 A whole first install through the app, for a home of its own: link `<home>/Library/Application Support/Steam/
 steamapps/common/Rocksmith2014` to the clean depot, start the app as in that section with `-Game mac`, from outside the
 repository (it takes the current folder's repository if there is one), and click Build & Install: that is the only
-click until the last window, about 20 minutes, with `Rocksmith2014_x64_decrypted` matching the pin.
+click until the run ends (the box above the log says so, and Close is beside Build Again), about 20 minutes, with `Rocksmith2014_x64_decrypted` matching the pin.
 
 A test home on another disk needs two things a real home doesn't: its `logs` folder has to be a link to the startup disk
 (the launcher's `open --stdout` there fails with -10810, launchd's spawn refused with EPERM), and each new build asks

@@ -99,7 +99,7 @@ is done. **Stop** in the box ends the run; what is done is kept, and Build & Ins
 3. **Downloading your DLC.** Each DLC is a Steam download of its own, and the game's download has none. The
    installer reads which DLC your Steam account owns and has Steam fetch them one after another, with the same
    nothing-to-do progress ("12 of 73"). If you own none, this step says nothing. If it is stopped, the next run
-   continues. One that fails doesn't stop the install: the last window names it, and Refresh Game Files tries again.
+   continues. One that fails doesn't stop the install: the box at the end names it, and Refresh Game Files tries again.
 4. **Copying the game files**: the app's own copy of the game, `…/RS Re-ARMed/learn-play/game`
    ([Game files](#game-files)). It goes on the same APFS disk as Steam's download, where it takes seconds
    and no extra space.

@@ -90,6 +90,16 @@ its built-in fixes still name addresses in `win32_overrides.c`.
   it can't see reaches it as null, with a log line. `runtime/rc_mods.c` is the `mods/` folder for both apps.
   Learn & Play loads only a library that has `rc_mod_abi` (`rc_mod.h` defines it): one built without it has the
   Mac's offsets compiled in and reads a pointer as 8 bytes, so none of its code runs. The Mac loads both.
+- **Files a mod serves** (`runtime/rc_file.h`, which `rc_mod.h` includes; `runtime/rc_file.c`). `rc_file_provide`
+  registers a provider: it answers for files the game opens for reading (their size, date and bytes), adds names to
+  a folder's listing and hides ones the folder has. A served file is a descriptor of its own, a placeholder opened on
+  `/dev/null` with a record beside it, so the editions' file layers stay as they are and call `rc_file_open`,
+  `_read`, `_pread`, `_lseek`, `_fstat`, `_stat`, `_dup`, `_close`, `_fopen`, `_opendir`, `_readdir` and `_closedir`
+  in place of the system's: the Mac through its import thunks (`thunks/gen_thunks.py`: `FILE_FUNCS`; a served `FILE`
+  is `funopen`'s, with the placeholder as its `fileno`), Learn & Play in its Win32 seam (`win32_kfile.c`,
+  `win32_ksync.c`: opens, reads, seeks, sizes, attributes, finds, mapped views). Each is the system's function for
+  a file no provider serves, and without a provider costs a test of a counter. Not offered: writing, a folder that
+  does not exist. `RS_FILE_LOG=1` logs each served open and each listing a provider added to.
 - **Native code on the guest's own context** (the overrides): `OV_ARGS_OF(name, a, c)` reads by the name's
   convention, `OV_ARGS_CC(a, c, cc)` is the same for a helper that serves several functions, and neither compiles
   for a `custom` function: those are read by hand. `ov32_ret` and `ov32_ret_f` end an override.

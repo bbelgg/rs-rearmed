@@ -58,7 +58,7 @@ echo "===== Runtime ====="
 tgt=$obj/target
 "${LP_PY:-python3}" -I "$root/tools/targets/targets.py" gen --target win-x86 "$tgt"
 CC="clang -arch arm64 -O2 -g -DRC_GUEST32 -I$runtime"
-for m in rc32_mem rc32_image rc32_main rc32_teb rc32_seh rc32_wrappers rc32_hook rc_hook rc_mods rc_mid; do
+for m in rc32_mem rc32_image rc32_main rc32_teb rc32_seh rc32_wrappers rc32_hook rc_hook rc_mods rc_mid rc_file; do
   $CC -w -c "$runtime/$m.c" -o "$obj/rt/$m.o"
 done
 $CC -w -c "$tgt/rc_target.c" -o "$obj/rt/rc_target.o"

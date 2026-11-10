@@ -67,6 +67,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
 | Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 18 of the 21 hook points, the overlay API and the render API |
+| Files a mod serves to the game (`rc_file.h`) | ✅ (not released) | ✅ the same interface (not released) |
 | [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
 | Edits and mid points: a mod changes a function from the inside | ✅ | ✅ |
 | 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ✅ played with a guitar; a chart needs a Mac archive (`_m.psarc`) | ✅ played with a guitar |

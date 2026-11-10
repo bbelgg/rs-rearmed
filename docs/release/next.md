@@ -17,4 +17,7 @@ notes and empties this file. -->
   only open files in its own folders by a Mac path.
 - **Learn & Play: listening to the guitar takes about a quarter less processor time in a song.** One more of the
   note detection's loops runs without a memory fence at every step.
+- **A mod can serve files to the game** (for mod authors; `rc_file.h`, included by `rc_mod.h`): files the game
+  opens for reading, their size and date, and names in a folder's listing, added or hidden, by one interface in both
+  editions. Before, a mod could only hook the game's functions.
 - **A draw that waits for a shader compile hurries it**, which should shorten a first-play stutter. Not measured.

@@ -441,7 +441,11 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A name the game doesn't have gives -1 and a log
   line; `rc_target()` returns `win-x86`. A hook point that is also a built-in fix is `N_<addr>` in
   `win32_overrides.c`, and a mod's hooks run around the fix. A library without `rc_mod_abi` is left out, with a
-  log line: built for the Mac alone, it would misread this game's memory.
+  log line: built for the Mac alone, it would misread this game's memory. A mod can also serve files to the game
+  (`rc_file_provide`, `tools/ws7/recomp/runtime/rc_file.h`): the Win32 seam's opens for reading, reads, seeks,
+  sizes, attributes, finds and mapped views (`win32_kfile.c`) go through the runtime, which asks the mod's provider
+  first; the same interface as the Mac's. The provider sees host paths, after the seam's mapping of
+  `C:\Rocksmith2014` and its lookup without case.
 
   A hook point of a name is the Mac's call here too, and `targets.py` compares the prototypes. Sixteen of the 21
   are functions of this game. Eight of those are this game's own shape, adapted in `symbols.map`: `game_frame` is the ServiceManager tick,

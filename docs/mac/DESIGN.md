@@ -256,7 +256,10 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   Mods that draw use the overlay API (`shims/include/rs_overlay.h`), which works on both renderers; a mod that changes a game texture uses the render API (`shims/include/rs_render.h`, Metal alone). A mod built
   with `tools/ws7/recomp/runtime/rc_mod.h` is the same dylib for this edition and Learn & Play: it looks offsets
   up by name when it runs and keeps pointer width out of its source
-  ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A mod built for 1.4.x keeps working here as it
+  ([recompiler](../recompiler/README.md#overrides-and-hook-points)). A mod can also serve files to the game
+  (`rc_file_provide`, `tools/ws7/recomp/runtime/rc_file.h`): the game's file imports (`open`, `read`, `close`,
+  `fstat`, `stat`, `fopen`, `opendir`, `readdir`, `closedir`) go through the runtime, which asks the mod's provider
+  first; the same interface as Learn & Play's. A mod built for 1.4.x keeps working here as it
   was, and is left out on Learn & Play. The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) is
   built this way: its names are under "the mods library" in `tools/targets/names`. Its song search check knows the key
   from the tables (`song_search_key`), as a game binding: `/` here, Shift in Learn & Play. Edits and mid points

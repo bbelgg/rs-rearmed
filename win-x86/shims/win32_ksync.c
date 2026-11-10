@@ -10,6 +10,7 @@
 #include <unistd.h>
 #include <pthread/qos.h>
 
+#include "rc_file.h"
 #include "win32_handles.h"
 
 #define MAXH 16384
@@ -126,19 +127,19 @@ uint32_t w32_handle_dup(uint32_t h) {
 static void obj_free(w32_obj *o) {
   switch (o->type) {
   case H_FILE:
-    if (!o->u.file.console && o->u.file.fd >= 0) close(o->u.file.fd);
+    if (!o->u.file.console && o->u.file.fd >= 0) rc_file_close(o->u.file.fd);
     free(o->u.file.path);
     break;
   case H_FIND:
-    if (o->u.find.dir) closedir((DIR *)o->u.find.dir);
-    if (o->u.find.dir2) closedir((DIR *)o->u.find.dir2);
+    if (o->u.find.dir) rc_file_closedir((DIR *)o->u.find.dir);
+    if (o->u.find.dir2) rc_file_closedir((DIR *)o->u.find.dir2);
     free(o->u.find.hostdir);
     free(o->u.find.hostdir2);
     free(o->u.find.over);
     free(o->u.find.pattern);
     break;
   case H_MAPPING:
-    if (o->u.map.fd >= 0) close(o->u.map.fd);
+    if (o->u.map.fd >= 0) rc_file_close(o->u.map.fd);
     break;
   case H_THREAD:
     if (!o->u.th.done) return;  // the thread holds it until it ends (thread_main frees it then)

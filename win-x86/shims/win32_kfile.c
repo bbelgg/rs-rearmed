@@ -5,6 +5,9 @@
 // directory) and lives in LP_GAME_DIR; any other path of a drive X lives under LP_USER_DIR/x/.
 // Windows names are case-insensitive, so a path component that does not exist as spelt is looked
 // up without case. Every file the guest opens is logged with LP_LOG_FILES=1; failed opens always.
+//
+// Opens for reading, reads, seeks, sizes, attributes, finds and mapped views go through rc_file.h, so a
+// mod's file provider serves a file here as it does on the Mac: a served file is a descriptor like any other.
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -18,6 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "rc_file.h"
 #include "win32_handles.h"
 
 static const char GAME_WIN[] = "C:\\Rocksmith2014";
@@ -307,7 +311,7 @@ static uint32_t create_file(rc_ctx *c, const char *win, uint32_t access, uint32_
   case 5: of |= O_TRUNC; break;            // TRUNCATE_EXISTING
   }
   struct stat st;
-  int existed = stat(host, &st) == 0;
+  int existed = rc_file_stat(host, &st) == 0;
   if (existed && S_ISDIR(st.st_mode)) {
     if (!(flags & 0x02000000u)) {  // FILE_FLAG_BACKUP_SEMANTICS opens a directory
       w32_set_error(c, W32_ERROR_ACCESS_DENIED);
@@ -316,7 +320,7 @@ static uint32_t create_file(rc_ctx *c, const char *win, uint32_t access, uint32_
     }
     of = O_RDONLY;
   }
-  int fd = open(host, of | O_CLOEXEC, 0644);
+  int fd = rc_file_open(host, of | O_CLOEXEC, 0644);
   if (fd < 0) {
     int e = errno;
     set_open_err(c, host);
@@ -325,7 +329,7 @@ static uint32_t create_file(rc_ctx *c, const char *win, uint32_t access, uint32_
   }
   w32_obj *o;
   uint32_t h = w32_handle_new(H_FILE, &o);
-  if (!h) { close(fd); return 0xffffffffu; }
+  if (!h) { rc_file_close(fd); return 0xffffffffu; }
   o->u.file.fd = fd;
   o->u.file.path = strdup(host);
   o->u.file.access = access;
@@ -359,7 +363,7 @@ static void k_ReadFile(rc_ctx *c) {
   if (!(o->u.file.console && o->u.file.fd == 0)) {  // the console's input reads as empty
     int64_t off = ovl ? ovl_off(ovl) : -1;
     while (got < n) {
-      ssize_t r = off >= 0 ? pread(o->u.file.fd, RC32_H(b + got), n - got, off + got) : read(o->u.file.fd, RC32_H(b + got), n - got);
+      ssize_t r = off >= 0 ? rc_file_pread(o->u.file.fd, RC32_H(b + got), n - got, off + got) : rc_file_read(o->u.file.fd, RC32_H(b + got), n - got);
       if (r < 0 && errno == EINTR) continue;
       if (r < 0) { set_errno_err(c); if (rd) w32_wr32(rd, got); w32_ret(c, 0, 5); return; }
       if (r == 0) break;
@@ -398,7 +402,7 @@ static void k_SetFilePointer(rc_ctx *c) {
   uint32_t h = w32_arg(c, 0), hip = w32_arg(c, 2), how = w32_arg(c, 3);
   int fd = w32_file_fd(h);
   int64_t d = hip ? (int64_t)((uint64_t)w32_arg(c, 1) | (uint64_t)w32_rd32(hip) << 32) : (int64_t)(int32_t)w32_arg(c, 1);
-  off_t r = fd < 0 ? -1 : lseek(fd, d, how == 1 ? SEEK_CUR : how == 2 ? SEEK_END : SEEK_SET);
+  off_t r = fd < 0 ? -1 : rc_file_lseek(fd, d, how == 1 ? SEEK_CUR : how == 2 ? SEEK_END : SEEK_SET);
   if (r < 0) {
     w32_set_error(c, fd < 0 ? W32_ERROR_INVALID_HANDLE : 131);  // ERROR_NEGATIVE_SEEK
     w32_ret(c, 0xffffffffu, 4);
@@ -412,7 +416,7 @@ static void k_SetFilePointerEx(rc_ctx *c) {
   int fd = w32_file_fd(w32_arg(c, 0));
   int64_t d = (int64_t)((uint64_t)w32_arg(c, 1) | (uint64_t)w32_arg(c, 2) << 32);
   uint32_t outp = w32_arg(c, 3), how = w32_arg(c, 4);
-  off_t r = fd < 0 ? -1 : lseek(fd, d, how == 1 ? SEEK_CUR : how == 2 ? SEEK_END : SEEK_SET);
+  off_t r = fd < 0 ? -1 : rc_file_lseek(fd, d, how == 1 ? SEEK_CUR : how == 2 ? SEEK_END : SEEK_SET);
   if (r < 0) { w32_set_error(c, W32_ERROR_INVALID_PARAMETER); w32_ret(c, 0, 5); return; }
   if (outp) w32_wr64(outp, (uint64_t)r);
   w32_ret(c, 1, 5);
@@ -420,7 +424,7 @@ static void k_SetFilePointerEx(rc_ctx *c) {
 static void k_GetFileSize(rc_ctx *c) {
   struct stat st;
   int fd = w32_file_fd(w32_arg(c, 0));
-  if (fd < 0 || fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0xffffffffu, 2); return; }
+  if (fd < 0 || rc_file_fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0xffffffffu, 2); return; }
   if (w32_arg(c, 1)) w32_wr32(w32_arg(c, 1), (uint32_t)((uint64_t)st.st_size >> 32));
   w32_set_error(c, 0);
   w32_ret(c, (uint32_t)st.st_size, 2);
@@ -428,7 +432,7 @@ static void k_GetFileSize(rc_ctx *c) {
 static void k_GetFileSizeEx(rc_ctx *c) {
   struct stat st;
   int fd = w32_file_fd(w32_arg(c, 0));
-  if (fd < 0 || fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 2); return; }
+  if (fd < 0 || rc_file_fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 2); return; }
   w32_wr64(w32_arg(c, 1), (uint64_t)st.st_size);
   w32_ret(c, 1, 2);
 }
@@ -443,7 +447,7 @@ static void k_GetFileType(rc_ctx *c) {
   if (o && o->u.file.console) t = 2;  // FILE_TYPE_CHAR
   else if (o) {
     struct stat st;
-    t = fstat(o->u.file.fd, &st) ? 0 : S_ISFIFO(st.st_mode) || S_ISSOCK(st.st_mode) ? 3 : S_ISCHR(st.st_mode) ? 2 : 1;
+    t = rc_file_fstat(o->u.file.fd, &st) ? 0 : S_ISFIFO(st.st_mode) || S_ISSOCK(st.st_mode) ? 3 : S_ISCHR(st.st_mode) ? 2 : 1;
   }
   if (!o) w32_set_error(c, W32_ERROR_INVALID_HANDLE);
   w32_ret(c, t, 1);
@@ -451,7 +455,7 @@ static void k_GetFileType(rc_ctx *c) {
 static void k_GetFileTime(rc_ctx *c) {
   struct stat st;
   int fd = w32_file_fd(w32_arg(c, 0));
-  if (fd < 0 || fstat(fd, &st)) { w32_ret(c, 0, 4); return; }
+  if (fd < 0 || rc_file_fstat(fd, &st)) { w32_ret(c, 0, 4); return; }
   if (w32_arg(c, 1)) w32_wr64(w32_arg(c, 1), filetime(st.st_birthtimespec));
   if (w32_arg(c, 2)) w32_wr64(w32_arg(c, 2), filetime(st.st_atimespec));
   if (w32_arg(c, 3)) w32_wr64(w32_arg(c, 3), filetime(st.st_mtimespec));
@@ -475,7 +479,7 @@ static void k_GetFileInformationByHandle(rc_ctx *c) {
   struct stat st;
   w32_obj *o = w32_handle_get(w32_arg(c, 0), H_FILE);
   uint32_t b = w32_arg(c, 1);
-  if (!o || fstat(o->u.file.fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 2); return; }
+  if (!o || rc_file_fstat(o->u.file.fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 2); return; }
   memset(RC32_H(b), 0, 52);
   w32_wr32(b, attrs(&st, o->u.file.path ? o->u.file.path : ""));
   w32_wr64(b + 4, filetime(st.st_birthtimespec));
@@ -502,7 +506,7 @@ static uint32_t get_attrs(rc_ctx *c, const char *win) {
   char host[PATH_MAX];
   struct stat st;
   w32_path(win, host, sizeof host);
-  if (stat(host, &st)) {
+  if (rc_file_stat(host, &st)) {
     set_open_err(c, host);
     if (flog()) fprintf(stderr, "w32: file: attributes of \"%s\": none\n", win);
     return 0xffffffffu;
@@ -519,7 +523,7 @@ static int attr_data(rc_ctx *c, const char *win, uint32_t b) {
   char host[PATH_MAX];
   struct stat st;
   w32_path(win, host, sizeof host);
-  if (stat(host, &st)) {
+  if (rc_file_stat(host, &st)) {
     set_open_err(c, host);
     if (flog()) fprintf(stderr, "w32: file: attributes of \"%s\": none\n", win);
     return 0;
@@ -711,10 +715,10 @@ static void k_GetDiskFreeSpaceA(rc_ctx *c) {  // 4 KB clusters, 100 GB free of 2
 static int find_next(w32_obj *o, uint32_t fd, int wide) {
   struct dirent *e;
   for (;;) {
-    e = readdir((DIR *)o->u.find.dir);
+    e = rc_file_readdir((DIR *)o->u.find.dir);
     if (!e) {
       if (!o->u.find.dir2) break;
-      closedir((DIR *)o->u.find.dir);
+      rc_file_closedir((DIR *)o->u.find.dir);
       o->u.find.dir = o->u.find.dir2;
       o->u.find.dir2 = 0;
       free(o->u.find.over);
@@ -731,7 +735,7 @@ static int find_next(w32_obj *o, uint32_t fd, int wide) {
       if (!lstat(host, &st)) continue;
     }
     snprintf(host, sizeof host, "%s/%s", o->u.find.hostdir, e->d_name);
-    if (stat(host, &st)) continue;
+    if (rc_file_stat(host, &st)) continue;
     memset(RC32_H(fd), 0, wide ? 592 : 320);
     w32_wr32(fd, attrs(&st, host));
     w32_wr64(fd + 4, filetime(st.st_birthtimespec));
@@ -763,7 +767,7 @@ static uint32_t find_first(rc_ctx *c, const char *win, uint32_t fd, int wide) {
   if (sl) *sl = 0;
   if (on_host) snprintf(host, sizeof host, "%s", sl == full ? "/" : full);  // checked with its last part
   else w32_path(sl == full + 2 ? (strcat(full, "\\"), full) : full, host, sizeof host);
-  DIR *d = opendir(host);
+  DIR *d = rc_file_opendir(host);
   if (!d) {
     set_open_err(c, host);
     if (flog()) fprintf(stderr, "w32: file: find \"%s\": no directory\n", win);
@@ -772,7 +776,7 @@ static uint32_t find_first(rc_ctx *c, const char *win, uint32_t fd, int wide) {
   w32_obj *o;
   uint32_t h = w32_handle_new(H_FIND, &o);
   if (!h) {
-    closedir(d);
+    rc_file_closedir(d);
     w32_set_error(c, W32_ERROR_NOT_ENOUGH_MEMORY);
     return 0xffffffffu;
   }
@@ -783,7 +787,7 @@ static uint32_t find_first(rc_ctx *c, const char *win, uint32_t fd, int wide) {
   if (!on_host && !strncasecmp(full, GAME_WIN, g) && (full[g] == '\\' || !full[g])) {
     char game[PATH_MAX];
     join_ci(game_dir(), full + g, game, sizeof game);
-    if (strcmp(game, host) && (o->u.find.dir2 = opendir(game))) o->u.find.hostdir2 = strdup(game);
+    if (strcmp(game, host) && (o->u.find.dir2 = rc_file_opendir(game))) o->u.find.hostdir2 = strdup(game);
   }
   if (!find_next(o, fd, wide)) {
     w32_handle_close(h);
@@ -821,12 +825,12 @@ static void k_CreateFileMappingA(rc_ctx *c) {
   int fd = w32_file_fd(w32_arg(c, 0));
   uint64_t sz = (uint64_t)w32_arg(c, 3) << 32 | w32_arg(c, 4);
   struct stat st;
-  if (fd < 0 || fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 6); return; }
+  if (fd < 0 || rc_file_fstat(fd, &st)) { w32_set_error(c, W32_ERROR_INVALID_HANDLE); w32_ret(c, 0, 6); return; }
   if (!sz) sz = (uint64_t)st.st_size;
   w32_obj *o;
   uint32_t h = w32_handle_new(H_MAPPING, &o);
   if (!h) { w32_set_error(c, W32_ERROR_NOT_ENOUGH_MEMORY); w32_ret(c, 0, 6); return; }
-  o->u.map.fd = dup(fd);
+  o->u.map.fd = rc_file_dup(fd);
   o->u.map.size = (uint32_t)sz;
   w32_set_error(c, 0);
   w32_ret(c, h, 6);
@@ -838,11 +842,11 @@ static void k_MapViewOfFile(rc_ctx *c) {
   uint32_t n = w32_arg(c, 4) ? w32_arg(c, 4) : o->u.map.size - (uint32_t)off;
   uint32_t g = w32_galloc(n);
   if (!g) { w32_set_error(c, W32_ERROR_NOT_ENOUGH_MEMORY); w32_ret(c, 0, 5); return; }
-  ssize_t r = pread(o->u.map.fd, RC32_H(g), n, off);
+  ssize_t r = rc_file_pread(o->u.map.fd, RC32_H(g), n, off);
   (void)r;
   view *v = malloc(sizeof *v);
   pthread_mutex_lock(&view_mu);
-  *v = (view){g, n, dup(o->u.map.fd), off, (w32_arg(c, 1) & 2) != 0, views};
+  *v = (view){g, n, rc_file_dup(o->u.map.fd), off, (w32_arg(c, 1) & 2) != 0, views};
   views = v;
   pthread_mutex_unlock(&view_mu);
   w32_ret(c, g, 5);
@@ -860,7 +864,7 @@ static void k_UnmapViewOfFile(rc_ctx *c) {
       ssize_t r = pwrite(v->fd, RC32_H(v->g), v->size, v->off);
       (void)r;
     }
-    close(v->fd);
+    rc_file_close(v->fd);
     w32_gfree(v->g, v->size);
     free(v);
   }

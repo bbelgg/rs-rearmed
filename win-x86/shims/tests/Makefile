@@ -10,7 +10,7 @@ CC       := clang -arch arm64
 CFLAGS   := -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -DRC_GUEST32 \
             -I$(runtime) -I..
 
-RT := rc32_mem rc32_teb rc32_image rc32_seh
+RT := rc32_mem rc32_teb rc32_image rc32_seh rc_file
 $(OUT)/rt_%.o: $(runtime)/%.c | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/win32_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h | $(OUT)

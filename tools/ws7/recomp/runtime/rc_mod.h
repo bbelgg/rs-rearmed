@@ -25,11 +25,14 @@
 // function by its convention, rc_call_name_f one with a float among its arguments; what they return is the guest's
 // value: a pointer goes through RC_HOST. rc_mod_set_arg changes an argument of the call a pre hook sees.
 //
+// rc_file_provide (rc_file.h) has the mod serve files to the game: ones it opens, sizes and finds in a folder.
+//
 // The offline rules hold for a mod as for the game: the network guard is loaded before any mod in both editions.
 #ifndef RC_MOD_H
 #define RC_MOD_H
 
 #define RC_MOD 1
+#include "rc_file.h"
 #include "rc_hook.h"
 #include "rc_mid.h"
 #include "rc_ov.h"

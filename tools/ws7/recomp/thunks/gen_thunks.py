@@ -47,6 +47,12 @@ FMT_VARIADIC = {  # name -> (native v-function, kind)
 EXTRA_VARIADIC = {"open": ["int"], "openat": ["int"], "fcntl": ["long"], "ioctl": ["long"],
                   "sem_open": ["int", "unsigned"]}
 
+# --- files: the runtime's functions in place of the system's (runtime/rc_file.h) --------------------
+# A mod's file provider serves files through these; each is the system's function for any other file. Learn &
+# Play's Win32 seam calls the same ones (win-x86/shims/win32_kfile.c).
+FILE_FUNCS = {n: "rc_file_" + n for n in ("open", "close", "read", "pread", "lseek", "fstat", "dup", "stat",
+                                           "fopen", "opendir", "readdir", "closedir")}
+
 # --- hooks that rewrite callback-carrying structs ------------------------------------
 HOOKS = {
     # struct sigaction {handler; mask; flags}: wrap the handler in the copy we pass down
@@ -398,6 +404,8 @@ class Gen:
         return ["rc_native_generic(c, rc_imp(0x%xull, \"%s\"), 0);" % (slot, name)]
 
     def fn_expr(self, slot, name, sym):
+        if name.split("$")[0] in FILE_FUNCS:
+            return self.direct_ref(FILE_FUNCS[name.split("$")[0]])
         if "$" in sym:  # legacy decoration (stat$INODE64, select$1050): the plain symbol is the arm64 one
             return self.direct_ref(name.split("$")[0])
         return "rc_imp(0x%xull, \"%s\")" % (slot, name)

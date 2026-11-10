@@ -27,7 +27,7 @@ where you point them and never copied into the repository.
 | Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#measured-runs)): frame-time statistics, the settings file's pins, the report |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): what a change calls for, and a release's edits and notes |
 | Tables | `python3 tools/targets/check.py` | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
-| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
+| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; the files a mod serves (`test_files`: `rc_file.h` as descriptors, as a `FILE` and in a folder's listing); `probe_mod.dylib` for the game runs |
 
 ### The recompiler
 
@@ -297,6 +297,8 @@ resolution`, `d3d9: Reset 900x700` and `the game draws 900x700 at its own shape`
 window losing and regaining the keyboard, `audio` as the system's default output changing. `LP_OFFSCREEN=1` runs without a window, and starts neither
 script: `d3d9_platform_context` returns before `window_script` and `w32_input_script`, so the game stays on the
 title screen, there is no `input script` line in the log, and a `quit` step never comes. Use `RS_FULLSCREEN=0` for a scripted run.
+
+**Files a mod serves**: `DIR/files_mod.dylib` of `tools/ws7/recomp/test/hooks`, as in the [Mac's TESTING.md](../mac/TESTING.md): in the mods folder it serves every `.psarc` the game opens through the file provider and logs each; one `tools/perf/run.py CONFIG OUT --route-only` run to the note highway reads the game's archives that way.
 
 **Mods**: `make -C tools/ws7/recomp/test/hooks OUT=DIR`, `DIR/probe_mod.dylib` into `<LP_HOME>/mods/`, and the script to the note
 highway above, with `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:

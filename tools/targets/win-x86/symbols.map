@@ -1232,7 +1232,7 @@ nicamera_vtable                                                  0x1d69598  data
 efd_str_destroy                                                  0x014d5910  thiscall  void(void *s)  # unless +0x14 is +0x10: the allocator (0x149e770) frees the text with 9 and its size, the flag 0x1ee18e1 set around it, as the Mac's 0x10000a060; 6615 calls
 ak_vorbis_codebooks                                              0x1ddabc8  data      void *[]  # 599 pointers, 0x1ca4e08 to 0x1cb673f: the same block as the Mac's, byte for byte
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
-guitar_rebuild_player0         0x013e3a60  cdecl     void(void)  # takes no argument (its `push ecx` is a local slot): the guitar manager from the service at *0x1ed8654 (+0x10, interface 0x1000620, +0x10), Rnd_Guitar_EnsureForPlayer 0x1117400 for player 0 (ecx 0), then for both holders the scene attach 0x10330d0 (eax = holder) when it rebuilt: rs7string's RebuildPlayer (0x596030 + 0x4B24F0), which C can't call itself (0x10330d0 takes eax)
+guitar_rebuild_player0         0x013e3a60  cdecl     void(void)  # takes no argument (its `push ecx` is a local slot): the guitar manager from the service at *0x1ed8654 (+0x10, interface 0x1000620, +0x10), Rnd_Guitar_EnsureForPlayer 0x1117400 for player 0 (ecx 0), then for both holders the scene attach 0x10330d0 (eax = holder) when it rebuilt: rs7string's RebuildPlayer (0x596030 + 0x4B24F0), which C can't call itself (0x10330d0 takes eax); the Mac's takes the player; the C passes 0, which this cdecl function ignores
 guitar_string_attach_point     0x01115960  thiscall  bool(void *info, int string, float *point)  # rs7string's Rnd_GetStringAttachPoint 0x594530 (X_ATTACH, the call at 0x111b9b9): ecx = InstrumentInfo, `ret` 0, the caller removes the two stack arguments (rc_call_name restores esp either way); strings past 5 return 0 (0x11159dd)
 tuner_manager                  0x1ee05d4   data      void *  # rs7string's 0x135F5D4 (X_TMGR, read at 0x12be8db): the tuner manager, its player tuners at tuner_manager_tuners
 tuner_peg_names                0x1e6e0c0   data      const char *[6]  # rs7string's 0x12ED0C0 (X_PEGNAMES, PSN1 0x1131dbd): the six peg colour names
@@ -1278,4 +1278,24 @@ fixed_string_create    0x0149b430  cdecl     const char *(const char *text)  # r
 mesh_float_extra       0x01330720  cdecl     void *(void *mesh, const char *name, float value)  # the float extra data `name` of a mesh, found or made with value (Rnd_SetStringShaderParams 0x111acc0 calls it for 8 of a segment's values, 0x111ad72); returned without a reference for the caller
 mesh_colour_extra      0x01330960  cdecl     void *(void *mesh, const float *rgba)  # the mesh's g_diffuseColor colour extra data, found or made with rgba (0x111acf6)
 pegs_apply_transforms  0x0111da10  stdcall   void(void *pegs)  # rs7string's X_PEGPLACE Rnd_PegSet_ApplyTransforms 0x59C630 (the call 0x111470d): each taken peg of the active count on its locator's world transform
+fretgrid_cell_ctor           unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+fretgrid_wire_ctor           unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+fretgrid_wire_reset          unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+fretgrid_wire_flush          unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+ref_release                  unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+play_detect_input            unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+entity_model_root            unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+json_key_make                unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+chord_slide_head             unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+guitar_strings_pluck         unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+section_string_bit           unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+nf_adapter_ctor              unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+mesh_colour_extra_named      unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+guitar_string_ctor           unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+guitar_string_dtor           unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+efd_delete                   unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+peg_slot_dtor                unsupported  the Mac game's (Seven-String Guitar); Learn & Play has no counterpart
+tuning_store_song_select2    0x011c6474 code -  # the Mac copies Play_SetPlayerTuningFromManifest per caller; here the one of tuning_store_song_select
+tuning_store_song_select3    0x011c6474 code -  # as tuning_store_song_select2
+tuning_store_guitarcade3     0x01187cac code -  # the Mac's third copy; here the one of tuning_store_guitarcade
 # --- Seven-String Guitar: end

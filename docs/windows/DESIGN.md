@@ -478,7 +478,8 @@ build too, and `RS_MODS_FIXES=0` turns both off:
   [recompiler](../recompiler/README.md#overrides-and-hook-points)). The tables have two groups, both for rearmed-mods:
   `seven_string`, its Seven-String Guitar after rs7string (735 edits and 127 mid points: the game's arrays for six
   strings grown to eight, the chord records, the tuner, the tuning names, the headstock), and `plain_packages`, its
-  Plain Packages (2 edits and a mid point on the song file's decrypt). The Mac's tables have none yet.
+  Plain Packages (2 edits and a mid point on the song file's decrypt). The Mac's tables have the same two groups
+  ([Mac DESIGN](../mac/DESIGN.md#built-in-fixes-and-mods)); the 29 points only the Mac needs are `none` here.
 
   The network rule holds with mods in the folder. `win32_net.c` answers the game's own calls, but a mod is
   native code, so before anything else the app looks whether it has mods to load and, if so, starts itself again

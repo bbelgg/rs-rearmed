@@ -26,6 +26,7 @@ in the repository.
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`, the built-in mods switched off in the installer. The launcher's reader (run with macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same: comments, spaces, CRLF, a repeated key, the environment winning, other lines ignored (the network guard's and Steam's switches among them); the launcher's `--env` pairs carrying the value it logs as used, the environment's too, as `open` gives the game only launchd's environment; the same keys in both and in the installer |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`, also `python3 tools/targets/check.py`) | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
 | Hook points and mods | `recomp.hooks` (`tools/ws7/recomp/test/hooks`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
+| Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | the 64-bit front end's edits and mid points (`xlat/inner.py`, `rc_mid.h`) on a made-up x86-64 Mach-O: edited code against Unicorn with the switches off and on, mid point hooks against answers, bad tables refused; Learn & Play's counterpart is `test/x86/innercases.py` |
 | Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with the Windows port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
 | Renderer | `opengl.*` (`shims/opengl/test`) | the GL entry-point table and its clients (`opengl.table.clients`), offscreen contexts on both backends, 40 GL sequences run on GL and Metal with their pixels compared (`opengl.metal.*`), every game import with `RS_GL_CHECK=1` (`opengl.metal.coverage`), the Metal disk cache (`opengl.metal.cache`) |
@@ -220,6 +221,29 @@ user's, with a test profile.
   Return (no match: the box stays open), `i`; a click, `i`. The same dylib ran the same route in Learn & Play ([Windows
   testing](../windows/TESTING.md#unattended-runs)), with the same SHA-256 in both logs and the same results but for the lyrics (Learn & Play's test song has no lyric steps). Keep a copy of
   `steam/`: Return on ProfileSelect with no profile starts the first-time screens, and `fwddelete` there deletes the profile.
+- **7-string charts** (rearmed-mods' Seven-String Guitar, 2026-11-10; the input injector and virtual cable above, the executable
+  started directly with the launcher's environment, `RS_MODS_LOG=1`, snapshots every 3 s, a test home with a profile and the chart as a Mac
+  archive in `dlc/`, `SevenString = on` and `PlainPackages = on` in `RSMods.ini`). The log has `[rc] edits seven_string: on (618)`,
+  `[rc] edits plain_packages: on (2)`, `seven-string: on, 123 mid points (and 34 this game needs no call at)` and `plain packages: on` at the
+  start; with a table `unsupported` it says which part has no mid points and that the guitar keeps six strings. A chart then logs its RS7X block
+  (`chords: SNG ...: RS7X v1 block`), `pitch: song detection widened (strings, lowest open note) (7, 35)`, `chord frame up to string 6`, the
+  guitar rebuilt with 7 strings and the seven-peg headstock shown; leaving it, the song file freed, the guitar rebuilt with 6 and `back to the
+  stock headstock`. How each screen went:
+  - Title: Return 6 s after the title matches (the fade-in drops keys). Profile select: Return. Main menu: wait 40 s, as the search takes no keys
+    while the DLC is enumerated. Return on LEARN A SONG, 8 s, `/`, the letters 1.5 s apart (`romance` for the chart, `peace` for Peace of
+    Mind, a six-string song), 2 s, Return on the first match, Return on Play Song. On the tuner, about 15 s later: Delete, then Return 6 s later
+    on "skip tuning?" (Return on the tuner itself is Calibrate). The highway about 40 s after that, after the venue's intro.
+  - The pause menu keeps its cursor: Escape opens it on the item last chosen, so press Up six times (to RESUME) before counting Down:
+    TUNER is Down 2, CHORDS Down 4, EXIT Down 5. Keys 0.6 s apart.
+  - CHORDS lists only the named chords met so far; the chart's chords on the low B have no name, so no seven-row diagram shows there. Escape
+    goes back to the pause menu, a second Escape resumes the song. TUNER shows the seven pegs and B STANDARD 7STR with the low B selected first;
+    Escape goes back to the pause menu.
+  - EXIT goes to the song's page. Escape from there is the song list with the search still in it: `/`, Delete ten times, then the new letters.
+    The chart's chords on the low B come about 60-70 s into it, so play it 100 s to see them.
+  - Bass: in the song list Ctrl opens Path/Input, Right twice moves PATH from Lead Guitar to Bass (the guitar is rebuilt with 4 strings at once),
+    Escape back; the bass tuner is skipped as the guitar's. Bass's pause menu has no CHORDS: Down 5 stops on EXIT too. Afterwards Ctrl and Left
+    twice put PATH back to Lead Guitar, or the profile stays on Bass for the next run.
+  A run that ends by a kill after the last step leaves no crash report; check `netguard.log` for `mode=block`.
 - **Decoded song audio** (`ak_src_submit`, 2026-11-09): a test mod on the hook point wrote each stereo block, its file ID and position to a file, and its `Play_` events to a log; by keyfifo as for the rearmed-mods library (LearnASong_PreSongTuner: `fwddelete`, Return), 30 s of the song, then `z` (rearmed-mods' rewind, `AllowRewind = on`). The song's file ID is the `.wem` in its archive (a custom song in `dlc/wrz/` here; the archive search has to go into `dlc/`'s folders). Its blocks against vgmstream's decode of that `.wem`: -92 dB at worst, the rewind's next block -98 dB.
 - **Sharper picture and screen shape** (2026-11-08, a test install, the colors run's profile on DISCONNECTED, `RS_MODS_LOG=1`,
   `RS_GL_SNAPSHOT_SECS=5`): the log has `MSAA 4x on the game's screen-sized targets`. By keyfifo, Return on TitleScreen, ProfileSelect,

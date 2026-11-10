@@ -20,6 +20,22 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - **A hook on the tone change** (new in 1.11.0): `tone_change` (0x1002bebc0, Learn & Play's 0x1352620) asks for a player's tone, and waits while a change is under way (`tone_change_busy`). rearmed-mods' Prevent Buggy Tones clears that wait, where RSMods jumps past it on Windows. A mod hooked it in a run on a relinked build, with no refusal; the stuck tone itself, a rare bug, has not been met.
 - **A hook on the song lists' names** (new in 1.11.0): `song_list_name` (0x1005dd8d0, Learn & Play's 0x10d2470) gives the menus a song list's name, the localized "SONG LIST" with the list's number after it, and `efd_str_destroy` (0x10000a060) is the game's string destructor. rearmed-mods' Custom Song List Titles puts the player's own titles in that name, where RSMods changes the function's code on Windows. Played on a build of the branch (2026-11-09): Learn a Song's song list filter and Non-Stop Play's choice of list showed the titles, short ones and ones longer than the game's name.
 - **A hook on decoded song audio** (new in 1.12.0): `ak_src_submit` (0x100b0e6a0, Learn & Play's 0x1a98ed0) is where every Wwise source hands a decoded block to the mixer (16-bit interleaved from the Vorbis decoder, 256 frames at a time for a song), with the source's file (`ak_src_pbi`, `ak_pbi_src_info`, `ak_src_info_file_id`: the number of the `.wem` in the song's archive) and the block's position (`ak_src_position`). For rearmed-mods' Song Stems, which takes the guitar or bass part out of the song being played, at a level of the player's own: played on a build of the branch (2026-11-09) with its helper separating the song on the Neural Engine while the song loaded (the first 30 s in 2.2 s), the guitar out from the song's first notes, the level changed by its key within a block, and aligned after a rewind; its helper decodes a song's `.wem` with the game's own Vorbis codebook library, named for mods as `ak_vorbis_codebooks` (599 codebooks, `ak_vorbis_codebook_count`; the same bytes in both editions). Checked in a run on a build of the branch (2026-11-09): a test mod recorded a custom song's blocks and compared them with the `.wem` decoded by vgmstream: each block at its position, to -92 dB (the two decoders' rounding), and again after a rewind.
+- **Edits and mid points, and 7-string charts** (after 1.12.0, not released): the tables (`tools/targets/mac-x64/edits.map` and `mids.map`) now carry
+  rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string) (`seven_string`: 618 edits, 122 mid points), and Plain Packages
+  (`plain_packages`: 2 edits, 1 mid point), the whole unit as Learn & Play has it: the strings' colours, the strings, the fret grid, pitch detection, the
+  tuner, chords, chord detection and drawing, the chord diagrams, the tuning names and the seven-peg headstock. 34 of the points the two editions share are
+  `none` here (this game gets to the same result another way), and 29 points are this edition's own,
+  `none` in Learn & Play: mostly loops Learn & Play's edits lengthen, unrolled here, whose extra strings need a call, and
+  functions inlined here. The 64-bit front end's edits and mid
+  points have their own test (`recomp.inner64`, [TESTING.md](TESTING.md#tests-in-the-repository)). Run 2026-11-10 by scripted input with rearmed-mods'
+  branch, with no fault: a six-string song; DotCharter's 7-string chart with its tuner, the pause menu's TUNER and CHORDS pages; a six-string song and the
+  chart again in one run; a bass arrangement. The snapshots show seven strings, the low B's lane and notes, chord frames over the low B, the seven-peg
+  headstock and B STANDARD 7STR in the tuner; leaving a song rebuilt the guitar with six strings, and four for the bass. Not yet played with a guitar here,
+  so the low B's detection and scoring, the tuner's reading of it and a seven-row chord diagram (the chart's chords on the low B have no name, and the
+  CHORDS page lists only named ones) are unchecked. One difference from Learn & Play: there the edits let the game's list of a chord's expected notes
+  hold eight; here that list is in the same function as chord detection, with arrays for six, and keeps six. A chord of seven or eight notes is judged by
+  the mod's own chord detection in both editions, before that list is filled, so here it never gets more than six and such a chord loses nothing. Where Guitarcade, Session Mode and the tuner menu store a tuning was read from the code,
+  not visited in a run. A chart published for Windows (`_p.psarc`) has to be a Mac archive first; RS Re-ARMed does not convert it ([Next work](#next-work)).
 - **Built-in mods switched off in the installer** (new in 1.11.0): **Built-in Mods…** writes `settings.env`, which the launcher reads at every start, so a change needs no reinstall: custom songs, the rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title logo ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play reads its own file the same way, and one test runs both readers. The sheet was checked in a test home for both games, and a start of each edition with the intro skip switched off in the file played the intro (2026-11-09).
 - **Exit Game** (new in 1.9.0): EXIT GAME in the main menu, in place of UPLAY, pressed in a test install of each edition.
 - **Game Mode** (new in 1.9.1): the app's category is music, so macOS leaves Game Mode off, which made a plug-in host crackle. Played on an installed game changed by hand; not yet run in Learn & Play.
@@ -78,10 +94,12 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 Being looked into, with no promise of if or when:
 
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
-- **7-string charts**: rearmed-mods' Seven-String Guitar and Plain Packages on this edition, as they run in Learn & Play
-  ([Windows plan](../windows/PLAN.md#status)). The 64-bit front end's edits and mid points need a test of their own first;
-  then the Mac's tables. Fewer places than Learn & Play's: here the string colors and the fret grid's cells go through a few
-  functions of their own, where the Windows build inlines them, though some of the six-string loops are unrolled.
+- **7-string charts**: the tables are in ([Status](#status)). Left: a run with a guitar (the low B's notes and chords
+  scored, the tuner on it, a seven-row diagram). DotCharter publishes its 7-string charts as
+  Windows archives (`_p.psarc`, unencrypted); the Mac game reads `_m.psarc`, with the song files under `songs/bin/macos/`,
+  the audio under `audio/mac/`, the graph naming them so and the song files encrypted with the Mac's key. The other files
+  are the same bytes. RS Re-ARMed has no converter for that and will not get one: it would need the archives' keys, and
+  nothing from the game is in this repository. A chart has to be a Mac archive before it is put in `dlc`.
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
   hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

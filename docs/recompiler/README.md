@@ -122,14 +122,20 @@ its built-in fixes still name addresses in `win32_overrides.c`.
     (`OV_GUEST`), which leaves eax, ecx and edx (the SysV call-clobbered registers on the Mac) as the callee did:
     after the hooks every register and xmm register is put back as the point found it, but those a hook set with
     `rc_mid_set` or `rc_mid_set_f`, so the code after the point reads its own. A name that is null or not the
-    point's, a point that is none and a hook that is null are refused with a log line, not read; a value is found
+    point's, a point index that is not one and a hook that is null are refused with a log line, not read; a point
+    a target's table marks `none` (`NAME none REASON`: that game needs no call at the moment, its code gets there
+    another way) takes a hook and never calls it, answers `rc_mid_is_none` with 1, and has no values or
+    continuations; a value is found
     by its index in the table, so a hook on a busy path pays no walk of the table for each one it reads.
 
   The tables are checked where the function is translated: the old bytes must be the image's, a range must start
   and end on an instruction with no jump into it, the new bytes must decode to whole instructions, a continuation
   must be an instruction of the function. A failure there, or an entry no translated function reached, stops the
   build (`TableError`), where an unsupported function would only become a stub. A function with a mid point is not
-  translated as a relaxed one.
+  translated as a relaxed one. On the 64-bit front end a code address a hook reads (a return address on the stack)
+  is the mapped one, `RC_A` of the image address; a length-changing edit (a disp8 grown to disp32) is a `=HEX`
+  replacement; and a loop the compiler unrolled has no count to edit, so its extra strings take a mid point of the
+  Mac's own ([tools/targets](../../tools/targets/README.md#edits-and-mid-points)).
 - **Windows.** The 32-bit runtime overrides an export of a translated DLL by name
   (`rc32_override_add(dll, name, fn)`, used for msvcr100's math) and replaces virtual methods by writing
   host thunk cells into game vtables (the online layer).
@@ -289,7 +295,7 @@ convention (cdecl, stdcall, thiscall, fastcall, register arguments, floats, 64-b
 the sixth, folded ones), changes arguments and results, does the call itself and calls game code first. The same mod
 switches edit groups on and hooks a mid point in its constructor; the test checks the refusals (no such group, none on
 this game, too late) and the hook's values (a register, a pointer in a register and on the stack, a float in `xmm0` and
-`st0`), flags and continuation, and that registers the hook changed without setting them are put back, on both
+`st0`), flags and continuation, a point that is `none` (taken, never called), and that registers the hook changed without setting them are put back, on both
 runtimes.
 
 Edits and mid points in translated code: `test/x86/innercases.py` builds a small PE and translates it with edits and
@@ -298,7 +304,18 @@ operand, a loop count, a branch made unconditional and one taken out, a range of
 twice: switches off against the image, on against a copy with the new bytes (and a patch over two instructions with a
 loop jumping to the second). `test/x86/midrun.c` runs the mid points
 with and without hooks against the answers in the test, and the test checks that bad tables are refused. The 64-bit
-front end shares the code (`xlat/inner.py`); no test of its own covers it yet.
+front end shares the code (`xlat/inner.py`) and has a test of its own, `test/x64/innercases.py` (ctest
+`recomp.inner64`): a small x86-64 Mach-O linked at an address of its own, its functions translated with edits and mid
+points and run by `test/x64/run64.c` from seeded states, switches off against Unicorn on the image, on against Unicorn
+on a copy with the new bytes, or on a twin function written with the edited instructions where the length changes (a
+disp8 grown to disp32, a RIP-relative operand and a call in replaced code, a branch in it). The edits: a stride,
+disp8 and disp32 displacements, an r12-r15 base and index, a RIP-relative displacement, an SSE operand, a loop count,
+a branch made unconditional, a patch over two instructions with a loop to the second. The mid points, against
+answers: values in general registers (r9, r13, r14), in xmm registers (a float and a double), in memory at a register
+plus an offset, a pointer, a byte and a 32-bit value of a 64-bit register, flags, a continuation, and a hook that calls
+guest code, after which the registers it did not set are as before. Its runner is built with every register through
+`rc_ctx` at calls and with `RC_ABI_TRUST`, as the Mac build compiles. Bad tables are refused as on the 32-bit side,
+and a continuation inside another instruction too.
 
 The 64-bit front end is checked by the Mac build itself: the whole image regenerates byte for byte across
 runs and scheduling, and the shims' differential tests compare replaced functions against the original

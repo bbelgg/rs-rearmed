@@ -38,6 +38,7 @@ Capstone and Unicorn (Unicorn is for maintainers only and not in `requirements.t
 cd tools/ws7/recomp
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.handcases --out DIR                    # no DLL needed
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.innercases --out DIR                   # edits and mid points, no DLL needed
+"$PY" -m test.x64.innercases --out DIR                                        # the same for the Mac's front end (ctest recomp.inner64)
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.difftest IMAGE.dll --out DIR --cases 6 --jobs 8
 ```
 
@@ -226,7 +227,8 @@ taking it for a change's doing.
 **7-string charts** (rearmed-mods' Seven-String Guitar, 2026-11-09): the log has `[rc] edits seven_string: on (735)` and
 `seven-string: on, 128 mid points` at the start; a chart then logs its RS7X block (`chords: SNG ...: RS7X v1 block`), its tuning's
 name (`names: ... -> "B STANDARD 7STR"`), the guitar rebuilt with 7 strings and the headstock bound. The snapshots show the seventh
-string, grey, above the low E.
+string, grey, above the low E. The Mac edition's route through the same chart, its pause menu's pages and a bass arrangement is in
+[Mac testing](../mac/TESTING.md#game-runs); the screens are the same here, with this edition's keys and log lines.
 
 **Title logo** (`RS_REARMED`, as on the Mac): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026"
 tag across REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. No keys are needed: with

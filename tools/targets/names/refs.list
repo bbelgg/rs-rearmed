@@ -464,4 +464,24 @@ fixed_string_create
 mesh_float_extra
 mesh_colour_extra
 pegs_apply_transforms
+fretgrid_cell_ctor
+fretgrid_wire_ctor
+fretgrid_wire_reset
+fretgrid_wire_flush
+ref_release
+play_detect_input
+entity_model_root
+json_key_make
+chord_slide_head
+guitar_strings_pluck
+section_string_bit
+nf_adapter_ctor
+mesh_colour_extra_named
+guitar_string_ctor
+guitar_string_dtor
+efd_delete
+peg_slot_dtor
+tuning_store_song_select2
+tuning_store_song_select3
+tuning_store_guitarcade3
 # --- Seven-String Guitar: end

@@ -12,6 +12,8 @@
 
 A map line `NAME unsupported REASON...` says the target has no counterpart; the name then resolves to
 nothing there (an override or hook point is left out, code that uses it does not compile for that target).
+In mids.map, `NAME none REASON...` says the target needs no call at that moment (its code needs nothing there): a
+mod's hook on the point is taken and never called (rc_mid.h).
 
 usage: targets.py gen [--target ID] OUTDIR     write OUTDIR/rc_target_names.h, OUTDIR/rc_target.c and
                                                OUTDIR/skip/<module>.skip (gen_image.py --skip) for one target
@@ -77,6 +79,7 @@ class Target:
         self.edits = []        # (group, addr, length, check, patches, where): parse_edit
         self.mids = {}         # name -> (addr, [(kind, name, loc, mem, off)], [(cont name, addr)])
         self.inner_unsupported = {}  # edit group or mid point -> reason
+        self.inner_none = {}  # mid point -> reason: this target needs no call at that moment (`NAME none REASON`)
         self._read_symbols()
         self._read_offsets()
         self._read_drops()
@@ -153,10 +156,15 @@ class Target:
         for where, p in self._lines("mids.map"):
             if not IDENT.match(p[0]):
                 raise TargetError("%s: bad name %r" % (where, p[0]))
-            if p[0] in self.mids or p[0] in self.inner_unsupported:
+            if p[0] in self.mids or p[0] in self.inner_unsupported or p[0] in self.inner_none:
                 raise TargetError("%s: %s defined twice" % (where, p[0]))
             if len(p) > 1 and p[1] == "unsupported":
                 self.inner_unsupported[p[0]] = " ".join(p[2:]) or "(no reason given)"
+                continue
+            if len(p) > 1 and p[1] == "none":   # the moment needs nothing here: a hook on it is taken, never called
+                if len(p) < 3:
+                    raise TargetError("%s: %s none: give the reason this target needs no call there" % (where, p[0]))
+                self.inner_none[p[0]] = " ".join(p[2:])
                 continue
             if len(p) < 3:
                 raise TargetError("%s: expected NAME ADDRESS (VALUES) [-> CONT=ADDRESS, ...]" % where)
@@ -543,6 +551,9 @@ def gen_runtime_c(t, lists):
           "// names/mids.list: each point's address, values and continuations, or why this target has none (rc_mid.h)",
           "const rc_mid_name rc_target_mids[] = {"]
     for name in lists.get("mids", []):
+        if name in t.inner_none:   # needed nowhere here: no address, the reason, and none = 1
+            L.append('  {"%s", 0, %s, 0, {{0}}, 0, {0}, 1},' % (name, _c_string(t.inner_none[name])))
+            continue
         if name not in t.mids:
             why = t.inner_unsupported.get(name, "not in %s/mids.map" % t.id)
             L.append('  {"%s", 0, %s},' % (name, _c_string(why)))

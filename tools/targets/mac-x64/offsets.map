@@ -126,236 +126,246 @@ ui_note_stats_1                   unsupported  as ui_note_stats_0
 ui_note_stats_2                   unsupported  as ui_note_stats_0
 ui_note_stats_3                   unsupported  as ui_note_stats_0
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
-guitar_headstock unsupported Seven-String Guitar: not ported to the Mac game yet
-headstock_pegs unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_strings_ghost unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_loaded unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_shader unsupported Seven-String Guitar: not ported to the Mac game yet
-string_shader_v unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_dim unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_size unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_inline unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_string_mode unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_manager_holders unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_holder_guitar unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_holder_profile unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_profile_type unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_profile_strings unsupported Seven-String Guitar: not ported to the Mac game yet
-string_renderer_strings unsupported Seven-String Guitar: not ported to the Mac game yet
-tuner_manager_tuners unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_player unsupported Seven-String Guitar: not ported to the Mac game yet
-pegs_count unsupported Seven-String Guitar: not ported to the Mac game yet
-pegs_loaded unsupported Seven-String Guitar: not ported to the Mac game yet
-pegs_slots unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_slot_size unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_slot_rgb unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_slot_named unsupported Seven-String Guitar: not ported to the Mac game yet
-pegs_colours unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_colour_size unsupported Seven-String Guitar: not ported to the Mac game yet
-note_lane_pos unsupported Seven-String Guitar: not ported to the Mac game yet
-note_head_lane_z unsupported Seven-String Guitar: not ported to the Mac game yet
-gem_lane_y unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_main unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_ghost unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_glow unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_tail unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_guitar unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_info unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_gs_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_info_active unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_info_loaded unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_info_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_pegs_colours unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_pegs_tail unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_pegs_colour_player unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_pegs_size unsupported Seven-String Guitar: not ported to the Mac game yet
-game_color_mode unsupported Seven-String Guitar: not ported to the Mac game yet
-game_color_uv unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_color_table unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_color_uv unsupported Seven-String Guitar: not ported to the Mac game yet
-fretgrid_guitar unsupported Seven-String Guitar: not ported to the Mac game yet
-fretgrid_bars unsupported Seven-String Guitar: not ported to the Mac game yet
-fretbar_size unsupported Seven-String Guitar: not ported to the Mac game yet
-fretbar_valid unsupported Seven-String Guitar: not ported to the Mac game yet
-fretbar_a_local unsupported Seven-String Guitar: not ported to the Mac game yet
-fretbar_b_local unsupported Seven-String Guitar: not ported to the Mac game yet
-fretbar_b_world unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_strings unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_info unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_fret_bars unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_strings_string unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_attach unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_head_frame unsupported Seven-String Guitar: not ported to the Mac game yet
-inlays_entity unsupported Seven-String Guitar: not ported to the Mac game yet
-entity_flags unsupported Seven-String Guitar: not ported to the Mac game yet
-entity_root_node unsupported Seven-String Guitar: not ported to the Mac game yet
-render_world_scene unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_world_translate unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_cells unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_row unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_rows unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_cell unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_cell_local unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_cell_world unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_wires unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_wire_row unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_fretgrid_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_nextgrid_time unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_nextgrid_size unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_lowest_open unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_tuning unsupported Seven-String Guitar: not ported to the Mac game yet
-detector_matcher unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_detection unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_tuning unsupported Seven-String Guitar: not ported to the Mac game yet
-tracker_detector unsupported Seven-String Guitar: not ported to the Mac game yet
-tracked_note_string unsupported Seven-String Guitar: not ported to the Mac game yet
-tracked_note_fret unsupported Seven-String Guitar: not ported to the Mac game yet
-tracked_note_played_fret unsupported Seven-String Guitar: not ported to the Mac game yet
-tracked_note_played_string unsupported Seven-String Guitar: not ported to the Mac game yet
-session_guitar unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_offset unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_entity unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_strings unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_frets unsupported Seven-String Guitar: not ported to the Mac game yet
-std_vector_begin unsupported Seven-String Guitar: not ported to the Mac game yet
-std_vector_end unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_detection_tuning8 unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_detection_open8 unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_detection_count unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_detection_magic unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_matcher_tuning8 unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_matcher_magic unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_input unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_guitar unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_open unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_offset unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_string unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_note_tuner unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_detector unsupported Seven-String Guitar: not ported to the Mac game yet
-json_value_find_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_value_number_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_tail unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_open unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_offset unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_peak unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_letters unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_picks unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_last_pick unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_count unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_target unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_edge unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_tuner_order unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_song_levels unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_song_templates unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_song_chord_notes unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_song_tuning unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_song_capo unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_level_size unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_level_notes unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_note_size unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_note_mask unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_note_chord unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_note_chord_notes unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_template_size unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_template_frets unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_template_fingers unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_template_midi unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_template_name unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_size unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_mask unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_bends unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_slide_to unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_slide_unpitch_to unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_chord_notes_vibrato unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_bend_data_size unsupported Seven-String Guitar: not ported to the Mac game yet
-sng_bend_data_used unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_frets unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_fingers unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_midi unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_slots unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_t8_used unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_size unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_mask unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_slide_to unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_slide_unpitch_to unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_vibrato unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_c8_bends unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_midi8 unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_midi unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_mask unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_fret unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_finger unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_slide unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_unpitch unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_tail_vibrato unsupported Seven-String Guitar: not ported to the Mac game yet
-seven_eval_child67 unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_detector unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_octave_dyads unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_frames unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_frame_write unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_frame_capacity unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_frame_count unsupported Seven-String Guitar: not ported to the Mac game yet
-detection_frame_size unsupported Seven-String Guitar: not ported to the Mac game yet
-frame_level unsupported Seven-String Guitar: not ported to the Mac game yet
-frame_peak_count unsupported Seven-String Guitar: not ported to the Mac game yet
-frame_peaks unsupported Seven-String Guitar: not ported to the Mac game yet
-frame_peak_size unsupported Seven-String Guitar: not ported to the Mac game yet
-frame_peak_strength unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_candidate_size unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_candidate_bin unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_candidate_strength unsupported Seven-String Guitar: not ported to the Mac game yet
-tracker_evals unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_size unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_children unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_is_chord unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_whole unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_judge_a unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_judge_a_on unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_judge_b unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_judge_b_on unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_string_masks unsupported Seven-String Guitar: not ported to the Mac game yet
-eval_slide_to unsupported Seven-String Guitar: not ported to the Mac game yet
-chord_render_template unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_fretgrid unsupported Seven-String Guitar: not ported to the Mac game yet
-json_node_member_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_node_number_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_node_object_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_node_add_ref_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_node_release_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-json_array_items unsupported Seven-String Guitar: not ported to the Mac game yet
-json_number_size unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_ref_count unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_node_children unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_node_child_slots unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_node_attach_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_stream_top unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_stream_top_count unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_av_properties unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_property_node_next unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_property_node_item unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_property_type_slot unsupported Seven-String Guitar: not ported to the Mac game yet
-noteway_layer_type unsupported Seven-String Guitar: not ported to the Mac game yet
-noteway_layer_value unsupported Seven-String Guitar: not ported to the Mac game yet
-ni_extra_value unsupported Seven-String Guitar: not ported to the Mac game yet
-nif_resource_stream unsupported Seven-String Guitar: not ported to the Mac game yet
-headstock_seg_params unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_inverted unsupported Seven-String Guitar: not ported to the Mac game yet
-instrument_lefty unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_slot_entity unsupported Seven-String Guitar: not ported to the Mac game yet
-peg_slot_locator unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_blob_data unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_blob_size unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_blob_size64 unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_blob_size_bytes unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_file_blob unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_file_pos unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_file_size unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_pos unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_read unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_write unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_good unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_file unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_size unsupported Seven-String Guitar: not ported to the Mac game yet
+guitar_headstock             0x28  # Rnd_Guitar: Rnd_Headstock (guitar ctor 0x10019e804; N5's callee 0x100199af0 gets [guitar+0x28])
+headstock_pegs               0x18  # Rnd_Headstock: PegSet (0x100198dde)
+guitar_strings_ghost         0x38  # GuitarStrings: the game's six ghosts (ctor 0x1001b0120..)
+guitar_string_loaded         0x88  # string object: u8 model loaded (0x1001af519)
+guitar_string_shader         0x60  # string object: the atlas-row float parameter (0x1001af5e0 stores it at [string+0x38]+0x28)
+string_shader_v              0x28  # that parameter object: its float (0x1002a15ea)
+guitar_string_dim            0xac  # string object: u8 section dimming (GSSS 0x1001b1620 / GSSE 0x1001b16b0)
+instrument_size              0x38  # InstrumentInfo (0x10019e79c)
+instrument_inline            0xa  # InstrumentInfo: u8 (profile +0x17 at 0x100194e6b)
+instrument_string_mode       0x20  # InstrumentInfo: u32 modes (0x100194efc)
+guitar_manager_holders       0x20  # guitar manager: holders[2] (0x1001a5a9b)
+guitar_holder_guitar         0x8  # holder: Rnd_Guitar (holder ctor 0x1001a9aa9: the 0x80 object from the guitar ctor)
+guitar_holder_profile        0x10  # holder: profile (accessor 0x1001a9cf0, Equals' operand)
+guitar_profile_type          0x1c  # profile: int, 2 bass (0x1001a1ce2)
+guitar_profile_strings       0x48  # profile: u8 count (0x1001a1da8)
+string_renderer_strings      0x8  # string renderer: GuitarStrings (0x1008af790)
+tuner_manager_tuners         0x18  # tuner manager: tuners[] (0x10053173e)
+player_tuner_player          0x8  # UI_PlayerTuner: u32 player (0x10052dc11)
+pegs_count                   0x4  # PegSet: u16 (0x1001b6d19)
+pegs_loaded                  0x8  # PegSet: u8 (0x1001b6e8a)
+pegs_slots                   0x10  # PegSet: slots (getter 0x1001b7450)
+peg_slot_size                0x38  # (0x1001b7462)
+peg_slot_rgb                 0x20  # slot: float[3] (slot ctor 0x1001b63ab; named colour 0x1001b647b)
+peg_slot_named               0x2c  # slot: u32 colour name (0x1001b6499)
+pegs_colours                 0x160  # PegSet: pegColor[6] (ctor 0x1001b6a21)
+peg_colour_size              0x10
+note_lane_pos                unsupported  R3a-c/R4 are none on the Mac (GetCellPos)
+note_head_lane_z             unsupported  R2 is none on the Mac
+gem_lane_y                   unsupported  R6 is none on the Mac
+seven_gs_main                0x78
+seven_gs_ghost               0xb8
+seven_gs_glow                0xf8  # kept and zeroed by GSC1; the Mac's glow edits use the renderer's tail (+0x170) instead
+seven_gs_tail                0x118
+seven_gs_guitar              0x120
+seven_gs_info                0x128
+seven_gs_size                0x130
+seven_info_active            0x40
+seven_info_loaded            0x41
+seven_info_size              0x48
+seven_pegs_colours           0x1d0
+seven_pegs_tail              0x250
+seven_pegs_colour_player     0x252
+seven_pegs_size              0x258
+game_color_mode              0x688  # GameColorManager: u32 per player, the colour mode (0 normal, 1 colourblind): the getters read +0x688 + 4 * player, 0x1006eabd0 / 0x1006ead30 write it, the constructor zeroes both (0x1006e8bea)
+game_color_uv                0x1110  # GameColorManager: the stock V table, [2][28][6] floats, mode stride 0x2a0 (GetV 0x1006ead05/0x1006ead17, the constructor's fill)
+seven_color_table            0x1650  # Seven-String: the eight-column colour pointer table appended, [2][28][8] 8-byte pointers (0xe00 bytes)
+seven_color_uv               0x2450  # Seven-String: the eight-column V table appended, [2][28][8] floats (0x700 bytes); the manager is 0x2b50 bytes with them
+fretgrid_guitar              0x0  # FretGrid: the Rnd_Guitar (every FretGrid method reads [grid] -> +0x40 the info)
+fretgrid_bars                0x6120  # FretGrid: the fret-bar records, 26 of fretbar_size (ctor 0x10019b990: 0x10019a520 on +0x6120 + n*0x40)
+fretbar_size                 0x40  # fret-bar record (ctor 0x10019a520 writes up to +0x38; the loops of 0x10019c900 step 0x40)
+fretbar_valid                0x0  # fret-bar record: u8 (ctor)
+fretbar_a_local              0x4  # fret-bar record: vec3, local point 0 (0x10019a680: +4 + 12k)
+fretbar_b_local              0x10  # fret-bar record: vec3, local point 1
+fretbar_b_world              0x28  # fret-bar record: vec3, world point 1 (0x10019a5a0 / 0x10019a580: +0x1c + 12k)
+guitar_strings               0x10  # Rnd_Guitar: its GuitarStrings (the guitar ctor 0x10019e740: efd_alloc(0x78) at +0x10)
+guitar_info                  0x40  # Rnd_Guitar: its InstrumentInfo (every FretGrid method: [guitar+0x40])
+instrument_fret_bars         0xd  # InstrumentInfo: u8, the fret bars (0x10019c900 loops over [info+0xd])
+guitar_strings_string        0x8  # GuitarStrings: main[6], 8 bytes each (plan section 3, the strings part's map)
+guitar_string_attach         0x10  # string object: vec3, attach point (plan section 3: GSXF)
+guitar_head_frame            0x8  # headstock (Rnd_Guitar +0x28): the frame entity (0x100199870: Entity_SetTranslation([head+8], guitar+0x4c, 1))
+inlays_entity                0x8  # inlay set (headstock +0x20): its entity (0x1001b5cc0: [rbx+8] to the entity setters)
+entity_flags                 0x188  # Entity: bit 0 = the root node is at entity_root_node (Entity_SetScale 0x1002a28b0)
+entity_root_node             0x190  # Entity: the root scene node when bit 0 (0x1002a2935)
+render_world_scene           0x1f0  # the render world: nonzero when it has its scene (0x1002a2918); not read on the Mac (render_world unsupported)
+ni_world_translate           0xd4  # NiAVObject: vec3, the world translation: the world NiTransform at +0xac, its translation at +0x28 (NiTransform 0x100f07c00: rotation +0x4, translation +0x28, scale +0x34; ni_world_scale 0xe0). (0xd0, the rotation's last element, was a guess that a game run refuted)
+seven_fretgrid_cells         0xc  # FretGrid: cell (row 0, string 0): rows from +0x8, a valid byte padded to 4, then the cells (GetCellPos 0x10019ce20: +0xc)
+seven_fretgrid_row           0x264  # FretGrid: a cell row, 4 + 8 * 0x4c (the game's 0x1cc)
+seven_fretgrid_rows          0x1a  # FretGrid: cell rows
+seven_fretgrid_cell          0x4c  # FretGrid: a cell
+seven_fretgrid_cell_local    0x4  # FretGrid cell: three local points (0x10019dbb0)
+seven_fretgrid_cell_world    0x28  # FretGrid cell: three world points (0x10019dbf0)
+seven_fretgrid_wires         0x7920  # FretGrid: the fret-wire rows (the game's +0x2ec0)
+seven_fretgrid_wire_row      0x260  # FretGrid: a fret-wire row, 0xa0 + 8 * 0x38 (the game's 0x1f0)
+seven_fretgrid_size          0xb6e0  # FretGrid: bytes (the game's 0x7920)
+seven_nextgrid_time          0x17c0  # next-note grid: time[8][26] (rows 0x68) behind the time-set tree (+0x1798, 0x28); the game's time[6][26] at +0x1520
+seven_nextgrid_size          0x1b00  # next-note grid: bytes (the game's 0x17c0); at rbp-0x1b30 of the neck targets' Update 0x10043baf0 (frame 0x1b18)
+detection_lowest_open        0x130c  # [0x11f8] detection: s32 lowest open MIDI note (Play_Detector_SetTuning 0x100227c1e/0x100227c5a, Reset 0x10021bdc2)
+detection_tuning             0x14c0  # [0x1340] detection: int16[6] (SetTuning 0x100227b9a..; PUBAN passes det + 0x14c0 to 0x10017aa60 at 0x10010fa2d)
+detector_matcher             0x10  # [0x8] Play_DetectInput: its matcher (Init 0x10023484b; 0x100231a36)
+matcher_detection            0x8  # [0x4] matcher: the detection (ctor 0x10022a436 from Init's rdx = [input+8]; SetTuning 0x100230c4c)
+matcher_tuning               0x4c  # [0x44] matcher: int16[6] (ctor zeroes +0x4c qword and +0x54 dword; SetTuning 0x100230b6f..0x100230c36; PUBCL 0x10010f770..)
+tracker_detector             0x4c1c8  # [0x4c19c] note tracker: its Play_DetectInput (PUBCL 0x10010f68b, PUBAN 0x10010f9fa)
+tracked_note_string          0xc0  # [0xc0] tracked note (tracker + i * 0xc28): u8 (0x10010f707)
+tracked_note_fret            0xc1  # [0xc1] u8 (0x10010f758)
+tracked_note_played_fret     0x14  # [0x14] s32 (0x10010f939)
+tracked_note_played_string   0x18  # [0x18] s32 (0x10010f710)
+session_guitar               0x490  # [0x37c] play session: its Rnd_Guitar (song setup 0x10043477f, PUBEDGE 0x10043e7c5)
+guitar_offset                0x4c  # [0x2c] Rnd_Guitar: vec3 (ApplyOffset 0x10019cd3e/0x10019cd4b)
+guitar_string_entity         0x8  # [0x4] string object: its entity (Build 0x10019c78b, the object from 0x1001b0c80)
+instrument_strings           0xb  # [0xb] InstrumentInfo: u8 (Build 0x10019c73c)
+instrument_frets             0xc  # [0xc] (Build 0x10019c744)
+std_vector_begin             0x0  # [0x0] (SetTuning 0x100227b84)
+std_vector_end               0x8  # [0x4] (SetTuning 0x100227b87)
+seven_detection_tuning8      0x1550
+seven_detection_open8        0x1560
+seven_detection_count        0x1570
+seven_detection_magic        0x1574
+seven_matcher_tuning8        0x60
+seven_matcher_magic          0x70
+player_tuner_input           0xc  # [0xc] u32 input id (ctor 0x1005243b2; ApplyTuning 0x10052901c hands it to 0x100231b40)
+player_tuner_guitar          0x30  # [0x2c] its Rnd_Guitar (bound at 0x100527cca; the methods read [+0x30]+0x40)
+player_tuner_open            0x48  # [0x38] int32[6] target notes (ResetStandard 0x100526d4c, ApplyTuning 0x100529008)
+player_tuner_offset          0x60  # [0x50] int32[6] offsets (ApplyTuning 0x100529010)
+player_tuner_string          0x84  # [0x74] int32 the string being tuned (arrow keys 0x10052db20 / 0x10052db44)
+player_tuner_note_tuner      0xe0  # [0xd0] its NoteTuner (SelectString 0x100529325 hands r12+0xe0 to UI_NoteTuner_Initialize)
+detection_detector           unsupported  [0x1238] not read on the Mac: TS8SEL gets the Play_DetectInput from play_detect_input
+json_value_find_slot         0x7  # [0x5] JSON value vtable: member by name (0x1001061af, [+0x38])
+json_value_number_slot       0x15  # [0x14] JSON value vtable: its number object or null (0x1001061c0, [+0xa8])
+seven_tuner_tail             0x308
+seven_tuner_size             0x458  # CONTRACT CHANGE (plan 0x450): the order u8[8] at 0x450
+seven_tuner_open             0x308  # int32[8]
+seven_tuner_offset           0x328  # int32[8]
+seven_tuner_peak             0x348  # float[8] (no code relies on its distance from the open notes)
+seven_tuner_letters          0x368  # {letter, sharp}[8], 64-bit pointers
+seven_tuner_picks            0x3e8  # pointer[8]
+seven_tuner_last_pick        0x428  # int32[8] each pick's state (-2: none)
+seven_tuner_count            0x448  # u8
+seven_tuner_target           0x44a  # u8
+seven_tuner_edge             0x44b  # u8
+seven_tuner_order            0x450  # u8[8] (CONTRACT CHANGE: new)
+sng_song_levels              0x58  # SNG_Song: std::vector of levels (PostProcessNotes 0x1001f297d: [r13+0x58]; Learn & Play 0x40)
+sng_song_templates           0x100  # SNG_Song: std::vector of chord templates (SNG_Song_GetChord 0x1001eb4a7; SNG_Song_Load reads it at 0x1001eb951)
+sng_song_chord_notes         0x130  # SNG_Song: std::vector of ChordNotes records (SNG_Song_GetChordNotes 0x1001eb4e6; Load 0x1001eb960)
+sng_song_tuning              0x1f8  # SNG_Song: std::vector<int16_t>, the MetaData tuning (Load 0x1001ec178..0x1001ec1cc; the destructor frees it 0x1001eae94)
+sng_song_capo                0x210  # SNG_Song: u8, the capo fret, 0xff none (PostProcessNotes 0x1001f21b1 and the six unrolled template compares 0x1001f2260..)
+sng_level_size               0xc8  # SNG level (PostProcessNotes 0x1001f296d: add r14,0xc8; Learn & Play 0x64)
+sng_level_notes              0x60  # SNG level: std::vector of notes (0x1001f28f0 / 0x1001f28f4: [r14+0x60], [r14+0x68]; Learn & Play 0x30)
+sng_note_size                0x1c8  # SNG note (0x1001f2955: add rbx,0x1c8; as Learn & Play)
+sng_note_mask                0x0  # SNG note: u32 mask (0x1001f293f)
+sng_note_chord               0x14  # SNG note: int32 chord template id, -1 none (0x1001f2900; the spawn 0x10043daef)
+sng_note_chord_notes         0x18  # SNG note: int32 ChordNotes id, -1 none (0x1001f2fa3; the spawn 0x10043db2c)
+sng_template_size            0x48  # chord template (GetChord: lea [id+id*8], [base+r*8]; the reader 0x1001f4843)
+sng_template_frets           0x4  # chord template: int8 frets[6] (0x1001d4750 reads +4..+9; DM1 0x100568104)
+sng_template_fingers         0xa  # chord template: int8 fingers[6] (the file's layout)
+sng_template_midi            0x10  # chord template: int32 midi[6] (Play_Eval_Build 0x10010d563..0x10010d586 copies +0x10..+0x24 to the eval's +0x2c)
+sng_template_name            0x28  # chord template: char name[32] (the file's layout)
+sng_chord_notes_size         0x948  # ChordNotes record (GetChordNotes 0x1001eb50e; Play_Eval_Build copies 0x948 bytes 0x10010d5a0)
+sng_chord_notes_mask         0x0  # ChordNotes: u32 mask[6] (PostProcessNotes 0x1001f2ffa)
+sng_chord_notes_bends        0x18  # ChordNotes: BendData32 bends[6] (the file's layout)
+sng_chord_notes_slide_to     0x930  # ChordNotes: int8 slideTo[6] (0x1001f3028)
+sng_chord_notes_slide_unpitch_to 0x936  # ChordNotes: int8 slideUnpitchTo[6] (0x1001f3012)
+sng_chord_notes_vibrato      0x93c  # ChordNotes: int16 vibrato[6] (the file's layout)
+sng_bend_data_size           0x184  # BendData32 (the file's layout)
+sng_bend_data_used           0x180  # BendData32: u32, the values used (the file's layout)
+seven_t8_size                0x80
+seven_t8_frets               0x48
+seven_t8_fingers             0x50
+seven_t8_midi                0x58
+seven_t8_slots               0x78
+seven_t8_used                0x79
+seven_c8_size                0x15a8
+seven_c8_mask                0x948
+seven_c8_slide_to            0x968
+seven_c8_slide_unpitch_to    0x970
+seven_c8_vibrato             0x978
+seven_c8_bends               0x988
+seven_eval_midi8             0x284
+seven_eval_tail_midi         0x29c
+seven_eval_tail_mask         0x2a4
+seven_eval_tail_fret         0x2ac
+seven_eval_tail_finger       0x2ae
+seven_eval_tail_slide        0x2b0
+seven_eval_tail_unpitch      0x2b2
+seven_eval_tail_vibrato      0x2b4
+seven_eval_child67           0xc1e
+matcher_detector             0x0  # [0x0] matcher: its Play_DetectInput (0x10022e501: [matcher], then its +0x8 is the detection with the frames)
+matcher_octave_dyads         0x5c  # [0x54] matcher: u8, a bass's octave dyad passes on one note (0x10022ec5b)
+detection_frames             0xec8  # [0xdb8] detection: the ring of analysis frames, a pointer (0x10022e5c9; 0x1002303a7)
+detection_frame_write        0xed0  # [0xdbc] detection: s32, the ring's next index (0x10022e546)
+detection_frame_capacity     0xed4  # [0xdc0] detection: s32, the ring's frames (0x10022e574)
+detection_frame_count        0xedc  # [0xdc8] detection: s32, frames written so far (0x10022e539)
+detection_frame_size         0x7d0  # [0x7d0] detection frame (0x10022e5c2; the copy of 0x7cc bytes 0x10022e5d7)
+frame_level                  0x700  # [0x700] frame: float, its level in dB (0x10022e5e1: [rbp-0x398] of the copy at [rbp-0xa98]; at -55 or below no strength)
+frame_peak_count             0xbc  # [0xbc] frame: s32, its peaks (0x10022e5f2: [rbp-0x9dc])
+frame_peaks                  0x1c  # [0x1c] frame: its peaks {int32 MIDI bin, float strength} (0x10022e600: [rbp+rcx*8-0xa7c])
+frame_peak_size              0x8  # [0x8] (0x10022e600: rcx*8)
+frame_peak_strength          0x4  # [0x4] peak: float (0x10022e60e: [rbp+rcx*8-0xa78])
+matcher_candidate_size       0xc  # [0xc] the matcher's candidate {int32 bin, float strength, u8, 3 bytes}: 128 in a vector (0x10022e64c..0x10022e66d; the sort's 127 x 12 = 0x5f4 at 0x10022e7b6)
+matcher_candidate_bin        0x0  # [0x0] (0x10022e64c)
+matcher_candidate_strength   0x4  # [0x4] (0x10022e650; the comparator 0x100230b34)
+tracker_evals                0x8  # [0x8] note tracker: its evals (the release 0x10010e2d9: lea [tracker + slot*0xc28 + 8])
+eval_size                    0xc28  # [0xc28] (0x10010e29c; the child queries 0x1001101fc)
+eval_children                0xc04  # [0xc04] eval: int32[6] child slots (0x1001101ef: [eval + s*4 + 0xc04]; the release's [slot + 0xc0c])
+eval_is_chord                0xc1c  # [0xc1c] eval: u8 (0x1001101a9; the release reads it at its slot's +0xc24, 0x10010e2de)
+eval_whole                   0xc1d  # [0xc1d] eval: u8 (0x1001101b2; AddNoteOrChord sets it at the slot's +0xc25, 0x10010edb0)
+eval_judge_a                 0x54  # [0x54] eval: u8[3] (the child queries 0x100110497 +0x54, 0x1001106f7 +0x55, 0x1001101c7 +0x56)
+eval_judge_a_on              0x64  # [0x64] eval: u8 (0x1001101c1)
+eval_judge_b                 0x74  # [0x74] eval: u8[3] (0x1001104f4 +0x74, 0x100110754 +0x75, 0x100110220 +0x76)
+eval_judge_b_on              0x84  # [0x84] eval: u8 (0x1001101bb)
+eval_string_masks            0x2bc  # [0x2bc] eval: u32[6] (0x100110bdb; read by Learn & Play's callbacks only: the Mac's points pass the eval)
+eval_slide_to                0xbec  # [0xbec] eval: int8[6] (0x100113051; as eval_string_masks)
+chord_render_template        0x40  # chord render object: its chord template (0x100013100 hands [obj+0x38..0x48] = note, template, ChordNotes to 0x10040b5e0; SH 0x100014510 reads [obj+0x48] as the ChordNotes, NB/CLB [obj+0x40] as the template) - medium
+guitar_fretgrid              0x18  # Rnd_Guitar: FretGrid (the plan's section 3, the guitar ctor 0x10019e740) - reused, high
+json_node_member_slot        0x6  # JSON value vtable: an object's member by name (0x1001063a0: [vtbl+0x30], called by the serializer 0x1007d614d "Frets")
+json_node_number_slot        0x14  # JSON value vtable: its number object (the serializer 0x1007d627c: [vtbl+0xa0], then the double at +0x10, 0x1000f9190)
+json_node_object_slot        0x16  # JSON value vtable: the object (dictionary) it is (0x1007d613b, 0x1007d6470: [vtbl+0xb0])
+json_node_add_ref_slot       0x0  # JSON value vtable: AddRef (0x1007d6173: call [rax])
+json_node_release_slot       0x1  # JSON value vtable: Release (0x1007d67a0: [vtbl+8])
+json_array_items             0x20  # JSON array: std::vector of its values, a pointer each (0x1000ee940: ([+0x28] - [+0x20]) >> 3)
+json_number_size             0x18  # JSON number object: num_intern 0x1000f8f10 allocates 0x18 (efd_alloc at 0x1000f8fcc): vtable, refs +8, double +0x10
+ni_ref_count                 0x8  # NiRefObject: int32 (AddRef 0x100164af0: atomic add at this + 8)
+ni_node_children             0x130  # NiNode: NiTObjectArray at +0x128 (AttachChild 0x100e87400: lea [this+0x128]): +0x8 base
+ni_node_child_slots          0x138  # its u16 max size (0x100e874a1), +0x13a used, +0x13e grow by
+ni_node_attach_slot          0x29  # NiNode vtable slot 41 (+0x148) = AttachChild(child, first_free) 0x100e87400 (vtable 0x1018624c8; Learn & Play's 40 + the second destructor)
+ni_stream_top                0x180  # NiStream: its top objects (0x100ef1f90 loops [+0x180][i] while i < [+0x18c]; the ctor 0x100eed7e0)
+ni_stream_top_count          0x18c  # u32, their count
+ni_av_properties             0xf0  # NiAVObject: the head of its property list (GetProperty 0x100e3b1b0)
+ni_property_node_next        0x0  # list node: next (0x100e3b1d4)
+ni_property_node_item        0x10  # list node: the property (0x100e3b1d0)
+ni_property_type_slot        0x13  # NiProperty vtable slot of its type (+0x98, 0x100e3b1e2)
+noteway_layer_type           0xc  # the layer setter 0x1002a23f0 asks GetProperty(0xc), checks GRAlphaSortingProperty's RTTI 0x1018ea388
+noteway_layer_value          0x3c  # GRAlphaSortingProperty: u16 layer (0x1002a2539; made 0x48 at 0x1002a2442)
+ni_extra_value               0x28  # float extra (0x1002a15ea, 0x1002a161e) and colour extra (0x100e46ed4) value
+nif_resource_stream          0x10  # nif resource (0x18 bytes, 0x1003d5c5e): its NiStream (LoadNif's first out pointer, 0x101175eca)
+headstock_seg_params         0x38  # Rnd_Headstock: the params of its six segments, 8 bytes each (GSHC 0x100199b36; the loaded bytes at +0x30)
+instrument_inverted          0x8  # InstrumentInfo: u8 (the binder 0x1001b6f77 picks Locator_Invert_Peg_%d by [[guitar+0x40]+8])
+instrument_lefty             0x9  # InstrumentInfo: u8 left-handed (the pitch part's census: [info+9] the hand); as Learn & Play
+peg_slot_entity              0x8  # PegSet slot: the peg entity (ApplyTransforms 0x1001b751e: [slot+8])
+peg_slot_locator             0x10  # PegSet slot: its locator node, a counted pointer (the binder 0x1001b706a, ApplyTransforms 0x1001b74bc)
+mem_blob_data                0x10  # the memory blob (ctor 0x1001577f0, 0x38 bytes): its bytes (Read 0x100157a6b, getter 0x1001578b0)
+mem_blob_size                0x20  # u64 size (Read 0x100157a5e; Size reads its low u32; getter 0x1001578c0); the C writes the low u32 into zeroed memory
+mem_blob_size64              0x28  # Size64 (0x100157b04) reads [blob+0x28]
+mem_blob_size_bytes          0x38  # the blob (0x1003d2e03 allocates 0x38)
+mem_file_blob                0x10  # memory IFile (ctor 0x100157960): its blob
+mem_file_pos                 0x18  # u32 position
+mem_file_size                0x20  # bytes (0x1001578da allocates 0x20)
+nf_adapter_pos               0x24  # NiFile adapter (ctor 0x100003d90): u32 position
+nf_adapter_read              0x10  # read function (0x100003d7b)
+nf_adapter_write             0x18  # write function (0x100003d7f)
+nf_adapter_good              0x20  # u8 (0x100003dce)
+nf_adapter_file              0x28  # its IFile (0x100003dac)
+nf_adapter_size              0x30  # bytes (the stack object at rbp-0x90 .. -0x58 in 0x1003d4ca0's frame; the last field +0x28)
+seven_fretgrid_wire_head     0xa0  # fret-wire row: the header before record 0 (0x100199fd0); Learn & Play 0xa0
+seven_fretgrid_wire_rec      0x38  # fret-wire record (ctor 0x10019dc30); Learn & Play 0x30
+seven_fretgrid_wire_state    0x8  # fret-wire record: u32 state, 2 = settled (0x10019a0b0); Learn & Play 0x8
+detect_target_string         0x10  # [0x10] the target note PUBAN gets: u8 its string (0x10010fa23; LP 0x13f5265)
+detect_target_fret           0x11  # [0x11] u8 its fret (0x10010fa28; LP 0x13f525f)
+tuner_entity_release_slot    0x2  # [0x2] the vtable slot the game releases the session's picks and letters with (Mac dtor
+sng_note_time                0xc  # SNG note: float time (SH 0x100014510 reads [note+0xc]; LP 0x13217b0 the same)
+sng_note_sustain             0x3c  # SNG note: float sustain (the same reads, +0x3c; LP the same)
+headstock_seg_values         0x8  # a segment's params: its nine value pointers start at +0x8 (Rnd_SetStringShaderParams 0x1001af5e0: g_flickerPhase +0x8 ... g_diffuseColor +0x20, v_positionString +0x28, the last +0x48); Learn & Play 0x0
+guitar_string_size           0x168  # string object size (efd_alloc in the ctor 0x1001b00e7; LP 0x110)
 # --- Seven-String Guitar: end

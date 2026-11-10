@@ -198,7 +198,9 @@ class InnerMixin:
     def mid_block(self, a, seen):
         k, conts, name = self.mids[a]
         for t in conts:
-            if t not in seen:
+            # discovery decodes from a continuation as from any target: one inside another instruction is decoded
+            # too, and is no instruction of the function
+            if t not in seen or any(b < t < b + i.size for b, i in seen.items() if t - 16 < b < t):
                 raise TableError("mid point %s: continuation 0x%x is not an instruction of the function" % (name, t))
         go = "switch (go_) { %s default: break; }" % " ".join(
             "case %d: goto L_%x;" % (n + 1, t) for n, t in enumerate(conts)) if conts else "(void)go_;"

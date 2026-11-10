@@ -370,4 +370,14 @@ nf_adapter_write
 nf_adapter_good
 nf_adapter_file
 nf_adapter_size
+seven_fretgrid_wire_head
+seven_fretgrid_wire_rec
+seven_fretgrid_wire_state
+detect_target_string
+detect_target_fret
+tuner_entity_release_slot
+sng_note_time
+sng_note_sustain
+headstock_seg_values
+guitar_string_size
 # --- Seven-String Guitar: end

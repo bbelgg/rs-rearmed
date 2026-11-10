@@ -95,12 +95,28 @@ other_group    unsupported REASON                        # a group this target h
 # mids.map: the point (names/mids.list), where (before that instruction), its values by type, name and place, and
 # where it may go on instead (instructions of the same function)
 tuner_select   0x00f30135  (int submode@edi, int string@[ebp+0xc]) -> skip=0x00f3013a
+other_point    none REASON                               # this target needs no call at that moment
+third_point    unsupported REASON                        # this target has no such moment found
 ```
+
+`none` and `unsupported` differ: `none` says the target's code needs nothing at that moment (it reaches the same
+result another way, say through a function an edit already widens), so a mod's hook on it is taken and never called
+and the mod works on; `unsupported` says the moment is missing here, and the hook is refused. A mod tells them apart
+with `rc_mid_is_none` (rc_mid.h). Edit groups have no `none`: a group with nothing to change on a target is
+`unsupported` there.
 
 A value's place is a general register (`eax`..`edi`, `rax`..`r15`), `xmm0`-`xmm15`, `st0`-`st7` (a 32-bit
 guest), or memory at a general register plus an offset (`[esp+0x18]`); its type is a hook prototype's (`int`,
 `uint8_t`, `float`, `double`, a pointer, ...). The same name on two targets should have the same values and
 continuations, so one mod reads both.
+
+Three things the Mac's tables taught. A code address a hook reads at a point (a return address at `[rsp]`, say) is
+where the image is mapped on the Mac, the image address in Learn & Play: compare it with the mapped address (`RC_A`),
+not the table's. A patch keeps every instruction's length, so a displacement that outgrows its byte (a disp8
+that has to become a disp32) needs `=HEX`, the whole instruction replaced. And where clang unrolled a six-string loop
+that Learn & Play's edits lengthen, there is no count to edit: the Mac needs a mid point of its own that does the
+extra strings, `none` on Learn & Play. Of Learn & Play's 29 `none`, most are such points; the rest stand where the Mac
+inlines a function or calls it from another place.
 
 ## Adding a game function, global or field
 

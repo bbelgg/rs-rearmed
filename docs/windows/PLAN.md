@@ -26,7 +26,9 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   maintainer the same day, a chart played through several times: it works; that session's log has the song's 7-string chord diagrams
   and the seven-peg headstock shown, and no fault.
   Those runs found a hook's game call leaving ecx changed for the code after its point (a crash freeing a song's vocals): a point now puts
-  back the registers its hooks didn't set.
+  back the registers its hooks didn't set. The Mac edition has the same unit now, not yet played with a guitar there
+  ([Mac plan](../mac/PLAN.md#status)); its tables add 29 points of their own, which are `none` here (mostly loops the edits
+  lengthen here, unrolled on the Mac), so the generated C of this edition's functions is byte for byte as before.
 - **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does. A start with the intro skip switched off in the file played the intro (2026-11-09).
 - **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
 - **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
@@ -93,8 +95,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   (`songs/bin/macos`, `audio/mac` against `songs/bin/generic`, `audio/windows`), the `.nt` graph, and the `.sng`
   files, which are the same size but encrypted with a key per platform; the audio banks are byte for byte the
   same. So an install-time converter is simple in itself, but it needs the other platform's key, which is
-  not in the game a player has here, and nothing from the game may be in this repository. Left for the
-  maintainer to decide.
+  not in the game a player has here, and nothing from the game may be in this repository. So RS Re-ARMed
+  has no converter and will not get one: an archive has to be the edition's own kind.
 - From the code review of 2026-11-09, read from the code and not measured or fixed: a guest thread's stack,
   TEB and TLS blocks are never given back (`rc32_teb.c`, `win32_ksync.c`; the Mac runtime frees its own), so a
   session that makes many short threads uses up the guest window; `rc32_alloc` clears every block it hands out,

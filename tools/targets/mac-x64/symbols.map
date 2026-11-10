@@ -1188,50 +1188,70 @@ nicamera_vtable                                                  0x101841d60  da
 efd_str_destroy                                                  0x10000a060  sysv  void(void *s)  # unless +0x18 is the string's +0x10: efd_free of the text and its size, the flag 0x10193a8d0 set around it, as in every inlined copy; Learn & Play's 0x14d5910 is the same; here it is the static strings' destructor (__cxa_atexit)
 ak_vorbis_codebooks                                              0x1018ad3c0  data  void *[]  # 599 pointers into one block, 0x101402eb0 to the last at 0x1014147e7, in order; the Vorbis decoder reads it at 0x100b2f710; the same bytes and offsets as Learn & Play's
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
-guitar_rebuild_player0 unsupported Seven-String Guitar: not ported to the Mac game yet
-guitar_string_attach_point unsupported Seven-String Guitar: not ported to the Mac game yet
-tuner_manager unsupported Seven-String Guitar: not ported to the Mac game yet
-tuner_peg_names unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_song_select unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_guitarcade unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_guitarcade2 unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_lessons unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_session_tuner unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_session_tuner2 unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_session_start unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_session_start2 unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_technique_hub unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_tuner_menu unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_store_tuner_menu2 unsupported Seven-String Guitar: not ported to the Mac game yet
-entity_set_translation unsupported Seven-String Guitar: not ported to the Mac game yet
-entity_set_scale unsupported Seven-String Guitar: not ported to the Mac game yet
-render_world unsupported Seven-String Guitar: not ported to the Mac game yet
-world_entity_root unsupported Seven-String Guitar: not ported to the Mac game yet
-fretgrid_ctor unsupported Seven-String Guitar: not ported to the Mac game yet
-efd_allocator unsupported Seven-String Guitar: not ported to the Mac game yet
-standard_tuning unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_apply_matcher_ret unsupported Seven-String Guitar: not ported to the Mac game yet
-tuning_apply_detection_ret unsupported Seven-String Guitar: not ported to the Mac game yet
-play_get_detection unsupported Seven-String Guitar: not ported to the Mac game yet
-player_tuner_low_note_limit unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_sort unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_candidate_less unsupported Seven-String Guitar: not ported to the Mac game yet
-matcher_subharmonics unsupported Seven-String Guitar: not ported to the Mac game yet
-tracker_eval_release unsupported Seven-String Guitar: not ported to the Mac game yet
-gemgeom_build_span_ret unsupported Seven-String Guitar: not ported to the Mac game yet
-json_key_intern unsupported Seven-String Guitar: not ported to the Mac game yet
-json_object_set unsupported Seven-String Guitar: not ported to the Mac game yet
-localize_texts unsupported Seven-String Guitar: not ported to the Mac game yet
-service_holder unsupported Seven-String Guitar: not ported to the Mac game yet
-nif_mem_handler unsupported Seven-String Guitar: not ported to the Mac game yet
-dds_stream_handler unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_dtor unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_vtable unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_read_fn unsupported Seven-String Guitar: not ported to the Mac game yet
-nf_adapter_write_fn unsupported Seven-String Guitar: not ported to the Mac game yet
-mem_file_vtable unsupported Seven-String Guitar: not ported to the Mac game yet
-fixed_string_create unsupported Seven-String Guitar: not ported to the Mac game yet
-mesh_float_extra unsupported Seven-String Guitar: not ported to the Mac game yet
-mesh_colour_extra unsupported Seven-String Guitar: not ported to the Mac game yet
-pegs_apply_transforms unsupported Seven-String Guitar: not ported to the Mac game yet
+guitar_rebuild_player0       0x1001c3340 sysv void(int player)  # service 0x1000620 -> 0x1001ac2f0: EnsureForPlayer 0x1001a7ce0 then the attach 0x1001a81b0 when it rebuilt; LP's takes none (the C passes 0, ignored there)
+guitar_string_attach_point   0x1001a2d30 sysv bool(void *info, int string, float *point)  # GSLD's call 0x1001b0a9f
+tuner_manager                0x1018f6748 data void *  # its getter 0x1005313f0 (callers allocate tuners into it)
+tuner_peg_names              0x101804060 data const char *[6]  # SetPegColorAnim 0x10052dca4; entries 6, 7 are null
+tuning_store_song_select     0x100341fa5 code -  # a copy of Play_SetPlayerTuningFromManifest (CapoFret/CentOffset), called from the LAS song start 0x10033fc50
+tuning_store_guitarcade      0x10032c0b2 code -  # 0x10032bcd0 (GC_WhaleRider, Guitarcade_Game_Return_Stage)
+tuning_store_guitarcade2     0x100834566 code -  # 0x1008342b0 (the same strings)
+tuning_store_lessons         0x100450cdc code -  # 0x100450ac0 (GE_Song_LessonSongId)
+tuning_store_session_tuner   0x10068600e code -  # 0x100685e30 (SessionMode_PreSMTuner/MP)
+tuning_store_session_tuner2  0x100686094 code -
+tuning_store_session_start   0x10069c2fb code -  # GUESS 0x10069c140 (SMTuner, SessionMode_PreSMTuner, MainMenu, KillGame)
+tuning_store_session_start2  0x10069c385 code -
+tuning_store_technique_hub   0x1005431e4 code -  # 0x1005430e0 (GE_TechniqueHub, PlayerIndex)
+tuning_store_tuner_menu      0x1007c6bb5 code -  # GUESS medium 0x1007c6ae0 (a tuning by "ID", two calls as LP's menu)
+tuning_store_tuner_menu2     0x1007c6c3a code -
+entity_set_translation       0x1002a2550 sysv void(void *entity, const float *pos, int flag)  # the call of each fret bar in 0x10019c900 (flag 1); service 0x7002000, root node +0x190, local translation +0x9c
+entity_set_scale             0x1002a28b0 sysv void(void *entity, int flag, float scale)  # the hash 0x2d7cad2d of Learn & Play's 0x132f350; local scale +0xa8; flag 1 as the setters pass it; called by seven_f1_setscale
+render_world                 unsupported  inlined on the Mac: each entity setter asks the service manager (0x1002b34e0) for 0x7002000
+world_entity_root            unsupported  0x101187df0 takes (world, entity), and the world has no getter (render_world)
+fretgrid_ctor                0x10019c100 sysv void *(void *grid)  # the guitar ctor's call after efd_alloc(0x7920, 0) (0x10019e7e4); a thunk to 0x10019b990, rax not the grid (the ctor keeps it in r14). Not used by the C
+efd_allocator                unsupported  the Mac frees the FretGrid by the sized free 0x1012efc50(ptr, 0x7920) (0x10019e93e)
+standard_tuning              0x1013ebeb0 data int16_t[6]  # twelve zero bytes in __const; the tuning four callers of the two S1 copies pass (0x100005821, 0x1002d6cc2, 0x1002d71b3, 0x1002d71fa)
+tuning_apply_matcher_ret     0x10053b4f3 code -  # Play_Tuning_ApplyToDetection 0x10053b2a0 (the profile's six strings, its loop of 6): the return address of its call of the SetTuning wrapper 0x100231a20; seven_pm1's `from` is the wrapper's return address
+tuning_apply_detection_ret   0x10053b4f3 code -  # the same: the wrapper tail-jumps to Play_Detector_SetTuning, so seven_s3's [rsp] is this address
+play_get_detection           unsupported  Learn & Play's 0x10697e0 is inlined everywhere on the Mac (0x10021ac20 + [+8]); TS8SEL takes play_detect_input
+player_tuner_low_note_limit  0x1013ed0a0 data float  # 34.0: CheckWrongInstrument 0x1005268f0's guitar limit (movss xmm1 at 0x1005269f0)
+matcher_sort                 0x100230f20 sysv void(void *first, void *last, void *unused, long depth, void *less)  # Play_Matcher_DetectChord 0x10022e0a0's call at 0x10022e7d1 (first, first + 127 x 12, 0, 12 = 2 x log2 127, its comparator): the introsort loop, runs of 16 (cmp 0xc1), the comparator called through rbx; Learn & Play 0x1069320
+matcher_candidate_less       0x100230b30 sysv bool(const void *a, const void *b)  # the comparator DetectChord passes (lea r8 at 0x10022e7bd): a's strength (+4) above b's (ucomiss, seta); Learn & Play 0x1067ad0
+matcher_subharmonics         0x1013ec1f0 data int32_t[128][6]  # the virtual row 0: DetectChord indexes 0x1013ec400 + 24 * (note - [0x1013ec3f8] = 22) (0x10022e489..0x10022e4dc), so row 22 is at 0x1013ec400 as Learn & Play's 0x1d1bc20; real rows are notes 22..94
+tracker_eval_release         0x10010e3c0 sysv int(void *tracker, int slot)  # the eval release (rdi the tracker, esi the slot, eax -1) the release 0x10010e270 calls for its children (0x10010e2f8) and itself (0x10010e418); Learn & Play 0x13f44b0
+gemgeom_build_span_ret       0x100409ac4 code -  # Rnd_GemGeom_Build 0x100409930: the return address of its call of Rnd_GemGeom_ApplySpan 0x1002a4530 at 0x100409abf (kind 4, the chord frame: the chord box builder makes it with r8d = 4 at 0x100013dc3; jump table 0x100409aec entry 4)
+json_key_intern              unsupported  the Mac's interning takes the key's place first: json_key_make
+json_object_set              0x1000fba70 sysv void(void *object, void **key, void **value)  # the serializer's number setter 0x1000fd380 calls it (object, &key, &value) between an AddRef and a Release of its own: the object keeps a reference of its own
+localize_texts               0x1000e32e0 sysv void *(void *out, void *holder, int count, const char *text, ...)  # the game's localizer as Learn & Play's 0x1340150, the same arguments in SysV order: 0x1001bfd20 (which TJ 0x10020f069, TU and TN 0x10053cdfa call to localize "$[36576]CUSTOM TUNING") calls it with (out, the service holder, 1, the text); variadic (it saves xmm0-7 when al is not 0)
+service_holder               0x1018e3538 data void *  # the global service_manager_holder 0x1000dc450 returns (Learn & Play's 0x1ee0bfc)
+nif_mem_handler              0x1003d5bc0 sysv void *(const char *name, const void *buf, uint32_t size)  # registered for "nif" (0x1002b03e7, with "kf"/"kfm" beside it, as Learn & Play's 0x11279e7); the service's LoadNif (0x101198ec0 -> 0x101175e50, NiStream 0x4c8) then a 0x18 resource, the stream at +0x10
+dds_stream_handler           0x1003d5800 sysv void *(const char *name, void *stream)  # registered for "nidds" (0x1002b03cf, the stream registrar 0x1003d2060); the file job calls it at 0x1003d4e0b with its adapter
+nf_adapter_dtor              0x100003df0 sysv void(void *adapter)  # the call 0x1003d4e13 after the handler: Releases +0x28, base dtor (no free)
+nf_adapter_vtable            0x1017f1950 data const void *[]  # (the ctor sets it; the Mac's C calls the ctor)
+nf_adapter_read_fn           unsupported  the Mac's ctor sets the read/write functions itself (vtable +0x38, 0x100003d50: by endianness)
+nf_adapter_write_fn          unsupported  as nf_adapter_read_fn
+mem_file_vtable              0x1017f7098 data const void *[]  # the memory IFile (ctor 0x100157960): Read 0x100157a40, Size 0x100157a90, Tell ..ab0, Seek ..ad0, Size64 ..b00, IsGood ..b10; AddRef/Release (slots 2, 3) the NiRefObject's 0x100164af0/b10, as the blob's (vtable 0x1017f7068)
+fixed_string_create          0x1012e3ef0 sysv const char *(const char *text)  # NiGlobalStringTable::AddString: the NiFixedString(const char *) ctor 0x1012e2340 stores its result
+mesh_float_extra             0x1002a1540 sysv void *(void *mesh, const char *name, float value)  # Rnd_SetStringShaderParams 0x1001af5e0 calls it for 8 values (0x1001af6b4 ...); float extra 0x30, value +0x28
+mesh_colour_extra            unsupported  the Mac's takes the name: mesh_colour_extra_named
+pegs_apply_transforms        0x1001b7480 sysv void(void *pegs, void *guitar)  # Rnd_PegSet_ApplyTransforms: the headstock update 0x100199870 calls it with [headstock+0x18]; each taken slot (+0x10, 0x38 each): entity +0x8 on the locator (+0x10) world rotate +0xb0 / translate +0xd4; rsi unused
+fretgrid_cell_ctor           0x10019db30 sysv void(void *cell)  # the cell constructor (valid byte 0, six points from 0x1018e80d8); 6 calls in the cell row ctor 0x100199f70
+fretgrid_wire_ctor           0x10019dc30 sysv void(void *record)  # the fret-wire record constructor; 6 calls in the wire row ctor 0x100199fd0
+fretgrid_wire_reset          0x10019dc80 sysv void(void *record)  # a record's references released and state 2 (the FretGrid unload, via 0x10019a050)
+fretgrid_wire_flush          0x10019e1f0 sysv void(void *record)  # a record's references given back to the service manager (the flush, via 0x10019a1a0)
+ref_release                  0x10017a490 sysv void(void **ref)  # if (*ref) (*ref)->slot 2 (release), as the FretGrid dtor does inline for each record
+play_detect_input            0x10021ac20 sysv void *(int input)  # an input id's Play_DetectInput (input 0: DetectionService +0x18, input 2: +0x20) or null; seven_s4_input's way to the detection (+detector_detection). LP: unsupported (inlined; seven_s4_input is none there)
+entity_model_root            0x1002a2ba0 sysv void *(void *entity)  # the entity's root node once the render world has its scene and the model is loaded, else null (the Mac's whole ModelReady; Rnd_FretGrid_Build asks it of each string at 0x10019c798). LP: unsupported (there render_world + world_entity_root)
+json_key_make                0x1000f5950 sysv void(void **out, const char *text)  # (names/refs.list; win-x86 `unsupported`: json_key_intern there): *out = the interned key with a reference (0x1000f5810 stores it at 0x1000f5922); the serializer 0x1007d666b makes "StartFret" so, 0x1000f59b0 lets it go
+chord_slide_head             0x100011980 sysv void(void *obj, void *arg, int time_arg, int string, int slide_to, float at)  # the chord's per-string slide-head gem (LP 0x131f830), called by SH 0x100014510 per string; win-x86: unsupported (seven_sh7 is none there)
+guitar_strings_pluck         0x1001b1460 sysv void(void *strings, int string, int fret, int fret_or_1)  # Rnd_GuitarStrings pluck (GSPK; LP 0x111c100, register arguments there), called by the chord pluck 0x10043ad10 per string; win-x86: unsupported (seven_pl7 none)
+section_string_bit           0x1001ea7b0 sysv void(void *sections, int phrase, int string)  # sets a string's bit in a section's mask byte (+0x34), string <= 5 (SMb widens to 6); inlined on LP; win-x86: unsupported (seven_sm7 none)
+nf_adapter_ctor              0x100003d90 sysv void(void *adapter, void *file)  # (Learn & Play: unsupported, its ctor takes registers): the file job's NiFile adapter on the stack (0x1003d4d1b): base ctor, vtable 0x1017f1950, file +0x28 AddRef'd, good byte +0x20, then its vtable +0x38 sets the read/write functions
+mesh_colour_extra_named      0x1002a50b0 sysv void *(void *mesh, const char *name, const float *rgb)  # (Learn & Play: unsupported): 0x1001af629 with "g_diffuseColor"; reads 3 floats; colour extra 0x38, RGBA +0x28
+guitar_string_ctor           0x1001ad200 sysv void(void *obj, int is_ghost)  # (LP unsupported): the GS ctor's 12 calls
+guitar_string_dtor           0x1001ad210 sysv void(void *obj)  # the GS release's 12 calls
+efd_delete                   0x1012efc50 sysv void(void *ptr, size_t size)  # the sized free every release uses (allocator slot 3)
+peg_slot_dtor                0x1001b63e0 sysv void(void *slot)  # the PegSet dtor's 6 calls
+tuning_store_song_select2    0x1006b1715 code -  # another copy, from NonStopPlay's pre-song tuner 0x1006afe90 (LP: = song_select)
+tuning_store_song_select3    0x10085a9a5 code -  # another copy, from Score Attack 0x100859eb0 (LP: = song_select)
+tuning_store_guitarcade3     0x10054c649 code -  # GUESS: 0x10054c590 from the Guitarcade tuner 0x100546e30 (LP: = guitarcade)
 # --- Seven-String Guitar: end

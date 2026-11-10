@@ -152,3 +152,34 @@ seven_pgh1          0x010c3eec  (void *mesh@ebx) -> skip=0x010c409a             
 
 # plain
 plain_pp_sngd  0x010da084  (const uint8_t *src@[esp], uint32_t len@[esp+0x4], uint8_t *out@[esp+0x10], uint32_t out_len@[esp+0x14], uint8_t ok@eax) -> done=0x010da089  # PP_SNGD the song file loader 0x10d9f80's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, cdecl: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
+
+# the Mac game's own moments (the Mac's unrolled loops, its own functions): nothing to call here
+seven_f1_setscale   none  Learn & Play injects the scale call itself (seven_f1_scale)
+seven_grid_cellrow_ctor none  the Mac's unrolled cell row constructor; Learn & Play edits the loop's count
+seven_grid_wirerow_ctor none  the Mac's unrolled wire row constructor; Learn & Play edits the loop's count
+seven_grid_wirerow_reset none  the Mac's unrolled wire row reset; Learn & Play edits the loop's count
+seven_grid_wirerow_mark none  the Mac's unrolled wire row event; Learn & Play edits the loop's count
+seven_grid_wirerow_flush none  the Mac's unrolled wire row flush; Learn & Play edits the loop's count
+seven_grid_wires_dtor none  the Mac's unrolled destructor of a wire row; Learn & Play edits the loop's count
+seven_s1b           none  the Mac's second standard-tuning copy; Learn & Play's one is seven_s1
+seven_s4_input      none  the Mac reaches the detection through the input id; Learn & Play's seven_s4 has it
+seven_puban         none  the Mac's inlined target-note check; Learn & Play edits its function
+seven_pubnl_count   none  the Mac's unrolled next-note loop; Learn & Play edits the loop's count
+seven_pubnl_open    none  the Mac's unrolled next-note loop; Learn & Play edits the loop's count
+seven_tu8dt         none  the Mac's unrolled tuner destructor; Learn & Play edits the loop's count
+seven_ds1_count     none  the Mac's unrolled diagram loop; Learn & Play edits the loop's count
+seven_cs1_ctor      none  the Mac's unrolled chord constructor; Learn & Play edits the loop's count
+seven_cs1_build     none  the Mac's unrolled chord build; Learn & Play edits the loop's count
+seven_sh7           none  the Mac's unrolled per-string slide heads; Learn & Play edits the loop's count
+seven_pl7           none  the Mac's unrolled chord pluck; Learn & Play edits the loop's count
+seven_sm7           none  the Mac's section string bit (a function); inlined on Learn & Play, whose edits widen it
+seven_gsc_tail      none  the Mac's unrolled GuitarStrings constructor; Learn & Play edits the loop's count
+seven_gsfr_tail     none  the Mac's unrolled GuitarStrings free; Learn & Play edits the loop's count
+seven_psd_tail      none  the Mac's unrolled PegSet destructor; Learn & Play edits the loop's count
+seven_am1_b         none  the Mac's second copy of the shifted-chord call (clang duplicated the loop); Learn & Play's is seven_am1
+seven_pd3_update    none  the Mac inlines the no-technique test into the eval update; Learn & Play's is the function seven_pd3
+seven_pd2_update    none  the Mac inlines the all-strings-slide test into the eval update; Learn & Play's is the function seven_pd2
+seven_pd4_update    none  the Mac inlines the all-strings-tremolo test into the eval update; Learn & Play's is the function seven_pd4
+seven_pd2_chord     none  the Mac inlines the all-strings-slide test into the chord update; Learn & Play's is the function seven_pd2
+seven_pd4_sustain   none  the Mac inlines the all-strings-tremolo test into the sustain update; Learn & Play's is the function seven_pd4
+seven_pd5_eval      none  the Mac's unrolled slide-distance function; Learn & Play's is seven_pd5

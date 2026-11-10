@@ -118,11 +118,11 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
                 errs.append("target %s: edit group %s has no edits (add them to %s/edits.map, or `%s unsupported REASON`)"
                             % (t.id, g, t.id, g))
         for n in lists.get("mids", []):
-            if n not in t.mids and n not in t.inner_unsupported:
-                errs.append("target %s: no mid point %s (add it to %s/mids.map, or `%s unsupported REASON`)"
-                            % (t.id, n, t.id, n))
-        for n in sorted((groups | set(t.mids) | set(t.inner_unsupported)) - set(lists.get("edits", []))
-                        - set(lists.get("mids", []))):
+            if n not in t.mids and n not in t.inner_unsupported and n not in t.inner_none:
+                errs.append("target %s: no mid point %s (add it to %s/mids.map, `%s none REASON` or `%s unsupported "
+                            "REASON`)" % (t.id, n, t.id, n, n))
+        for n in sorted((groups | set(t.mids) | set(t.inner_unsupported) | set(t.inner_none))
+                        - set(lists.get("edits", [])) - set(lists.get("mids", []))):
             errs.append("target %s: %s is in edits.map or mids.map but not in names/edits.list or mids.list" % (t.id, n))
         try:
             targets.inner_points(t, lists)

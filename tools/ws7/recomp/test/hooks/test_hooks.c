@@ -66,8 +66,8 @@ const rc_hook_name rc_target_hooks[] = {
     {0, 0, 0},
 };
 #endif
-// edit groups and mid points (rc_mid.h): one of each here, one of each not on this game; the same values on both,
-// in each one's own places
+// edit groups and mid points (rc_mid.h): one of each here, one of each not on this game, and a point this game needs
+// no call at (none); the same values on both, in each one's own places
 const rc_edit_name rc_target_edits[] = {{"grp_here", 3, 0}, {"grp_gone", 0, "no edits on this target"},
                                         {"grp_late", 1, 0}, {0, 0, 0}};
 #ifdef RC_GUEST32
@@ -75,11 +75,13 @@ const rc_mid_name rc_target_mids[] = {
     {"mid_here", 0x401800, 0, 3, {{"count", 'i', 6, 0}, {"obj", 'p', RC_MID_MEM | 4, 8}, {"scale", 'd', 32, 0}}, 2,
      {"again", "done"}},
     {"mid_gone", 0, "not in this build"},
+    {"mid_skip", 0, "this build needs no call there", 0, {{0}}, 0, {0}, 1},
     {0}};
 #else
 const rc_mid_name rc_target_mids[] = {
     {"mid_here", 0x401800, 0, 3, {{"count", 'i', 6, 0}, {"obj", 'p', 7, 0}, {"scale", 'f', 16, 0}}, 2, {"again", "done"}},
     {"mid_gone", 0, "not in this build"},
+    {"mid_skip", 0, "this build needs no call there", 0, {{0}}, 0, {0}, 1},
     {0}};
 #endif
 
@@ -655,8 +657,8 @@ static void cost(void) {
 // continuation; the registers the hook changed without setting them (as a call into the game does) put back
 static void inner(void) {
   int *edit = dlsym(RTLD_DEFAULT, "hm_edit"), *point = dlsym(RTLD_DEFAULT, "hm_mid_point"),
-      *gone = dlsym(RTLD_DEFAULT, "hm_mid_gone");
-  CHECK(edit && point && gone);
+      *gone = dlsym(RTLD_DEFAULT, "hm_mid_gone"), *skip = dlsym(RTLD_DEFAULT, "hm_mid_skip");
+  CHECK(edit && point && gone && skip);
   CHECK_EQ(edit[0], 0);
   CHECK_EQ((uint32_t)edit[1], (uint32_t)-1);
   CHECK_EQ((uint32_t)edit[2], (uint32_t)-1);
@@ -666,9 +668,22 @@ static void inner(void) {
   CHECK_EQ(*point, 0);
   CHECK_EQ((uint32_t)*gone, (uint32_t)-1);
   CHECK(rc_mid_on[0] && !rc_mid_on[1]);
+  // a point that is none here: the hook is taken (its index), never switched on or called; no values, no continuations
+  CHECK_EQ(*skip, 2);
+  CHECK(!rc_mid_on[2] && rc_mid_is_none(2) && !rc_mid_is_none(0) && !rc_mid_is_none(1) && !rc_mid_is_none(-1));
+  CHECK_EQ((uint32_t)rc_mid_value(2, "count"), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_cont(2, "done"), (uint32_t)-1);
+  CHECK_EQ((uint32_t)rc_mid_add_name("mid_skip", 0, 0), (uint32_t)-1);
+  {
+    uint32_t fl = 0x41;
+    uint64_t r6 = ctx->r[6];
+    CHECK_EQ(rc_mid_call(2, ctx, &fl), 0);  // what generated code would do if it reached one: nothing
+    CHECK_EQ(fl, 0x41);
+    CHECK_EQ(ctx->r[6], r6);
+  }
   CHECK_EQ((uint32_t)rc_mid_value(0, "nothing"), (uint32_t)-1);
   CHECK_EQ(rc_mid_cont(0, "again"), 1);
-  // a name that is not there, a point that is not one, a hook that is none: refused, not read
+  // a name that is not there, a point index that is not one, a null hook: refused, not read
   CHECK_EQ((uint32_t)rc_edit_enable(0), (uint32_t)-1);
   CHECK(!rc_edit_is_on(0));
   CHECK_EQ((uint32_t)rc_mid_value(0, 0), (uint32_t)-1);

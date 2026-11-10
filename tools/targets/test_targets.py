@@ -228,6 +228,25 @@ class Inner(Tree, unittest.TestCase):
                       "{\"skip\", \"out\"}},", c)
         self.assertIn('{"wide", 2, 0},', targets.gen_runtime_c(mac, lists))
 
+    def test_none_point(self):
+        # `NAME none REASON`: the target needs no call there; it is neither a point nor unsupported
+        self.write("names/mids.list", "pick\nskip\n")
+        self.write("mac-x64/mids.map", "pick 0x1008 (int n@rsi)\nskip none read through the widened function\n")
+        self.write("win-x86/mids.map", "pick 0x401008 (int n@esi)\nskip unsupported not here\n")
+        self.assertEqual(self.errs(), [])
+        lists = targets.name_lists(self.base)
+        mac = targets.Target("mac-x64", self.base)
+        self.assertEqual(mac.inner_none, {"skip": "read through the widened function"})
+        self.assertNotIn("skip", mac.inner_unsupported)
+        self.assertEqual(sorted(m[2] for m in targets.inner_points(mac, lists)[1].values()), ["pick"])
+        self.assertIn('{"skip", 0, "read through the widened function", 0, {{0}}, 0, {0}, 1},',
+                      targets.gen_runtime_c(mac, lists))
+        self.assertIn('{"skip", 0, "not here"},', targets.gen_runtime_c(targets.Target("win-x86", self.base), lists))
+        for text, want in (("skip none\n", "give the reason"), ("skip none x\nskip none y\n", "defined twice"),
+                           ("skip none x\nskip unsupported y\n", "defined twice")):
+            self.write("mac-x64/mids.map", "pick 0x1008 (int n@rsi)\n" + text)
+            self.assertIn(want, "\n".join(self.errs()))
+
     def test_missing_and_stale(self):
         self.write("win-x86/edits.map", "")
         self.write("win-x86/mids.map", "other 0x401008 ()\n")

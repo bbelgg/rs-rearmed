@@ -66,6 +66,11 @@ add_test(NAME recomp.hooks COMMAND make -C ${CMAKE_SOURCE_DIR}/tools/ws7/recomp/
 # The per-game name tables (tools/targets): every name resolves in every target.
 if(Python3_FOUND)
   add_test(NAME targets.check COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/targets/test_targets.py)
+  # Edits and mid points of the 64-bit front end on a made-up x86-64 Mach-O, against Unicorn (tools/ws7/recomp/test/x64;
+  # skips without capstone and unicorn)
+  add_test(NAME recomp.inner64 COMMAND ${Python3_EXECUTABLE} -m test.x64.innercases --out ${CMAKE_BINARY_DIR}/recomp-inner64
+           WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}/tools/ws7/recomp)
+  set_tests_properties(recomp.inner64 PROPERTIES SKIP_RETURN_CODE 77)
   # The Learn & Play install steps (win-x86/install): fixture cabinets, no Steam, no network.
   add_test(NAME win-x86.install COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/win-x86/install/test_lp_install.py)
   # Learn & Play's shader corpus sources (win-x86/shaders): hand-assembled shaders, nothing of the game.

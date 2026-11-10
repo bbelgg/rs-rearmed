@@ -16,6 +16,10 @@
 //     (OV_GUEST), which changes registers as any call does: after the hooks, every register (and xmm register) is
 //     as the point found it unless a hook set it with rc_mid_set or rc_mid_set_f.
 //
+// A point can be `none` on a game (mids.map: `NAME none REASON`): that game needs no call at that moment (its code
+// reaches the same result another way, an edit say). A hook on it is taken (rc_mid_add_name answers its index) and
+// never called; rc_mid_is_none tells a mod so, and rc_mid_value / rc_mid_cont answer -1 on it without a log line.
+//
 // A value is what its type says on every target: an integer of its width (zero-extended), a pointer as a host
 // pointer (null stays null; one given back must be in the guest's memory, rc_guest_alloc), a float or double. The
 // same mod source serves every target as long as the tables of each give a point the same values and continuations.
@@ -43,8 +47,10 @@ typedef struct rc_mid_frame {
 typedef void (*rc_mid_fn)(rc_mid_frame *f, void *user);
 
 // Adds fn to the point `name`: its index, or -1 with a log line (no such point, not on this game, its hooks taken).
-// Before the game runs, as hooks.
+// Before the game runs, as hooks. On a point that is none here: its index, one log line, and fn is never called.
 int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user);
+// 1 when the point (rc_mid_add_name's answer) is none on this game, else 0
+int rc_mid_is_none(int point);
 // A value's index by its name in the table, and a continuation's number (for go): -1 with a log line for a name the
 // point hasn't here.
 int rc_mid_value(int point, const char *value);
@@ -75,6 +81,7 @@ typedef struct {
   rc_mid_val value[RC_MID_MAXVALUES];
   int8_t nconts;
   const char *cont[RC_MID_MAXCONTS];
+  uint8_t none;     // 1: needs no call on this game (vmaddr 0, `why` says why); hooks are taken, never called
 } rc_mid_name;
 typedef struct {
   const char *name;

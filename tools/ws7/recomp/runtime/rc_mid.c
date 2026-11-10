@@ -78,6 +78,14 @@ int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user) {
   int k = 0;
   for (const rc_mid_name *m = rc_target_mids; name && m->name; m++, k++) {
     if (strcmp(m->name, name)) continue;
+    if (m->none) {  // nothing to do at this moment on this game: taken, never called (rc_mid_on stays 0)
+      if (!fn) {
+        fprintf(stderr, "[rc] mid point %s: no function given\n", name);
+        return -1;
+      }
+      fprintf(stderr, "[rc] mid point %s: not needed on this game (%s): %s\n", name, target(), m->why ? m->why : "");
+      return k;
+    }
     if (!m->vmaddr) {
       fprintf(stderr, "[rc] mid point %s: not on this game (%s): %s\n", name, target(), m->why);
       return -1;
@@ -99,8 +107,14 @@ int rc_mid_add_name(const char *name, rc_mid_fn fn, void *user) {
   return -1;
 }
 
+int rc_mid_is_none(int point) {
+  const rc_mid_name *m = mid_of(point);
+  return m && m->none;
+}
+
 int rc_mid_value(int point, const char *value) {
   const rc_mid_name *m = mid_of(point);
+  if (m && m->none) return -1;  // no values: its hooks never run
   for (int i = 0; m && value && i < m->nvalues; i++)
     if (!strcmp(m->value[i].name, value)) return i;
   fprintf(stderr, "[rc] mid point %s: no value %s here (%s)\n", m ? m->name : "?", value ? value : "(null)", target());
@@ -109,6 +123,7 @@ int rc_mid_value(int point, const char *value) {
 
 int rc_mid_cont(int point, const char *cont) {
   const rc_mid_name *m = mid_of(point);
+  if (m && m->none) return -1;
   for (int i = 0; m && cont && i < m->nconts; i++)
     if (!strcmp(m->cont[i], cont)) return i + 1;
   fprintf(stderr, "[rc] mid point %s: no continuation %s here (%s)\n", m ? m->name : "?", cont ? cont : "(null)",

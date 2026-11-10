@@ -260,8 +260,13 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   was, and is left out on Learn & Play. The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) is
   built this way: its names are under "the mods library" in `tools/targets/names`. Its song search check knows the key
   from the tables (`song_search_key`), as a game binding: `/` here, Shift in Learn & Play. Edits and mid points
-  (`rc_mid.h`, [recompiler](../recompiler/README.md#overrides-and-hook-points)) are in this front end too, with no
-  entries in the Mac's tables yet: rearmed-mods' Seven-String Guitar and Plain Packages run in Learn & Play only.
+  (`rc_mid.h`, [recompiler](../recompiler/README.md#overrides-and-hook-points)) are in this front end too, and the
+  Mac's tables (`tools/targets/mac-x64/edits.map` and `mids.map`) have the same two groups as Learn & Play's, both for
+  rearmed-mods: `seven_string`, its Seven-String Guitar (618 edits and 122 mid points), and `plain_packages`, its Plain
+  Packages (2 edits and a mid point). Fewer edits than Learn & Play's 735: what the Windows build inlines in several
+  places goes through one function here, and many of the game's six-string loops are unrolled, so where Learn & Play's
+  edits lengthen a loop, mid points of this edition's own (29 in all, `none` in Learn & Play) do the extra strings. 34 of the
+  shared points are `none` here, where this game gets to the same result another way.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the

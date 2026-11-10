@@ -364,4 +364,14 @@ nf_adapter_write            0xc     # the adapter: its write function (0x102063a
 nf_adapter_good             0x10    # the adapter: u8, its file is good (0x1020630)
 nf_adapter_file             0x18    # the adapter: its IFile, one reference (0x1020614)
 nf_adapter_size             0x1c    # the adapter: bytes (the ctor writes +0x0..+0x18; rs7string's kNiFileSize)
+seven_fretgrid_wire_head     0xa0  # fret-wire row: the header before record 0
+seven_fretgrid_wire_rec      0x30  # fret-wire record
+seven_fretgrid_wire_state    0x8  # fret-wire record: u32 state, 2 = settled
+detect_target_string         0x10  # the target note: u8 its string (0x13f5265)
+detect_target_fret           0x11  # the target note: u8 its fret (0x13f525f)
+tuner_entity_release_slot    0x2  # the vtable slot the tuner's dtor releases picks and letters with (0x112f91d)
+sng_note_time                0xc  # SNG note: float time (0x13217b0)
+sng_note_sustain             0x3c  # SNG note: float sustain (0x13217b0)
+headstock_seg_values         0x0  # a segment's params: its value pointers from the start (not read: 4-byte guests)
+guitar_string_size           0x110  # string object: bytes (its allocation in the GuitarStrings ctor)
 # --- Seven-String Guitar: end

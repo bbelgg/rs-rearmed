@@ -9,7 +9,7 @@
 # installer passes its app, docs/windows/PERFORMANCE.md "Shader preparation"): no window, no
 # game. Metal's shader cache belongs to an app (its bundle identifier and bundle path), so only the
 # installed app itself can fill the one the game reads; it is run by its resolved path, as
-# LaunchServices starts it. A few minutes the first time (about 7 on an M2), a second or so when
+# LaunchServices starts it. A few minutes the first time (4.5 to 6.5 on an M2), a second or so when
 # everything is compiled already. RS_WARM_SHADERS=0 skips it.
 #
 # stdout: "progress F Preparing shaders… N of M" lines (F: 0..1; the installer's progress bar), on a

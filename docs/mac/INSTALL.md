@@ -185,7 +185,7 @@ tools/play-native/install.sh
 
 It makes the [copy of the game files](#game-files), puts the app (`$RS_BUILD_DIR/m4/app/Rocksmith2014.app`, or
 the path you pass) and the network guard in `~/Library/Application Support/RS Re-ARMed/`, creates the launcher
-`~/Applications/RS Re-ARMed.app`, and prepares the Metal shaders (about 4.5 minutes the first time, a second on
+`~/Applications/RS Re-ARMed.app`, and prepares the Metal shaders (4.5 to 6.5 minutes the first time on an M2, a second on
 later installs; `RS_WARM_SHADERS=0` skips it, `tools/play-native/warm-shaders.sh` does it later). Quit the game
 first. Always start the game through the launcher: opening `Rocksmith2014.app` directly doesn't work.
 

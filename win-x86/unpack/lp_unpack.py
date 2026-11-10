@@ -8,7 +8,7 @@ Output: the decompressed image (all sections at their link-base RVAs, before rel
 
 No Windows, no snapshot, no real DLLs. The seed lets us skip VMProtect's un-emulatable
 anti-debug bootstrap and resume at the point where decompression begins; the decompression
-itself is deterministic (proven: identical sha256 across runs). See SPIKE-OFFLINE-UNPACK.md.
+itself is deterministic (identical sha256 across runs). See README.md beside this file.
 
 Dependencies: unicorn, pefile (both ship prebuilt arm64 wheels). Everything else is stdlib.
 """

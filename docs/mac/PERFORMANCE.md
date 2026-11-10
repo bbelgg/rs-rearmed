@@ -198,6 +198,30 @@ the system may then composite instead of showing directly; not done. With the GP
 ([Shader preparation](#shader-preparation)), and neither came back in a later run. The warm-up of that set played only the first 75 s of the song; it plays the
 whole window now.
 
+## Where the CPU goes in 1.13.0
+
+2026-11-10, `tools/perf/run.py --trace 30` and `tools/perf/profile.py` ([TESTING.md](TESTING.md#measured-runs)): a Time Profiler trace of 30 s of the song from 45 s in, the
+setup of [Measured runs](#measured-runs-for-1130), one trace of each edition. Points of a core; a thread's total from the measured runs, shares from the trace.
+
+| Thread | Mac | Learn & Play |
+|---|---|---|
+| game | 27.6 | 33.9 |
+| Wwise | 5.8 (6.5 in the trace) | 7.4 (5.1) |
+| note detection | 2.6 (3.1) | 6.0 (5.9) |
+
+**Note detection** is one function here: `dsp_fft`, 86% of the thread, 2.7 points of a core, relaxed already. Learn & Play's FFT (`0x13f23e0`, `0x13f2d50`) is 0.9 points:
+its build has the twiddle factors in a table, where this one's FFT works them out as it goes. A native FFT in its place, or the same loop with a table, would take about 2
+points off this edition; it has to give the detector the same answers, which is the work. Learn & Play's largest is `0x13f3690`, 2.0 points, not on its relaxed list, and
+`pow` through the translated CRT, 0.7.
+
+**Wwise**: `expander_gain` 28% of the thread, `parametric_eq_biquad` 15%, both relaxed; then `F_100b2c560` and `F_100b2c240`, 25% together, beside the Vorbis decoder and
+not relaxed: about 1.6 points of a core fenced.
+
+**The game thread** is flat, as [before](#learn--plays-route): 72% in translated game code with no function over 3.2% of the thread, the renderer 20% with what it calls.
+The one copy that shows is `glBufferSubData`'s, 3.6% of the thread, 1.0 point of a core: the game's vertex data for the frame into Metal's buffers. In Learn & Play that
+data is copied twice, by the game through `memcpy_s` (2.8% of its thread) and then by `glBufferSubData` (1.2%). rearmed-mods' settings lookups (`rsm_get`, a string compare
+for each) are 1.4% of the thread here and 1.9% there.
+
 ## Learn & Play's route
 
 2026-11-06, an Apple M2, the 75 Hz 2560x1440 display. One run each, the game's executable started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal cache (a

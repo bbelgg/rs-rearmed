@@ -397,6 +397,11 @@ one at a time on a cool Mac: a MacBook Air has no fan, and the fourth such run i
 the first. `OUT/<edition>-<n>/result.json` has them with what the run was: the commit, the executable's and
 the mods' hashes, the settings and the display.
 
+`tools/perf/run.py CONFIG OUT --trace 30` runs the same route and, from the settle on, records a Time Profiler trace of the
+game for 30 s (`xcrun xctrace`, which samples every thread); `tools/perf/profile.py OUT/<edition>-trace/game.trace` adds
+it up by thread and function, self and with callees, and `--under NAME` for what runs under one function. A traced run
+gives no numbers: the sampler slows the game.
+
 Checked 2026-11-10 on an M2 MacBook Air's own screen (1470x956 points, 60 Hz), test builds of both editions, a
 profile on DIRECT CONNECT with the Mac's microphone, one run each with a 60 s window: both reached the highway and
 gave a table. With 2,300 archives in `dlc` the main menu took no key for about 20 s after it came up (the song list

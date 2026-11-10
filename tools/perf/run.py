@@ -6,6 +6,7 @@ keys, and the numbers over the same part of the song.
   tools/perf/run.py CONFIG OUT --editions mac --rounds 1 --no-warmup
   tools/perf/run.py CONFIG OUT --route-only       to the note highway and out, with snapshots: to check a route
   tools/perf/run.py CONFIG OUT --profile-keys bench   once: a profile folder with the settings of PROFILE_KEYS
+  tools/perf/run.py CONFIG OUT --trace 30         a Time Profiler trace of each edition, for tools/perf/profile.py
   tools/perf/report.py OUT                        the table
 
 CONFIG is a JSON file of this Mac's test installs (tools/perf/example.json says what goes in it); OUT gets a
@@ -397,6 +398,20 @@ class Game:
                 "instructions_per_s": round((u1["instructions"] - u0["instructions"]) / dt),
                 "samples": rows}
 
+    def trace(self, seconds):
+        """A Time Profiler trace of the game for `seconds` (xctrace, which samples every thread; `sample` shows the
+        audio threads idle). -> the trace's path. tools/perf/profile.py reads it."""
+        trace = os.path.join(self.out, "game.trace")
+        self.say()
+        r = subprocess.run(["xcrun", "xctrace", "record", "--template", "Time Profiler", "--attach", str(self.p.pid),
+                            "--time-limit", "%ds" % seconds, "--output", trace, "--no-prompt"],
+                           capture_output=True, text=True)
+        if not os.path.exists(trace):
+            raise Stop("xctrace made no trace: %s" % (r.stderr.strip() or r.stdout.strip())[-300:])
+        if self.screens()[-1] != HIGHWAY:
+            raise Stop("the game left the note highway while it was traced (%s)" % self.screens()[-1])
+        return trace
+
     def quit(self):
         if self.p is None or not self.alive():
             return
@@ -411,8 +426,9 @@ class Game:
                 self.p.kill()
 
 
-def one_run(cfg, name, out, kind, force, snapshots):
-    """kind: "measured", "warmup" (the same run, not in the report), "route" (to the highway and out) or
+def one_run(cfg, name, out, kind, force, snapshots, trace_seconds=0):
+    """kind: "measured", "warmup" (the same run, not in the report), "route" (to the highway and out), "trace"
+    (a Time Profiler trace after the settle, and no numbers: a sampled game is not a measured one) or
     a list of key sequences (the profile's settings; the profile folder it leaves is OUT/steam)."""
     print("%s: %s (%s)" % (os.path.basename(out), name, "profile" if isinstance(kind, list) else kind), flush=True)
     bad, ds = preflight(cfg)
@@ -427,6 +443,9 @@ def one_run(cfg, name, out, kind, force, snapshots):
         result["screens"] = g.to_highway(until="MainMenu" if isinstance(kind, list) else HIGHWAY)
         if isinstance(kind, list):
             g.edit_profile(kind)
+        elif kind == "trace":
+            time.sleep(run_cfg["settle"])
+            result["trace"] = g.trace(trace_seconds)
         elif kind != "route":
             time.sleep(run_cfg["settle"])
             m = g.measure()
@@ -484,6 +503,8 @@ def main():
     ap.add_argument("--profile-keys", metavar="KEYS",
                     help="keys from the main menu, sequences apart by a comma, or \"bench\" for PROFILE_KEYS; "
                          "OUT/<edition>-profile/steam is then a \"profile\"")
+    ap.add_argument("--trace", type=int, metavar="SECONDS",
+                    help="a Time Profiler trace of each edition from `settle` seconds into the song, and no numbers")
     ap.add_argument("--force", action="store_true", help="run in a state the checks refuse; the result says so")
     a = ap.parse_args()
     try:
@@ -500,7 +521,13 @@ def main():
             if os.path.exists(d):
                 raise Stop("%s is there already: another OUT, or remove it" % d)
             wait_calm(cfg)
-            return one_run(cfg, name, d, kind, a.force, snapshots)
+            return one_run(cfg, name, d, kind, a.force, snapshots, a.trace or 0)
+
+        if a.trace:
+            for n in editions:
+                run(n, "trace", "trace")
+            print("hot spots: tools/perf/profile.py %s/<edition>-trace/game.trace" % a.out)
+            return 0
 
         if a.profile_keys:
             keys = PROFILE_KEYS if a.profile_keys == "bench" else a.profile_keys

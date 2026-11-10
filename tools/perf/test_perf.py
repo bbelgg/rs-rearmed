@@ -6,6 +6,7 @@ import unittest
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import profile as hot  # noqa: E402
 import report  # noqa: E402
 import stats   # noqa: E402
 
@@ -84,6 +85,30 @@ class Ini(unittest.TestCase):
         pins = {"Renderer": {"Fullscreen": "1", "New": "2"}}
         once, _ = stats.pin_ini(self.MAC, pins)
         self.assertEqual(stats.pin_ini(once, pins)[0], once)
+
+
+TRACE = """<?xml version="1.0"?><trace-query-result><node>
+<row><sample-time id="1">1000000000</sample-time><thread id="2" fmt="game"><tid id="3" fmt="0x1">1</tid></thread>
+<weight id="4">1000000</weight><tagged-backtrace id="5"><frame id="6" name="leaf" addr="0x1"><binary id="7" name="game"/></frame>
+<frame id="8" name="frame" addr="0x2"><binary ref="7"/></frame><frame id="9" name="thread_start" addr="0x3">
+<binary id="10" name="libsystem_pthread.dylib"/></frame></tagged-backtrace></row>
+<row><sample-time id="11">2000000000</sample-time><thread ref="2"/><weight ref="4"/><tagged-backtrace ref="5"/></row>
+<row><sample-time id="12">3000000000</sample-time><thread ref="2"/><weight ref="4"/><tagged-backtrace id="13">
+<frame id="14" name="other" addr="0x4"><binary ref="7"/></frame><frame ref="8"/><frame ref="9"/></tagged-backtrace></row>
+</node></trace-query-result>"""
+
+
+class Profile(unittest.TestCase):
+    def test_refs_are_followed_and_times_added(self):
+        import io
+        seconds, threads = hot.summarise(hot.samples(io.StringIO(TRACE)))
+        t = threads["0x1"]
+        self.assertEqual((seconds, t["total"]), (2.0, 3000000))
+        self.assertEqual(t["self"][("leaf", "game")], 2000000)
+        self.assertEqual(t["incl"][("frame", "game")], 3000000)
+        self.assertEqual(t["roots"].most_common(1)[0][0], ("frame", "game"))  # not the system's thread start
+        self.assertEqual(hot.under(t, "frame")[1], 3000000)
+        self.assertEqual(hot.under(t, "leaf")[0][("leaf", "game")], 2000000)
 
 
 def result(edition, cpu, fps=60.0, **manifest):

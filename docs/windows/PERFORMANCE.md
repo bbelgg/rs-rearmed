@@ -219,6 +219,16 @@ With the renderer's own times in the log, one more run: all 9,001 frames went on
 refresh, not its limit, and the one frame of 0.37 s is a pipeline's first use: [the Mac edition's](../mac/PERFORMANCE.md#measured-runs-for-1130) has both. The
 free frame rate and the GPU's time by pass were run in the Mac edition only; Learn & Play draws through the same renderer.
 
+## Where the CPU goes in 1.13.0
+
+One trace of each edition, 2026-11-10: the table and the Mac edition's side are in [its file](../mac/PERFORMANCE.md#where-the-cpu-goes-in-1130). This edition's:
+
+- **Note detection**, 6.0 points of a core against the Mac edition's 2.6: `0x13f3690` is 34% of the thread, 2.0 points, and not in `relaxed.map`; the FFT (`0x13f23e0`,
+  `0x13f2d50`, relaxed) is 0.9; `pow` through the translated CRT (`ci_pow`, the import thunk) 0.7.
+- **Wwise**: `0x1a08300` (`expander_gain`, left out of the relaxed list for the static it sets) 22% of the thread, Vorbis' Huffman decode 8%.
+- **The game thread**, 33.9 points: flat, 76% in translated code. The frame's vertex data is copied twice, by the game through `memcpy_s` from `0x176b550` (2.8% of
+  the thread, about a point of a core) and by `glBufferSubData` (1.2%): the zero-copy buffers of [Opportunities](#opportunities-by-expected-payoff).
+
 ## Hook points
 
 What the hook table costs the game thread with no mod loaded: nothing that shows (2026-11-04). The same song and screen by

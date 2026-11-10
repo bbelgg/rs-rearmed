@@ -225,6 +225,11 @@ One trace of each edition, 2026-11-10: the table and the Mac edition's side are 
 
 - **Note detection**, 6.0 points of a core against the Mac edition's 2.6: `0x13f3690` is 34% of the thread, 2.0 points, and not in `relaxed.map`; the FFT (`0x13f23e0`,
   `0x13f2d50`, relaxed) is 0.9; `pow` through the translated CRT (`ci_pow`, the import thunk) 0.7.
+  **Relaxed since** (not released): `0x13f3690` copies its input with the CRT's `memcpy` and calls its `_CIpow`, which a relaxed function could not do in this front end.
+  An entry of `relaxed.map` marked `+calls` now may, with the function's exit fence before each such call and its entry fence after it
+  ([the recompiler](../recompiler/README.md)): 61 loads and 14 stores lost their fences, 7 calls got a pair. One measured run on that build, the same setup: the thread at
+  4.4 points where four runs before had 5.8 to 6.3, the game at 50.4% of a core where they had 52.0 to 53.9, the other threads as they were. No guitar was played in it:
+  that the game still hears the notes right is for a person to check.
 - **Wwise**: `0x1a08300` (`expander_gain`, left out of the relaxed list for the static it sets) 22% of the thread, Vorbis' Huffman decode 8%.
 - **The game thread**, 33.9 points: flat, 76% in translated code. The frame's vertex data is copied twice, by the game through `memcpy_s` from `0x176b550` (2.8% of
   the thread, about a point of a core) and by `glBufferSubData` (1.2%): the zero-copy buffers of [Opportunities](#opportunities-by-expected-payoff).

@@ -26,6 +26,13 @@ The functions are listed by name in tools/targets/names/relaxed.list, with what 
 their addresses (function starts of the original image) are in the target's symbols.map. A target can add functions
 by address in its relaxed.map. In the 32-bit front end a relaxed function's calls can only be to other relaxed
 functions: no entry of PURE_IMPORTS is a 32-bit import's name.
+
+A relaxed.map entry marked `+calls` may also call fenced code directly (CALLS_OK): a kernel that copies its
+input with the C runtime's memcpy, or calls its pow. Such a call is where the function ends and begins again:
+RC_RELAX_EXIT before it and RC_RELAX_ENTER after it, as at the function's own boundary, so the callee's accesses
+keep their order against the function's on both sides and the function is two blocks to other threads where it
+was one. The entry is read by hand for the same things, in each stretch between its calls. Indirect calls and
+calls of imports stay refused.
 """
 import os
 import sys
@@ -37,6 +44,7 @@ def _relaxed():
     import targets
     t = targets.Target(os.environ.get("RC_TARGET") or targets.DEFAULT_TARGET)
     out = {}
+    CALLS_OK.clear()
     path = os.path.join(targets.HERE, "names", "relaxed.list")
     with open(path) as f:
         for ln in f:
@@ -51,10 +59,14 @@ def _relaxed():
             for ln in f:
                 if ln.strip() and not ln.startswith("#"):
                     a, why = ln.split(None, 1)
+                    if why.split(None, 1)[0] == "+calls":
+                        CALLS_OK.add(int(a, 16))
+                        why = why.split(None, 1)[1]
                     out[int(a, 16)] = why.strip()
     return out
 
 
+CALLS_OK = set()  # the relaxed.map entries marked +calls (above)
 RELAXED = _relaxed()
 
 # Imports a relaxed function may call without fences around the call: native functions that

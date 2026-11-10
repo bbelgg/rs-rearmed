@@ -5,7 +5,9 @@
 # FFT's butterflies, 0x106c130): the 32-bit front end relaxes a function only when what it calls is relaxed too. Each was read for
 # what relaxed.py asks: a loop counted over buffers or the effect's own state (or no loop), no write to a global, no wait on
 # memory, no lock prefix. 0x1a35660 (peak_limiter_follower), 0x1a35ba0 and 0x1a08300 (expander_gain) are as hot but set a
-# static's guard (0x1ed2598), so they stay fenced.
+# static's guard (0x1ed2598), so they stay fenced. An entry marked +calls also calls fenced code, with the function's
+# fences around each such call (relaxed.py): 0x13f3690 was 34% of the note detection's thread on 2026-11-10, loads two
+# constants and writes only through its arguments and its frame.
 0x1a05bf0   Wwise: the FFT's radix-4 butterfly (SSE), which fft_work calls; inline in the Mac's
 0x1a0ab70   Wwise: scalar SSE resampler loop
 0x1a05a10   Wwise: the FFT's radix-2 butterfly, which fft_work calls; inline in the Mac's
@@ -20,4 +22,5 @@
 0x10622d0   note detection: x87 scan of a spectrum, counted
 0x13f23e0   note detection: SSE FFT pass
 0x13f2d50   note detection: bit reversal and packing of the FFT's data
+0x13f3690   +calls  note detection: the spectrum of a block: window, FFT, magnitudes with pow and a running maximum; memcpy and _CIpow through the CRT's thunks (0x1adba36, 0x1adbb2c)
 0x106c130   note detection: SSE cosine of four floats in xmm0, registers and constants only (dsp_analysis_window's vcosf)

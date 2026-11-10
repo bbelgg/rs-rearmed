@@ -774,8 +774,11 @@ class Translator32(X87Mixin, core.Translator):
 
     def call_internal(self, t, tail=False):
         self.callees.add(t)
+        fenced = self.fenced_call(t)  # a relaxed function leaves for fenced code (core.fenced_call)
         if tail:
-            return "SPILL_CALL(); F_%x(c); return;" % t
+            return "%sSPILL_CALL(); F_%x(c); return;" % ("RC_RELAX_EXIT(); " if fenced else "", t)
+        if fenced:
+            return "RC_RELAX_EXIT(); SPILL_CALL(); F_%x(c); FILL_CALL(); RC_RELAX_ENTER();" % t
         return "SPILL_CALL(); F_%x(c); FILL_CALL();" % t
 
     # --- integer instructions that differ in 32-bit mode -----------------------

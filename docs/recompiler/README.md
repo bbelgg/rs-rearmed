@@ -194,7 +194,9 @@ what the game publishes to its other threads. Not fenced: `esp`-based and frame-
 (`read_only`, `RC_LDC`). A `rep movs` or `rep stos` taking the `memmove`/`memset` path is fenced before and
 after, not store by store. None of `relaxed.list`'s functions is matched in `win-x86`, so its relaxed functions are by address, in
 `tools/targets/win-x86/relaxed.map` (read for `--target`, so the game only): the hottest DSP functions of the Wwise thread and the note detection,
-with the same check. A relaxed function here can call only other relaxed ones. `ldapr`/`stlr` were tried in place of the fences on
+with the same check. A relaxed function here can call only other relaxed ones, unless its entry is marked `+calls`: then it may call fenced
+code too (the C runtime's `memcpy`, its `pow`), and each such call gets the function's exit fence before it and its entry fence after it, so the
+function is one block to other threads between its calls. Either front end reads the mark; only this target has one. `ldapr`/`stlr` were tried in place of the fences on
 a microbenchmark: no faster on an M2 (0.53 ns an access against 0.48), and they fault on an access across 16 bytes.
 
 ### x87 and MMX

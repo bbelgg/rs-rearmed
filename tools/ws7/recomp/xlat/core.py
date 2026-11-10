@@ -58,7 +58,7 @@ from .emit_int import IntMixin  # noqa: E402
 from .inner import InnerMixin  # noqa: E402
 from .emit_sse import SseMixin  # noqa: E402
 from .jumptab import JumpTableMixin  # noqa: E402
-from .relaxed import PURE_IMPORTS, RELAXED  # noqa: E402
+from .relaxed import CALLS_OK, PURE_IMPORTS, RELAXED  # noqa: E402
 
 # Sections that hold nothing a guest thread writes after rc_image_load has rebased and bound the
 # image (before any guest code runs): all of __TEXT, and the constant and pointer sections of __DATA.
@@ -293,7 +293,8 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
     # --- relaxed functions (relaxed.py) ------------------------------------
     def relax_ok(self, entry, seen):
         """The automatic part of the RELAXED check: no lock-prefixed, xchg or fence instruction,
-        and calls only to other relaxed functions or PURE_IMPORTS. None if fine, else the reason."""
+        and calls only to other relaxed functions or PURE_IMPORTS, or for a CALLS_OK entry to any function of
+        the image (fenced_call). None if fine, else the reason."""
         for a, i in seen.items():
             m = i.mnemonic
             if i.prefix[0] == 0xf0 or m in ("xchg", "cmpxchg", "cmpxchg8b", "cmpxchg16b", "xadd", "mfence",
@@ -309,9 +310,14 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
                 if t in self.stubs:
                     if self.stubs[t][1] not in PURE_IMPORTS or self.stub_local_target(self.stubs[t][0]) is not None:
                         return "call of %s at 0x%x" % (self.stubs[t][1], a)
-                elif (m == "call" or (t in self.fset and t != entry)) and t not in RELAXED:
+                elif (m == "call" or (t in self.fset and t != entry)) and t not in RELAXED and entry not in CALLS_OK:
                     return "call of 0x%x at 0x%x" % (t, a)
         return None
+
+    def fenced_call(self, t):
+        """A relaxed function (a CALLS_OK one: relax_ok) calls fenced code: the call gets the function's exit
+        fence before it and its entry fence after it (relaxed.py)."""
+        return self.relaxed and t not in RELAXED
 
     def relax_exit(self):
         return "RC_RELAX_EXIT(); " if self.relaxed else ""
@@ -415,6 +421,8 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
         a tail call, which ends this function."""
         self.callees.add(t)
         s = "SPILL_CALL(); F_%x(c); FILL_CALL();" % t
+        if self.fenced_call(t) and not tail:
+            s = "RC_RELAX_EXIT(); %s RC_RELAX_ENTER();" % s
         return ("%sSPILL_CALL(); F_%x(c); return;" % (self.relax_exit(), t)) if tail else s
 
     # --- one function ------------------------------------------------------

@@ -15,4 +15,6 @@ notes and empties this file. -->
   refresh read every game file again; now none. The first refresh after updating still reads them once.
 - **Learn & Play: long sessions no longer use up the game's address space with ended threads**, and the game can
   only open files in its own folders by a Mac path.
+- **Learn & Play: listening to the guitar takes about a quarter less processor time in a song.** One more of the
+  note detection's loops runs without a memory fence at every step.
 - **A draw that waits for a shader compile hurries it**, which should shorten a first-play stutter. Not measured.

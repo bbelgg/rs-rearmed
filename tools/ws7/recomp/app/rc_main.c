@@ -30,6 +30,7 @@
 // install's inserted (netguard_start; RC_NETGUARD_START marks the second start).
 #include <CoreFoundation/CoreFoundation.h>
 #include <dlfcn.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <mach-o/dyld.h>
 #include <mach-o/loader.h>
@@ -357,6 +358,12 @@ int main(int argc, char **argv, char **envp, char **apple) {
   g_phase = "mods";
   snprintf(path, sizeof path, "%s/../../mods", bundle);  // <home>/game/Rocksmith2014.app -> <home>/mods
   const char *mods = rc_mods_where(have_bundle ? path : NULL);
+  // A mod finds its settings in the game folder, and reads them in its constructor: the game makes that
+  // folder the working directory only when its engine starts, and an app opened from the Finder starts in /.
+  if (mods && have_bundle) {
+    snprintf(img, sizeof img, "%s/..", bundle);  // img is free again: the image is loaded
+    if (chdir(img)) fprintf(stderr, "[rc] cannot go to the game folder %s: %s\n", img, strerror(errno));
+  }
   if (mods) rc_mods_load(mods);
 
   // 4. initializers, translated, on the main thread's guest context. The

@@ -547,6 +547,7 @@ class TestGameCopy(Base):
         self.assertEqual(read(os.path.join(home, "game-dir")), (self.dest + "\n").encode())
         self.assertTrue(os.path.isfile(os.path.join(home, "gamefiles.py")))
         self.assertTrue(os.path.isfile(os.path.join(home, "cache_overlay.py")))
+        self.assertTrue(os.path.isfile(os.path.join(home, "psarc_key.py")))
 
 
 class TestTitleLogo(unittest.TestCase):

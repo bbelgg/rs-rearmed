@@ -36,7 +36,8 @@ cache.psarc itself is never written, so a modded cache works too: files that alr
 as they are, and with nothing to change there is no overlay. Both editions use it (gamefiles.py runs it after a copy
 or refresh of the game files). Nothing of the game is in this file: the archives are read and written here.
 
-Standard library only (any Python 3.9+); the archive tables are AES-encrypted, done with /usr/bin/openssl.
+Standard library only (any Python 3.9+); the archive tables are AES-encrypted, done with /usr/bin/openssl, with
+the key read from the player's own game (psarc_key.py, next to this file).
 """
 import hashlib
 import lzma
@@ -47,11 +48,13 @@ import subprocess
 import sys
 import zlib
 
+# Run with python3 -I, so the folder is not on the path by itself.
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import psarc_key  # noqa: E402
+del sys.path[0]
+
 # --- psarc -------------------------------------------------------------------------------------------------
 
-# The well-known Rocksmith 2014 table-of-contents key (AES-256-CFB).
-TOC_KEY = "C53DB23870A1A2F71CAE64061FDD0E1157309DC85204D4C5BFDF25090DF2572C"
-TOC_IV = "E915AA018FEF71FC508132E4BB4CEB42"
 PSARC_VERSION = 0x00010004
 BLOCK = 0x10000
 FLAG_TOC_ENCRYPTED = 4
@@ -62,15 +65,40 @@ class Unsupported(Exception):
     """An archive this module cannot read (the overlay is then left out; the game runs without it)."""
 
 
-def _toc_crypt(data, decrypt):
-    # CFB is a stream mode, but openssl wants whole blocks with -nopad: pad, then trim.
-    padded = data + b"\0" * (-len(data) % 16)
+def _toc_crypt(data, decrypt, near=()):
+    """A table of contents de- or encrypted with the game's key (psarc_key.py: found near the archive NEAR, in
+    the player's game). Reading one of the game's archives also tells the IV that writing needs."""
     try:
-        out = subprocess.run(["openssl", "enc", "-d" if decrypt else "-e", "-aes-256-cfb", "-nopad",
-                              "-K", TOC_KEY, "-iv", TOC_IV], input=padded, capture_output=True, check=True).stdout
+        key = psarc_key.toc_key(*near)
+        if decrypt:
+            psarc_key.table_iv(data[:16], key)
+            return psarc_key.crypt_toc(data, True, key)
+        _learn_iv(near, key)
+        return psarc_key.crypt_toc(data, False, key, psarc_key.toc_iv())
+    except psarc_key.NoKey as e:
+        raise Unsupported(str(e))
     except (OSError, subprocess.CalledProcessError) as e:
         raise Unsupported("openssl failed: %s" % e)
-    return out[:len(data)]
+
+
+def _learn_iv(near, key):
+    """The IV comes from a game archive read earlier; when none was (a cache.psarc some tool wrote without
+    encryption), from another archive in the folders of NEAR."""
+    for start in near:
+        folder = start if os.path.isdir(start) else os.path.dirname(os.path.abspath(start))
+        try:
+            names = sorted(n for n in os.listdir(folder) if n.lower().endswith(".psarc"))
+        except OSError:
+            continue
+        for name in names:
+            try:
+                with open(os.path.join(folder, name), "rb") as f:
+                    hdr = f.read(48)
+            except OSError:
+                continue
+            if (len(hdr) == 48 and hdr[:4] == b"PSAR" and struct.unpack(">I", hdr[28:32])[0] & FLAG_TOC_ENCRYPTED
+                    and psarc_key.table_iv(hdr[32:], key)):
+                return
 
 
 class Psarc:
@@ -93,7 +121,7 @@ class Psarc:
             raise Unsupported("%s: psarc kind %r/%d" % (path, comp, ent_size))
         toc = self.f.read(toc_len - 32)
         if flags & FLAG_TOC_ENCRYPTED:
-            toc = _toc_crypt(toc, True)
+            toc = _toc_crypt(toc, True, (path,))
         self.entries = []
         for i in range(n):
             e = toc[i * ent_size:(i + 1) * ent_size]
@@ -129,8 +157,9 @@ class Psarc:
         return self._read(self.entries[self.index[name]])
 
 
-def write_psarc(files):
-    """A psarc (bytes) with FILES, [(name, data)]: zlib blocks of 64 KiB, encrypted table, entry 0 the names."""
+def write_psarc(files, near=()):
+    """A psarc (bytes) with FILES, [(name, data)]: zlib blocks of 64 KiB, encrypted table, entry 0 the names.
+    NEAR: the game's archives it is made for (the key and the IV come from the game: _toc_crypt)."""
     names = [n for n, _ in files]
     datas = [b"\n".join(n.encode() for n in names)] + [d for _, d in files]
     hashes = [bytes(16)] + [hashlib.md5(n.encode()).digest() for n in names]
@@ -154,7 +183,7 @@ def write_psarc(files):
             ztab += z.to_bytes(2, "big")
             pos += len(b)
         zi += len(bl)
-    toc = _toc_crypt(bytes(toc + ztab), False)
+    toc = _toc_crypt(bytes(toc + ztab), False, near)
     out = bytearray(struct.pack(">4sI4sIIIII", b"PSAR", PSARC_VERSION, b"zlib", toc_len, ENTRY_SIZE, len(datas),
                                 BLOCK, FLAG_TOC_ENCRYPTED))
     out += toc
@@ -703,7 +732,7 @@ def build(cache_path):
         entries = [(name, rewrite_7z(ps.read(name), files)) for name, files in sorted(changes.items())]
     finally:
         ps.close()
-    return write_psarc(entries), sorted(f for files in changes.values() for f in files)
+    return write_psarc(entries, (cache_path,)), sorted(f for files in changes.values() for f in files)
 
 
 def make(game_dir):

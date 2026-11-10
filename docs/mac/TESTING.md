@@ -190,7 +190,8 @@ user's, with a test profile.
   Bee as 999999: "amor" gives 2 Matches (Paramore too), the song plays to the note highway with no restart;
   with `RS_MODS_BYPASS=0` 1 Match, without the song.
 - **Song ownership** (songs listed whatever AppID they carry): re-pack an official archive with another
-  `appid.appid` (with `tools/play-native/cache_overlay.py`'s `Psarc` and `write_psarc`), put it in the
+  `appid.appid` (with `tools/play-native/cache_overlay.py`'s `Psarc` and `write_psarc`; they find the game's key
+  for an archive in a game folder or a copy, else set `RS_PSARC_KEY_IMAGE` to the game's program), put it in the
   `dlc/` of the test install's game source and refresh the copy (`gamefiles.py`): `steam.env`'s
   `RS_STEAM_DLC` gains the AppID and a search finds the song; with the copy's `steam.env` holding the list
   without it, the search does not. Checked on 2026-11-03 with Dancing Queen as 999999 ("danc": 9 matches

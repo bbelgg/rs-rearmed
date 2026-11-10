@@ -12,8 +12,8 @@
     app-install WORK --game DIR [--app APP]
         the app bundle (default ~/Applications/RS Re-ARMed Learn & Play.app; $LP_NATIVE_APP) from
         WORK/out, ad-hoc signed, and its folder ~/Library/Application Support/RS Re-ARMed/learn-play
-        ($LP_HOME): game-dir (the game folder the app reads: its own copy, game/), gamefiles.py and
-        cache_overlay.py, userdata/, steam/, logs/ (win-x86/app/lp_main.c).
+        ($LP_HOME): game-dir (the game folder the app reads: its own copy, game/), gamefiles.py,
+        cache_overlay.py and psarc_key.py, userdata/, steam/, logs/ (win-x86/app/lp_main.c).
     build-clean WORK [--all]
         delete the build's intermediates; keep each translated library and its key (a cache that
         makes a rerun skip the translation), or nothing with --all.
@@ -809,7 +809,7 @@ def install_app(work, game, app=None, home=None, run=subprocess.run, say=None):
         os.makedirs(os.path.join(home, sub), exist_ok=True)
     with open(os.path.join(home, "game-dir"), "w") as f:
         f.write(os.path.abspath(game) + "\n")
-    for tool in ("gamefiles.py", "cache_overlay.py"):
+    for tool in ("gamefiles.py", "cache_overlay.py", "psarc_key.py"):
         shutil.copy2(os.path.join(ROOT, "tools", "play-native", tool), os.path.join(home, tool))
     lsregister = ("/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/"
                   "Support/lsregister")

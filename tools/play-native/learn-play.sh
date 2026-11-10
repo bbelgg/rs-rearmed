@@ -38,7 +38,7 @@
 #      game/static.psarc.rearmed (tools/loadscreen, RS_REARMED=0 not; its Python packages need the network once).
 #   5. The install: ~/Applications/RS Re-ARMed Learn & Play.app ($LP_NATIVE_APP), ad-hoc signed, and its
 #      folder ~/Library/Application Support/RS Re-ARMed/learn-play (game/: the copy; game-dir: the folder
-#      the app reads, game/; gamefiles.py, cache_overlay.py: the copy's tools, for a refresh without the
+#      the app reads, game/; gamefiles.py, cache_overlay.py, psarc_key.py: the copy's tools, for a refresh without the
 #      repository; userdata/: Rocksmith.ini; steam/: profiles and progress; logs/). Then the build's
 #      intermediates are deleted, except the translated libraries, a cache of about 140 MB
 #      (LP_KEEP_BUILD=1 keeps everything, LP_KEEP_BUILD=0 nothing).

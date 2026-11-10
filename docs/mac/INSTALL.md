@@ -207,6 +207,10 @@ yourself, set `RS_STEAM_ID` (a SteamID64 or the number in `Steam/userdata/<numbe
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed:
 it adds DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. If your cache can't be read, the copy goes on without it and says so.
 
+The copy's tools read the game's archives with what the game itself holds: its program in the game folder shows it, and
+the copy keeps a note of it (`game/.rearmed/toc-key`), so a refresh works with the game folder away. Nothing for it is in
+RS Re-ARMed (`tools/play-native/psarc_key.py`).
+
 - **Disk use.** On the same APFS volume as your home folder every file is a clone: seconds, and no extra space, though `du` and the Finder count the full size.
 - **A Steam library on another drive.** On APFS the copy goes onto that drive as clones, in `RS Re-ARMed/game` at its top, and `…/RS Re-ARMed/game` is a link to it, so the game needs that drive connected. On
   a drive that can't clone (exFAT, HFS+, a network volume) it is a real copy in your home folder, about 6.5 GB without DLC, after a check for room. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game`

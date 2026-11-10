@@ -186,6 +186,11 @@ SteamID64 or the number in `Steam/userdata/<number>`) for a refresh.
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc` (`tools/play-native/cache_overlay.py`, as on the Mac), from the copy's `cache.psarc`, which isn't changed: it adds
 DIRECT CONNECT and turns SHOP into ENUMERATE and UPLAY into EXIT GAME. If the cache can't be read, the copy goes on without it and says so.
 
+The copy's tools read the game's archives with what the game itself holds, as on the Mac (`tools/play-native/psarc_key.py`).
+Learn & Play's exe shows it only once unpacked, so the first copy leaves your DLC's list and the overlay for the moment the
+code image is there: the build step finishes them and keeps a note in the copy (`game/.rearmed/toc-key`), and a refresh
+after that needs neither the image nor the game folder.
+
 - **Disk use.** On the same APFS volume the copy is clones: seconds, and no extra space, though `du` and the Finder count the full size. With the game on another APFS drive the copy goes onto that drive, in
   `RS Re-ARMed/learn-play/game` at its top, and `…/learn-play/game` is a link to it, so the game needs that drive connected. From a drive that can't clone it is a real copy, about 6 GB plus DLC, after a check for
   room. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/learn-play/game` (`home`: the app's folder); a refresh keeps it where it is. Once it's made, Steam's download may be deleted, though that frees nothing if the copy is clones of it.

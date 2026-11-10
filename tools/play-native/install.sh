@@ -8,7 +8,7 @@
 #       the same volume, which take no extra space, else a real copy; a game on another APFS drive: the copy is
 #       on that drive, <drive>/RS Re-ARMed/game, and game/ a link to it) with a copy of APP (default: the
 #       build-m4.sh output, $RS_BUILD_DIR/m4/app/Rocksmith2014.app, RS_BUILD_DIR default <repo>/build),
-#       libnetguard.dylib, gamefiles.py and cache_overlay.py (for a refresh without the repository),
+#       libnetguard.dylib, gamefiles.py, cache_overlay.py and psarc_key.py (for a refresh without the repository),
 #       in game/ also the "Re-ARMed 2026" title logo, static.psarc.rearmed (tools/loadscreen, once, unless
 #       RS_REARMED=0; RS_PY or the build's venv has its packages, else it makes its own with pip),
 #       steam/ (the shim's offline cloud, made on first launch), logs/
@@ -75,7 +75,7 @@ mkdir -p "$home/logs" "$home/steam"
 echo "game files: $RS_GAME_DIR -> $home/game"
 python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} sync "$RS_GAME_DIR" "$home/game" --edition mac ||
     rs_die "the game files could not be copied (see above); nothing else was changed"
-cp "$here/gamefiles.py" "$here/cache_overlay.py" "$home/"
+cp "$here/gamefiles.py" "$here/cache_overlay.py" "$here/psarc_key.py" "$home/"
 # The title logo goes in the copy, as Learn & Play's does, and not in Steam's folder. Without it the game shows
 # its own.
 if [[ ${RS_REARMED:-1} != 0 && ! -f "$home/game/static.psarc.rearmed" ]]; then
@@ -101,6 +101,10 @@ codesign --force -s - "$home/game/Rocksmith2014.app.new/Contents/MacOS/Rocksmith
 find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
 rm -rf "$home/game/Rocksmith2014.app"
 mv "$home/game/Rocksmith2014.app.new" "$home/game/Rocksmith2014.app"
+# A game folder without the game's program left the copy's archives unread (gamefiles.py): the app is here now.
+if [[ -e "$home/game/.rearmed/key-pending" ]]; then
+    python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} refresh "$home/game" || true
+fi
 cp "$netguard" "$home/libnetguard.dylib"
 printf '%s\n' "$home/game" > "$home/game-dir"  # the folder the game reads (marks an install, rsp_renderer_home)
 printf '%s\n' "$RS_GAME_DIR" > "$home/game-source"  # where the copy comes from (a refresh reads .rearmed/source.json)

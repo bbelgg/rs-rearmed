@@ -285,7 +285,9 @@ x86-64 functions under Rosetta against the rewrites ([TESTING.md](TESTING.md)).
   `cache.psarc`'s `cacheN.7z` archives) leaves them out. At each copy or refresh of the game files,
   `tools/play-native/cache_overlay.py` adds them to the user's own copies of the two files and stores the
   rewritten archive in `game/Update/patcharchives.psarc`, the patch container the engine mounts at
-  `PatchUpdate/` when it is there. The engine's patch layer takes only its own `.new`/`.delta` archives from
+  `PatchUpdate/` when it is there. The tools read and write the archives' tables with the game's own key, found
+  in the game's program or in the note the copy keeps of it (`tools/play-native/psarc_key.py`); the table's IV is
+  worked out from one of the game's archives. The engine's patch layer takes only its own `.new`/`.delta` archives from
   the container, so a pre hook on `FrontEnd_OpenFile` (the hook point `frontend_open_file`, in
   `overrides/mods/mods.c`) opens `PatchUpdate/cacheN.7z` first and the `cache.psarc` one when the overlay
   has none. `cache.psarc` is never changed, so a modded cache still works; one that has the entries gets no

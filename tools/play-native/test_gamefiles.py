@@ -20,6 +20,10 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import gamefiles  # noqa: E402
+
+# The archives here are made up, and so are their key and IV: the game's own are read from a game (psarc_key.py).
+TEST_KEY = ("00112233445566778899AABBCCDDEEFF" * 2, "0F1E2D3C4B5A69788796A5B4C3D2E1F0")
+gamefiles.cache_overlay.psarc_key.use(*TEST_KEY)
 from gamefiles import Copier, Failure  # noqa: E402
 
 MANIFEST = """"AppState"
@@ -238,6 +242,85 @@ class Rs1Owned(Base):
             copy = os.path.join(self.tmp, "fresh")
             Copier("mac", self.src, copy, (), self.steam, quiet(), is_running=lambda e: False).run()
         self.assertIn(b"RS_STEAM_OWNED=206166\n", open(os.path.join(copy, ".rearmed", "steam.env"), "rb").read())
+
+
+class ArchiveKey(Base):
+    """The archives' key is read from the game (psarc_key.py), never from RS Re-ARMed: a game image shows it, a
+    copy keeps it, and a copy made before the image is there waits for it. A made-up key stands in for the
+    game's, known by its hash as the game's is."""
+
+    KEY = b"89ABCDEF0123456776543210FEDCBA98" * 2
+
+    def setUp(self):
+        super().setUp()
+        self.pk = pk = gamefiles.cache_overlay.psarc_key
+        pk.use(None, None)
+        self.addCleanup(pk.use, *TEST_KEY)
+        p = mock.patch.multiple(pk, KEY_SHA256=__import__("hashlib").sha256(self.KEY).hexdigest(), _checked=False)
+        p.start()
+        self.addCleanup(p.stop)
+        os.environ.pop(pk.IMAGE_ENV, None)
+        self.image = write(os.path.join(self.tmp, "image.bin"), b"\x90" * 99 + b"0123456789ABCDEF" * 4 + b"\0"
+                           + b"G" + self.KEY + b"\0code" + b"A" * 70)
+
+    def archive(self, path, appid):
+        """A song archive made as the game's are, wherever the key comes from afterwards."""
+        self.pk.use(self.KEY.decode(), TEST_KEY[1])
+        data = song(appid)
+        self.pk.use(None, None)
+        self.pk._checked = False
+        return write(path, data)
+
+    def test_image(self):
+        self.assertEqual(self.pk.key_in_image(self.image), self.KEY.decode())
+        self.assertIsNone(self.pk.key_in_image(write(os.path.join(self.tmp, "packed.exe"), b"MZ" + b"\x11" * 500)))
+        self.assertIsNone(self.pk.key_in_image(os.path.join(self.tmp, "missing")))
+
+    def test_found_near_the_archive(self):
+        far = self.archive(os.path.join(self.tmp, "alone", "a_p.psarc"), 5)
+        self.assertIsNone(self.pk.find_key(far))
+        self.assertIsNone(gamefiles.archive_appid(far))
+        game = os.path.join(self.tmp, "game")
+        deep = self.archive(os.path.join(game, "dlc", "cdlc", "pack", "b_m.psarc"), 7)
+        shutil.copy(self.image, write(os.path.join(game, "Rocksmith2014.app", "Contents", "MacOS", "Rocksmith2014"), b""))
+        self.assertEqual(gamefiles.archive_appid(deep), 7)
+        self.pk.use(None, None)
+        self.pk._checked = False
+        copy = os.path.join(self.tmp, "copy")
+        self.assertTrue(self.pk.note(copy, image=self.image))
+        self.assertEqual(self.pk.find_key(os.path.join(copy, "dlc", "x_p.psarc")), self.KEY.decode())
+        write(os.path.join(copy, ".rearmed", "toc-key"), b"F" * 64)  # not the key: not believed
+        self.assertIsNone(self.pk.find_key(os.path.join(copy, "dlc", "x_p.psarc")))
+        with mock.patch.dict(os.environ, {self.pk.IMAGE_ENV: self.image}):
+            self.assertEqual(gamefiles.archive_appid(far), 5)
+
+    def test_a_copy_waits_for_the_image(self):
+        self.mac_game()
+        lp = self.lp_game()
+        self.archive(os.path.join(self.src, "dlc", "cdlc", "Custom_p.psarc"), 999999)
+        said = []
+        progress = quiet()
+        progress.say = said.append
+        self.copier("learn-play", lp, dlc_from=[os.path.join(self.src, "dlc")], progress=progress).run()
+        meta = os.path.join(self.dest, ".rearmed")
+        self.assertTrue(os.path.exists(os.path.join(meta, "key-pending")))
+        self.assertTrue(any("code image" in line for line in said))
+        self.assertNotIn("dlc/cdlc/Custom_p.psarc", gamefiles.read_json(os.path.join(meta, "dlc-appids.json"))["files"])
+        self.assertTrue(os.path.isfile(os.path.join(self.dest, "dlc", "cdlc", "Custom_p.psarc")))  # copied all the same
+        self.assertFalse(gamefiles.key_from_image(self.dest, os.path.join(self.tmp, "missing")))
+        self.assertTrue(gamefiles.key_from_image(self.dest, self.image, quiet(), is_running=lambda e: False))
+        self.assertFalse(os.path.exists(os.path.join(meta, "key-pending")))
+        self.assertEqual(gamefiles.read_json(os.path.join(meta, "dlc-appids.json"))["files"]["dlc/cdlc/Custom_p.psarc"][2],
+                         999999)
+        with open(os.path.join(meta, "steam.env")) as f:
+            self.assertIn("999999", f.read())
+        # and a later refresh needs neither the image nor the game
+        self.pk.use(None, None)
+        self.pk._checked = False
+        self.archive(os.path.join(self.src, "dlc", "cdlc", "Later_p.psarc"), 123456)
+        gamefiles.refresh(self.dest, progress=quiet(), is_running=lambda e: False)
+        with open(os.path.join(meta, "steam.env")) as f:
+            self.assertIn("123456", f.read())
 
 
 def song(appid=None, name="songs/bin/generic/x_lead.sng"):

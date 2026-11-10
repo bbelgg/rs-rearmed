@@ -342,7 +342,8 @@ the Shop.", and nothing is scanned: the game as it was.
 
 Song ownership (whatever AppID an archive carries): re-pack an official archive with another
 `appid.appid` (read every entry with `tools/play-native/cache_overlay.py`'s `Psarc`, write them back with
-`write_psarc`, the AppID changed; the name hashes stay the same), put it in the `dlc/` of a game folder of
+`write_psarc`, the AppID changed; the name hashes stay the same; they find the game's key for an archive in a
+copy, else set `RS_PSARC_KEY_IMAGE` to the unpacked code image), put it in the `dlc/` of a game folder of
 its own and make the copy with `gamefiles.Copier` (`steam.env` then lists the new AppID). Searching for the
 song finds it; with `RS_STEAM_DLC` set to the list without that AppID (as before the change) it finds
 nothing ("0 Matches"). Checked on 2026-11-03 with Dancing Queen as 999999. To test a changed archive, run with a game folder of its own (`cp -Rc` of the game

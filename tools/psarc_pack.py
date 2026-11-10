@@ -11,19 +11,19 @@ packed back to back, so archives whose entries are padded to alignment
 (cache.psarc) do not round-trip byte for byte; static.psarc does.
 """
 import struct
-import subprocess
 import sys
 import zlib
 
-from psarc_extract import TOC_IV, TOC_KEY, read_archive, read_entry
+from psarc_extract import decrypt_toc, psarc_key, read_archive, read_entry
 
 
-def encrypt_toc(data):
-    padded = data + b"\0" * (-len(data) % 16)
-    out = subprocess.run(
-        ["openssl", "enc", "-e", "-aes-256-cfb", "-nopad", "-K", TOC_KEY, "-iv", TOC_IV],
-        input=padded, capture_output=True, check=True).stdout
-    return out[:len(data)]
+def encrypt_toc(data, path):
+    """The table encrypted as the game's are: the key from the game of the archive at PATH, the IV from that
+    archive's own table, read before this (psarc_key.py)."""
+    try:
+        return psarc_key.crypt_toc(data, False, psarc_key.toc_key(path), psarc_key.toc_iv())
+    except psarc_key.NoKey as e:
+        sys.exit(str(e))
 
 
 def raw_blocks(f, block_size, zsizes, entry):
@@ -70,8 +70,7 @@ def main():
     f.seek(32)
     toc = f.read(toc_len - 32)
     if flags & 4:
-        from psarc_extract import decrypt_toc
-        toc = decrypt_toc(toc)
+        toc = decrypt_toc(toc, src)
     names = read_entry(f, block_size, zsizes, entries[0]).decode().split("\n")
     by_name = {n: i + 1 for i, n in enumerate(names)}
     for name in repl:
@@ -111,7 +110,7 @@ def main():
             offsets[i].to_bytes(5, "big") + e[30:]
     new_toc += ztab
     if flags & 4:
-        new_toc = encrypt_toc(bytes(new_toc))
+        new_toc = encrypt_toc(bytes(new_toc), src)
 
     with open(dst, "wb") as o:
         o.write(struct.pack(">4sI4sIIIII", magic, ver, comp, new_toc_len, ent_size, n_ent,

@@ -92,6 +92,7 @@ PREVIOUS = "manifest.previous.json"  # the set of an earlier copy while a refres
 SOURCE_INFO = "source.json"
 ENUMERATED = "enumerated.txt"  # songs the game's ENUMERATE entry copied in (shims/steam/src/enumerate.h)
 STEAM_ENV = "steam.env"
+KEY_PENDING = "key-pending"  # the copy's archives could not be read yet (Copier._archive_key)
 TMP_SUFFIX = ".rearmed-part"
 SKIP_NAMES = {".DS_Store", "Thumbs.db", "desktop.ini"}
 FREE_CDLC_APP = 248750  # the free DLC most custom songs carry (shims/steam: owned in "installed" mode)
@@ -357,8 +358,10 @@ def archive_appid(path):
         p.close()
 
 
-def dlc_appids(dest, entries):
-    """The AppIDs the archives under DEST/dlc carry, ENTRIES being the copy's files (relative paths)."""
+def dlc_appids(dest, entries, readable=True):
+    """The AppIDs the archives under DEST/dlc carry, ENTRIES being the copy's files (relative paths). Not
+    READABLE (the archives' key is not at hand yet): what an earlier copy found, and the rest is left for the
+    run that can read them."""
     cache_path = os.path.join(dest, META, DLC_APPIDS)
     old = read_json(cache_path)
     old = old.get("files") if isinstance(old, dict) and isinstance(old.get("files"), dict) else {}
@@ -374,8 +377,10 @@ def dlc_appids(dest, entries):
         known = old.get(rel)
         if isinstance(known, list) and len(known) == 3 and known[:2] == key:
             app = known[2]
-        else:
+        elif readable:
             app = archive_appid(os.path.join(dest, rel))
+        else:
+            continue
         new[rel] = key + [app]
         if isinstance(app, int) and app > 0:
             apps.add(app)
@@ -988,6 +993,30 @@ class Copier:
             self.progress.say("%s isn't there now: its %d files stay in the copy." % (", ".join(away), len(kept)))
         return kept
 
+    def _archive_key(self, meta):
+        """Whether the copy's archives can be read: their tables are encrypted with a key that is in the game's
+        own code (psarc_key.py), not in RS Re-ARMed. The Mac game's executable shows it; the copy then keeps it
+        in .rearmed, so a refresh needs no game folder. Learn & Play's exe shows it only unpacked, and the code
+        image is made after the first copy: until then the copy is marked, the parts that read archives (the
+        DLC's AppIDs, the Rocksmith 1 songs, the menu overlay) wait, and key_from_image finishes them. A Mac
+        game folder without the game's program waits the same way, for a refresh once the app is installed."""
+        if cache_overlay is None:
+            return True
+        pk = cache_overlay.psarc_key
+        mark = os.path.join(meta, KEY_PENDING)
+        if pk.have_key(self.dest, self.source):
+            pk.note(self.dest, pk.toc_key())
+            if os.path.exists(mark):
+                os.unlink(mark)
+            return True
+        with open(mark, "w") as f:
+            f.write("the archives are read once the game's code is at hand (gamefiles.py)\n")
+        self.progress.say("Your DLC's list and the menu entries are made when the game's code image is there."
+                          if self.edition == "learn-play" else
+                          "Rocksmith2014.app is not in %s: your DLC's list and the menu entries wait for it."
+                          % self.source)
+        return False
+
     def _overlay(self):
         """The Direct Connect overlay, Update/patcharchives.psarc, made from the copy's cache.psarc
         (cache_overlay.py, next to this file). Not made (a cache it cannot read): the game runs without it."""
@@ -1023,6 +1052,7 @@ class Copier:
         if os.path.islink(meta):
             os.unlink(meta)
         os.makedirs(meta, exist_ok=True)
+        readable = self._archive_key(meta)
         unlinked = self._old_links()
         if unlinked:
             self.progress.say("Removed %d links to the game folder (the earlier install's mirror)." % unlinked)
@@ -1155,11 +1185,13 @@ class Copier:
         recorded = recorded_account(env_path)
         if recorded and how not in (HOW_OVERRIDE, HOW_LICENSE):
             account, how = recorded, "kept from the earlier copy"  # a guess never replaces an earlier choice
-        apps = dlc_appids(self.dest, entries)
+        apps = dlc_appids(self.dest, entries, readable)
         if self.edition == "learn-play" and account:  # what the ticket lists: a Learn & Play buyer has no appmanifest
             apps = set(apps) | set(account_dlc(self.steam, account) or [])
         env = steam_env(appmanifest, account, apps, rs1_owned(self.steam, self.dest, account, self.progress.say))
-        if env:
+        if not readable and os.path.exists(env_path):
+            pass  # an earlier copy's facts stay until the archives can be read again
+        elif env:
             with open(env_path + TMP_SUFFIX, "w") as f:
                 f.write("# the game's Steam facts, from Steam's appmanifest when the copy was made (gamefiles.py)\n")
                 if account:
@@ -1170,7 +1202,8 @@ class Copier:
             os.unlink(env_path)
 
         self._static_link()
-        self._overlay()
+        if readable:
+            self._overlay()
         nbytes = sum(e["size"] for e in entries.values())
         write_json(os.path.join(meta, MANIFEST), {
             "format": FORMAT, "edition": self.edition, "source": self.source, "dlc_from": self.dlc_from,
@@ -1825,6 +1858,21 @@ def refresh(dest, progress=None, **kw):
         if kw["source_away"]:
             kw["placement"] = None
     return Copier(info["edition"], info["source"], dest, dlc, info.get("steam"), progress, **kw).run()
+
+
+def key_from_image(dest, image, progress=None, **kw):
+    """The archives' key from the game's code IMAGE, kept in the copy DEST; a copy that waited for it
+    (Copier._archive_key) is finished with a refresh. True when the copy has the key."""
+    if cache_overlay is None:
+        return False
+    pk = cache_overlay.psarc_key
+    if not os.path.isfile(os.path.join(dest, META, SOURCE_INFO)):
+        return False  # not a copy (a game folder of Steam's): nothing is written there
+    if not pk.note(dest, image=image):
+        return False
+    if os.path.exists(os.path.join(dest, META, KEY_PENDING)):
+        refresh(dest, progress, **kw)
+    return True
 
 
 def main(argv=None):

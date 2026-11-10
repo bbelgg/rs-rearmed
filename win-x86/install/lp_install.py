@@ -1281,6 +1281,13 @@ def main(argv=None):
         elif a.cmd == "app-install":
             app, home = lp_build.install_app(os.path.abspath(a.work), os.path.abspath(a.game), a.app,
                                              say=progress.say)
+            # an install over an earlier one, with no build in between: the copy's tools get what they read
+            # the archives with from the installed image (the build step does it for a first install)
+            try:
+                gamefiles.key_from_image(os.path.abspath(a.game), os.path.join(app, "Contents", "Resources",
+                                                                               "lp_game.exe"), progress)
+            except gamefiles.Failure as e:
+                progress.say("The game files were not refreshed: %s" % e)
             progress.say("Installed: %s" % app)
             progress.say("Your settings, saves and logs: %s" % home)
         elif a.cmd == "game-copy":
@@ -1343,6 +1350,12 @@ def build(cfg, a, progress):
     if free < need:
         raise Failure("not enough free space for the build in %s: %s free, about %s needed. Free some space, or "
                       "set RS_BUILD_DIR to a folder on another disk, and run this again." % (work, human(free), human(need)))
+    # The copy of the game files reads its archives with what the code image holds (gamefiles.py): from here on
+    # it can, and what the first copy left for this moment is finished.
+    try:
+        gamefiles.key_from_image(os.path.abspath(a.game), os.path.abspath(a.image), progress)
+    except gamefiles.Failure as e:
+        raise Failure(str(e))
     b = lp_build.Builder(work, os.path.abspath(a.image), os.path.abspath(a.dlls), os.path.abspath(a.game), a.py,
                          a.jobs or None, progress, progress.say)
     secs = b.run()

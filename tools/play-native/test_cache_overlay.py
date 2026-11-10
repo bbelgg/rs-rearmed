@@ -21,6 +21,10 @@ sys.path.insert(0, HERE)
 import cache_overlay as co  # noqa: E402
 import gamefiles  # noqa: E402
 
+# The archives here are made up, and so are their key and IV: the game's own are read from a game (psarc_key.py).
+TEST_KEY = ("00112233445566778899AABBCCDDEEFF" * 2, "0F1E2D3C4B5A69788796A5B4C3D2E1F0")
+co.psarc_key.use(*TEST_KEY)
+
 # Made-up menu files with the shape of the game's (tabs, CRLF, the game's loose JSON).
 STARTUP = """{ "Static" : { "UI" : { "Menus" : { "Entries" :
 {
@@ -421,6 +425,10 @@ class RealCache(unittest.TestCase):
         caches = real_caches()
         if not caches:
             self.skipTest("no cache.psarc (set RS_TEST_CACHE)")
+        co.psarc_key.use(None, None)  # the game's own archive: its key, from the game next to it
+        self.addCleanup(co.psarc_key.use, *TEST_KEY)
+        if not co.psarc_key.have_key(*caches):
+            self.skipTest("no game next to cache.psarc to read it with (set RS_PSARC_KEY_IMAGE)")
         for cache in caches:
             data, names = co.build(cache)
             if data is None:

@@ -3,28 +3,32 @@
 
     psarc_extract.py <archive.psarc> <out_dir> [--list] [--match SUBSTR]
 
-The TOC is AES-256-CFB encrypted with the well-known Rocksmith key; decryption
-is done with the `openssl` CLI so no Python crypto package is needed. Entry 0 is
-the manifest (newline-separated file names for entries 1..n).
+The TOC is AES-256-CFB encrypted with the game's key, which is read from the
+game the archive belongs to (tools/play-native/psarc_key.py: found by itself for an
+archive in a Mac game folder or in a copy of the game files, else from the image
+RS_PSARC_KEY_IMAGE names); decryption is done with the `openssl` CLI so no Python
+crypto package is needed. Entry 0 is the manifest (newline-separated file names
+for entries 1..n).
 """
 import argparse
 import os
 import struct
-import subprocess
 import sys
 import zlib
 
-TOC_KEY = "C53DB23870A1A2F71CAE64061FDD0E1157309DC85204D4C5BFDF25090DF2572C"
-TOC_IV = "E915AA018FEF71FC508132E4BB4CEB42"
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "play-native"))
+import psarc_key  # noqa: E402
+del sys.path[0]
 
 
-def decrypt_toc(data):
-    # CFB is a stream mode, but openssl wants whole blocks for -nopad; pad and trim.
-    padded = data + b"\0" * (-len(data) % 16)
-    out = subprocess.run(
-        ["openssl", "enc", "-d", "-aes-256-cfb", "-nopad", "-K", TOC_KEY, "-iv", TOC_IV],
-        input=padded, capture_output=True, check=True).stdout
-    return out[:len(data)]
+def decrypt_toc(data, path):
+    """The table of the archive at PATH; reading it also tells the IV a writer needs (psarc_pack.py)."""
+    try:
+        key = psarc_key.toc_key(path)
+    except psarc_key.NoKey as e:
+        sys.exit(str(e))
+    psarc_key.table_iv(data[:16], key)
+    return psarc_key.crypt_toc(data, True, key)
 
 
 def read_archive(path):
@@ -35,7 +39,7 @@ def read_archive(path):
         sys.exit("not a PSARC file")
     toc = f.read(toc_len - 32)
     if flags & 4:
-        toc = decrypt_toc(toc)
+        toc = decrypt_toc(toc, path)
     entries = []
     for i in range(n_ent):
         e = toc[i * ent_size:(i + 1) * ent_size]

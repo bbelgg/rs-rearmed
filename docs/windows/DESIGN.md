@@ -492,7 +492,9 @@ More native replacements of single game functions by address (`win-x86/build/ski
 
 - **Direct Connect choice.** The same overlay as the Mac's ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)):
   `tools/play-native/cache_overlay.py` makes `game/Update/patcharchives.psarc` from the copy's own
-  `cache.psarc` at each copy or refresh, and the engine mounts it at `PatchUpdate/`. `FrontEnd_OpenFile`
+  `cache.psarc` at each copy or refresh, and the engine mounts it at `PatchUpdate/`. The tools read and write
+  the archives' tables with the game's own key, as on the Mac (`tools/play-native/psarc_key.py`); here it comes
+  from the unpacked code image, which the build step hands to the copy (`gamefiles.key_from_image`). `FrontEnd_OpenFile`
   (0x101ba80; path in `ecx`, the result pointer on the stack, removed by the caller) is a native function
   here: for a `cacheN.7z` it opens `PatchUpdate/<name>` first,
   then does what the original does (the lower-case path to the front-end file system's `Open`, slot +0x10

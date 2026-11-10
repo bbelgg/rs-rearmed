@@ -239,6 +239,8 @@ class Translator32(X87Mixin, core.Translator):
         self.thunk_prefix = "I_"  # import thunk names: <prefix><slot> (gen_image_pe.py --module)
         self.flag_callees = set()  # functions whose callers read the flags they leave (find_functions)
         self.inline_interlocked = False  # the game's: the difftest stops at imports (gen_image_pe.py --target)
+        self.keep_calls = set()          # functions always called, never inlined at a call site: the hook points
+        self._stack_checks = {}
         self.set_wrappers(wrappers or ())
         if functions is None:
             functions = self.find_functions()
@@ -352,6 +354,29 @@ class Translator32(X87Mixin, core.Translator):
                 self._dcache[a] = i
             return i
         raise Unsupported("undecodable at 0x%x" % a)
+
+    def stack_check(self, t):
+        """The address of the cookie if the function at t is MSVC's __security_check_cookie as /GS code calls it
+        at every return of a function with a buffer: `cmp ecx, [cookie]; jne fail; ret`. Else None.
+        A call of it is translated in place (emit_flow32): the compare, and the call itself only when the
+        cookie is not the one. Such a function has 11,000 call sites in the game, and a call spills and fills
+        every register for it."""
+        if t not in self._stack_checks:
+            g = None
+            try:
+                a, b = self.insn(t), None
+                if (a.mnemonic == "cmp" and len(a.operands) == 2 and a.operands[0].type == x86.X86_OP_REG
+                        and a.operands[0].reg == x86.X86_REG_ECX and a.operands[1].type == x86.X86_OP_MEM
+                        and a.operands[1].mem.base == 0 and a.operands[1].mem.index == 0 and a.operands[1].size == 4
+                        and a.operands[1].mem.segment == 0):
+                    b = self.insn(t + a.size)
+                    r = self.insn(t + a.size + b.size)
+                    if b.mnemonic == "jne" and r.mnemonic == "ret" and not r.operands:
+                        g = a.operands[1].mem.disp & M32
+            except Unsupported:
+                g = None
+            self._stack_checks[t] = None if t in self.keep_calls else g
+        return self._stack_checks[t]
 
     # --- edits (inner.py) ----------------------------------------------------
     def image_bytes(self, a, n):
@@ -751,6 +776,14 @@ class Translator32(X87Mixin, core.Translator):
                     out.append(self.push4("0x%xu" % ret))
                     return True
                 flags = t in self.flag_callees
+                cookie = None if flags else self.stack_check(t)
+                if cookie is not None:
+                    # the function's own compare; with the right cookie it only returns, leaving the return
+                    # address it was called with below esp, and its flags are its own as after any call
+                    out.append("if (__builtin_expect((uint32_t)rcx != %s(uint32_t, RC_M(0x%xu)), 0)) { %s %s %s } "
+                               "else { RC_STS(uint32_t, RC_M((uint32_t)(rsp - 4)), 0x%xu); }"
+                               % ("RC_LDR" if self.relaxed else "RC_LD", cookie, self.push4("0x%xu" % ret), self.call_internal(t), self.ret_other(ret), ret))
+                    return True
                 out.append("%s%s %s %s%s" % ("RC32_FLAGS_OUT(); " if flags else "", self.push4("0x%xu" % ret), self.call_internal(t),
                                              self.ret_other(ret), " RC32_FLAGS_IN();" if flags else ""))
                 return True

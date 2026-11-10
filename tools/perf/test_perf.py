@@ -138,6 +138,17 @@ class Report(unittest.TestCase):
         self.assertEqual(t[0], "| Song | Mac (2 runs) | Learn & Play (1 run) |")
         self.assertIn("| CPU (% of a core) | 44.0-45.0 | 53.0 |", t)
 
+    def test_a_busy_run_is_left_out(self):
+        import json, tempfile
+        with tempfile.TemporaryDirectory() as d:
+            for name, load in (("mac-1", 0.4), ("mac-2", 4.6)):
+                os.mkdir(os.path.join(d, name))
+                with open(os.path.join(d, name, "result.json"), "w") as f:
+                    json.dump(dict(result("mac", 44.0), other_load=load), f)
+            runs, left = report.load(d)
+        self.assertEqual(len(runs["mac"]), 1)
+        self.assertIn("mac-2: the Mac was busy", left[0])
+
     def test_same_setup_has_no_differences(self):
         self.assertEqual(report.differences({"mac": [result("mac", 44.0)], "lp": [result("lp", 53.0)]}), [])
 

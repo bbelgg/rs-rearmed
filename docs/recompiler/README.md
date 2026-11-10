@@ -196,7 +196,11 @@ after, not store by store. None of `relaxed.list`'s functions is matched in `win
 `tools/targets/win-x86/relaxed.map` (read for `--target`, so the game only): the hottest DSP functions of the Wwise thread and the note detection,
 with the same check. A relaxed function here can call only other relaxed ones, unless its entry is marked `+calls`: then it may call fenced
 code too (the C runtime's `memcpy`, its `pow`), and each such call gets the function's exit fence before it and its entry fence after it, so the
-function is one block to other threads between its calls. Either front end reads the mark; only this target has one. `ldapr`/`stlr` were tried in place of the fences on
+function is one block to other threads between its calls. Either front end reads the mark; only this target has one.
+
+**The stack check in place** (32-bit): a call of a function that is `cmp ecx, [cookie]; jne fail; ret`, MSVC's `__security_check_cookie`, is translated as that
+compare, with the call itself in the branch for a wrong cookie; the return address still goes below `esp`, as the call would have left it. The game calls it from
+11,054 places. A hook point is never translated this way (`Translator32.keep_calls`). `ldapr`/`stlr` were tried in place of the fences on
 a microbenchmark: no faster on an M2 (0.53 ns an access against 0.48), and they fault on an access across 16 bytes.
 
 ### x87 and MMX

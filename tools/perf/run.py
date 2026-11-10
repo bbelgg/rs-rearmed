@@ -389,6 +389,8 @@ class Game:
         gb = 2.0 ** 30
         return {"start_unix": t0, "end_unix": t1,
                 "front": front0 and proc.frontmost_pid() == pid,
+                # the system's load at the window's end, less the game's own: other work that ran beside it
+                "other_load": round(os.getloadavg()[0] - (u1["cpu"] - u0["cpu"]) / dt, 2),
                 "cpu_pct": round((u1["cpu"] - u0["cpu"]) / dt * 100, 2),
                 "threads": proc.thread_cpu(th0, th1, dt)[:12], "helpers": helpers,
                 "footprint_gb": stats.spread([round(r["footprint"] / gb, 3) for r in rows]),

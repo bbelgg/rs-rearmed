@@ -237,6 +237,24 @@ One trace of each edition, 2026-11-10: the table and the Mac edition's side are 
 - **The game thread**, 33.9 points: flat, 76% in translated code. The frame's vertex data is copied twice, by the game through `memcpy_s` from `0x176b550` (2.8% of
   the thread, about a point of a core) and by `glBufferSubData` (1.2%): the zero-copy buffers of [Opportunities](#opportunities-by-expected-payoff).
 
+**After that, the same day** (not released), looking for more of the same:
+
+- **The stack check is done in place.** MSVC's `/GS` ends a function that has a buffer with a call of `__security_check_cookie` (`0x1adb478`: compare `ecx` with the
+  cookie, return): 11,054 call sites in the game and 697 in its DLLs, each a full call that spilled and filled every register. The translator now emits the compare
+  where the call was and makes the call only when the cookie is wrong ([the recompiler](../recompiler/README.md)). In the profile the function was 0.46 points of a
+  core on the game thread and is gone. The measured runs do not show it: five runs of that build gave 49.3 to 53.1% of a core where three before gave 49.8 to 51.0,
+  on an afternoon when another job was running on the Mac between them.
+- **Eight more functions relaxed, and taken out again: nothing changed.** `0x1a08300` (`expander_gain`), `0x1a35ba0`, `0x1a35660`, `0x1a1ff00` and `0x1aab890` on the
+  Wwise thread, and three small matrix functions of the game thread (`0xff80f0`, a 3x3 product with 63 fenced accesses and the thread's largest translated
+  function, `0x1560ac0`, `0x1666110`). Two runs: the game at 49.8 and 51.0% of a core and both threads where they were. A fence costs about half a nanosecond, so it
+  counts in a loop of little else over thousands of samples, as `0x13f3690` was, and not beside x87 arithmetic for each sample. The three with the static's guard
+  would have been safe: the static is a copy of one constant, and the x86 code sets the guard before the value itself.
+- **Not to be relaxed**, though nothing in the instructions says so: `0x106b590` and `0x106b6d0`, the write and read of the ring that carries the guitar's samples
+  from the audio thread to the note detection (its indices and state word are what the two threads go by), and `0x105f420`, the note detection's main routine (0.7
+  points, the largest fenced function left there), which writes the detector's flags and results that the game thread reads.
+- **Where the rest is**: the note detection's FFT pass and bit reversal, 1.7 points together and relaxed already, are its own work now; `pow` reaches the system's
+  through the CRT's error rules at 0.5; and seven of Metal's own threads that submit the frame's command buffer take about 3.3 points between them, in both editions.
+
 ## Hook points
 
 What the hook table costs the game thread with no mod loaded: nothing that shows (2026-11-04). The same song and screen by

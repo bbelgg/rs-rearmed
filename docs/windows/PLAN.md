@@ -121,7 +121,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
 **Note detection** (not released): `0x13f3690` relaxed, 1.6 points of a core less in a song ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); to be played with
-a guitar before a release. `pow` through the translated CRT (0.7 points) is the next there.
+a guitar before a release. The stack check in place and what else was tried are there too; what is left on that thread is its own work, or is not safe to relax.
 
 **Measured runs:** what is left of `tools/perf` is in the [Mac plan](../mac/PLAN.md#next-work), for both editions.
 

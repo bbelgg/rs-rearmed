@@ -158,6 +158,26 @@ CASES = [
         mov edx, 5
         ret
     """),
+    # --- /GS: the call of __security_check_cookie is translated in place (Translator32.stack_check): the
+    # right cookie goes on, a wrong one makes the call, whose failure path here sets eax ---
+    ("stack_check", """
+        mov eax, 1
+        mov ecx, dword ptr [stack_cookie]
+        call stack_check_fn
+        mov ecx, 5
+        call stack_check_fn
+        add eax, 16
+        ret
+    """),
+    ("stack_check_fn", """
+        cmp ecx, dword ptr [stack_cookie]
+        jne stack_check_fail
+        ret
+    """),
+    ("stack_check_fail", """
+        mov eax, 100
+        ret
+    """),
     ("flags_callee_zero", """
         test eax, 0
         mov edx, 3
@@ -574,6 +594,7 @@ DATA_CASES = [
         ret
     """),
     # the IAT of IMPORTS
+    ("stack_cookie", ".long 0xbb40e64e"),
     ("iat_GetTickCount", ".long 0"),
     ("iat_GetVersion", ".long 0"),
     ("iat_Sleep", ".long 0"),

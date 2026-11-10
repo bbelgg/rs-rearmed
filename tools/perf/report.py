@@ -4,7 +4,8 @@
   tools/perf/report.py OUT                   a Markdown table, a column an edition, each cell the runs' range
   tools/perf/report.py OUT --against BASE    the same with the change from BASE's runs beside each cell
 
-Warm-up runs, runs that stopped and runs whose window was not in front are left out and listed. What the two
+Warm-up runs, runs that stopped, runs whose window was not in front and runs that had other work beside them are
+left out and listed. What the two
 editions' runs did not have in common (settings, mods, switches, display) is listed under the table: a table of
 runs that differ there is not a comparison. A change smaller than the noise between runs of one build is marked
 "within noise": about 2 points of a core, and the larger of 2% and the runs' own spread for the rest.
@@ -43,6 +44,7 @@ ROWS = [
     ("Footprint's growth (MB a minute)", lambda r: r.get("footprint_mb_per_min"), 1, None),
 ]
 NAMES = {"mac": "Mac", "lp": "Learn & Play"}
+BUSY = 3.0  # the load beside the game's own over which a run is not a result (run.py's other_load)
 
 
 def load(out):
@@ -60,6 +62,8 @@ def load(out):
             left.append("%s: %s" % (name, r["frames"]["error"]))
         elif not r.get("front"):
             left.append("%s: the game's window was not in front" % name)
+        elif r.get("other_load", 0) > BUSY:
+            left.append("%s: the Mac was busy with something else (a load of %.1f beside the game)" % (name, r["other_load"]))
         else:
             runs.setdefault(r["manifest"]["edition"], []).append(r)
             if r["manifest"].get("preflight_failed"):

@@ -24,6 +24,7 @@ in the repository.
 | Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) with made-up game folders: what each edition copies, clones and real copies, the space check, resuming a stopped copy, refreshes (only the copied set is removed, the game's own writes stay), the earlier mirror's links removed without following them, the completeness check |
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (the cable screen's DIRECT CONNECT button, the INPUT slider's fourth value, the main menu's ENUMERATE, the notice) and that a file which has them is left alone; the psarc and 7z readers and writers with made-up archives (a rewritten 7z keeps every other file's stored bytes, order, times and attributes); the overlay made, and left out for a cache that has the entries; `gamefiles.py` making it after a copy. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`, the built-in mods switched off in the installer. The launcher's reader (run with macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same: comments, spaces, CRLF, a repeated key, the environment winning, other lines ignored (the network guard's and Steam's switches among them); the launcher's `--env` pairs carrying the value it logs as used, the environment's too, as `open` gives the game only launchd's environment; the same keys in both and in the installer |
+| Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with the Windows port: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with the Windows port: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`, also `python3 tools/targets/check.py`) | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
 | Hook points and mods | `recomp.hooks` (`tools/ws7/recomp/test/hooks`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
@@ -326,6 +327,66 @@ user's, with a test profile.
   output callbacks and the game's sound (peak 0.3) on the new device at its own buffer size, 128 frames on one with inputs, 256 on
   the speakers, there and back, and a clean quit. On the installed app, the same day: a real change in Sound settings during a song, and the sound moved, heard by the maintainer.
 - Before reporting a game bug, check whether it also happens in the original game under Rosetta.
+
+### Measured runs
+
+`tools/perf/run.py` runs either edition the same way every time and measures the same part of the same song, so that
+two builds, or the two editions, can be compared. It is the route of this section as a script: the keys go through
+`tools/ws8/keyfifo`, and each waits for the screen it belongs to, by the `menu:` and `song:` lines that
+[rearmed-mods](https://github.com/glebb/rearmed-mods) logs with `RS_MODS_LOG=1`. A screen it doesn't know stops the run.
+
+```bash
+tools/perf/run.py CONFIG OUT                         # a warm-up and three measured runs of each edition, in turn
+tools/perf/run.py CONFIG OUT --editions mac --rounds 1 --no-warmup
+tools/perf/run.py CONFIG OUT --route-only            # to the note highway and out, with snapshots
+tools/perf/run.py CONFIG OUT --profile-keys bench    # once: the profile's settings (below)
+tools/perf/report.py OUT [--against OTHER_OUT]       # the table, and the change from another set of runs
+```
+
+`CONFIG` is a JSON file of your own test installs (`tools/perf/example.json`): for each edition the executable, its
+folder, its `Rocksmith.ini`, its mods and its network guard, and for both the profile folder, the mods' `RSMods.ini`,
+switches and the helper processes to count. Test installs only: a run writes `Rocksmith.ini`, and refuses the installed
+game's folder.
+
+What is the same in every run, in both editions:
+
+- **The Mac**: on mains power, Low Power Mode off, no heat limit, a load under 3, no other game and no build, the
+  built-in screen as the main display. A run refuses otherwise (`--force` runs and says so in its result), and waits
+  between runs until the load is down. Leave the Mac alone during a run: the game pauses when another app takes the
+  focus, and such a run is left out of the report.
+- **The settings file**: full screen at the screen's size in points, `VisualQuality=2` (High) with post effects,
+  shadows, the high-res scope, depth of field and per-pixel lighting on, `MsaaSamples=4`, `LatencyBuffer=1`,
+  `EnableMicrophone=0`. Full screen is `Fullscreen=2` in this edition's file and `1` in Learn & Play's.
+- **The switches**: a clean environment with `RS_METAL_MSAA=4`, `RS_METAL_ANISO=16`, `RS_METAL_UPSCALE=1` and what
+  `CONFIG` adds. `RS_NETGUARD` and `RS_STEAM_KEEP_CREDENTIALS` are refused, and no key is sent before the guard's log
+  says `mode=block`.
+- **The profile**: a copy of one folder for every run, so each starts from the same progress and the folder itself
+  never changes. Its settings are made once, with `--profile-keys`: the keys from the main menu, then out to the title,
+  which saves it; the folder it leaves, `OUT/<edition>-profile/steam`, is the next `"profile"`. `bench` is INPUT to
+  DIRECT CONNECT (Ctrl, Down, Right four times) and Venue Mode on (Space for Tools, Down three times to OPTIONS,
+  Return, Down three times to ADV DISPLAY SETTINGS, Return, Down three times to VENUE MODE, Return opens it, Return
+  ticks it, Esc). A setting opened this way is a tick box: Return turns it over, so start from a profile where it is
+  off, and look at the run's snapshots. A menu keeps its cursor, so visit each menu once in a run. The other two that
+  count: Tools, DIFFICULTY SETTINGS, OVERRIDE TO MAX (every arrangement at its full difficulty, no levelling), and
+  OPTIONS, PLAY SETTINGS, MASTER MODE.
+- **The mods**: the same libraries and the same `RSMods.ini` for both, Song Stems among them; the report lists what
+  differed.
+- **The song**: Cherub Rock by the search (`/` here, Shift in Learn & Play, then `cher` and Down until the log says
+  `song: CherubRock`), Play Song, Skip Tuner and its "continue". The window is 150 s from 45 s after
+  `menu: LearnASong_Game`.
+
+What is measured over the window: the frame intervals (`RS_GL_FRAMETIMES`: rate, median, p95, p99, worst, frames over
+20, 33 and 50 ms, and this edition's game frame), the game's CPU and each thread's (from `libproc`, exact, with no
+sampler stopping the game), the helpers' CPU, the memory footprint and its growth, and the GPU's utilisation (`ioreg`,
+the whole system's). `OUT/<edition>-<n>/result.json` has them with what the run was: the commit, the executable's and
+the mods' hashes, the settings and the display.
+
+Checked 2026-11-10 on an M2 MacBook Air's own screen (1470x956 points, 60 Hz), test builds of both editions, a
+profile on DIRECT CONNECT with the Mac's microphone, one run each with a 60 s window: both reached the highway and
+gave a table. With 2,300 archives in `dlc` the main menu took no key for about 20 s after it came up (the song list
+is still being made), so the first key there is pressed until the screen changes. A click in another app during a run
+paused the game (`menu: LearnASong_Pause`), and the run was left out as it should be. Not looked at yet: that the venue
+shows with no guitar played, and a run on an external display.
 
 ### Shaders of a run
 

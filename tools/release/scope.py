@@ -32,6 +32,7 @@ BOTH = (MAC, LP)
 #   ctest  a CTest pattern (-R) of the root CMake build, which check.py brings up to date first.
 SUITES = {
     "release":       ("the release tools", "cmd", "{py} tools/release/test_release.py"),
+    "perf":          ("the measuring tools", "cmd", "{py} tools/perf/test_perf.py"),
     "gamefiles":     ("the game-file copy", "cmd", "{py} tools/play-native/test_gamefiles.py"),
     "cache_overlay": ("the menu overlay", "cmd", "{py} tools/play-native/test_cache_overlay.py"),
     "settings":      ("settings.env", "cmd", "{py} tools/play-native/test_settings.py"),
@@ -94,6 +95,7 @@ RULES = {
     "CONTRIBUTING.md": NOTHING, "LICENSE": NOTHING, "THIRD_PARTY_NOTICES.md": NOTHING, "VERSION": NOTHING,
     ".github/": NOTHING, ".claude/": NOTHING, ".gitignore": NOTHING, "requirements.txt": NOTHING,
     "tools/release/": rule(suites=["release"]),
+    "tools/perf/": rule(suites=["perf"]),
     "tools/ws8/keyfifo/": NOTHING,
     "tools/loadscreen/": NOTHING,
 

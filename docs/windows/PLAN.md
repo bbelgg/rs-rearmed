@@ -117,6 +117,8 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 - The checks the Mac port has had that are left: long sessions, and guitar latency against it.
 
+**Measured runs:** what is left of `tools/perf` is in the [Mac plan](../mac/PLAN.md#next-work), for both editions.
+
 **Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the

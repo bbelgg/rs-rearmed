@@ -34,6 +34,8 @@ haven't been measured here.
 - **Hot spots of every thread**: `xcrun xctrace record --template 'Time Profiler' --attach PID --time-limit 15s`, then `xctrace export` of
   the `time-profile` table. `sample` shows the audio threads idle (the Wwise thread at 2 of 1,093 samples when it uses 10% of a core), so its
   figures for them are not usable.
+- **From 2026-11-10** the runs are `tools/perf/run.py`'s ([TESTING.md](TESTING.md#measured-runs)), as the
+  [Mac edition's](../mac/PERFORMANCE.md#method): the tables below were made by hand before it.
 - **Noise**: the same configuration measured 69.0, 69.0, 69.5, 70.1% (as merged) and 52.4, 52.5%
   (after the first fix): about +-1 point of a core between runs. Differences under 2 points are
   not results.
@@ -184,6 +186,34 @@ prepares its shaders now, and [Shader preparation](#shader-preparation) has its 
 Against the numbers above: 48% of a core at 60 fps (8.0 ms a frame, another song, no memory order) is now 63% at 75 fps (8.4 ms
 a frame). Footprint is 1.28-1.36 GB against 1.05 GB before, at a larger picture and with the memory order. Not done: the
 memory order's cost at this frame rate ([Memory order](#memory-order)).
+
+## Measured runs for 1.13.0
+
+2026-11-10, `tools/perf/run.py` ([TESTING.md](TESTING.md#measured-runs)): three runs of each edition in turn after a warm-up of each, an Apple M2 MacBook Air (16 GB,
+macOS 27) on its own screen, full screen at 1470x956 points and 60 Hz with MetalFX upscaling and 4x MSAA. Builds of the code that 1.13.0 has (Learn & Play's from the
+7-string branch before its last commits, which were for the Mac edition), rearmed-mods 0.11.0 with the same `RSMods.ini` in both, Song Stems on. `VisualQuality=2`
+with every effect on, `LatencyBuffer=1`, Venue Mode on, 147 and 150 archives in `dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's
+microphone and no guitar; 150 s from 45 s after the note highway came up, about 9,000 frames a run.
+
+| Song | Mac | Learn & Play |
+|---|---|---|
+| Frame rate | 59.9-60.0 | 59.9-60.0 |
+| Frame interval, median | 16.61-16.64 ms | 16.66-16.67 ms |
+| p95 | 18.7-18.9 ms | 17.3-17.4 ms |
+| p99 | 19.4-19.7 ms | 17.7-17.8 ms |
+| Frames over 20 ms | 27, 38, 62 | 10, 12, 13 |
+| Frames over 50 ms | 0-1 | 0-1 |
+| Game frame, median | 4.22-4.33 ms | not logged |
+| CPU (% of a core) | 41.7, 43.1, 43.1 | 52.0, 52.8, 53.6 |
+| CPU per frame | 6.97-7.18 ms | 8.66-8.93 ms |
+| game thread | 26.7-27.7 | 32.6-33.3 |
+| Wwise thread | 5.8 | 7.2-7.5 |
+| note detection | 2.5-2.7 | 5.8-6.3 |
+| GPU | 89% | 90% |
+| Footprint | 1.22-1.23 GB | 1.51-1.52 GB |
+
+What it says is in the [Mac edition's](../mac/PERFORMANCE.md#measured-runs-for-1130): 10 points of a core and 0.29 GB over the Mac edition, with the steadier frames.
+The threads are `w32 game`, `w32 thread 1a823c0` (Wwise) and `w32 thread 149ab10` (note detection).
 
 ## Hook points
 

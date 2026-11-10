@@ -28,6 +28,9 @@ CPU; with them the GPU hasn't been measured (`RS_METAL_MSAA=1 RS_METAL_ANISO=1` 
   `time-profile` table, as in [Windows](../windows/PERFORMANCE.md#method). Shares within a thread are usable. A thread's total is not, for the audio threads:
   the Wwise thread wakes every 5.33 ms for a burst shorter than the 1 ms between samples, and one trace had it at 2.6% where `ps -M` had 5.7% over the 90 s
   just before ([Learn & Play's route](#learn--plays-route)). Take a thread's CPU from `ps -M`.
+- **From 2026-11-10** the runs are `tools/perf/run.py`'s ([TESTING.md](TESTING.md#measured-runs)): one script for both editions, on the Mac's own
+  screen, with the settings, profile, mods and song pinned and the Mac's state checked first. The tables below were made by hand before it, each
+  on the setup its text gives, so they compare within a table and not with each other.
 - **Noise**: as in [Windows](../windows/PERFORMANCE.md#method), about +-1 point of a core between runs of one build. Differences under 2 points are not results.
 
 ## Results
@@ -133,6 +136,36 @@ So with the shaders prepared at install the Mac's first play has one 0.6 s stall
 Play's first play was what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
 in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first. Learn & Play
 prepares its shaders now too, in 16.5 s: [its numbers](../windows/PERFORMANCE.md#shader-preparation).
+
+## Measured runs for 1.13.0
+
+2026-11-10, `tools/perf/run.py` ([TESTING.md](TESTING.md#measured-runs)): three runs of each edition in turn after a warm-up of each, an Apple M2 MacBook Air (16 GB,
+macOS 27) on its own screen, full screen at 1470x956 points and 60 Hz with MetalFX upscaling and 4x MSAA. Builds of the code that 1.13.0 has (Learn & Play's from the
+7-string branch before its last commits, which were for the Mac edition), rearmed-mods 0.11.0 with the same `RSMods.ini` in both, Song Stems on. `VisualQuality=2`
+with every effect on, `LatencyBuffer=1`, Venue Mode on, 147 and 150 archives in `dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's
+microphone and no guitar; 150 s from 45 s after the note highway came up, about 9,000 frames a run.
+
+| Song | Mac | Learn & Play |
+|---|---|---|
+| Frame rate | 59.9-60.0 | 59.9-60.0 |
+| Frame interval, median | 16.61-16.64 ms | 16.66-16.67 ms |
+| p95 | 18.7-18.9 ms | 17.3-17.4 ms |
+| p99 | 19.4-19.7 ms | 17.7-17.8 ms |
+| Frames over 20 ms | 27, 38, 62 | 10, 12, 13 |
+| Frames over 50 ms | 0-1 | 0-1 |
+| Game frame, median | 4.22-4.33 ms | not logged |
+| CPU (% of a core) | 41.7, 43.1, 43.1 | 52.0, 52.8, 53.6 |
+| CPU per frame | 6.97-7.18 ms | 8.66-8.93 ms |
+| game thread | 26.7-27.7 | 32.6-33.3 |
+| Wwise thread | 5.8 | 7.2-7.5 |
+| note detection | 2.5-2.7 | 5.8-6.3 |
+| GPU | 89% | 90% |
+| Footprint | 1.22-1.23 GB | 1.51-1.52 GB |
+
+Learn & Play takes 10 points of a core more than this edition, 1.7 ms a frame, and 0.29 GB more memory; its frames are the steadier ones (p99 17.7 ms against
+19.4-19.7, and a third as many over 20 ms). The GPU is near its limit on this screen at these settings in both, where the 75 Hz display at 1x had it at 56-57%
+([Final pass](#final-pass-for-140)). One frame of about 0.36 s came in one run of each edition. The stems helper used no CPU: the song's backing track was in its cache from
+the warm-up. Not looked at: whether the venue showed, with no notes played.
 
 ## Learn & Play's route
 

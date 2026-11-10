@@ -24,6 +24,7 @@ where you point them and never copied into the repository.
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export over 3,000-5,500 inputs each (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
+| Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#measured-runs)): frame-time statistics, the settings file's pins, the report |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): what a change calls for, and a release's edits and notes |
 | Tables | `python3 tools/targets/check.py` | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
 | Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
@@ -468,6 +469,24 @@ twice; Esc, Down, Return leaves), GUITARCADE, MULTIPLAYER (the second profile, C
 "It sounds like Player 2's cable is unplugged"), TONE DESIGNER (Return on EDIT TONE), SHOP. A finished song shows
 notices that each take Return, and a Return too many starts the next song. Esc from the main menu, Return on "Yes, quit",
 Esc on the title, Return on EXIT GAME: the game's own Exit.
+
+### Measured runs
+
+`tools/perf/run.py` measures this edition and the Mac edition the same way: the same settings file, profile, mods,
+song and window, and one report with a column for each. It is described once, in
+[Mac testing](../mac/TESTING.md#measured-runs). What differs here:
+
+- The edition's entry in `CONFIG` names a build's `out/rs2014_lp`, and `LP_GAME_DIR` and `LP_USER_DIR` in its `env`;
+  its `Rocksmith.ini` is `userdata/game/Rocksmith.ini`, where full screen is `Fullscreen=1`.
+- The keys are keyfifo's, not `LP_INPUT_SCRIPT`'s, so that both editions get the same route from the same script;
+  Ctrl and Shift go as `lpctrl` and `lpshift`.
+- The network guard comes with the mods ([Game runs](#game-runs)): a run stops if the log says the mods were not
+  loaded.
+- The frame times have no game-frame events here, so that row of the report is empty; the threads have their names
+  (`w32 game`, `w32 thread <start address>`).
+
+Checked 2026-11-10 with the Mac edition's run: one run to the highway and a 60 s window. That run was this build's
+first play of the song on that screen, and had one stall of 0.3 s in the window: the warm-up run is there for it.
 
 ### Shaders of a run
 

@@ -1,0 +1,46 @@
+{
+  "_": "A copy of this with your own test installs' paths is run.py's CONFIG. Keys that start with _ are notes.",
+
+  "profile": "/path/to/a/steam/folder/with/one/test/profile",
+  "_profile": "Copied for every run, so each starts from the same progress. Its INPUT setting is DIRECT CONNECT.",
+
+  "guitar_input": "/path/to/guitar-input.ini",
+  "_guitar_input": "Optional: the same input device, channel and gain for both editions (RS_AUDIO_INPUT_FILE).",
+
+  "song": "CherubRock",
+  "search": "cher",
+  "settle": 45,
+  "window": 150,
+
+  "helpers": ["rs-stems"],
+  "_helpers": "Processes beside the game whose CPU is counted too, by name.",
+
+  "env": {"RS_STEMS_HOME": "/path/to/the/stems/helper", "RS_STEMS_CACHE": "/path/to/a/stems/cache"},
+  "_env": "Switches for both editions, on top of run.py's ENV_PINS.",
+
+  "mods_settings": "/path/to/RSMods.ini",
+  "_mods_settings": "Optional: copied to each edition's \"mods_settings\" before a run, so the mods have the same switches.",
+
+  "ini": {"Renderer": {"VisualQuality": 1}},
+  "_ini": "Rocksmith.ini keys for both editions, on top of run.py's INI_PINS.",
+
+  "editions": {
+    "mac": {
+      "exe": "/path/to/test-home/game/Rocksmith2014.app/Contents/MacOS/Rocksmith2014",
+      "cwd": "/path/to/test-home/game",
+      "ini": "/path/to/test-home/game/Rocksmith.ini",
+      "mods": "/path/to/test-home/mods",
+      "mods_settings": "/path/to/test-home/game/RSMods.ini",
+      "insert": ["/path/to/test-home/libnetguard.dylib"],
+      "env": {"RS_STEAM_MODE": "stub", "RS_NATIVE_HOME": "/path/to/test-home"}
+    },
+    "lp": {
+      "exe": "/path/to/lp-build/out/rs2014_lp",
+      "cwd": "/path/to/lp-test-home/game",
+      "ini": "/path/to/lp-test-home/userdata/game/Rocksmith.ini",
+      "mods": "/path/to/lp-test-home/mods",
+      "mods_settings": "/path/to/lp-test-home/game/RSMods.ini",
+      "env": {"LP_GAME_DIR": "/path/to/lp-test-home/game", "LP_USER_DIR": "/path/to/lp-test-home/userdata"}
+    }
+  }
+}

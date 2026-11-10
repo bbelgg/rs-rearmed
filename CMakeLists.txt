@@ -86,4 +86,6 @@ if(Python3_FOUND)
   add_test(NAME play-native.settings COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_settings.py)
   # The release tools (tools/release): what a change calls for, and a release's edits, on made-up trees.
   add_test(NAME release.tools COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/release/test_release.py)
+  # The measuring tools (tools/perf): frame-time statistics, the settings file's pins, the report.
+  add_test(NAME perf.tools COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/perf/test_perf.py)
 endif()

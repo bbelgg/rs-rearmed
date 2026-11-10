@@ -389,6 +389,10 @@ a build that is not installed, wrap the binary in a small `.app` (an `Info.plist
 `CFBundleExecutable` the binary, `LSEnvironment` for `LP_GAME_DIR`, `LP_USER_DIR` and other variables, the
 runtime library next to it).
 
+The full-screen keys are pressed as on the Mac ([Mac testing](../mac/TESTING.md#by-hand-and-with-computer-use)),
+with the process `rs2014_lp`: at the title each of Control-Command-F and Shift-Command-F went from the game's
+full screen to a window of the screen's shape and back, with `lp: window macOS:` lines in the log.
+
 - **An interface's channel and gain**, as on the Mac ([Mac testing](../mac/TESTING.md#by-hand-and-with-computer-use)),
   with `RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log has `guitar input "<device>": channel N, gain G dB`
   when the capture stream opens, `input level:` for each level set, and a peak for each open input every five

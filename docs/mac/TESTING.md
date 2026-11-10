@@ -340,6 +340,11 @@ the user's alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-
 
 - **By hand**: menus, a song, Session Mode, lessons, Guitarcade, full screen and back, quitting; on both
   renderers. The keys are in [INSTALL.md](INSTALL.md#playing).
+- **The full-screen keys**, without a person: System Events brings the game to the front and types the key,
+  and the window's frame says what happened (`osascript -e 'tell application "System Events" to keystroke "f"
+  using {control down, command down}'`, then `get {position, size} of window 1` of the process `Rocksmith2014`).
+  At the title each of Control-Command-F and Shift-Command-F went from the screen's size to a 1280x720 window
+  and back.
 - **An interface's channel and gain**: `RS_AUDIO_LOG=1` with a `guitar-input.ini` (`RS_AUDIO_INPUT_FILE` for a
   test one). INPUT to DIRECT CONNECT, the interface from the list, the calibration, then play: the log has
   `listening to channel N of M` for each entry taken, `input level:` for each level set, and a peak every five

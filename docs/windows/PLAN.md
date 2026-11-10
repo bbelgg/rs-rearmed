@@ -109,8 +109,8 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   no converter and will not get one.
 - **The fixes from the code review of 2026-11-09** (not released) were run in their suites and in one song: a thread
   that ends gives its stack, TEB and TLS blocks to the next, a guest path that starts with `/` is a host path only
-  inside the game's own folders, and `HeapAlloc` clears a block it uses again. A long session, where the reused blocks
-  matter, has not been played. What the shared code got from the same review is in the
+  inside the game's own folders, and `HeapAlloc` clears a block it uses again. Played with a guitar since, four songs in Learn a Song with no fault; a long
+  session, where the reused blocks matter, has not been played. What the shared code got from the same review is in the
   [Mac plan](../mac/PLAN.md#open-issues).
 - D3DX paths not exercised yet: `D3DXCreateEffectCompiler`, `D3DXCreateTextureFromFileExA`, the cube and
   volume loaders, `D3DXSaveSurfaceToFileInMemory`, effects with textures.
@@ -123,7 +123,7 @@ Being looked into, with no promise of if or when:
 
 - **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
 - **Note detection** (not released): one more of its loops runs relaxed, about 1.6 points of a core less in a song
-  ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); to be played with a guitar before a release. What is
+  ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); played with a guitar, four songs in Learn a Song. What is
   left on that thread is its own work, or is not safe to relax.
 - **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note
   detection and the Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time

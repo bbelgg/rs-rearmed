@@ -12,8 +12,8 @@ into the notes as it stands. -->
   guard when its app is started directly and not through the launcher, and the launcher forcing the game's offline
   settings when there is no `Rocksmith.ini` yet. Both games have been run on this code started the usual way. If the
   game doesn't start after updating, `logs/last-run.log` says why; please open an issue with it.
-- **Played once each:** the fixes from the code review of 2026-11-09 that this release adds were run in one song of
-  each game, not in a long session or in every mode. If the game misbehaves after updating, `logs/last-run.log`
+- **Played briefly:** the fixes from the code review of 2026-11-09 that this release adds were played with a guitar
+  for a few songs in each game, not in a long session or in every mode. If the game misbehaves after updating, `logs/last-run.log`
   says why; please open an issue with it.
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
   in `guitar-input.ini` makes an interface one entry, which leaves room.

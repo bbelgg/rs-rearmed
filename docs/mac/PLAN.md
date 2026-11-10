@@ -81,7 +81,8 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   its pipeline key while nothing it is made of has changed (not released), but the game sets vertex state or the
   program before every draw, so no draw keeps one until the marks compare values.
 - **The fixes from the code review of 2026-11-09** (not released) were run in their suites and in one song of each
-  edition, with the numbers unchanged. A long session has not been played on them.
+  edition, with the numbers unchanged. Played with a guitar since, six songs with no fault; a long session has
+  not been played on them.
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the Retina
   mouse in songs, and a fresh player's first answer to macOS's question about another disk.
 - The installer keeps its preferences in the user's defaults even when run with a test `HOME`

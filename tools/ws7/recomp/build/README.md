@@ -10,10 +10,10 @@ Run alone: generated C in `analysis/ws7/recomp/gen` (large; may be a symlink to 
 `libgame_rc.a` in `analysis/ws7/recomp/obj`. Override with `RC_GEN_DIR`, `RC_OBJ_DIR`; `app/build-m4.sh` sets them to
 `gen` and `obj` in its build folder.
 Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC_TSO`, `RC_IMAGE`, `RC_PY`, `RS_NINJA`,
-`RC_SMOKE` (`0` skips the smoke test).
+`RC_SMOKE` (`0` skips the smoke test), `RC_TARGET` (default `mac-x64`).
 
 - `optflags.sh` -- the optimisation switches every build script sources: `RC_LTO=thin` (TUs, runtime,
-  thunks and overrides as bitcode; ThinLTO at the app link with `-Wl,-cache_path_lto`, `RC_LTO_JOBS`
+  thunks and overrides as bitcode; ThinLTO at the app link with `-Wl,-cache_path_lto` (`RC_LTO_CACHE`), `RC_LTO_JOBS`
   threads, at `RC_OPT`), `RC_PGO=gen` (`-fprofile-instr-generate`; the app names the profile
   `RC_PGO_DIR/rs-%p%c.profraw`: continuous mode, because the game ends with `_exit`, which skips the
   profile writer), `RC_PGO=use:FILE` (`-fprofile-instr-use`; the profile is an implicit ninja input).
@@ -24,7 +24,10 @@ Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC
 - `gen_image.py` -- parallel translation, TU chunking by instruction count (`--chunk-insns`),
   stubs for rejected functions, `decls.h`, `table.c`, `manifest.json`, `build.ninja`.
   `--skip FILE` (repeatable): `ADDR` = override provides `F_ADDR` (stays in `rc_table`);
-  `ADDR drop` = not generated, not in the table. `--o1 FILE`: functions compiled alone at -O1.
+  `ADDR drop` = not generated, not in the table; `ADDR wrap` = a hook point (`W_ADDR`, with a generated
+  `F_ADDR` that runs the hooks). `--o1 FILE`: functions compiled alone at -O1. `--only LO-HI`: that
+  address range alone (experiments). `--target ID`: the game's tables (`tools/targets`), its edits and mid
+  points, and a check of the image against `target.toml`.
   `--tso-ranges FILE`: TUs in those ranges get `-DRC_MO_TSO` (`RC_TSO`; default: the whole image).
   Two kinds of access stay unfenced inside them: RIP-relative loads from sections nothing writes after
   the image is loaded (`RC_LDC`), and the functions listed in `tools/targets/names/relaxed.list`, which fence only at

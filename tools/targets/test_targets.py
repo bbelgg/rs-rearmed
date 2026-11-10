@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Tests of tools/targets: the committed tables pass check.py, and check.py catches what it should.
 
-usage: python3 tools/targets/test_targets.py   (also run by ctest: targets_check)
+usage: python3 tools/targets/test_targets.py   (also run by ctest: targets.check)
 """
 import os
 import shutil

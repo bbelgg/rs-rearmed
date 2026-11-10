@@ -10,8 +10,8 @@ tests and diagnostics ([TESTING.md](../docs/windows/TESTING.md)).
 ## Architecture
 
 ```
-game image (image/lp_image.py, unpack/ or a harvest)    msvcr100 / msvcp100 / d3dx9_42 / D3DCompiler_42
-        |  gen_image_pe.py (--wrappers)                      |  gen_image_pe.py --module NAME
+game image (image/lp_image.py, unpack/ or a harvest)    msvcr100 / msvcp100 / d3dx9_42 / D3DCompiler_42 / bink2w32
+        |  gen_image_pe.py (--wrappers, --target)            |  gen_image_pe.py --module NAME
         v                                                    v
    game/obj/libgame_rc.a                           modules/NAME/obj/libgame_rc.a
         \_______________________  ________________________/
@@ -34,19 +34,24 @@ Win32 seam by name (`shims/win32_dispatch.c`).
   the build, the app bundle and the clean-up (`lp_build.py`, through `lp_install.py build`, `app-install`, `build-clean`)
 - `imports/` — the import tables (IAT slots and VMProtect wrapper sites) at link addresses
 - `build/` — `translate.sh` (the game, ~15-25 min), `build_modules.sh` (the DLLs), `build_shims.sh`,
-  `build_gl.sh` (libRSOpenGL without CMake), `build.sh` (everything, then the link)
-- `shims/` — the Win32 seam: `win32_kernel32.c` / `win32_kfile.c` / `win32_ksync.c` (kernel32),
-  `win32_user32.c`, `win32_net.c` (ws2_32, iphlpapi, wininet: offline), `win32_misc.c` (advapi32,
-  ole32, shell32, winmm, setupapi, rpcrt4, dinput8, xinput1_3, gdi32, bink2w32), `win32_d3d9.c`
-  and `d3d9/` (Direct3D 9 on libRSOpenGL), `steam/` (offline steam_api), `audio/` (WASAPI and
-  winmm on CoreAudio)
+  `build_gl.sh` (libRSOpenGL without CMake), `build.sh` (everything, then the link); `skip.txt`, the game
+  functions the seam replaces
+- `shims/` — the Win32 seam: `win32_dispatch.c` (imports by name), `win32_kernel32.c` / `win32_kfile.c` /
+  `win32_ksync.c` (kernel32), `win32_user32.c`, `win32_input.c` (keyboard and mouse from the host window),
+  `win32_net.c` (ws2_32, iphlpapi, wininet: offline), `win32_misc.c` (advapi32, ole32, shell32, winmm,
+  setupapi, rpcrt4, dinput8, xinput1_3, gdi32, bink2w32), `win32_d3d9.c` and `d3d9/` (Direct3D 9 on
+  libRSOpenGL), `win32_overrides.c` (native replacements of game functions: the built-in fixes),
+  `win32_crtmath.c` (msvcr100's math, native), `win32_frame.c` (the frame log), `steam/` (offline
+  steam_api), `audio/` (WASAPI and winmm on CoreAudio)
 - `shaders/` — the Metal shader corpus's sources: the list of programs the game links (`programs.tsv`, hashes only),
   `lp_shaders.c`, which makes their GLSL from the user's game files, and `record_programs.py`, which adds a run to the list
 - `online/` — the offline online layer: RSConnect's vtables patched at start-up (`online32.c`)
-- `app/` — `lp_main.c`: load, bind, start, run
+- `app/` — `lp_main.c`: load, bind, start, run; `lp_window.m` and `lp_screen.c` (the window and its rules),
+  `lp_settings.c` (`settings.env`)
 - `harvest/` — the one-time capture tool for a Windows PC (prebuilt, with its source)
 - `crt/`, `d3dx/`, `bink/` — the CRT, D3DX and Bink probes (the DLLs without the game)
-- `test/` — the D3D9 layer's and the window rules' host tests
+- `test/` — the D3D9 layer's and the window rules' host tests; `shims/tests`, `shims/audio/tests`,
+  `shims/steam/tests`, `online/tests` — the seam's
 
 ## Build and run
 
@@ -54,9 +59,9 @@ The installer does all of it: `tools/play-native/learn-play.sh` ([INSTALL.md](..
 `$RS_BUILD_DIR/win-x86/lp` with `lp_install.py build` and installs `~/Applications/RS Re-ARMed Learn &
 Play.app`, which reads its folders from `~/Library/Application Support/RS Re-ARMed/learn-play`
 (`LP_HOME`: `game/`, the app's own copy of the game files, `game-dir`, `userdata/`, `steam/`, `logs/`;
-`app/lp_main.c`). By hand:
+`app/lp_main.c`).
 
-Every input path is an environment variable; nothing derived from Microsoft's or the game's
+By hand, every input path is an environment variable; nothing derived from Microsoft's or the game's
 binaries is committed.
 
 ```sh

@@ -10,18 +10,16 @@ It exports the 12 symbols the game imports, plus `SteamAPI_InitSafe`,
 ```
 make          # builds build/libsteam_api.dylib and ./libsteam_api.dylib
 make check    # exports vs. the game's imports, both slices
-make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
+make test     # vtable-slot check, ABI tests (arm64, and x86_64 under Rosetta), Enumerate, mode auto
 ```
 
 ## Backends
 
-- **real**: forwards to Valve's library, which talks to the Steam client.
-  Valve doesn't need to provide an arm64 build: the Steam client already ships
-  a universal `libsteam_api.dylib` inside
+- **real**: forwards to Valve's library, which talks to the Steam client. The Steam client ships a
+  universal `libsteam_api.dylib` inside
   `Steam.AppBundle/.../Frameworks/Steam Helper.app/Contents/MacOS/`, and the shim
-  finds it automatically. That library is from a modern SDK and **no longer
-  exports `SteamAPI_Init`** (newer SDKs make it an inline wrapper), so it can't
-  be dropped in directly. The shim maps `SteamAPI_Init` onto
+  finds it. That library is from a modern SDK and **no longer exports `SteamAPI_Init`**, so it can't
+  be dropped in directly: the shim maps `SteamAPI_Init` onto
   `SteamAPI_InitSafe`, or onto `SteamInternal_SteamAPI_Init` if `InitSafe` is
   missing. The old interface version strings (`SteamUser020`, ...) are passed
   through unchanged, and the Steam client still serves them.
@@ -47,8 +45,7 @@ make test     # vtable-slot check and ABI tests, arm64 and x86_64 (Rosetta)
     the `dlcappid` entries of the appmanifest's `InstalledDepots` (Steam
     installs only DLC the account owns), and 248750, a free DLC that most
     custom songs carry (the toolkit's default). The game hides every song
-    whose archive's AppID is not owned: with only the base app owned, the
-    native build listed far fewer songs than the Steam version. When the
+    whose archive's AppID is not owned. When the
     game folder is a folder of symlinks, the appmanifest is found next to
     the real install through its `steam_appid.txt` or `static.psarc` link,
     in whichever Steam library that is (e.g. one on an external drive).
@@ -70,7 +67,8 @@ The stub also answers the Enumerate entry of the main menu (`src/enumerate.h`, s
 `DlcInstalled_t` for 248750 makes the game scan them ([DESIGN.md](../../docs/mac/DESIGN.md#built-in-fixes-and-mods)).
 
 `auto` (the default) uses real when Valve's library loads and
-`SteamAPI_Init` succeeds through it, and stub otherwise. Settings go in
+`SteamAPI_Init` succeeds through it, and stub otherwise; listeners the game
+registered before a failed `SteamAPI_Init` are the stub's from then on. Settings go in
 `steam_shim.ini` (in `.rearmed/` next to the app bundle, or inside the bundle
 next to `libsteam_api.dylib`), or in `RS_STEAM_*` environment variables (see
 [steam_shim.ini.example](steam_shim.ini.example)).

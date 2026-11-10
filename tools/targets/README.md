@@ -8,14 +8,15 @@ tree uses names only, so the same source builds for every target
 ```
 tools/targets/
   mac-x64/           the macOS game (Steam, x86-64 Mach-O)
-    target.toml      identity of the image (SHA-256), front end, ABI, image layout
+    target.toml      identity of the image (SHA-256), front end, ABI, image layout; flat `key = value` lines
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
     edits.map        GROUP  ADDRESS  LEN:CHECK  EDIT        instructions a mod can switch to others (below)
     mids.map         NAME  ADDRESS  (VALUES) [-> CONTS]      mid points: a mod's hook before one instruction (below)
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 987 of 1,178 symbols read, the rest `unsupported`
-                     with the reason; target.toml also has the install pins
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,042 of 1,250 symbols read, the rest
+                     `unsupported` with the reason; target.toml also has the install pins (the depot, the exe, Microsoft's DLLs)
+    relaxed.map      ADDRESS [+calls] WHY                   relaxed functions relaxed.list doesn't name (xlat/relaxed.py)
   names/             shared by every target
     overrides/*.list the functions each override module replaces
     hooks.list       hook points (the names mods use with rc_hook_add_name)
@@ -25,7 +26,8 @@ tools/targets/
     relaxed.list     functions the translator emits without per-access fences (xlat/relaxed.py)
     edits.list       edit groups (rc_edit_enable), mids.list mid points (rc_mid_add_name)
   targets.py         reads the tables; `gen` writes what one build needs
-  check.py           every name resolves in every target (ctest: targets.check)
+  check.py           every name resolves in every target
+  test_targets.py    check.py on the committed tables, and that it catches what it should (ctest: targets.check)
 ```
 
 A map line `NAME unsupported REASON` says a target has no counterpart: an override or hook point is then
@@ -56,7 +58,7 @@ sources too.
 The runtime shows a hook the Mac's SysV call whatever the game's convention
 ([docs/recompiler](../../docs/recompiler/README.md#overrides-and-hook-points)), and goes by the prototype in
 `symbols.map`, so a hook point's prototype has to be right (`targets.py hook_abi`; `check.py` fails on one it
-can't read). A hook point of a name is the Mac's call on every target. `hook_abi` compares the two prototypes:
+can't read). `hook_abi` compares it with the Mac's:
 the same arguments in the same order, the same kind of result, an integer's width aside. What differs is adapted
 in the prototype, or hooks on that point are refused at run time, with both prototypes in the log line. The forms
 only hook points need:
@@ -75,7 +77,7 @@ A map line `unsupported` on a point can still run: the platform layer takes it w
 
 A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose stack
 arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments, so no check
-stands behind those prototypes: 7 of the 13 points on `win-x86`.
+stands behind those prototypes: 9 of the 16 points `win-x86` has.
 
 ## Edits and mid points
 
@@ -88,13 +90,13 @@ target they build (`gen_image.py`, `gen_image_pe.py --target`); an entry that do
 # digits of their SHA-256: the table holds no bytes of the game, the translator reads them from the image), and the
 # edit: patches inside the range (+OFFSET=HEX, the same length), or =HEX, instructions in place of the whole range (any
 # length, decoded from its address; flow goes on at the range's end). A note after # says what it is.
-seven_string   0x00f8cce5  6:3fa2910c  +2=6402          # FretGrid row stride 0x1cc -> 0x264
-seven_string   0x00f8d102  2:9b01e4c7  =9090            # the branch taken out
+seven_string   0x00f8cce5  6:a37c44af  +2=6402          # a row stride 0x1cc -> 0x264
+seven_string   0x01113e9a  2:92858753  =68b0000000      # a size pushed, 0x40 -> 0xb0: a longer instruction
 other_group    unsupported REASON                        # a group this target has no edits for
 
 # mids.map: the point (names/mids.list), where (before that instruction), its values by type, name and place, and
 # where it may go on instead (instructions of the same function)
-tuner_select   0x00f30135  (int submode@edi, int string@[ebp+0xc]) -> skip=0x00f3013a
+seven_gke      0x01117711  (void *profile@esi, void *other@edi) -> differ=0x01117928
 other_point    none REASON                               # this target needs no call at that moment
 third_point    unsupported REASON                        # this target has no such moment found
 ```
@@ -110,13 +112,11 @@ guest), or memory at a general register plus an offset (`[esp+0x18]`); its type 
 `uint8_t`, `float`, `double`, a pointer, ...). The same name on two targets should have the same values and
 continuations, so one mod reads both.
 
-Three things the Mac's tables taught. A code address a hook reads at a point (a return address at `[rsp]`, say) is
+Three rules from the Mac's tables. A code address a hook reads at a point (a return address at `[rsp]`, say) is
 where the image is mapped on the Mac, the image address in Learn & Play: compare it with the mapped address (`RC_A`),
-not the table's. A patch keeps every instruction's length, so a displacement that outgrows its byte (a disp8
-that has to become a disp32) needs `=HEX`, the whole instruction replaced. And where clang unrolled a six-string loop
-that Learn & Play's edits lengthen, there is no count to edit: the Mac needs a mid point of its own that does the
-extra strings, `none` on Learn & Play. Of Learn & Play's 29 `none`, most are such points; the rest stand where the Mac
-inlines a function or calls it from another place.
+not the table's. A patch keeps every instruction's length, so a displacement that outgrows its byte needs `=HEX`,
+the whole instruction replaced. And where clang unrolled a six-string loop that Learn & Play's edits lengthen, there
+is no count to edit: the Mac needs a mid point of its own that does the extra strings, `none` on Learn & Play.
 
 ## Adding a game function, global or field
 

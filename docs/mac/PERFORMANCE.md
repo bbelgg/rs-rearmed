@@ -1,180 +1,50 @@
 # Performance of the Mac port
 
-Measurements of the native build, all on one Mac: Apple M2 (4 performance and 4 efficiency cores), a 75 Hz
-external display and the built-in 60 Hz Retina screen. The Windows port's measurements:
+Measurements of the native build, all on one Mac: an Apple M2 MacBook Air (4 performance and 4 efficiency cores, 16 GB,
+macOS 27), on its own 60 Hz Retina screen or a 75 Hz 2560x1440 external display. The Windows port's:
 [Windows performance](../windows/PERFORMANCE.md).
 
 ## Summary
 
-In a song the native build holds the display's rate at 44% of a core (74.9 fps on a 75 Hz display,
-[Final pass](#final-pass-for-140)); on the Mac's own 60 Hz screen at 42-43%, where the original game under Rosetta takes 51% ([Against Rosetta](#against-rosetta)). It renders at the
-display's refresh rate, so a 75 Hz or 120 Hz display gets 75 or 120 fps (`RS_FPS=N` fixes a rate). Metal uses about 5%
-less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little. The figures here predate 4x MSAA and 16x
-anisotropic filtering (on by default since 2026-11-08, [METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)), which cost mostly GPU time rather than
-CPU; with them the GPU hasn't been measured (`RS_METAL_MSAA=1 RS_METAL_ANISO=1` is the setting these were taken at).
+The current figures are the [measured runs](#measured-runs-for-1130) of 2026-11-10 on 1.13.0's code: a song, full screen on
+the Mac's own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods loaded.
+
+| Song | Mac | |
+|---|---|---|
+| Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Final pass](#final-pass-for-140)). `RS_FPS=N` fixes a rate |
+| CPU | 41.7-43.1% of a core, 6.97-7.18 ms a frame | game thread 26.7-27.7, Wwise 5.8, note detection 2.5-2.7 |
+| Memory footprint | 1.22-1.23 GB | 0.80-0.81 GB on 2026-11-04, on a 1x display before MSAA and upscaling, without mods |
+| GPU | about 9.7 ms of work a frame, 58% of a 60 Hz refresh | a quarter of it the upscaler |
+
+- **Against the original under Rosetta**: about a sixth less CPU (the original 51.0% of a core and 0.93 GB), with a better
+  picture and half the audio buffer ([Against Rosetta](#against-rosetta)).
+- **Against Learn & Play**: Learn & Play takes 10 points of a core more, 1.7 ms a frame, and 0.29 GB more
+  ([Against the Windows port](#against-the-windows-port)).
+- **Metal against OpenGL**: about 5% less CPU per frame ([Renderer](#renderer), measured before 1.4.0).
+- The compiler switches (ThinLTO, PGO, `-O3`) change little ([Build options](#build-options)).
 
 ## Method
 
-- A test install separate from the user's (the installed game untouched), driven by an input script and a
-  virtual audio cable playing a recording into the Real Tone input: menu, a song, about a minute of play.
-  The input injector, the virtual cable and the scripts that run and measure these are not in this
-  repository ([TESTING.md](TESTING.md#game-runs)).
-- CPU: the game process' CPU time over a fixed window of the song, in seconds per second (1.0 = one core).
-  Builds alternated, each measured more than once.
-- Frame times: `RS_GL_FRAMETIMES=FILE` (one line per frame); snapshot runs (`RS_GL_SNAPSHOT_DIR`) excluded,
-  since each snapshot is a synchronous readback of about 70 ms.
-- Rosetta: the original game under Rosetta on the same Mac, over a scripted song.
-- **Hot spots of every thread**: `xcrun xctrace record --template 'Time Profiler' --attach PID --time-limit 20s`, then `xctrace export` of the
-  `time-profile` table, as in [Windows](../windows/PERFORMANCE.md#method). Shares within a thread are usable. A thread's total is not, for the audio threads:
-  the Wwise thread wakes every 5.33 ms for a burst shorter than the 1 ms between samples, and one trace had it at 2.6% where `ps -M` had 5.7% over the 90 s
-  just before ([Learn & Play's route](#learn--plays-route)). Take a thread's CPU from `ps -M`.
-- **From 2026-11-10** the runs are `tools/perf/run.py`'s ([TESTING.md](TESTING.md#measured-runs)): one script for both editions, on the Mac's own
-  screen, with the settings, profile, mods and song pinned and the Mac's state checked first. The tables below were made by hand before it, each
-  on the setup its text gives, so they compare within a table and not with each other.
-- **Noise**: as in [Windows](../windows/PERFORMANCE.md#method), about +-1 point of a core between runs of one build. Differences under 2 points are not results.
-
-## Results
-
-### Against Rosetta
-
-2026-11-10, the original game under Rosetta beside the [measured runs](#measured-runs-for-1130) of both editions: the same Mac and screen, Cherub Rock, 150 s
-from about 45 s into the song, one run.
-
-| Song | Original under Rosetta | Mac | Learn & Play |
-|---|---|---|---|
-| Frame rate | 59.95 | 59.9-60.0 | 59.9-60.0 |
-| CPU (% of a core) | 51.0 | 41.7-43.1 | 52.0-53.6 |
-| CPU per frame | 8.5 ms | 6.97-7.18 ms | 8.66-8.93 ms |
-| the frame's thread | 35.1 | 26.7-27.7 | 32.6-33.3 |
-| note detection | 1.9 | 2.5-2.7 | 5.8-6.3 |
-| Frames handed over more than 33 ms apart | 8 | 0-3 | 0-1 |
-| Footprint | 0.93 GB | 1.22-1.23 GB | 1.51-1.52 GB |
-
-So the Mac edition takes about a sixth less processor time than the original under Rosetta and Learn & Play about the same, each while doing more for the picture and
-the sound than the original does. What was not the same:
-
-- **The picture.** All three draw 1470x956, the screen's size in points, with the game's High quality and every effect on. The original draws through Apple's OpenGL and
-  the screen scales the frame up; the editions draw through Metal with 4x MSAA on the 3D picture, 16x anisotropic filtering and MetalFX upscaling to the screen's
-  2940x1912 pixels, about a quarter of their GPU time ([where it goes](#measured-runs-for-1130)). The original's GPU read 68% and the editions' 89-90%; neither is the
-  GPU's work at a fixed frame rate.
-- **The audio engine.** The original ran at `LatencyBuffer=2`: at 1 it does not hold on this Mac. The editions ran at 1, half the output buffer.
-- **Mods.** The original has none. The editions ran rearmed-mods with Song Stems and the rest of the maintainer's settings.
-- **The songs.** The original's copy had the game's own songs and Cherub Rock's archive; the editions had 147 and 150 archives in `dlc`, which is part of their memory.
-- **Input.** The same profile, whose INPUT is DIRECT CONNECT, a value the original has no name for. Its tuner came up and its note detection ran (1.9 points of a core),
-  on which input was not looked at. No guitar was played in any of the runs.
-- **How it was run.** The original is the clean download's own binary, decrypted (`tools/steamless/decrypt.py`), started directly with the offline Steam layer on a copy
-  of the profile and the network guard, which refused its one lookup of a Ubisoft host. Its keys were timed by hand, so its window starts within a few seconds of where
-  the editions' does. Its frame times are the calls of `flushBuffer` (a spy library, `libglspy`), not what the screen got.
-
-The venue was up in the original's song with no note played.
-
-Before the editions had this script, measured before Metal existed (the exact figures were not kept in this repository):
-
-| Song | CPU |
-|---|---|
-| original under Rosetta | about half a core at 60 fps |
-| native, OpenGL, 60 fps | about the same, a little less on average |
-
-The latency figures are the other difference: the native build runs the output device at 256 frames
-instead of the system's 512, and at 128 with `LatencyBuffer=1` without crackling, which the game under
-Rosetta does not manage.
-
-### Renderer
-
-Song, 45 s from the intro, warm caches, original `cache.psarc`, 3 alternating rounds:
-
-| | frame rate | CPU | CPU per frame | game frame |
-|---|---|---|---|---|
-| OpenGL | 60 fps | 0.415-0.42 s/s | 6.9-7.0 ms | 4.37 ms |
-| Metal | 75 fps (the display's rate) | 0.48-0.49 s/s | 6.6-6.7 ms | 3.96 ms |
-
-Metal costs about 5% less CPU per frame and has a 9% shorter game frame; it uses more CPU in total only
-because it renders 75 frames a second where OpenGL stays at 60.
-
-Frame times over a 53 s song: OpenGL median 16.66 ms, p99 18.0 ms; Metal median 13.34 ms, p99 15.7 ms; one
-frame over 20 ms on each.
-
-- **Retina** (`RS_METAL_RETINA=1`, the built-in 60 Hz screen, 2560x1440): median 16.65 ms, p99 17.95 ms,
-  game frame 4.12 ms (3.82 at 1x).
-- **Multithreaded GL engine** (`RS_GL_MTENGINE=1`, OpenGL only): the frame thread 4% shorter, total CPU 2%
-  higher. Off by default.
-- **Long session** (Metal, six full songs in a row, 37 minutes): 74.7 fps, memory footprint 943-983 MB from
-  the first song to the last, no frame over 50 ms outside song loads.
-
-### Shader preparation
-
-The Metal shader corpus (3880 distinct programs) compiles in about 270-390 s on a cold system cache
-(install-time warm-up, 8 threads), and in about 0.2 s when the system cache is warm. The first play of a
-song after an install can stall for up to about 0.8 s while pipelines are built for the first time; in the
-[Final pass](#final-pass-for-140) that was one 0.6 s stall at Play Song and none in the song. The second play has none.
-Learn & Play's corpus is 281 programs, from a list of what the game was seen linking:
-[its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
-
-### Against the Windows port
-
-The same song on both at 75 fps: [Final pass](#final-pass-for-140). Learn & Play has come down since, to 7.2 ms a frame on a route of its own, and on that route
-this edition takes 6.1 ms: [Learn & Play's route](#learn--plays-route).
-
-## Final pass for 1.4.0
-
-Measured on 2026-11-04 on the apps the installer built from the code that goes into 1.4.0, each started with `open` in a
-test home: Apple M2, 16 GB, macOS 27, the 75 Hz 2560x1440 external display with the built-in screen also attached. Both
-editions full screen and rendering 2560x1440, the same song (Cherub Rock, bass arrangement, no guitar), the window in
-front, nothing else heavy running, keys by `tools/ws8/keyfifo`, no snapshots. Frame times and CPU over 150 s of the song, 172
-to 322 s after the start, about 11,200 frames a run; CPU and memory sampled every 2 s and 10 s, GPU from `ioreg`.
-
-| Song | Mac | Learn & Play |
-|---|---|---|
-| Frame rate | 74.9 fps (three runs) | 74.9 fps (three runs) |
-| Frame interval, median | 13.21-13.26 ms | 13.35-13.39 ms |
-| p95 | 16.7-17.1 ms | 16.6-16.7 ms |
-| p99 | 18.1-18.6 ms | 17.5-17.7 ms |
-| Worst | 21.6, 29.2, 33.8 ms | 23.2, 23.7, 24.2 ms |
-| Frames over 33 ms | 0, 0, 1 | 0, 0, 0 |
-| Frames over 50 ms | 0 | 0 |
-| CPU (% of a core) | 44.1, 44.3, 44.4 | 62.6, 63.2, 63.2 |
-| CPU per frame | 5.9 ms | 8.4 ms |
-| GPU | 56-57% | 56-57% |
-| Footprint | 0.80-0.81 GB | 1.28-1.36 GB |
-| RSS | 0.78 GB | 1.10-1.17 GB |
-
-So Learn & Play holds the same frames at about 43% more CPU than the Mac edition (19 points of a core) and 0.5 GB more
-memory. Learn & Play in the 1280x720 window (`RS_FULLSCREEN=0`, one run): 63.4% of a core, GPU 35%, so its CPU does not
-follow the size of the picture.
-
-| Start | Mac | Learn & Play |
-|---|---|---|
-| Title up, warm shader cache (two runs each) | 7.4, 7.8 s | 6.9, 7.3 s |
-| Title takes keys, Return every 1.5 s, frames 1 s apart | by 11.5-11.9 s | by 10.0-10.4 s |
-| Mounting the archives | 148 archives: held open for 2.2 s after the profile's Return (`lsof`, one run; this edition logs no end of it) | 75 archives in 6 frames, 0.32 s (two runs); 73 in 8 frames, 0.45 s |
-| A rescan by Enumerate | not timed | 74 archives in 3 frames, 0.14 s |
-| Quit from inside a song | 0.3-0.5 s | 0.3-0.5 s |
-
-The first play after an install against the second, one run of each, with no shader cache at all: the app's cache emptied and
-the system's Metal cache for the bundle moved aside for the runs and put back after. Learn & Play had nothing to prepare at
-install then; the Mac edition's Preparing shaders ran first and took about 330 and 390 s. Frames over 33 ms, and the time they took:
-
-| | Mac, first | Mac, second | Learn & Play, first | Learn & Play, second |
-|---|---|---|---|---|
-| Start to the main menu | 25, 2.4 s, worst 0.7 s | 21, 1.8 s, worst 0.7 s | 44, 14.6 s, worst 3.2 s | 48, 3.0 s, worst 0.7 s |
-| Song list | 6, 0.3 s | 3, 0.2 s | 5, 1.4 s, worst 0.7 s | 3, 0.2 s |
-| Play Song to the highway | 9, 1.0 s, worst 0.6 s | 2, 0.1 s | 14, 8.7 s, worst 3.6 s | 3, 0.2 s |
-| 150 s of the song | none | none | 4, 1.3 s, each about 0.32 s | none |
-| Title up | 7.5 s | | 16.5 s | |
-| Title takes keys | by 9.6 s | | by 20.5 s | |
-
-So with the shaders prepared at install the Mac's first play has one 0.6 s stall at Play Song and none in the song. Learn &
-Play's first play was what that step saves: about 21 s more of stalls up to the highway, the title 10 s later, and four short stalls
-in the song. The second play is clean on both. A player's first run may differ: it depends on what is drawn first. Learn & Play
-prepares its shaders now too, in 16.5 s: [its numbers](../windows/PERFORMANCE.md#shader-preparation).
+- **Measured runs**: `tools/perf/run.py` ([Reproducing](#reproducing), [TESTING.md](TESTING.md#measured-runs)), from
+  2026-11-10: one script for both editions, on the Mac's own screen, with the settings, profile, mods and song pinned and
+  the Mac's state checked first. CPU is exact (`libproc`), by thread; frame times are `RS_GL_FRAMETIMES`' events; memory is
+  the footprint; GPU is `ioreg`'s utilisation.
+- **Earlier tables** ([Final pass](#final-pass-for-140), [Learn & Play's route](#learn--plays-route), [Renderer](#renderer))
+  were made by hand, each on the setup its text gives: test installs driven by `tools/ws8/keyfifo`, CPU from `ps`
+  (`ps -M` by thread), no snapshots (`RS_GL_SNAPSHOT_DIR` is a synchronous readback of about 70 ms each). They compare
+  within a table and not with each other.
+- **Hot spots**: a Time Profiler trace (`tools/perf/run.py --trace`, `tools/perf/profile.py`). Shares within a thread are
+  usable. A thread's total is not, for the audio threads: the Wwise thread wakes every 5.33 ms for a burst shorter than the
+  1 ms between samples, and comes out at about half its CPU. Take a thread's CPU from a measured run.
+- **Noise**: about +-1 point of a core between runs of one build. Differences under 2 points are not results.
 
 ## Measured runs for 1.13.0
 
-2026-11-10, `tools/perf/run.py` ([TESTING.md](TESTING.md#measured-runs)): three runs of each edition in turn after a warm-up of each, an Apple M2 MacBook Air (16 GB,
-macOS 27) on its own screen, full screen at 1470x956 points and 60 Hz with MetalFX upscaling and 4x MSAA. Builds of the code that 1.13.0 has (Learn & Play's from the
-7-string branch before its last commits, which were for the Mac edition), rearmed-mods 0.11.0 with the same `RSMods.ini` in both, Song Stems on. `VisualQuality=2`
-with every effect on, `LatencyBuffer=1`, Venue Mode on, 147 and 150 archives in `dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's
-microphone and no guitar; 150 s from 45 s after the note highway came up, about 9,000 frames a run.
+2026-11-10, `tools/perf/run.py`: three runs of each edition in turn after a warm-up of each, full screen at 1470x956
+points and 60 Hz with MetalFX upscaling to 2940x1912 and 4x MSAA. Builds of 1.13.0's code, rearmed-mods 0.11.0 with the
+same `RSMods.ini` in both, Song Stems on. `VisualQuality=2` with every effect on, `LatencyBuffer=1`, Venue Mode on, 147 and
+150 archives in `dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's microphone and no
+guitar; 150 s from 45 s after the note highway came up, about 9,000 frames a run.
 
 | Song | Mac | Learn & Play |
 |---|---|---|
@@ -193,23 +63,24 @@ microphone and no guitar; 150 s from 45 s after the note highway came up, about 
 | GPU | 89% | 90% |
 | Footprint | 1.22-1.23 GB | 1.51-1.52 GB |
 
-Learn & Play takes 10 points of a core more than this edition, 1.7 ms a frame, and 0.29 GB more memory; its frames are the steadier ones (p99 17.7 ms against
-19.4-19.7, and a third as many over 20 ms). The GPU is near its limit on this screen at these settings in both, where the 75 Hz display at 1x had it at 56-57%
-([Final pass](#final-pass-for-140)). One frame of about 0.36 s came in one run of each edition. The stems helper used no CPU: the song's backing track was in its cache from
-the warm-up. Not looked at: whether the venue showed, with no notes played.
+Learn & Play takes 10 points of a core more than this edition, 1.7 ms a frame, and 0.29 GB more memory. The stems helper
+used no CPU: the song's backing track was in its cache from the warm-up. Not looked at: whether the venue showed, with no
+notes played. Learn & Play's note detection has come down since: [its file](../windows/PERFORMANCE.md#where-the-cpu-goes-in-1130).
 
-**What the screen got** (the same day, one more run of each with the renderer's own times in the log: `P`, a frame on the screen, and `U`, a command buffer
-on the GPU). The Mac edition's 8,976 frames went on the screen one refresh apart but one, which stayed for two; Learn & Play's 9,001 all did. So the wider
-intervals above are not what is seen: they are taken where the game hands a frame to Metal, and this edition's game frame is 4 ms on most frames and 6 ms on one in
-five, which moves that moment and not the refresh the frame makes. The frame waits about 3 ms from there to the screen here and 10 ms in Learn & Play.
+**What the screen got** (one more run of each with the renderer's own times in the log: `P`, a frame on the screen, and
+`U`, a command buffer on the GPU). This edition's 8,976 frames went on the screen one refresh apart but one, which stayed
+for two; Learn & Play's 9,001 all did. So the intervals in the table are not what is seen: they are taken where the game
+hands a frame to Metal, and this edition's game frame is 4 ms on most frames and 6 ms on one in five, which moves that
+moment and not the refresh the frame makes. The frame waits about 3 ms from there to the screen here and 10 ms in Learn &
+Play.
 
-**The GPU is not near its limit.** Its 89% at 60 fps is the GPU slowing its clock to fill the refresh: with 4x MSAA switched off the command buffer still took
-14.5 ms from start to end (14.4 with it) and the utilisation stayed at 89%. With the frame rate free (`RS_FPS=300`, 40 s, the Mac cool) this edition drew 102
-frames a second at these settings and 107 without MSAA, the GPU at 99.6% and the game thread at 40% of a core: about 9.7 ms of GPU work a frame, 58% of a refresh,
-and MSAA about 4% of it. Two more such runs straight after, for the upscaler's and the post effects' shares, gave 73 and 87 frames a second with more switched
-off: the MacBook Air has no fan and was warm by then, so they say nothing.
+**The GPU is not near its limit.** Its 89% at 60 fps is the GPU slowing its clock to fill the refresh: without MSAA the
+command buffer still took 14.5 ms from start to end (14.4 with it) at 89%. With the frame rate free (`RS_FPS=300`, 40 s,
+the Mac cool) this edition drew 102 frames a second at these settings and 107 without MSAA, the GPU at 99.6% and the game
+thread at 40% of a core: about 9.7 ms of GPU work a frame, 58% of a refresh, MSAA about 4% of it. The MacBook Air has no
+fan: later runs in a row say nothing.
 
-**Where the GPU's time goes** (`RS_METAL_PASS_TIMES`, 960 frames of the song at 60 fps, the same settings; shares, since the clock is slowed):
+**Where the GPU's time goes** (`RS_METAL_PASS_TIMES`, 960 frames of the song at 60 fps; shares, since the clock is slowed):
 
 | | of the frame | |
 |---|---|---|
@@ -221,18 +92,17 @@ off: the MacBook Air has no fan and was warm by then, so they say nothing.
 | The copy to the drawable | 2% | |
 | Twenty small passes | the rest | |
 
-So half of it is the game's own scene and effects, a quarter is the upscaler, and the note highway is cheap. Nothing here can go without the picture changing but small
-things: the upscaler could write to the drawable itself and spare the copy (2%, and a texture of 22 MB), at the price of a drawable that is not framebuffer-only, which
-the system may then composite instead of showing directly; not done. With the GPU at 58% of a refresh at full clock there is no need.
+So half of it is the game's own scene and effects, a quarter is the upscaler, and the note highway is cheap.
 
-**The frames of about 0.36 s**, one in one run of each edition (91 s and 109 s into the song), are the size of a pipeline built on first use
-([Shader preparation](#shader-preparation)), and neither came back in a later run. The warm-up of that set played only the first 75 s of the song; it plays the
-whole window now.
+**One frame of about 0.36 s** came in one run of each edition (91 s and 109 s into the song): the size of a pipeline built
+on first use ([Shader preparation](#shader-preparation)). Neither came back in a later run, and the warm-up now plays the
+whole window.
 
 ## Where the CPU goes in 1.13.0
 
-2026-11-10, `tools/perf/run.py --trace 30` and `tools/perf/profile.py` ([TESTING.md](TESTING.md#measured-runs)): a Time Profiler trace of 30 s of the song from 45 s in, the
-setup of [Measured runs](#measured-runs-for-1130), one trace of each edition. Points of a core; a thread's total from the measured runs, shares from the trace.
+2026-11-10, `tools/perf/run.py --trace 30` and `tools/perf/profile.py`: a Time Profiler trace of 30 s of the song from 45 s
+in, the setup of [Measured runs](#measured-runs-for-1130), one trace of each edition. Points of a core; a thread's total
+from the measured runs, shares from the trace.
 
 | Thread | Mac | Learn & Play |
 |---|---|---|
@@ -240,26 +110,136 @@ setup of [Measured runs](#measured-runs-for-1130), one trace of each edition. Po
 | Wwise | 5.8 (6.5 in the trace) | 7.4 (5.1) |
 | note detection | 2.6 (3.1) | 6.0 (5.9) |
 
-**Note detection** is one function here: `dsp_fft`, 86% of the thread, 2.7 points of a core, relaxed already. Learn & Play's FFT (`0x13f23e0`, `0x13f2d50`) is 0.9 points:
-its build has the twiddle factors in a table, where this one's FFT works them out as it goes. A native FFT in its place, or the same loop with a table, would take about 2
-points off this edition; it has to give the detector the same answers, which is the work. Learn & Play's largest is `0x13f3690`, 2.0 points, not on its relaxed list, and
-`pow` through the translated CRT, 0.7.
+**Note detection** is one function here: `dsp_fft`, 86% of the thread, 2.7 points of a core, relaxed already. Learn &
+Play's FFT (`0x13f23e0`, `0x13f2d50`) is 0.9 points: its build has the twiddle factors in a table, where this one's FFT
+works them out as it goes. Learn & Play's largest was `0x13f3690`, 2.0 points, relaxed since
+([its file](../windows/PERFORMANCE.md#where-the-cpu-goes-in-1130)).
 
-**Wwise**: `expander_gain` 28% of the thread, `parametric_eq_biquad` 15%, both relaxed; then `F_100b2c560` and `F_100b2c240`, 25% together, beside the Vorbis decoder and
-not relaxed: about 1.6 points of a core fenced.
+**Wwise**: `expander_gain` 28% of the thread, `parametric_eq_biquad` 15%, both relaxed; then `F_100b2c560` and
+`F_100b2c240`, 25% together, beside the Vorbis decoder and not relaxed: about 1.6 points of a core fenced.
 
-**The game thread** is flat, as [before](#learn--plays-route): 72% in translated game code with no function over 3.2% of the thread, the renderer 20% with what it calls.
-The one copy that shows is `glBufferSubData`'s, 3.6% of the thread, 1.0 point of a core: the game's vertex data for the frame into Metal's buffers. In Learn & Play that
-data is copied twice, by the game through `memcpy_s` (2.8% of its thread) and then by `glBufferSubData` (1.2%). rearmed-mods' settings lookups (`rsm_get`, a string compare
-for each) are 1.4% of the thread here and 1.9% there.
+**The game thread** is flat: 72% in translated game code with no function over 3.2% of the thread, the renderer 20% with
+what it calls. The one copy that shows is `glBufferSubData`'s, 3.6% of the thread, 1.0 point of a core: the game's vertex
+data for the frame into Metal's buffers. In Learn & Play that data is copied twice, by the game through `memcpy_s` (2.8%
+of its thread) and then by `glBufferSubData` (1.2%). rearmed-mods' settings lookups (`rsm_get`, a string compare for each)
+are 1.4% of the thread here and 1.9% there.
+
+## Results
+
+### Against Rosetta
+
+2026-11-10, the original game under Rosetta beside the [measured runs](#measured-runs-for-1130) of both editions: the same
+Mac and screen, Cherub Rock, 150 s from about 45 s into the song, one run.
+
+| Song | Original under Rosetta | Mac | Learn & Play |
+|---|---|---|---|
+| Frame rate | 59.95 | 59.9-60.0 | 59.9-60.0 |
+| CPU (% of a core) | 51.0 | 41.7-43.1 | 52.0-53.6 |
+| CPU per frame | 8.5 ms | 6.97-7.18 ms | 8.66-8.93 ms |
+| the frame's thread | 35.1 | 26.7-27.7 | 32.6-33.3 |
+| note detection | 1.9 | 2.5-2.7 | 5.8-6.3 |
+| Frames handed over more than 33 ms apart | 8 | 0-3 | 0-1 |
+| Footprint | 0.93 GB | 1.22-1.23 GB | 1.51-1.52 GB |
+
+So the Mac edition takes about a sixth less processor time than the original under Rosetta and Learn & Play about the
+same, each while doing more for the picture and the sound. What was not the same:
+
+- **The picture.** All three draw 1470x956 with the game's High quality and every effect on. The original draws through
+  Apple's OpenGL and the screen scales the frame up; the editions draw through Metal with 4x MSAA, 16x anisotropic
+  filtering and MetalFX upscaling, about a quarter of their GPU time. The original's GPU read 68% and the editions'
+  89-90%; neither is the GPU's work at a fixed frame rate.
+- **The audio engine.** The original ran at `LatencyBuffer=2`: at 1 it does not hold on this Mac. The editions ran at 1,
+  half the output buffer.
+- **Mods.** The original has none. The editions ran rearmed-mods with Song Stems.
+- **The songs.** The original's copy had the game's own songs and Cherub Rock's archive; the editions had 147 and 150
+  archives in `dlc`, which is part of their memory.
+- **Input.** The same profile, whose INPUT is DIRECT CONNECT, a value the original has no name for. Its tuner came up and
+  its note detection ran; on which input was not looked at. No guitar was played in any of the runs.
+- **How it was run.** The original is the clean download's own binary, decrypted (`tools/steamless/decrypt.py`), started
+  directly with the offline Steam layer on a copy of the profile and the network guard, which refused its one lookup of a
+  Ubisoft host. Its keys were timed by hand, so its window starts within a few seconds of where the editions' does. Its
+  frame times are the calls of `flushBuffer` (a spy library), not what the screen got.
+
+The latency figures are the other difference: the native build runs the output device at 256 frames instead of the
+system's 512, and at 128 with `LatencyBuffer=1` without crackling, which the game under Rosetta does not manage.
+
+### Renderer
+
+Metal is the default; `RS_GL_BACKEND=gl` chooses OpenGL. Measured before 1.4.0 on the 75 Hz display at 1x, without MSAA:
+a song, 45 s from the intro, warm caches, 3 alternating rounds.
+
+| | frame rate | CPU | CPU per frame | game frame |
+|---|---|---|---|---|
+| OpenGL | 60 fps | 0.415-0.42 s/s | 6.9-7.0 ms | 4.37 ms |
+| Metal | 75 fps (the display's rate) | 0.48-0.49 s/s | 6.6-6.7 ms | 3.96 ms |
+
+Metal costs about 5% less CPU per frame and has a 9% shorter game frame; it uses more CPU in total only because it renders
+75 frames a second where OpenGL stays at 60. Frame times over a 53 s song: OpenGL median 16.66 ms, p99 18.0 ms; Metal
+median 13.34 ms, p99 15.7 ms; one frame over 20 ms on each.
+
+- **Multithreaded GL engine** (`RS_GL_MTENGINE=1`, OpenGL only): the frame thread 4% shorter, total CPU 2% higher. Off by
+  default.
+- **Long session** (Metal, six full songs in a row, 37 minutes): 74.7 fps, memory footprint 943-983 MB from the first song
+  to the last, no frame over 50 ms outside song loads.
+
+### Shader preparation
+
+The Metal shader corpus (3880 distinct programs) compiles in about 270-390 s on a cold system cache (install-time warm-up,
+8 threads), and in about 0.2 s when the system cache is warm. With that done, the first play of a song after an install
+had one 0.6 s stall at Play Song, while pipelines are built for the first time, and none in the song
+([Final pass](#final-pass-for-140)). The second play has none. Learn & Play's corpus is 281 programs, from a list of what
+the game was seen linking: [its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
+
+### Against the Windows port
+
+On the same song, screen and settings Learn & Play takes 52.0-53.6% of a core where this edition takes 41.7-43.1%, and
+1.5 GB where this takes 1.2 GB ([Measured runs](#measured-runs-for-1130), 2026-11-10). Where its extra time is:
+[Where the CPU goes](#where-the-cpu-goes-in-1130) and [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition).
+Earlier comparisons, on other setups: 5.9 against 8.4 ms a frame ([Final pass](#final-pass-for-140)), 6.1 against 7.2 ms
+([Learn & Play's route](#learn--plays-route)).
+
+## Final pass for 1.4.0
+
+2026-11-04, the apps the installer built from 1.4.0's code, each started with `open` in a test home: the 75 Hz 2560x1440
+external display, both editions full screen at 2560x1440, Cherub Rock (bass arrangement, no guitar, input Disconnected),
+no mods, before the renderer had MSAA and upscaling. Three runs each, 150 s of the song, about 11,200 frames a run.
+
+**The song**: both 74.9 fps, median 13.2-13.4 ms, p99 17.5-18.6 ms, one frame over 33 ms in six runs and none over 50 ms,
+GPU 56-57%. This edition 44.1-44.4% of a core, 5.9 ms a frame, footprint 0.80-0.81 GB. Learn & Play 62.6-63.2%, 8.4 ms and
+1.28-1.36 GB then; it has come down since ([Learn & Play's route](#learn--plays-route)).
+
+| Start | Mac | Learn & Play |
+|---|---|---|
+| Title up, warm shader cache (two runs each) | 7.4, 7.8 s | 6.9, 7.3 s |
+| Title takes keys, Return every 1.5 s, frames 1 s apart | by 11.5-11.9 s | by 10.0-10.4 s |
+| Mounting the archives | 148 archives: held open for 2.2 s after the profile's Return (`lsof`, one run; this edition logs no end of it) | 75 archives in 6 frames, 0.32 s (two runs); 73 in 8 frames, 0.45 s |
+| A rescan by Enumerate | not timed | 74 archives in 3 frames, 0.14 s |
+| Quit from inside a song | 0.3-0.5 s | 0.3-0.5 s |
+
+The first play after an install against the second, one run of each: the app's cache emptied and the system's Metal cache
+for the bundle moved aside, then Preparing shaders, which took about 330 and 390 s. Frames over 33 ms, and the time they
+took:
+
+| | Mac, first | Mac, second |
+|---|---|---|
+| Start to the main menu | 25, 2.4 s, worst 0.7 s | 21, 1.8 s, worst 0.7 s |
+| Song list | 6, 0.3 s | 3, 0.2 s |
+| Play Song to the highway | 9, 1.0 s, worst 0.6 s | 2, 0.1 s |
+| 150 s of the song | none | none |
+| Title up | 7.5 s | |
+| Title takes keys | by 9.6 s | |
+
+A player's first run may differ: it depends on what is drawn first. Learn & Play's first play, with and without its
+warm-up: [its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
 
 ## Learn & Play's route
 
-2026-11-06, an Apple M2, the 75 Hz 2560x1440 display. One run each, the game's executable started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal cache (a
-warm-up run first), the window in front, keys by `tools/ws8/keyfifo` on the same timing in both ([TESTING.md](TESTING.md#game-runs)): Cherub Rock, Lead, a DIRECT CONNECT
-profile on a UR22mkII, no guitar, measured for 90 s from 45 s after the tuner's skip. This is the route of [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition),
-at nice 0 where those runs were at nice 5. "Before" is the 1.7.0 build; "Relaxed" has 12 more functions relaxed; "Renderer" also has the [renderer's changes](#the-renderer-on-this-route),
-which Learn & Play's column does not. CPU by thread from `ps -M`.
+2026-11-06, the 75 Hz 2560x1440 display: the route of [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition),
+run on this edition. One run each, the game's executable started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal
+cache, no mods, keys by `tools/ws8/keyfifo` on the same timing in both ([TESTING.md](TESTING.md#game-runs)): Cherub Rock,
+Lead, a DIRECT CONNECT profile on a UR22mkII, no guitar, 90 s from 45 s after the tuner's skip. "Before" is the
+1.7.0 build; "Relaxed" has 12 more functions relaxed; "Renderer" also has the renderer's changes below, which Learn &
+Play's column does not. CPU by thread from `ps -M`.
 
 | | Before | Relaxed | Renderer | Learn & Play, final |
 |---|---|---|---|---|
@@ -273,48 +253,22 @@ which Learn & Play's column does not. CPU by thread from `ps -M`.
 | Frames over 20 ms | 1 | 0 | 0 | 0 |
 | Footprint | 0.90 GB | 0.88 GB | 0.89 GB | 1.33 GB |
 
-So the 12 functions saved 0.6 points of a core, within the noise of one run each, where the same step saved Learn & Play about 2. The note detection's 0.5 points
-agrees with its FFT, the one large function here (2.0 points of a core in the profile before, 1.4 after). The Wwise thread did not move by `ps`, though most functions
-added there fell as a share of the thread in the profile (`delay_network_wide` from 8.7% to 3.3%; `biquad_block` and `fft_work` didn't): why isn't known, and a trace doesn't say ([Method](#method)). In these runs the song
-played with the highway and lyrics up and no guitar, so the FFT ran on the input's noise; the final build then played well with a guitar, by the maintainer's own check.
+From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame; each alone is within the noise of one run.
 
-What was in the profile (Time Profiler, 20 s of the song, before, % of a core, about 5 points in all):
-
-| Function | Thread | | |
-|---|---|---|---|
-| `dsp_fft` | note detection | 2.0 | relaxed: bit reversal and FFT passes in one function, Learn & Play's `0x13f23e0` and `0x13f2d50` |
-| `delay_network_wide` | Wwise | 0.5 | relaxed: the delay network |
-| `biquad_block`, `biquad_scalar` | Wwise | 0.5 | relaxed |
-| `level_shaper`, `compressor_gain`, `biquad_cascade`, `mix_stereo_ramp`, `biquad_direct` | Wwise | 0.9 | relaxed: mixes and filters |
-| `fft_work`, `fft_bfly_generic`, `fft_complex_mac` | Wwise | 0.4 | relaxed; `___stack_chk_fail` joined `PURE_IMPORTS` for the stack guard |
-| `F_100a6dc96` | Wwise | 0.4 | left out: indirect calls |
-| `F_10010bbc0` | note detection | 0.2 | left out: calls `vpowf` and code that isn't relaxed |
-
-None of the 12 sets a static's guard: none writes through a RIP-relative address. `parametric_eq_biquad`, on the list already, is the thread's largest at 36%.
-
-The game thread, 30 of the 46 points, has no such target. Its profile is flat: 66% in translated game code with no function over 2.5%. What stands out is on the
-Metal side, each about a point of a core or a little more: Objective-C retain, release and message sends (5.5% of the thread), a render encoder for each pass
-(`renderCommandEncoderWithDescriptor`, 4.3%, under `rsm_begin_pass`'s 5.2%), and the Cg layer (3.1%). Then `memmove` at 2.6% and the import thunks (`rc_arg_i`, `rc_imp`) at 2.5%.
-`rsm_draw` is 10.3% with what it calls. The fences on this thread were not measured here; in Learn & Play they cost about 2 points of its 32.
-
-### The renderer on this route
-
-A song draws 21 passes a frame and about 250 draws (temporary counters, one run). Passes can't be merged: none follows a pass on the same target without a clear between, 0.00 a frame, as
-each draws to another texture, mostly the post effects' chain of one draw each. About 3 of the 21 are only a clear. Keeping a clear back until its target is next used would take those out,
-about 0.2 points of a core by their share of the encoder time, but it has to hold against every read of the target; not done.
-
-What was done is less work for each pass and each GL call: one `MTLRenderPassDescriptor` for all passes instead of a new one, and lookups that take no reference (`rsm_get`, `rsm_map_get`,
-the texture, buffer, uniform and query calls), with the context and objects in `__unsafe_unretained` locals where the name tables keep them alive. A function that creates what it looks up keeps a
-strong local: an unretained one frees the new object at once. The game thread went from 30.1 to 29.5 points, again within the noise of one run each, and the profile agrees: the Objective-C runtime
-fell from 4.0% of the thread to 0.9%. The encoder itself stays: `renderCommandEncoderWithDescriptor` is Metal's own work.
-
-From 1.7.0 the two steps together are 1.2 points of a core, 0.15 ms a frame. Learn & Play draws through the same code and played fine with it, by the maintainer's own check; its route was not measured with it.
-
-1.10.0, a short check (2026-11-08, one run each, not the table's setup: the built-in 60 Hz Retina screen, so MetalFX upscaling and 4x MSAA on, DISCONNECTED
-with no interface, so no note detection; 60 s of Cherub Rock in a 1280x720 window): 34.5% of a core, 5.83 ms a frame at 59.5 fps, 1.24 GB; Learn & Play 6.33 ms and
-1.54 GB on the same route ([Learn & Play](../windows/PERFORMANCE.md#toward-the-mac-edition)). The first run had two stalls of about 0.3 s at the song's tone switch, in
-the game frame: pipelines built on first use, the new MSAA variants among them. A second run found 282 of 285 in the cache and had none. Full screen on the 75 Hz
-display with a guitar, by the maintainer: 74.9 fps and a game frame of about 4 ms once a new song's first-play stutters were done.
+- **Relaxed**: `dsp_fft` (the note detection's FFT, 2.0 points of a core in the profile before and 1.4 after),
+  `delay_network_wide`, `biquad_block`, `biquad_scalar`, `level_shaper`, `compressor_gain`, `biquad_cascade`,
+  `mix_stereo_ramp`, `biquad_direct`, `fft_work`, `fft_bfly_generic` and `fft_complex_mac`; `___stack_chk_fail` joined
+  `PURE_IMPORTS` for the stack guard. None sets a static's guard. Left out: `F_100a6dc96` (0.4 points, indirect calls) and
+  `F_10010bbc0` (0.2, calls `vpowf` and code that isn't relaxed).
+- **Renderer**: one `MTLRenderPassDescriptor` for all passes instead of a new one each, and lookups that take no reference
+  (`rsm_get`, `rsm_map_get`, the texture, buffer, uniform and query calls), with the context and objects in
+  `__unsafe_unretained` locals where the name tables keep them alive. A function that creates what it looks up keeps a
+  strong local: an unretained one frees the new object at once. The Objective-C runtime fell from 4.0% of the game thread
+  to 0.9%. A song draws 21 passes a frame and about 250 draws; a render encoder for each pass
+  (`renderCommandEncoderWithDescriptor`, 4.3% of the thread) is Metal's own work and stays.
+- **1.10.0, a short check** (2026-11-08, the built-in screen with upscaling and 4x MSAA, DISCONNECTED, a 1280x720 window,
+  60 s, one run each): 5.83 ms a frame and 1.24 GB, Learn & Play 6.33 ms and 1.54 GB. The
+  [measured runs](#measured-runs-for-1130) have replaced it.
 
 ## Hook points
 
@@ -324,9 +278,9 @@ before. The run-time table and what it costs are Learn & Play's ([Windows](../wi
 ## The build: memory and time
 
 A first install through the app on 2026-11-04 took 12 minutes, with the system's shader cache warm so that Preparing
-shaders took a second; with it cold, add 5.5 to 6.5 minutes. Memory not measured yet.
-[Windows](../windows/PERFORMANCE.md#the-build-memory-and-time) has the numbers for its translator, which is a different front
-end.
+shaders took a second; with it cold, add 5.5 to 6.5 minutes. Memory not measured.
+[Windows](../windows/PERFORMANCE.md#the-build-memory-and-time) has the numbers for its translator, which is a different
+front end.
 
 ## Build options
 
@@ -358,8 +312,39 @@ write it elsewhere, set the path before starting the launcher and keep `%c` in i
 `launchctl setenv LLVM_PROFILE_FILE "$HOME/Library/Application Support/RS Re-ARMed/logs/rs-%p%c.profraw"`
 (`launchctl unsetenv LLVM_PROFILE_FILE` afterwards). A profile stays usable after small source changes.
 
-**`RC_RELAXED`** (on by default): the Wwise effect kernels and the note detector's window and FFT listed in `tools/targets/names/relaxed.list` are
-translated without a memory fence per access, which was about half their time; they fence at entry and
-exit instead. `RC_RELAXED=0` fences them too, for tracking down a suspected memory-ordering problem. Learn & Play's are by address, in
-`tools/targets/win-x86/relaxed.map`. The rest of what it gained has no counterpart here: this edition's game is SSE code, inlines its indirect calls and
-has the host's `memcpy`. The hottest of the rest of this edition's audio functions were added on Learn & Play's route: [what that gave](#learn--plays-route).
+**`RC_RELAXED`** (on by default): the Wwise effect kernels and the note detector's window and FFT listed in
+`tools/targets/names/relaxed.list` are translated without a memory fence per access, which was about half their time; they
+fence at entry and exit instead. `RC_RELAXED=0` fences them too, for tracking down a suspected memory-ordering problem.
+Learn & Play's are by address, in `tools/targets/win-x86/relaxed.map`
+([its Build options](../windows/PERFORMANCE.md#build-options)).
+
+## Opportunities, by expected payoff
+
+1. **The note detection's FFT**: `dsp_fft` is 2.7 points of a core. A native FFT in its place, or the same loop with the
+   twiddle factors in a table as Learn & Play's build has, would take about 2 points off; it has to give the detector the
+   same answers, which is the work.
+2. **Two Wwise functions beside the Vorbis decoder**, `F_100b2c560` and `F_100b2c240`: about 1.6 points of a core fenced,
+   not relaxed yet. `F_100a6dc96` (0.4) makes indirect calls.
+3. **The frame's vertex data**: `glBufferSubData`'s copy, 1.0 point of a core.
+4. **A clear kept back until its target is next used**: about 3 of the 21 passes are only a clear, about 0.2 points of a
+   core by their share of the encoder time. It has to hold against every read of the target.
+5. **The upscaler writing to the drawable itself**: spares the copy (2% of the GPU's frame, and a texture of 22 MB), at
+   the price of a drawable that is not framebuffer-only, which the system may then composite. With the GPU at 58% of a
+   refresh there is no need.
+
+Tried, no gain: ThinLTO and `-O3` ([Build options](#build-options)), the multithreaded GL engine ([Renderer](#renderer)),
+merging passes (none follows a pass on the same target without a clear between).
+
+## Reproducing
+
+```bash
+tools/perf/run.py CONFIG OUT              # a warm-up and three measured runs of each edition, in turn
+tools/perf/report.py OUT [--against BASE] # the table, and the change from another set of runs
+tools/perf/run.py CONFIG OUT --trace 30   # a Time Profiler trace of each edition
+tools/perf/profile.py OUT/mac-trace/game.trace [--under NAME]
+```
+
+`CONFIG` names test installs of your own (`tools/perf/example.json`); what a run pins and checks is in
+[TESTING.md](TESTING.md#measured-runs). The GPU's time by pass: `RS_METAL_PASS_TIMES=FILE`. The
+GPU's work with the frame rate free: `"RS_FPS": "300"` in `CONFIG`'s `env`, one run at a time on a cool Mac. Compare one
+variable at a time, alternate the builds, and repeat each.

@@ -89,7 +89,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Metal renderer, shaders prepared at install | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |
 | Installer app and install script | ✅ | ✅ |
-| Performance | ✅ about Rosetta's CPU | ✅ the display's frame rate, about 17% more CPU than the Mac port on one route, and more memory ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
+| Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs-for-1130)) | ✅ the display's frame rate, about Rosetta's CPU: 10 points of a core and 0.3 GB more than the Mac port ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 
 ¹ Learn & Play reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC has both, and
 the installer has Steam fetch what your account owns; custom songs often exist for one platform only.
@@ -159,6 +159,7 @@ Rosetta, or on Windows for Learn & Play).
 | Testing | [TESTING.md](docs/mac/TESTING.md) | [TESTING.md](docs/windows/TESTING.md) |
 
 The recompiler both use: [docs/recompiler](docs/recompiler/README.md). How the two games differ: [EDITIONS.md](docs/EDITIONS.md).
+How such a port is made, step by step: [FROM-SCRATCH.md](docs/FROM-SCRATCH.md).
 
 ## Credits
 

@@ -22,9 +22,9 @@ then keeps its own progress, so progress in one doesn't reach the other.
 | Testing | the most | far less |
 | Lower guitar latency | ✅ tested | ⚠️ present, not tested |
 | Renderer | Metal, with OpenGL as a choice and fallback | Metal only |
-| Mod hook points | 18 of 18 | 15 of 18; the same mods library works |
-| CPU | 6.1 ms a frame | 7.2 ms a frame, about 17% more ([details](windows/PERFORMANCE.md#toward-the-mac-edition)) |
-| Memory | about 0.8 GB | about 1.3 GB |
+| Mod hook points | 21 of 21 | 18 of 21; the same mods library works |
+| CPU in a song at 60 fps | 42-43% of a core | 52-54% of a core ([details](windows/PERFORMANCE.md#toward-the-mac-edition)) |
+| Memory | about 1.2 GB | about 1.5 GB |
 | First build on an M2 | about 15 minutes | about 25 minutes |
 | Game download | about 6.5 GB | about 5.5 GB |
 

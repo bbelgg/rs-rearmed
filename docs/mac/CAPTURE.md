@@ -1,11 +1,8 @@
 # Getting the game image on the Mac
 
-The Mac edition needs no capture: no Windows PC, no harvester and no seed. Those belong to Learn & Play,
-whose Windows exe is packed with VMProtect, so its code exists only in memory while the game runs
-([Windows capture](../windows/CAPTURE.md)).
-
-The Steam macOS game is not packed that way. It comes from Steam's native macOS depot and is only encrypted
-by SteamStub, so everything happens on your Mac during the install.
+The Mac edition needs no capture: no Windows PC, no harvester and no seed. Those belong to Learn & Play, whose
+Windows exe is packed with VMProtect ([Windows capture](../windows/CAPTURE.md)). The Steam macOS game is only
+encrypted by SteamStub, so everything happens on your Mac during the install.
 
 ## Path A: harvest the image
 

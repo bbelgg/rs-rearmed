@@ -1,8 +1,8 @@
 # The Metal renderer
 
 The game draws through `libRSOpenGL` (`shims/opengl`), RS Re-ARMed's own GL layer. It runs the game's
-OpenGL on Metal by default, or on Apple's OpenGL. Metal shipped in 1.3.0 as the default; OpenGL stays a
-choice and the automatic fallback. The Windows port's Direct3D 9 layer draws through the same library
+OpenGL on Metal by default, or on Apple's OpenGL, which stays a choice and the automatic fallback. The
+Windows port's Direct3D 9 layer draws through the same library
 ([Windows design](../windows/DESIGN.md#direct3d-9)).
 
 Why: Apple's OpenGL has been deprecated since macOS 10.14 and nothing else implements legacy GL 2.1 with ARB
@@ -49,29 +49,26 @@ together with every user. How to choose the renderer as a user: [INSTALL.md](INS
   test `opengl.table.clients` (`shims/opengl/tools/check-gl-clients.py`) checks the imports of every built client.
 - Wrappers cost a flag test and a tail call; counting (`rs_gl_stats`) only with `RS_GL_LOG`,
   `RS_GL_CHECK`, `RS_GL_TRACE_DIR` or `RS_GL_STATS` set. `rs_gl_current_program()` answers the program
-  `glUseProgram` last bound in the current context (or -1 when not known exactly) without a GL query; the
-  Cg shim uses it to re-take GL after Scaleform's `glUseProgram(0)`. The Cg shim also records the program
-  pairs the game linked (`cg-pairs.txt` in `~/Library/Caches/rs-rearmed`, `RS_CG_PAIR_CACHE`) and links
+  `glUseProgram` last bound without a GL query; the Cg shim uses it to re-take GL after Scaleform's
+  `glUseProgram(0)`. The Cg shim also records the program pairs the game linked (`cg-pairs.txt` in `~/Library/Caches/rs-rearmed`, `RS_CG_PAIR_CACHE`) and links
   them at load on later runs, so no link (and on Metal no compile) lands in the middle of a song.
 - `CGL*` (game imports `CGLLockContext`/`CGLUnlockContext`) and `NSOpenGLContext` are only used on GL. On
   Metal the shell uses `rs_gfx_*` and `CGLLockContext` takes the context's mutex.
 
 ## Defaults and fallback
 
-In `shims/platform/include/rsp_renderer.h`. Metal is the default; OpenGL stays a choice and the fallback. Since `libRSOpenGL` fixes its backend when
-it loads (before `main`), the app's `main()` decides first thing, before the image, the shims, the
-engine or a window (`rsp_renderer_startup`, `rsp_renderer_decide`: pure, unit-tested in
-`platform.core`), and when the decision differs from what `libRSOpenGL` loaded with it `execv`s its own
-executable with the same arguments and `RS_GL_BACKEND` set (same path: the same app for Metal's shader
-cache; no `NSApplication` yet, so LaunchServices sees nothing). Inputs, strongest first:
+In `shims/platform/include/rsp_renderer.h`. Since `libRSOpenGL` fixes its backend when it loads (before
+`main`), the app's `main()` decides first thing, before the image, the shims, the engine or a window
+(`rsp_renderer_startup`, `rsp_renderer_decide`: pure, unit-tested in `platform.core`), and when the decision
+differs from what `libRSOpenGL` loaded with it `execv`s its own executable with the same arguments and
+`RS_GL_BACKEND` set (the same path, so the same app to Metal's shader cache). Inputs, strongest first:
 
 1. `RS_GL_BACKEND=gl|metal`: always wins; `metal` also over the crash count.
 2. Metal cannot start: no `MTLCreateSystemDefaultDevice()`, or a `libRSOpenGL` without the `rs_gfx`
    presentation (`rsp_mtl_usable`; `RS_RENDERER_TEST_NO_METAL=1` simulates it) -> OpenGL, this start only.
 3. Crash count: the last two Metal sessions ended without a clean exit -> OpenGL; the setting becomes
    `opengl` (so the next starts need no count), the marker goes, `renderer-fallback.txt` explains it and
-   an `osascript` notification says so (fire and forget, never blocks the game; `RS_RENDERER_NOTIFY=0`
-   turns it off). Writing `metal` into the setting tries Metal again with a fresh count; `install.sh`
+   a notification says so (`RS_RENDERER_NOTIFY=0` turns it off). Writing `metal` into the setting tries Metal again with a fresh count; `install.sh`
    also resets the count (a new build).
 4. `<home>/renderer`: `metal` or `opengl` (`install.sh`'s `RS_RENDERER`, the installer's Renderer
    popup). The launcher passes `opengl` on as `RS_GL_BACKEND=gl` (no restart) and `metal` not at all (so
@@ -81,25 +78,22 @@ cache; no `NSApplication` yet, so LaunchServices sees nothing). Inputs, stronges
 `<home>`: `RS_NATIVE_HOME`, else the install when the app is `<home>/game/<app>` and `<home>/game-dir`
 exists, else `~/Library/Caches/rs-rearmed` (builds run from elsewhere). **Session marker**: a Metal game
 start (not `--warm-shaders`, `--init-only`, `--bind-only`, `--renderer-check`) writes
-`<home>/metal-session` holding N, the abnormal endings in a row before it; clean exits remove it:
-`rsp_exit` (the shell's quit path, `-[OpenGLView dealloc]` after `MainController`'s shutdown, ending in
-`_Exit(0)`), `rsp_request_quit` without an engine, `exit()` (atexit) and SIGTERM/SIGINT/SIGHUP (a polite
-stop is not Metal's fault; only installed when nobody else handles them). A marker found at start means
-that session crashed, hung and was force-quit, or was killed: count N + 1. Force quit counts as
-abnormal (unavoidable), hence the threshold of 2. A GL session neither writes nor clears it.
+`<home>/metal-session` holding N, the abnormal endings in a row before it; a clean exit removes it
+(`rsp_exit`, `exit()`, and SIGTERM/SIGINT/SIGHUP: a polite stop is not Metal's fault). A marker found at start
+means that session crashed, hung and was force-quit, or was killed: count N + 1. A force quit can't be told
+from a crash, hence the threshold of 2. A GL session neither writes nor clears it.
 
 Late failure: `rs_gfx_create_layer` failing in `rsp_mtl_attach` (window already up) also restarts with
 OpenGL (`rsp_renderer_restart_gl`: not counted as a crash); only if that exec fails does the shell abort
-with a message. The re-exec'd process logs the original reason
-(`[rsp] renderer: opengl (Metal cannot start here; restarted with RS_GL_BACKEND set)`).
-`--renderer-check` prints the decision and exits (a pending crash fallback is applied as by a start).
+with a message. `--renderer-check` prints the decision and exits (a pending crash fallback is applied as by a
+start).
 
 Tests: GL-only tests set `RS_GL_BACKEND=gl` (the Cg directory adds it to every test not named
 `*.metal`; `platform.overlay.<arch>`, `opengl.shim.window.*`), tests of both backends set it either way.
 
 ## Context and presentation API (`shims/opengl/src/rs_gfx.h`)
 
-Exported by `libRSOpenGL`, implemented for both backends, used by the shell and by tests:
+Exported by `libRSOpenGL`, implemented for both backends, used by the shell, Learn & Play's window and tests:
 offscreen contexts let every test run the same GL calls on both backends and compare pixels. See the
 header for the calls.
 
@@ -114,7 +108,8 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   contents copied, old one released when its command buffer completes). `glBufferData` always reallocates.
 - **Textures**: `MTLTexture` per GL texture; level 0 size/format fixes the descriptor, mips allocated on
   `glGenerateMipmap` or on a non-zero level upload. DXT1/3/5 → BC1/2/3, RGBA/BGRA 8-bit, luminance/alpha via
-  swizzle. Uploads into a texture still in flight go through a staging blit. Sampler state from the GL
+  swizzle; `GL_R11F_G11F_B10F` is `RG11B10Float`, its pixel data converted on upload and read-back. Uploads
+  into a texture still in flight go through a staging blit. Sampler state from the GL
   texture parameters → cached `MTLSamplerState`. A Metal sampler has no LOD bias: `GL_TEXTURE_LOD_BIAS`
   (the game sets -0.26 on most textures) goes to the fragment shader in buffer 2, one float per sampler
   slot, added to its implicit-level samples. Mipmapped textures with a linear filter get at least 16x
@@ -133,15 +128,17 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
 - **Programs**: `glLinkProgram` hands vertex + fragment GLSL to `rsmsl_translate` (`src/msl/msl_xlat.h`)
   and keeps the reflection (attributes, uniforms, samplers), so status, locations and `glUniform*` work at
   once; the MSL compile (`newLibraryWithSource:`, 0.1–0.5 s cold) goes to a compile pool (CPUs − 2 worker
-  threads, `RS_MTL_COMPILE_THREADS`; programs with the same MSL share one compile). The first draw with
-  the program waits for its library, or compiles it itself if no worker has started it. The link reports
+  threads, 2 to 8, `RS_MTL_COMPILE_THREADS`; programs with the same MSL share one compile). The first draw with
+  the program waits for its library, or compiles it itself if no worker has started it; while a draw waits for
+  a library or pipeline a pool worker is building, that worker's QoS is raised to the waiter's, as a worker
+  runs at utility when warming or throttled and a condition variable hands no priority on. The link reports
   success when the translation succeeded and the MSL is not already known to fail: the Cg shim (and
   Scaleform) query `GL_LINK_STATUS` right after every link, so waiting there would serialise the compiles
   again. A compile that fails later unlinks the program at its first draw or status query (logged with
   the MSL, draws skipped, `LINK_STATUS` false and the compiler's message in the info log).
-  Libraries and pipelines are cached in memory per device and on disk (`mtl_cache.m`: an
+- **The shader cache** (`mtl_cache.m`): libraries and pipelines are cached in memory per device and on disk, an
   `MTLBinaryArchive` plus a manifest of the libraries and pipelines used, warmed on the compile pool at
-  the next start behind the game's own links). The disk cache's key is the cache format, a
+  the next start behind the game's own links. The disk cache's key is the cache format, a
   core-conventions constant, the OS build and the GPU, not the build of libRSOpenGL: libraries are keyed
   by their MSL text, and ones the game has not linked for 8 runs leave the manifest. The archive is
   written every 32 new pipelines, 3 s after the last one, and at the end: `rsp_exit` ends in `_exit`, so
@@ -151,8 +148,11 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   (or a ring buffer when over 4 KB).
 - **Pipelines**: key = program, vertex layout (formats, strides, step functions), colour/depth formats,
   sample count, blend (enable, factors, equation), colour mask, alpha-test function → cached
-  `MTLRenderPipelineState`. Depth/stencil state → cached `MTLDepthStencilState`. Dynamic state (viewport,
-  scissor, cull, winding, fill mode, stencil ref, blend colour, depth bias) is set on the encoder.
+  `MTLRenderPipelineState`. A draw keeps the last draw's key while nothing it is made of changed
+  (`RS_METAL_PKEY_CHECK=1` builds it anyway and reports a stale one); the game sets vertex state or the program
+  before every draw, so in play this saves nothing yet. Depth/stencil state → cached `MTLDepthStencilState`.
+  Dynamic state (viewport, scissor, cull, winding, fill mode, stencil ref, blend colour, depth bias) is set on
+  the encoder.
 - **Encoders**: a render encoder is opened lazily at the first draw after a framebuffer bind; a `glClear`
   before the first draw becomes load actions, a later one (or a scissored one) draws a quad. Reads
   (`glReadPixels`, `glGetTexImage`) end the pass, commit and wait. Present ends the pass, draws the default
@@ -161,10 +161,10 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   screen's backing-pixel size while the game renders in points; the drawable takes that size, and present runs
   MetalFX's spatial scaler (`MTLFXSpatialScaler`, perceptual mode for 8-bit sRGB, macOS 13+, the framework weakly
   linked) from the default colour texture into a texture of the drawable's size, which it then draws flipped. Without
-  MetalFX, or with `RS_METAL_UPSCALE=0`, the frame is drawn bilinearly into the larger drawable, as the screen
-  scaled it before. `RS_METAL_RETINA=1` makes the framebuffer itself the backing size, and nothing is scaled. Layer
-  contexts are tagged sRGB (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the
-  display; `RS_METAL_COLORS=vivid` leaves the layer untagged, as before.
+  MetalFX, or with `RS_METAL_UPSCALE=0`, the frame is drawn bilinearly into the larger drawable. `RS_METAL_RETINA=1`
+  makes the framebuffer itself the backing size, and nothing is scaled. Layer contexts are tagged sRGB
+  (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the display;
+  `RS_METAL_COLORS=vivid` leaves the layer untagged.
 - **Conventions** (applied by the translator, so the core passes GL state through unchanged):
   - row 0 of every texture and render target is GL's bottom row; the vertex shader epilogue negates
     `y`, so viewport and scissor rectangles map 1:1 and uploads/reads need no flip; only present flips;
@@ -172,91 +172,108 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   - clip-space depth: epilogue `z = (z + w) * 0.5`;
   - alpha test: function constant 0 (`uint`, the GL compare function minus `GL_NEVER`, 8 = off) and the
     reference in fragment buffer 1 (`float`);
-  - texture LOD bias: fragment buffer 2 (`float[16]`, by sampler slot), added in `sample(..., bias(...))`.
+  - texture LOD bias: fragment buffer 2 (`float[16]`, by sampler slot), added in `sample(..., bias(...))`;
+  - vertex attributes `[[attribute(i)]]` from `[[stage_in]]`, one vertex buffer per enabled attribute at buffer
+    index 14 + attribute index (14..29: Metal stops at 30); uniforms at buffer 0 in each stage; textures and
+    samplers at the sampler's texture unit.
 - **Errors and queries**: `glGet*` answered from tracked state; `glGetError` returns the first recorded
   error. `RS_GL_CHECK` works the same on both backends.
-- **Texture log** (`mtl_texlog.m`, off unless set, [the switches](TESTING.md#diagnostics)): hashes level 0 at upload (in Learn & Play a
-  `glTexSubImage2D` of the whole level, as its D3D9 layer defines the level empty first) and records what each draw binds. It is how to find
-  a texture a mod should act on. `RS_GL_TEX_MARK` makes a [render API](#render-api-shimsincluders_renderh) rule that draws one in magenta.
+- **Diagnostics** (off unless set, [the switches](TESTING.md#diagnostics)). The texture log (`mtl_texlog.m`)
+  hashes level 0 at upload (in Learn & Play a `glTexSubImage2D` of the whole level, as its D3D9 layer defines the
+  level empty first) and records what each draw binds: it is how to find a texture a mod should act on, and
+  `RS_GL_TEX_MARK` makes a [render API](#render-api-shimsincluders_renderh) rule that draws one in magenta. With
+  `RS_GL_FRAMETIMES` the frame log gets what only Metal knows: when a drawable went on the screen and each
+  command buffer's time on the GPU. `RS_METAL_PASS_TIMES=FILE` samples the GPU's timestamp around each render
+  pass of every eighth frame and writes the sums by the pass' place in the frame, with the present and the
+  upscaler.
 - **Built-in attributes**: GLSL `gl_Vertex`, `gl_Normal`, `gl_Color`, `gl_MultiTexCoordN` use NVIDIA's
   aliasing (0, 2, 3, 8+N), so `glVertexAttribPointer` indices drive them.
 
 ## Safe load
 
-`rs_gfx_prepare`: with a community "fast-load" `cache.psarc` the game's loading can stall for good when the CPU is busy (a race in the game, on GL too), and a cold Metal start keeps every
-core compiling during loading. So when `<game>/cache.psarc` isn't the original (size, then MD5; `RS_METAL_SAFE_LOAD=1|0` forces it), the shell runs the second half of `MainController
-awakeFromNib` only after `rs_gfx_prepare(ctx, 600)` has returned on a background thread. The window stays black, with a "Preparing shaders… 120 of 3880" line from 0.5 s on. With the original
-`cache.psarc` nothing waits. On GL `rs_gfx_prepare` is a no-op.
+`rs_gfx_prepare`: with a community "fast-load" `cache.psarc` the game's loading can stall for good when the CPU
+is busy (a race in the game, on GL too), and a cold Metal start keeps every core compiling during loading. So
+when `<game>/cache.psarc` isn't the original (size, then MD5; `RS_METAL_SAFE_LOAD=1|0` forces it), the shell runs
+the second half of `MainController awakeFromNib` only after `rs_gfx_prepare(ctx, 600)` has returned on a
+background thread. The window stays black, with a "Preparing shaders… 120 of 3880" line from 0.5 s on.
+Afterwards the pool is throttled to 2 jobs (`RS_MTL_COMPILE_THREADS`) at utility QoS, so compiles can't starve
+the loading threads. With the original `cache.psarc` nothing waits. On GL `rs_gfx_prepare` is a no-op.
 
-**Corpus warm** (first run): when the manifest lists fewer than 32 libraries, or the cache directory has no `corpus-warmed` record for this corpus, it also compiles the MSL of every program of the
-offline corpus (4081 programs, 3880 distinct texts). The libraries aren't kept: the system's Metal cache has them, and the game's own compile later is a hit. Pipelines aren't warmed from
-the corpus: they need draw state and cost far less. On an M2, cold: 83 s once; the next start 0.04 s. A new corpus, translator or cache directory (OS update, GPU) warms again. At the
-timeout the rest is skipped with no record written, and the game compiles what it lacks. `RS_METAL_CORPUS_WARM=0|1` turns it off or forces it. Afterwards the pool is throttled to 2 jobs
-(`RS_MTL_COMPILE_THREADS`) at utility QoS, so compiles can't starve the loading threads.
+**Corpus warm** (first run): when the manifest lists fewer than 32 libraries, or the cache directory has no
+`corpus-warmed` record for this corpus, it also compiles the MSL of every program of the offline corpus. The
+libraries aren't kept: the system's Metal cache has them, and the game's own compile later is a hit. Pipelines
+aren't warmed from the corpus: they need draw state and cost far less. A new corpus, translator or cache
+directory (OS update, GPU) warms again. At the timeout the rest is skipped with no record written, and the game
+compiles what it lacks. `RS_METAL_CORPUS_WARM=0|1` turns it off or forces it.
 
-**Install-time warm-up** (`--warm-shaders`, `rsp_mtl_warm_only` in `rsp_present_metal.m`, `tools/play-native/warm-shaders.sh`; the loop is `rs_gfx_warm_only` in libRSOpenGL, which Learn & Play
-runs too): the installed app's executable, before it loads anything of the game, makes an offscreen context and runs `rs_gfx_prepare` with the same corpus rule, printing `progress F
-Preparing shaders… N of M` (`RS_METAL_WARM_MAX_SECONDS`, default 3600); exit 0 ready, 1 timed out, 2 no Metal. On an M2, cold: 3880 libraries in 270 s; again 0.2 s.
+**Install-time warm-up** (`--warm-shaders`, `rsp_mtl_warm_only` in `rsp_present_metal.m`,
+`tools/play-native/warm-shaders.sh`; the loop is `rs_gfx_warm_only` in libRSOpenGL, which Learn & Play runs
+too): the installed app's executable, before it loads anything of the game, makes an offscreen context and runs
+`rs_gfx_prepare` with the same corpus rule, printing `progress F Preparing shaders… N of M`
+(`RS_METAL_WARM_MAX_SECONDS`, default 3600); exit 0 ready, 1 timed out, 2 no Metal. On an M2, cold: 3880
+libraries in 270 s; again 0.2 s.
 
-It has to be the installed app at its resolved path: Metal's system shader cache is keyed by the bundle identifier and, as measured on macOS 26, the length of the bundle's path. So a separate tool can't do
-it, the warm-up survives reinstalls to the same place, and moving the install warms again. Our own disk cache is per user (`~/Library/Caches/rs-rearmed/metal`); Learn & Play has
-`~/Library/Caches/rs-rearmed/learn-play/metal` (`RS_METAL_CACHE_DIR`), so neither edition ages the other's shaders out of the manifest.
+It has to be the installed app at its resolved path: Metal's system shader cache is keyed by the bundle
+identifier and, as measured on macOS 26, the length of the bundle's path. So a separate tool can't do it, the
+warm-up survives reinstalls to the same place, and moving the install warms again. Our own disk cache is per
+user (`~/Library/Caches/rs-rearmed/metal`); Learn & Play has `~/Library/Caches/rs-rearmed/learn-play/metal`
+(`RS_METAL_CACHE_DIR`), so neither edition ages the other's shaders out of the manifest.
 
 ## Shader translation
 
-Sources: `shims/opengl/src/msl/`, `tools/metal/`. `rsmsl_translate` (see `msl_xlat.h`) first looks in the offline corpus (MSL generated at build time from
-every shader the game can compile; keyed by a hash of both sources), then translates at run time and logs it
-(`RS_MSL_LOG`).
+Sources: `shims/opengl/src/msl/`, `tools/metal/`. `rsmsl_translate` (see `msl_xlat.h`) first looks in the
+offline corpus (MSL generated at build time from every shader the game can compile; keyed by a hash of both
+sources), then translates at run time and logs it (`RS_MSL_LOG`). The binding conventions are the core's
+([Metal core](#metal-core-shimsopenglsrcmetal)).
 
-Learn & Play's corpus goes the same way from Direct3D bytecode ([its design](../windows/DESIGN.md#shader-corpus)).
 The corpus of a user's build is made from the game files alone (`tools/metal/make-corpus.sh`, run by
-`build-m4.sh`, a few seconds): Scaleform's GL HAL keeps the full source of each shader in the image,
-one set per GLSL version; `extract_scaleform.py` takes the `#version 120` set (66 vertex, 147 fragment
-shaders) and sizes the batch uniform arrays (`vfuniforms`, `vfmuniforms`) for 12 batches instead of the
-strings' 24, as the HAL does at run time with the GL limits both backends report. The result is byte
-for byte the 213 shaders `RS_GL_DUMP_SHADERS` dumped in menu and song runs. The Cg side comes from
-`static.psarc` (`shims/cg/tools/extract_corpus.py`, then `cg_corpus_load --dump-glsl`). Pairing
-(`pair_shaders.py`) and translation (`build-msl-corpus.sh --translate-only`, i.e. `msl_verify
---translate-only`: no MSL compile, no GL) give 6250 programs, 4081 entries, 3880 distinct MSL texts:
-the same entries as the corpus built from game-run dumps and checked against GL (only the "verified"
-flag differs; `RS_MSL_VERIFY=1` runs that check too, about 5 minutes). Not covered: a shader the game
-would build at run time from other sources (none seen in game runs), and a game version whose image
-does not hold the expected set (`extract_scaleform.py` then fails and the build goes on without a
-corpus). Binding conventions: vertex attributes `[[attribute(i)]]` from `[[stage_in]]`; vertex
-buffers at buffer index 14 + attribute index (14..29: one buffer per enabled attribute, Metal stops at 30); uniforms at buffer 0 in
-each stage; fragment alpha-test reference at buffer 1; texture LOD biases at fragment buffer 2 (16 floats, by
-sampler slot); textures and samplers at the sampler's texture unit.
+`build-m4.sh`, a few seconds):
+
+- Scaleform's GL HAL keeps the full source of each shader in the image, one set per GLSL version;
+  `extract_scaleform.py` takes the `#version 120` set (66 vertex, 147 fragment shaders) and sizes the batch
+  uniform arrays (`vfuniforms`, `vfmuniforms`) for 12 batches instead of the strings' 24, as the HAL does at run
+  time with the GL limits both backends report.
+- The Cg side comes from `static.psarc` (`shims/cg/tools/extract_corpus.py`, then `cg_corpus_load --dump-glsl`).
+- Pairing (`pair_shaders.py`) and translation (`build-msl-corpus.sh --translate-only`, i.e. `msl_verify
+  --translate-only`: no MSL compile, no GL) give 6250 programs, 4081 entries, 3880 distinct MSL texts.
+  `RS_MSL_VERIFY=1` also checks them against GL (about 5 minutes).
+
+Not covered: a shader the game would build at run time from other sources (none seen in game runs), and a game
+version whose image does not hold the expected set (`extract_scaleform.py` then fails and the build goes on
+without a corpus). Learn & Play's corpus goes the same way from Direct3D bytecode
+([its design](../windows/DESIGN.md#shader-corpus)).
 
 ## Overlay API (`shims/include/rs_overlay.h`)
 
 Exported by the executable. A mod registers a callback that runs after the game's frame and before
 present; inside it only `rs_overlay_*` calls are allowed (draw an RGBA image / text into a rect). The GL
 implementation uses only VBO + GLSL 1.20 + texture calls and saves/restores what it touches, so it runs
-unchanged on the Metal core. Rules as X-Plane's: no `glGet`, no game resources, state restored.
+unchanged on the Metal core, and in Learn & Play on its back buffer
+([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). Rules as X-Plane's: no `glGet`, no game
+resources, state restored.
 
 ## Render API (`shims/include/rs_render.h`)
 
-Exported by libRSOpenGL, for both editions, on Metal alone: on OpenGL `rs_render_api_version` is 0. A mod makes a rule for a game texture, by the size and the
-hash of what the game uploads to level 0 (`rs_render_match`), and gives pixels to draw in its place (`rs_render_replace`) or hides what is drawn with it (`rs_render_hide`).
-The core (`mtl_render.m`) keeps the rule on the texture object at upload and asks it when a draw binds the texture, so the game's own texture and its GL state stay as they
-were. Replacing a texture costs its draws a lock; a texture with no rule costs a draw one test, and an upload one test until a rule is made. Only uploads of the rule's size are
-hashed. New pixels wait for the next draw, which makes the Metal texture: a mod can give them from any thread. A rule ends with another upload or a sub-image of part of level 0,
-and an upload with the same content finds it again.
+Exported by libRSOpenGL, for both editions, on Metal alone: on OpenGL `rs_render_api_version` is 0. A mod makes
+a rule for a game texture, by the size and the hash of what the game uploads to level 0 (`rs_render_match`), and
+gives pixels to draw in its place (`rs_render_replace`) or hides what is drawn with it (`rs_render_hide`). The
+core (`mtl_render.m`) keeps the rule on the texture object at upload and asks it when a draw binds the texture,
+so the game's own texture and its GL state stay as they were. Replacing a texture costs its draws a lock; a
+texture with no rule costs a draw one test, and an upload one test until a rule is made. Only uploads of the
+rule's size are hashed. New pixels wait for the next draw, which makes the Metal texture: a mod can give them
+from any thread. A rule ends with another upload or a sub-image of part of level 0, and an upload with the same
+content finds it again.
 
-Why at the bind, and not a callback per draw as RSMods has on Direct3D: no mod code runs in the draw loop, and a texture means the same in both editions, where
-vertex counts and states would need working out in each. It also needs no hook point, so no new translation of the game. The game colors notes and the highway through small palette
-textures (the [texture log](#metal-core-shimsopenglsrcmetal) found them), so this is enough for those. What it can't do: tell two objects that share a texture apart.
+Why at the bind, and not a callback per draw as RSMods has on Direct3D: no mod code runs in the draw loop, and a
+texture means the same in both editions, where vertex counts and states would need working out in each. It also
+needs no hook point, so no new translation of the game. The game colors notes and the highway through small
+palette textures, so this is enough for those. What it can't do: tell two objects that share a texture apart.
 
 ## Status
 
-Shipped in 1.3.0 and checked in the game on one Mac (M2, a 75 Hz external display and the built-in Retina
-screen), on Metal, unattended and by hand: six full songs in a row (37 minutes; memory flat, 74.7 fps, no
-frame over 50 ms outside song loads), Session Mode for 10 minutes, the chord book, a lesson with its Bink
-video, the Guitarcade menus, minimise, live resize, full screen and back, quitting, OpenGL, and a mod
-drawing with OpenGL (no crash; its text does not show on Metal). GL and Metal match in frame diffs. The
-fallback was checked with two forced kills in a row. The installer was checked end to end with a test
-home: a fresh build and install, Skip during the shaders, an update after a fallback, quitting mid-build.
-CPU and frame times: [PERFORMANCE.md](PERFORMANCE.md#renderer).
+The default since 1.3.0, and the only renderer Learn & Play shows in a window. GL and Metal match in frame
+diffs; the fallback was checked with two forced kills in a row. CPU and frame times:
+[PERFORMANCE.md](PERFORMANCE.md#renderer).
 
 Not checked: a second Mac or GPU, sleep and wake, unplugging a display, the Retina mouse in songs.
 

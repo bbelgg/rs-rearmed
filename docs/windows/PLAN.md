@@ -1,115 +1,117 @@
 # Windows port: status and plan
 
-Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results of the last runs are in [TESTING.md](TESTING.md) and
-[PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) page.
+The Mac port's plan: [Mac plan](../mac/PLAN.md). How things were checked is in [TESTING.md](TESTING.md), the
+measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git and on the
+[Releases](https://github.com/bbelgg/rs-rearmed/releases) page.
 
 ## Status
 
-- **Works**, checked on an Apple Silicon Mac: the game offline with the Uplay screens skipped; songs to the end, Score Attack, the Guitarcade, Session Mode,
-  Nonstop Play, video lessons, the Tone Designer's Edit Tone, a Multiplayer song with each player on their own input (new in 1.8.0); custom songs and DLC; Enumerate, EXIT GAME (new in 1.9.0) and Refresh Game Files; a Real Tone cable
-  device (a virtual one named like the cable), the microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
-  calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and the close button, in 0.3-0.5 s.
-- **Files a mod serves** (not released): as in the [Mac plan](../mac/PLAN.md#status), through the Win32 seam's file calls ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Checked by the unit tests (`test_kfile`: a served file found, sized, read, seeked and mapped; `test_files`) and by the same run to the note highway with `files_mod.dylib` as the Mac's, over 500 archives opened through it. A provider that changes what an archive holds has not been run.
-- **Mods**: 18 of the 21 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two players are in `win32_overrides.c`), the overlay API, the `mods/` folder and one mod ABI with the Mac
-  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and 0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
-- **Colors of notes, the highway and strings** (new in 1.9.0): as in the [Mac plan](../mac/PLAN.md#status), through the render API and the game's string color table, checked here with rearmed-mods 0.5.0. Here the
-  ramps are BGRA, so their hashes differ from the Mac's; 210 of the game's textures have the same hash in both editions, the compressed ones among them.
-- **The note the game hears** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); here the names are RSMods' own chain on this game (`ptr_guitarSpeak`, the note at +0x5fc, a bass's at +0x5f4). Read on the Mac; not yet run here.
-- **The note counts and the grey-note time** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status). Here the counts' fields are matched by the code that counts a hit and a miss (0xfd4459, 0xfd4a82: hits +0x30, misses +0x40, the track +0xc). The track's times (the song position +0x3d0, the grey-note time +0x3dc) were read in runs (2026-11-09): the grey-note time is RSMods' and is raised to the song position at each pause. A path to the counts from a song's menu (+0x2c, +0x78, +0x24) held in two runs and not in a third, so the counts are reached as RSMods reaches them, from the UI manager (`ui_note_stats_0` to `_3`: +0xb0, +0x18, +0x4, +0x84), the same counts in the runs, in Learn a Song, playing and paused. Score Attack counts in another object here (RSMods' ScoreAttackNoteData), which that path doesn't reach: it is named as RSMods reaches it (`ui_score_attack_stats` +0x4c in place of the last step, `score_attack_hits` +0x4c, `score_attack_misses` +0x50): seen in a run (2026-11-10), rearmed-mods' accuracy following the hits and misses in Score Attack.
-- **A hook on the tone change** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); here `tone_change` takes its `this` in ecx and the player in eax, the tone on the stack (`ret 4`), at the function RSMods patches (0x1352620): checked against its code (2026-11-09). This edition's build of 2026-11-09 wraps it, and the game ran on it to Learn a Song with rearmed-mods loaded and no refusal; no mod hooked it there yet.
-- **A hook on the song lists' names** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); here `song_list_name` takes the name's string in edi and the list in ecx, at the function RSMods patches (0x10d2470), and `efd_str_destroy` is 0x14d5910 (`thiscall`). The registers checked against the code (2026-11-09), and the same build wraps it; played on the Mac with Custom Song List Titles, not yet here.
-- **A hook on decoded song audio** (new in 1.12.0): as in the [Mac plan](../mac/PLAN.md#status); here `ak_src_submit` is thiscall (0x1a98ed0, ret 0x14), called at the end of the Vorbis file source's GetBuffer as on the Mac, and the source's fields are +0xc, +0x64, +4 and +0x18; `ak_vorbis_codebooks` is 0x1ddabc8. Song Stems played here with a stand-in for its helper (2026-11-09: the guitar out from the song's first notes, the level by its key, after a rewind). Checked in a run here too (2026-11-09): the test mod's blocks of a song (128 frames each, half the Mac's) against vgmstream's decode of its `.wem`, -94 dB at worst, and -104 dB after a rewind.
-- **Edits and mid points** (new in 1.12.0): a mod changes a function from the inside ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)).
-  The tables carry rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string) (`seven_string`: 735 edits,
-  127 mid points), and Plain Packages (`plain_packages`: 2 edits, 1 mid point). Run 2026-11-09 with rearmed-mods' branch: a six-string song
-  played and was freed as before; DotCharter's 7-string chart showed seven strings and chord frames over the low B, named its tuning
-  B STANDARD 7STR in the song list, on the song's page and in the tuner, and loaded from an unencrypted copy. Played with a guitar by the
-  maintainer the same day, a chart played through several times: it works; that session's log has the song's 7-string chord diagrams
-  and the seven-peg headstock shown, and no fault.
-  Those runs found a hook's game call leaving ecx changed for the code after its point (a crash freeing a song's vocals): a point now puts
-  back the registers its hooks didn't set. The Mac edition has the same unit now (new in 1.13.0), played with a guitar there too
-  ([Mac plan](../mac/PLAN.md#status)); its tables add 29 points of their own, which are `none` here (mostly loops the edits
-  lengthen here, unrolled on the Mac), so the generated C of this edition's functions is byte for byte as before.
-- **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does. A start with the intro skip switched off in the file played the intro (2026-11-09).
-- **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run in this edition.
-- **Retina upscaling and sRGB colour** (new in 1.10.0): as in the [Mac plan](../mac/PLAN.md#status), `lp_window.m` asks for the backing-pixel
-  output and the shared renderer scales with MetalFX and tags the layer sRGB. First run here 2026-11-08, full screen on a built-in Retina screen:
-  `upscaling 1470x956 to 2940x1912 with MetalFX`, a song played. The upscaled picture itself wasn't looked at (snapshots are the back buffer).
-- **Sharper textures and MSAA** (new in 1.10.0): the renderer is shared, so the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA on
-  screen-sized targets with depth are here too ([Mac plan](../mac/PLAN.md#status)). First run here in the same song, `MSAA 4x` in the log; not compared with them off.
-- **Screen shape** (new in 1.10.0): the game draws at its screen's or window's own shape, with no bars, as the Mac edition does; the original fits a 16:9
-  picture into the screen itself ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed mode becomes the game's resolution.
-  Checked 2026-11-08 full screen on a MacBook's built-in screen (1470x956 points, 1.54:1): the cameras' frustums 1.430 x 0.930 at the title and
-  1.120 x 0.728 and 1.776 x 1.154 in a song, against 1.654, 1.294 and 2.052 wide at 16:9, the heights the same; the menus, the song list and the
-  highway undistorted. A window resized to 1200x600 by the window script became the game's resolution, drawn at 2:1. `RS_WINDOW_ANY_SHAPE=0`
-  keeps the original. Not run: an ultrawide screen, a drag by hand, macOS full screen from a window.
-- **1.10.0's build with a guitar**: played by the maintainer on 2026-11-08, in a window, on an HX Stomp: the note detection ran at its usual 6% of a core with
-  its analysis window now relaxed, the Wwise thread at 6.5-7%, and no audio errors. A song's first play stutters while its shaders compile; a second play didn't.
-- **Performance**: a song holds the display's rate, 74.9 fps on 75 Hz, with no frame over 20 ms, at 7.2 ms of CPU a frame, 54% of a core, where the Mac takes
-  [6.1 ms](../mac/PERFORMANCE.md#learn--plays-route). The Mac's figure has the renderer's last change (fewer references, one pass descriptor); this edition's 7.2 ms predates it, and it hasn't been measured here. The title is up in 7-9 s. Guest memory doesn't grow over songs in a row.
-- **Present but not tested**: a cable and an interface or two interfaces in Multiplayer, SWAP CABLE ASSIGNMENT on interfaces, the Workshop's other screens, the DLC preview, the prebuilt harvester
-  (`win-x86/harvest/rsharvest2.exe`), and Rocksmith 1 DLC songs in a game run (`test_steam32` covers `RS_STEAM_OWNED`; the test account owns none).
-- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. 987 of the 1,178 symbols and 79 of the 100 offsets are read from
-  the Windows code; the map says why for the rest. 88 names have `custom` conventions (LTCG register arguments), which their overrides read by hand.
-  No entry is left "not proved" (2026-11-08): of the 42, 20 have their address, from the Wwise plug-ins' registration (`0x17c4ab0`, the Mac's order and ids) down
-  to each kernel's call site, and the Vorbis, mixer, FFT and efd code by their tables and callers. The other 22 are inlined, folded or specialised by LTCG, have no
-  counterpart, are called only by the Mac's differential tests, or are found but left out because they can't be relaxed (a static's guard, a CRT call).
-- **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build without one
-  ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for its relocation sites, which nothing reads out of the capture VM yet.
-
-- **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native at 64 frames, as on the Mac. Its open work is kept with it.
+- **Released**: since 1.4.0; `VERSION` says which release this is.
+- **Works**, checked on an Apple Silicon Mac: the game offline with the Uplay screens skipped; songs to the end, Score
+  Attack, the Guitarcade, Session Mode, Nonstop Play, video lessons, the Tone Designer's Edit Tone; custom songs and
+  DLC; Enumerate, EXIT GAME and Refresh Game Files; a Real Tone cable device (a virtual one named like the cable), the
+  microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
+  calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and
+  the close button, in 0.3-0.5 s; the built-in fixes, no intro screens or Auto Save warning; the GUI installer.
+- **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
+- **Performance**: a song holds the display's rate, 60 fps on a 60 Hz display and 74.9 on 75 Hz, at 52-54% of a core
+  and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB
+  ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The title is up in about 7 s. Guest memory doesn't grow
+  over songs in a row.
+- **Mods**: 18 of the 21 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two
+  players are in `win32_overrides.c`), the overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and
+  0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
+- **Files a mod serves** (not released): as in the [Mac plan](../mac/PLAN.md#status), through the Win32 seam's file
+  calls ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Covered by unit tests and the same run to the note highway as
+  the Mac's ([TESTING.md](TESTING.md)). A provider that changes what an archive holds has not been run.
+- **Edits and mid points, and 7-string charts** (new in 1.12.0): a mod changes a function from the inside
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The tables (`tools/targets/win-x86/edits.map`, `mids.map`) carry
+  rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string), and Plain Packages.
+  Run by scripted input and played with a guitar, a 7-string chart through several times. The Mac edition has the same
+  units (new in 1.13.0); the points that are its own are `none` here.
+- **What the game names for mods**, as in the [Mac plan](../mac/PLAN.md#status):
+  - *Colors of notes, the highway and strings* (new in 1.9.0): checked here in one song. The palette textures are BGRA
+    here, so their hashes differ from the Mac's.
+  - *The note the game hears* (new in 1.11.0): named by RSMods' own chain on this game. Read on the Mac; not yet run
+    here.
+  - *The note counts and the grey-note time* (new in 1.11.0): the counts are reached as RSMods reaches them, from the
+    UI manager, in Learn a Song and, by its own names (not released), in Score Attack; both seen in runs, as was the
+    grey-note time.
+  - *A hook on the tone change* (new in 1.11.0): wrapped at the function RSMods patches; the game ran on it with
+    rearmed-mods loaded, but no mod hooked it here yet.
+  - *A hook on the song lists' names* (new in 1.11.0): wrapped at the function RSMods patches; played on the Mac, not
+    yet here.
+  - *A hook on decoded song audio* (new in 1.12.0): checked against another decoder block by block here too, also
+    after a rewind; Song Stems played here with a stand-in for its helper.
+- **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status);
+  `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of
+  `last-run.log`, as the Mac launcher does.
+- **Game Mode** (new in 1.9.1): the app's category is music, as in the [Mac plan](../mac/PLAN.md#status). Not yet run
+  in this edition.
+- **Two players** (new in 1.8.0): a song with each player on their own input, played on two channels of one interface.
+  A cable with an interface, two interfaces, and SWAP CABLE ASSIGNMENT on interfaces have not been played.
+- **Rocksmith 1 songs**: not played in a game run; the test account owns none (`test_steam32` covers `RS_STEAM_OWNED`).
+- **Screen shape** (new in 1.10.0): the game draws at its screen's or window's own shape, with no bars, as the Mac
+  edition does; the original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window
+  resized in Windowed mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original. Checked full
+  screen on a MacBook's built-in screen and in a resized window. Not run: an ultrawide screen, a drag by hand, macOS
+  full screen from a window.
+- **Retina, colour and a sharper picture** (new in 1.10.0): the renderer is shared, so MetalFX upscaling, the sRGB tag,
+  the game's texture LOD bias, 16x anisotropic filtering and 4x MSAA are here too
+  ([Mac plan](../mac/PLAN.md#status)). Run once, full screen on a built-in Retina screen; the upscaled picture itself
+  wasn't looked at (snapshots are the back buffer), and nothing was compared with them off.
+- **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native at 64 frames, as on the Mac. Its open
+  work is kept with it.
+- **Present but not tested**: the Workshop's other screens, the DLC preview, and the prebuilt harvester
+  (`win-x86/harvest/rsharvest2.exe`).
+- **The tables** (`tools/targets/win-x86`): every name has an entry, and `check.py` covers both targets. Most symbols
+  and offsets are read from the Windows code; the map says why for the rest (inlined, folded or specialised by LTCG,
+  or no counterpart). 88 names have `custom` conventions (LTCG register arguments), which their overrides read by hand.
+- **The game image**: unpacked on the Mac from the user's own exe with the release's seed, or a capture for a build
+  without one ([win-x86/unpack](../../win-x86/unpack/README.md)). A new exe build needs a loaded copy of the game for
+  its relocation sites, which nothing reads out of the capture VM yet.
 
 ## Open issues
 
-- **The published installer**: 1.12.0's hasn't been run, nor a full install from the tag. Exit Game and the colors were checked on test installs.
-- **The title screen's own Auto Save call** (`0x12bd061`): read from the code, not seen in a run. The title listens for the same `OnSignInFlowComplete` (`0x12bdd00`), and with
-  slot 0 of the object at `[[0x1ee0bfc] + 0x30]` and its byte `+0x14` set, its tick (`0x12bcfd0`) shows the warning for 4 s. What sets that byte isn't known, so whether a player can
-  reach it isn't either. If so, the skip needs the tick wrapped too, to clear its timer.
+- **The published installer**: recent releases' hasn't been run, nor a full install from the tag; the install scripts
+  and test installs were.
+- **The title screen's own Auto Save call**: read from the code, not seen in a run. The title's tick can show the
+  warning for 4 s when a flag is set; what sets it isn't known, so whether a player can reach it isn't either. If so,
+  the skip needs the tick wrapped too, to clear its timer.
 - The cable screen's Direct Connect button hasn't been checked.
-- The list of inputs and the level, not checked yet: unplugging an interface while the game runs, a Real Tone cable with this
-  build, and the level with a second profile, which counts as calibrated with the first.
+- The list of inputs and the level, not checked yet: unplugging an interface while the game runs, a Real Tone cable
+  with this build, and the level with a second profile, which counts as calibrated with the first.
 - winmm's device names stop at 31 characters, so on that fallback path a long interface name can lose its channel.
-- **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address
-  0x0`), a fault at guest address 0x168 before it. Neither reproduced on demand yet; neither came back in the
-  runs of 2026-11-04 (about ten tuner skips, on builds with x86 memory ordering and one without).
+- **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address 0x0`), and a fault
+  at guest address 0x168 before it. Neither has come back.
+- **A song ending a few seconds in**: with the machine heavily loaded by other builds, a song went back to its page
+  soon after it started in most runs, with the profile saved as at a song's end and no game exception
+  (`RC32_LOG_RAISE`). Not looked into further.
 - **Two COM object tables**: the D3D9, audio and Steam faces share the seam's thunk cells, vtables and guest
   memory (`win32_guestobj.c`), but the audio and D3D9 faces still each keep their own table of objects and
   their own `IUnknown` (D3D9's also has internal references and forwarded counts).
 - Guitar latency against the Mac port has not been measured.
-- **A song ending a few seconds in** (2026-11-09): with the machine loaded (load average about 30, other builds running), a song went back
-  to its page soon after it started in most runs, with Seven-String Guitar and Plain Packages switched off too, and the profile was saved
-  as at a song's end. No game exception came with it (`RC32_LOG_RAISE`). Other runs at the same load played the same songs. Not looked
-  into further.
-- **CPU and memory**: about 1.1 ms a frame over the Mac edition on one route, and 1.3 GB against 0.9 GB; with 1.10.0's 4x MSAA, 1.5 GB against 1.2 GB
-  ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition), 2026-11-08). The memory order costs about 1 ms a frame at the display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
-- **Shaders the list doesn't have**: the corpus has the programs seen in runs, and the Guitarcade's games wait for a guitar at
-  calibration, so of them it has only their effects, and of the venues (Venue Mode) one was seen, with four programs of its own. Run them
-  with `LP_SHADER_LOG` and add them ([TESTING.md](TESTING.md#shaders-of-a-run)). A program not in it stalls about 0.25 s the first time, as before.
-- **After a macOS update** the first play compiles again unless the warm-up is run again; the Mac edition does it at its next
-  start when safe load is on. In Learn & Play it would be `rs_gfx_prepare` at context creation, with a line on the black window.
-- **One DLC archive differs between depots**: 113 PC archive files in the depots are 73 different archives, and one
-  name (`notegew2_p.psarc`) has two versions 2 bytes apart. The copy keeps one; what the bytes do has not been read.
-- **Song archives per platform**: the Windows game reads the PC archives, `*_p.psarc`; the Mac game
-  reads `*_m.psarc`. Official DLC has both (each DLC is a depot with the two), but custom songs often
-  exist only for one platform, so a Mac-only CDLC collection (`_m`) will not load in this build, and a PC one
-  not in the Mac port. Compared on one official song, the two archives differ only in folder names
-  (`songs/bin/macos`, `audio/mac` against `songs/bin/generic`, `audio/windows`), the `.nt` graph, and the `.sng`
-  files, which are the same size but encrypted with a key per platform; the audio banks are byte for byte the
-  same. So an install-time converter is simple in itself, but it needs the other platform's key, which is
-  not in the game a player has here, and nothing from the game may be in this repository. So RS Re-ARMed
-  has no converter and will not get one: an archive has to be the edition's own kind.
-- The fixes for what the code review of 2026-11-09 left open (not released), run in their suites and in one game
-  run to the note highway and through 150 s of a song (`tools/perf/run.py`, 2026-11-10, relinked on the
-  translation of 2026-11-09: 59.6 fps, 51.5% of a core, 1.44 GB where 1.13.0 had 1.5 GB; its four frames over
-  50 ms were first-use shader compiles on a cold cache): a thread that ends gives its stack, TEB and TLS blocks to the next (`rc32_thread_end`), and
-  `rc32_alloc` no longer clears what it hands out, so a stack is in memory only as far as it is used; a guest
-  path that starts with `/` is a host path only inside the game folder, the user folder or the Steam layer's
-  data folder (`win32_kfile.c`); `HeapAlloc` clears what was asked for in a block it uses again; a D3D call
-  finds its object without the process-wide lock; the function discovery keeps its function set as it goes
-  (`x86_32.py`: the same 61,755 functions of the game in 164 s where it took 545 s). A long
-  session, where the threads' reused blocks matter, has not been played. The Mac plan
-  lists what the shared renderer, the recompiler's runtime and the installer got from the same review
-  ([Mac plan](../mac/PLAN.md#open-issues)).
+- **CPU and memory**: more than the Mac edition on the same route
+  ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The memory order costs about 1 ms a frame at the
+  display's rate ([PERFORMANCE.md](PERFORMANCE.md#memory-order)).
+- **Shaders the list doesn't have**: the corpus has the programs seen in runs. The Guitarcade's games wait for a guitar
+  at calibration, so it has only their effects, and one venue of Venue Mode. Run them with `LP_SHADER_LOG` and add them
+  ([TESTING.md](TESTING.md#shaders-of-a-run)). A program not in it stalls about 0.25 s the first time.
+- **After a macOS update** the first play compiles again unless the warm-up is run again; the Mac edition does it at
+  its next start when safe load is on. Here it would be `rs_gfx_prepare` at context creation, with a line on the black
+  window.
+- **One DLC archive differs between depots**: one name (`notegew2_p.psarc`) has two versions 2 bytes apart. The copy
+  keeps one; what the bytes do has not been read.
+- **Song archives per platform**: this game reads the PC archives (`*_p.psarc`), the Mac game `*_m.psarc`. Official DLC
+  has both; a custom song often exists for one platform only. The song files are encrypted with a key per platform,
+  which is not in the game a player has here, and nothing from the game may be in this repository, so RS Re-ARMed has
+  no converter and will not get one.
+- **The fixes from the code review of 2026-11-09** (not released) were run in their suites and in one song: a thread
+  that ends gives its stack, TEB and TLS blocks to the next, a guest path that starts with `/` is a host path only
+  inside the game's own folders, and `HeapAlloc` clears a block it uses again. A long session, where the reused blocks
+  matter, has not been played. What the shared code got from the same review is in the
+  [Mac plan](../mac/PLAN.md#open-issues).
 - D3DX paths not exercised yet: `D3DXCreateEffectCompiler`, `D3DXCreateTextureFromFileExA`, the cube and
   volume loaders, `D3DXSaveSurfaceToFileInMemory`, effects with textures.
 - Fixed function not implemented (logged once): vertex blending, sphere maps, bump mapping, user clip
@@ -117,19 +119,17 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
 
 ## Next work
 
-**Parity (P4):**
+Being looked into, with no promise of if or when:
 
-- The checks the Mac port has had that are left: long sessions, and guitar latency against it.
-
-**Note detection** (not released): `0x13f3690` relaxed, 1.6 points of a core less in a song ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); to be played with
-a guitar before a release. The stack check in place and what else was tried are there too; what is left on that thread is its own work, or is not safe to relax.
-
-**Measured runs:** what is left of `tools/perf` is in the [Mac plan](../mac/PLAN.md#next-work), for both editions.
-
-**Guitar input:** choosing both players' inputs on the Multiplayer screen, as in the [Mac plan](../mac/PLAN.md#next-work).
-
-**Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note detection and the
-Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).
+- **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
+- **Note detection** (not released): one more of its loops runs relaxed, about 1.6 points of a core less in a song
+  ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); to be played with a guitar before a release. What is
+  left on that thread is its own work, or is not safe to relax.
+- **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note
+  detection and the Wwise functions still fenced; the D3D9 layer's bookkeeping; the index-range scan of the draw-time
+  upload; zero-copy dynamic buffers; memory (guest copies of D3D9 buffers).
+- **Measured runs**: what is left of `tools/perf` is in the [Mac plan](../mac/PLAN.md#next-work), for both editions.
+- **Choosing both players' inputs on the Multiplayer screen**, as in the [Mac plan](../mac/PLAN.md#next-work).
 
 ## Risks
 

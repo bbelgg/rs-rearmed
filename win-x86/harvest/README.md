@@ -35,9 +35,8 @@ exe, its config and the wrapper into a folder to take to the PC.
 The wrapper expects the supported build of the game (SHA-256 `bb056959c0c6371d4ecf78f84c5d27e2fae93a9d0258830c2a36f33e6a2778eb`).
 Another build still captures, with a warning, but the Mac side is pinned to the supported one.
 
-**Tested:** the capture the port is built and played from (2026-11-01) was made with an earlier,
-self-contained build of the same harvester. This net48 build of `rsharvest2.cs` has not been run on
-Windows yet.
+**Not tested:** this net48 build of `rsharvest2.cs` has not been run on Windows yet. The capture the port
+was first built from was made with an earlier, self-contained build of the same harvester.
 
 ## Verify it yourself
 

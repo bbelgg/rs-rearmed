@@ -1,6 +1,6 @@
-# Title-screen logo: "RS Re-ARMed"
+# Title-screen logo: "Re-ARMed 2026"
 
-A red graffiti tag naming RS Re-ARMed, tilted across "REMASTERED" on the title-screen logo.
+A red graffiti tag, "Re-ARMed 2026", tilted across "REMASTERED" on the title-screen logo.
 Optional: at each start the Mac launcher (`tools/play-native/launch.sh`) and the Learn & Play app
 (`win-x86/app/lp_main.c`) link the game copy's `static.psarc` to `static.psarc.rearmed` when it is
 there (`RS_REARMED=0` for the original logo). The install's own `static.psarc` is never changed. The two
@@ -19,5 +19,6 @@ RS_GAME_DIR="$COPY" tools/loadscreen/build.sh "$COPY/static.psarc.rearmed"   # C
 | `rearmed.py` | Draws the tag on a 1024x256 logo PNG. `--variant A\|B\|C` (A, the default: over "REMASTERED"; B also strikes out "2014 EDITION"; C slashes across the whole logo), `--seed N` |
 | `../psarc_extract.py`, `../psarc_pack.py` | Read a psarc; rebuild one with entries replaced (other entries' blocks copied byte for byte) |
 
-Needs a Python with Pillow, numpy and etcpak (`RS_PY=...`, or `build.sh` makes a venv in `$TMPDIR`).
+Needs a Python with Pillow, numpy and etcpak (`RS_PY=...`, or `build.sh` makes a venv in
+`$RS_BUILD_DIR/loadscreen-venv`, which needs the network once).
 Pillow's own DXT5 encoder smears thin outlines; etcpak keeps the edges clean.

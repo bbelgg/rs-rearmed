@@ -39,13 +39,12 @@ into the notes as it stands. -->
 - Metal only: there is no OpenGL renderer.
 - Mods built without `rc_mod.h` are left out, with a line in the log. While a mod hooks `input_sink` or `set_app_focus`,
   input reaches the game a frame later, and a mod can't change `input_sink`'s arguments.
-- Mods can read the note counts in Learn a Song, not yet in Score Attack. The note the game hears, the tone change hook
-  and the song list titles have been played on the Mac edition only so far.
+- The note the game hears, the tone change hook and the song list titles have been played on the Mac edition only so far.
 - Shaders are prepared for what was played in testing. The Guitarcade's games and venues not reached there can stall
   briefly the first time. If you skip Preparing shaders, or after a macOS update, the first play stalls as before: run the
   installer again.
 - The Windows game reads PC song archives (`*_p.psarc`), so a Mac-only custom song collection doesn't load. Official
   DLC has both kinds.
 - Two crashes have been seen once each and not reproduced.
-- It uses more memory than the Mac edition (1.5 GB against 1.2 GB) and still a little more CPU.
+- It uses more memory than the Mac edition (1.5 GB against 1.2 GB) and more CPU (about 10 points of a core in a song).
 - Rocksmith 1 DLC songs have not been played in this edition yet: the test account owns none.

@@ -5,7 +5,8 @@ plays a song and can load custom songs (CDLC). Nothing is emulated or translated
 instruction is turned into C ahead of time and compiled for arm64.
 
 This file gives the shape of the work and the few facts that are expensive to rediscover. It gives no
-addresses — you recover those from your own copy. Work out the routine engineering yourself.
+addresses — you recover those from your own copy. How this repository does each step:
+[the recompiler](recompiler/README.md), [Mac design](mac/DESIGN.md), [Windows design](windows/DESIGN.md).
 
 ## The two editions
 
@@ -87,8 +88,9 @@ Generate C from the machine code and compile it for arm64. This is the bulk of t
   quietly wrong.
 - **Fence memory accesses from the start.** x86 is strongly ordered (TSO) and arm64 is not. Emit a barrier
   around translated loads and stores (stack and read-only-data accesses excepted). Skip this and the compiler
-  hoists loads out of the game's spin loops and threads read each other's writes stale — both appear as rare,
-  baffling hangs, not as obvious bugs.
+  hoists loads out of the game's spin loops and threads read each other's writes stale — both appear as rare
+  hangs, not as obvious bugs. The cost is in a few DSP loops: fence those only at entry, at exit and around
+  their calls, each after reading it for anything it shares with another thread.
 - Make generation deterministic and split the output into many translation units, so a 15–25-minute build can
   parallelise and resume.
 
@@ -172,9 +174,3 @@ Learn & Play). Four gates keep a custom song out; open all four:
 
 If no custom song is at hand, repack one of the game's own songs under a new AppID (and, for Learn & Play, a
 new song key). The community's psarc tooling documents the format.
-
----
-
-That is the whole path: a plain image, an ahead-of-time translator checked against the original, a runtime
-and platform for the translated code to live in, a renderer, offline stand-ins, and the four CDLC gates. The
-engineering is large but ordinary; the facts above are the ones that are slow to find by trial.

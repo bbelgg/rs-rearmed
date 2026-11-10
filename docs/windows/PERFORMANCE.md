@@ -14,7 +14,7 @@ the Mac's own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filteri
 | CPU | 52.0-53.6% of a core, 8.66-8.93 ms a frame | game thread 32.6-33.3, Wwise 7.2-7.5, note detection 5.8-6.3 |
 | Memory footprint | 1.51-1.52 GB | 1.28-1.36 GB on 2026-11-04, on a 1x display before MSAA and upscaling, without mods |
 
-- **Since 1.13.0** (not released): the note detection's spectrum loop is relaxed, one run at 50.4% of a core with that
+- **Since 1.13.0** (new in 1.14.0): the note detection's spectrum loop is relaxed, one run at 50.4% of a core with that
   thread at 4.4 points ([Where the CPU goes](#where-the-cpu-goes-in-1130)).
 - **Against the Mac edition**: 10 points of a core more, 1.7 ms a frame, and 0.29 GB more. On an earlier, lighter route
   the difference was 1.1 ms a frame, 17% ([Toward the Mac edition](#toward-the-mac-edition)).
@@ -77,7 +77,7 @@ One trace of each edition, 2026-11-10: the table and the Mac edition's side are 
   zero-copy buffers of [Opportunities](#opportunities-by-expected-payoff).
 - Seven of Metal's own threads that submit the frame's command buffer take about 3.3 points between them, in both editions.
 
-**Changed since, the same day** (not released):
+**Changed since, the same day** (new in 1.14.0):
 
 - **`0x13f3690` is relaxed.** It copies its input with the CRT's `memcpy` and calls its `_CIpow`, which a relaxed function
   could not do in this front end. An entry of `relaxed.map` marked `+calls` now may, with the function's exit fence before

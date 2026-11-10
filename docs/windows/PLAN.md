@@ -22,7 +22,7 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   players are in `win32_overrides.c`), the overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and
   0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
-- **Files a mod serves** (not released): as in the [Mac plan](../mac/PLAN.md#status), through the Win32 seam's file
+- **Files a mod serves** (new in 1.14.0): as in the [Mac plan](../mac/PLAN.md#status), through the Win32 seam's file
   calls ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Covered by unit tests and the same run to the note highway as
   the Mac's ([TESTING.md](TESTING.md)). A provider that changes what an archive holds has not been run.
 - **Edits and mid points, and 7-string charts** (new in 1.12.0): a mod changes a function from the inside
@@ -36,7 +36,7 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   - *The note the game hears* (new in 1.11.0): named by RSMods' own chain on this game. Read on the Mac; not yet run
     here.
   - *The note counts and the grey-note time* (new in 1.11.0): the counts are reached as RSMods reaches them, from the
-    UI manager, in Learn a Song and, by its own names (not released), in Score Attack; both seen in runs, as was the
+    UI manager, in Learn a Song and, by its own names (new in 1.14.0), in Score Attack; both seen in runs, as was the
     grey-note time.
   - *A hook on the tone change* (new in 1.11.0): wrapped at the function RSMods patches; the game ran on it with
     rearmed-mods loaded, but no mod hooked it here yet.
@@ -107,7 +107,7 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   has both; a custom song often exists for one platform only. The song files are encrypted with a key per platform,
   which is not in the game a player has here, and nothing from the game may be in this repository, so RS Re-ARMed has
   no converter and will not get one.
-- **The fixes from the code review of 2026-11-09** (not released) were run in their suites and in one song: a thread
+- **The fixes from the code review of 2026-11-09** (new in 1.14.0) were run in their suites and in one song: a thread
   that ends gives its stack, TEB and TLS blocks to the next, a guest path that starts with `/` is a host path only
   inside the game's own folders, and `HeapAlloc` clears a block it uses again. Played with a guitar since, four songs in Learn a Song with no fault; a long
   session, where the reused blocks matter, has not been played. What the shared code got from the same review is in the
@@ -122,7 +122,7 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
 Being looked into, with no promise of if or when:
 
 - **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
-- **Note detection** (not released): one more of its loops runs relaxed, about 1.6 points of a core less in a song
+- **Note detection** (new in 1.14.0): one more of its loops runs relaxed, about 1.6 points of a core less in a song
   ([PERFORMANCE.md](PERFORMANCE.md#where-the-cpu-goes-in-1130)); played with a guitar, four songs in Learn a Song. What is
   left on that thread is its own work, or is not safe to relax.
 - **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note

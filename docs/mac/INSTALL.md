@@ -416,7 +416,7 @@ clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runti
 ```
 
 `tools/ws7/recomp/test/hooks/probe_mod.c` is a small one; how mods hook the game:
-[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game (not released): ones it
+[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game (new in 1.14.0): ones it
 opens for reading, their size and date, and names in a folder's listing (`rc_file.h`, which `rc_mod.h` includes).
 Mods made for the original game that change its files may work as before: a modified `cache.psarc` is used as it
 is.

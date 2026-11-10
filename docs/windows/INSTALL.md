@@ -348,7 +348,7 @@ Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/learn-play/mo
 built with `rc_mod.h` ([how](../mac/INSTALL.md#settings-and-switches)); the same dylib then runs in the Mac
 edition, and one built without it is left out, with a line in the log. Mods load only with the network guard in
 the process, which logs to `logs/netguard.log`. How mods hook the game:
-[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game (not released): ones it
+[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game (new in 1.14.0): ones it
 opens for reading, their size and date, and names in a folder's listing (`rc_file.h`, which `rc_mod.h` includes).
 
 ## Update and uninstall

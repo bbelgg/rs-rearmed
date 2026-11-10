@@ -18,7 +18,7 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs-for-1130)); 74.9 fps on 75 Hz.
 - **Mods**: loaded at startup from `mods/`, with name-keyed hook points (all 21). A mod built with `rc_mod.h` is one
   dylib for this app and Learn & Play. `rearmed-mods.dylib` 0.8.0 loads here, with its 23 mods.
-- **Files a mod serves** (not released): a mod's file provider answers for the files the game opens, their sizes and
+- **Files a mod serves** (new in 1.14.0): a mod's file provider answers for the files the game opens, their sizes and
   folder listings (`rc_file.h`, [DESIGN.md](DESIGN.md#built-in-fixes-and-mods)), the same interface in both editions.
   Covered by unit tests and one run to the note highway with a mod serving every `.psarc` the game opens
   ([TESTING.md](TESTING.md)). A provider that changes what an archive holds has not been run.
@@ -74,13 +74,13 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
 - With the legacy fast-load `cache.psarc`, a start can stay on the white loading screen now and then (a race in the
   game). Metal's safe load avoids the stall shader compiles would add; on OpenGL quit and start again.
 - The first play of a song after an install stutters briefly on Metal (pipelines built on first use). A draw that
-  waits for a shader compile now hurries it (not released); the gain isn't measured.
+  waits for a shader compile now hurries it (new in 1.14.0); the gain isn't measured.
 - Mods that draw with OpenGL show nothing on Metal; they need the overlay API.
 - Renderer details: `RS_GL_CHECK` keeps one pending error per thread, not per context; `GL_TEXTURE_BASE_LEVEL` is
   ignored on Metal; shared CGL contexts are not supported on Metal; only the first GPU gets a disk cache. A draw keeps
-  its pipeline key while nothing it is made of has changed (not released), but the game sets vertex state or the
+  its pipeline key while nothing it is made of has changed (new in 1.14.0), but the game sets vertex state or the
   program before every draw, so no draw keeps one until the marks compare values.
-- **The fixes from the code review of 2026-11-09** (not released) were run in their suites and in one song of each
+- **The fixes from the code review of 2026-11-09** (new in 1.14.0) were run in their suites and in one song of each
   edition, with the numbers unchanged. Played with a guitar since, six songs with no fault; a long session has
   not been played on them.
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the Retina

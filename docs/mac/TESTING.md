@@ -91,7 +91,7 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
 - **The window as a run leaves it**, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed` or `update` in
   the app's environment shows the box of a finished install (Start the Game, Show in Finder), of a failed step
   (Try Again, Show Log File), or the title row's button for a newer release. Close (Escape) is at the bottom
-  right once a run has ended, with Build Again beside it. This window (not released) has been looked at in the
+  right once a run has ended, with Build Again beside it. This window (new in 1.14.0) has been looked at in the
   three previews, not yet after a real run.
 - **The standalone installer's check of its download**: `tools/installer/build.sh` prints `source digest:` and
   builds it in, and the app logs `The source is the one this installer was made from` before it runs anything.

@@ -26,7 +26,7 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   maintainer the same day, a chart played through several times: it works; that session's log has the song's 7-string chord diagrams
   and the seven-peg headstock shown, and no fault.
   Those runs found a hook's game call leaving ecx changed for the code after its point (a crash freeing a song's vocals): a point now puts
-  back the registers its hooks didn't set. The Mac edition has the same unit now (not released), played with a guitar there too
+  back the registers its hooks didn't set. The Mac edition has the same unit now (new in 1.13.0), played with a guitar there too
   ([Mac plan](../mac/PLAN.md#status)); its tables add 29 points of their own, which are `none` here (mostly loops the edits
   lengthen here, unrolled on the Mac), so the generated C of this edition's functions is byte for byte as before.
 - **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status); `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does. A start with the intro skip switched off in the file played the intro (2026-11-09).

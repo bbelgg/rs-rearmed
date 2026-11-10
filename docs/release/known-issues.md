@@ -8,14 +8,15 @@ into the notes as it stands. -->
 **Both editions**
 
 - No online features: Ubisoft services are not available.
-- **Not run in the game yet: the review's fixes.** They passed the automated tests of both editions, but neither game
-  was played on this exact code before the release. The parts a test can't reach are the Mac game's restart with the
-  network guard when its app is started directly, and the launcher's handling of `Rocksmith.ini` and `steam.env`. If the
+- **Not run in the game yet:** two of 1.12.0's fixes, which a test can't reach: the Mac game's restart with the network
+  guard when its app is started directly and not through the launcher, and the launcher forcing the game's offline
+  settings when there is no `Rocksmith.ini` yet. Both games have been run on this code started the usual way. If the
   game doesn't start after updating, `logs/last-run.log` says why; please open an issue with it.
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
   in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- Not tested yet with this release: a run of the published installer, full screen on a 16:10 or ultrawide screen in the Mac
+- Not tested yet with this release: a run of the installer app itself (the install scripts it runs were run for both
+  editions), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac
   edition, an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game
   Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an
   interface while the game runs, and in Multiplayer a cable with an interface, two interfaces, or the swap in Learn & Play.

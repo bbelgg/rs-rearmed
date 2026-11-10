@@ -234,7 +234,8 @@ uint32_t rsp_pack_keydown_char(uint16_t ch, uint64_t modifier_flags);
 // -[OpenGLView flagsChanged:] 0x100184ab0: forward only while Control is down.
 int rsp_flags_changed_forwards(uint64_t modifier_flags);
 // -[MainController keyDown:] 0x100185a80: charactersIgnoringModifiers[0] ==
-// 'F' and Command+Shift both down toggles full screen.
+// 'F' and Command+Shift both down toggles full screen. Not in the original: 'f' with
+// Command+Control does too (macOS's own key, as in Learn & Play).
 int rsp_is_fullscreen_toggle(uint16_t ch_ignoring_mods, uint64_t modifier_flags);
 // -[MainController mouseMoved:] 0x100185b40: (int64)floorf((float)(v + 0.5)).
 int rsp_mouse_coord(double v);

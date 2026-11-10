@@ -254,7 +254,7 @@ is saved as `[Renderer.Win32] Fullscreen` in `userdata/game/Rocksmith.ini`. Full
 the display the window is on.
 
 In a window, drag the edges to resize: the new size becomes the game's resolution, and the window takes any
-shape. The green button or Control-Command-F gives macOS full screen, at the screen's size. Control-Command-F in
+shape. The green button, Control-Command-F or Shift-Command-F gives macOS full screen, at the screen's size. Either key in
 the game's own full screen gives a window of the screen's shape instead, which scales the picture when resized:
 the game stays in full-screen mode. Command-Q, the close button and the game's own Exit all quit through the
 game's shutdown. The display mode never changes.

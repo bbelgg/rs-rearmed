@@ -13,7 +13,10 @@ uint32_t rsp_pack_keydown_char(uint16_t ch, uint64_t flags) {
 int rsp_flags_changed_forwards(uint64_t flags) { return (flags & RSP_MOD_CONTROL) != 0; }
 
 int rsp_is_fullscreen_toggle(uint16_t ch, uint64_t flags) {
-  return ch == 'F' && (flags & (RSP_MOD_COMMAND | RSP_MOD_SHIFT)) == (RSP_MOD_COMMAND | RSP_MOD_SHIFT);
+  if (ch == 'F' && (flags & (RSP_MOD_COMMAND | RSP_MOD_SHIFT)) == (RSP_MOD_COMMAND | RSP_MOD_SHIFT)) return 1;
+  // Not in the original: macOS's own Control-Command-F too, the key Learn & Play's View menu has
+  // (lp_window.m), so both editions take both keys.
+  return ch == 'f' && (flags & (RSP_MOD_COMMAND | RSP_MOD_CONTROL)) == (RSP_MOD_COMMAND | RSP_MOD_CONTROL);
 }
 
 int rsp_mouse_coord(double v) {

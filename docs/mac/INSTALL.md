@@ -275,7 +275,7 @@ From the title to a song: Return (title), Return (profile, or New profile), Retu
 
 ### Window modes
 
-Shift-Command-F switches between full screen and a window. Full screen covers the display the window is on, so
+Shift-Command-F or Control-Command-F switches between full screen and a window. Full screen covers the display the window is on, so
 with a second display, move the window there first. In a window, drag the edges to resize: the new size becomes
 the game's resolution, and the window takes any shape (the original kept it at 16:9; `RS_WINDOW_ANY_SHAPE=0` does
 too). The game follows the shape itself, in a window and in full screen alike: its cameras keep their height and

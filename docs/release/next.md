@@ -23,4 +23,6 @@ notes and empties this file. -->
 - **Learn & Play: mods can read the note counts in Score Attack** (for mod authors: `ui_score_attack_stats`,
   `score_attack_hits`, `score_attack_misses`), so rearmed-mods' Show Current Accuracy follows a Score Attack song
   too. Before, only in Learn a Song.
+- **Full screen is the same keys in both games:** Shift-Command-F and Control-Command-F. Before, the Mac game took
+  only the first and Learn & Play only the second.
 - **A draw that waits for a shader compile hurries it**, which should shorten a first-play stutter. Not measured.

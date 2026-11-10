@@ -413,7 +413,9 @@ static void test_logic(void) {
   CHECK(rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND | RSP_MOD_SHIFT), "Cmd+Shift+F");
   CHECK(rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND | RSP_MOD_SHIFT | RSP_MOD_CONTROL), "+Ctrl");
   CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND | RSP_MOD_SHIFT), "lower f");
-  CHECK(!rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND | RSP_MOD_CONTROL), "Cmd+Ctrl+F is not it");
+  CHECK(rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND | RSP_MOD_CONTROL), "Cmd+Ctrl+F, macOS's own");
+  CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND), "Cmd+F is not it");
+  CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_CONTROL), "Ctrl+F is not it");
 
   struct { double v; int want; } mc[] = {{0, 0}, {0.49, 0}, {0.5, 1}, {1.5, 2}, {-0.5, 0},
                                          {-0.51, -1}, {-1.5, -1}, {1279.999, 1280}, {719.4, 719},

@@ -241,7 +241,7 @@ void d3d9_platform_resize(uint32_t hwnd, int w, int h) {
 // Control-Command-F. E.g. LP_WINDOW_SCRIPT=20:900x700,30:toggle,40:toggle
 static void window_script(void);
 
-// Control-Command-F and View > Enter Full Screen: the borderless full screen goes to a window,
+// Control-Command-F, Shift-Command-F and View > Enter Full Screen: the borderless full screen goes to a window,
 // a window in and out of macOS full screen. Command-Q and the close button ask the game to quit, as
 // the Mac edition does (rsp_request_quit): WM_CLOSE, which its window procedure takes like the
 // close button on Windows, so the game shuts down by its own path; the process ends by itself
@@ -351,6 +351,14 @@ static void make_menu(void) {
   NSMenuItem *f = [vm addItemWithTitle:@"Enter Full Screen" action:@selector(toggleFullScreen:) keyEquivalent:@"f"];
   f.keyEquivalentModifierMask = NSEventModifierFlagControl | NSEventModifierFlagCommand;
   f.target = g_ctl;
+  // Shift-Command-F too, the Mac edition's key (the game's own there), on an item that is not shown.
+  NSMenuItem *f2 = [vm addItemWithTitle:@"Enter Full Screen" action:@selector(toggleFullScreen:) keyEquivalent:@"F"];
+  f2.keyEquivalentModifierMask = NSEventModifierFlagCommand;  // the capital letter is the Shift
+  f2.target = g_ctl;
+  if (@available(macOS 12.0, *)) {
+    f2.hidden = YES;
+    f2.allowsKeyEquivalentWhenHidden = YES;
+  }
   view.submenu = vm;
   [bar addItem:view];
   NSApp.mainMenu = bar;

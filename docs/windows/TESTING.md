@@ -434,6 +434,7 @@ The app logs to `<LP_HOME>/logs/last-run.log`, and with mods to `logs/netguard.l
 |---|---|
 | `LP_LOG=1\|2\|3` | imports: the first call of each / every call / and every call into the seam's COM objects (D3D9, audio, Steam) with its result; also every `LoadLibrary` and `GetProcAddress` |
 | `LP_LOG_FILES=1\|2` | files the game opens, including the missing ones it probes for |
+| `LP_LOG_DLC_CLOSE=1` | for the first closes of a song archive the game read from, the code addresses on the caller's stack (how the DLC update's head was found) |
 | `RS_FILE_LOG=1` | each open a mod's file provider served, and each folder listing it added names to (`[rc] file:`) |
 | `RC_HOOK_TRACE=NAME,NAME` | the raw calls of those hook points, the first 8 of each, refused ones too: return address, `ecx edx esi edi`, four stack words, then `eax` and `st0`. The way to check a table's address and prototype in a run |
 | `LP_LOG_TO=FILE` | append the log there |

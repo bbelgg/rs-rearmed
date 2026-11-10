@@ -384,7 +384,10 @@ runtime. `RS_MODS_LOG=1` logs them.
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`):
   - batched DLC mounting: the DLC coordinator's per-frame update (`F_1449310`) runs its install step in a loop
-    within `RS_MODS_BUDGET_MS` (default 50) instead of once;
+    within `RS_MODS_BUDGET_MS` (default 50) instead of once. A step starts mounting one archive and leaves its
+    file open; the update's head (`F_1446570`) finishes the mount and closes it, and a step taken before that drops
+    the next archive. So the loop calls the head until the file is closed (the seam counts the open song archives
+    of `dlc/`, `win32_ksync.c`) before the next step;
   - the open-file limit, which the batched mounting needs (a large library has more archives open than the 256
     descriptors of an app started from Finder): `lp_mods_init()` raises it with the Mac's code (`rc_nofile.h`);
   - the song path cache: the path intern (`F_141c130`, the Mac `path_intern`) takes each path's MD5 under the

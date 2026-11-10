@@ -12,14 +12,14 @@ into the notes as it stands. -->
   guard when its app is started directly and not through the launcher, and the launcher forcing the game's offline
   settings when there is no `Rocksmith.ini` yet. Both games have been run on this code started the usual way. If the
   game doesn't start after updating, `logs/last-run.log` says why; please open an issue with it.
-- **Played briefly:** the fixes from the code review of 2026-11-09 that this release adds were played with a guitar
+- **Played briefly:** the fixes from the code review of 2026-11-09 that 1.14.0 added were played with a guitar
   for a few songs in each game, not in a long session or in every mode. If the game misbehaves after updating, `logs/last-run.log`
   says why; please open an issue with it.
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
   in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- Not tested yet with this release: a run of the installer app itself (the install scripts it runs were run for both
-  editions), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac
+- Not tested yet with this release: a run of the installer app itself, a build from scratch, a mod serving files in
+  the Mac edition on this code (Learn & Play's was played with 2250 archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac
   edition, an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game
   Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an
   interface while the game runs, and in Multiplayer a cable with an interface, two interfaces, or the swap in Learn & Play.

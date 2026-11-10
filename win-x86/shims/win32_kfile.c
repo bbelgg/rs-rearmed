@@ -132,11 +132,79 @@ static void mk_parents(const char *p, size_t from) {
 // The game folder is read-only to the guest's writes: a file the game writes or creates there
 // goes to LP_USER_DIR/game/ (copied there first when it exists and is opened to be changed), and
 // reads see that copy from then on.
-static char *map_path(const char *win, char *host, size_t n, int wr) {
-  if (win[0] == '/') {  // a host path (the Steam shim's folders)
-    snprintf(host, n, "%s", win);
-    return host;
+// A host path is one the seam handed the guest, so it is taken only inside a folder the guest has:
+// the game's, the user folder, and what w32_host_root adds (the Steam layer's data folder). Any
+// other path that starts with a slash is the Windows path it also is, from the current drive's root.
+#define HOST_ROOTS 4
+static char host_roots[HOST_ROOTS][PATH_MAX];
+static int nhost_roots;
+static pthread_mutex_t roots_mu = PTHREAD_MUTEX_INITIALIZER;
+
+// p without "." and ".." components and doubled slashes; 0 when it does not fit or leaves the root
+static int host_norm(const char *p, char *out, size_t n) {
+  size_t o = 0;
+  while (*p) {
+    while (*p == '/') p++;
+    size_t len = strcspn(p, "/");
+    if (!len) break;
+    if (len == 1 && p[0] == '.') {
+    } else if (len == 2 && p[0] == '.' && p[1] == '.') {
+      if (!o) return 0;
+      while (o && out[--o] != '/') {}
+    } else {
+      if (o + len + 2 > n) return 0;
+      out[o++] = '/';
+      memcpy(out + o, p, len);
+      o += len;
+    }
+    p += len;
   }
+  if (!o) {
+    if (n < 2) return 0;
+    out[o++] = '/';
+  }
+  out[o] = 0;
+  return 1;
+}
+static int under(const char *path, const char *root) {
+  char r[PATH_MAX];
+  if (root[0] != '/') {  // LP_GAME_DIR and LP_USER_DIR may be relative
+    char cwd[PATH_MAX], t[2 * PATH_MAX];
+    if (!getcwd(cwd, sizeof cwd)) return 0;
+    snprintf(t, sizeof t, "%s/%s", cwd, root);
+    if (!host_norm(t, r, sizeof r)) return 0;
+  } else if (!host_norm(root, r, sizeof r)) {
+    return 0;
+  }
+  size_t k = strlen(r);
+  if (k == 1) return 0;  // "/" is nobody's folder
+  return !strncmp(path, r, k) && (path[k] == '/' || !path[k]);
+}
+void w32_host_root(const char *dir) {
+  char r[PATH_MAX];
+  if (!dir || dir[0] != '/' || !host_norm(dir, r, sizeof r)) return;
+  pthread_mutex_lock(&roots_mu);
+  int k = 0;
+  while (k < nhost_roots && strcmp(host_roots[k], r)) k++;
+  if (k == nhost_roots && nhost_roots < HOST_ROOTS) strcpy(host_roots[nhost_roots++], r);
+  pthread_mutex_unlock(&roots_mu);
+}
+// win as a host path the guest may use, in out; 0 when it is not one
+static int host_path(const char *win, char *out, size_t n) {
+  if (win[0] != '/' || !strncmp(win, "//?/", 4)) return 0;
+  char t[PATH_MAX];
+  if (!host_norm(win, t, sizeof t)) return 0;
+  int ok = under(t, game_dir()) || under(t, user_dir());
+  pthread_mutex_lock(&roots_mu);
+  for (int k = 0; k < nhost_roots && !ok; k++) ok = under(t, host_roots[k]);
+  pthread_mutex_unlock(&roots_mu);
+  if (ok) snprintf(out, n, "%s", t);
+  else if (flog()) fprintf(stderr, "w32: file: %s is outside the guest's folders: taken as a Windows path\n", win);
+  return ok;
+}
+
+static char *map_path(const char *win, char *host, size_t n, int wr) {
+  if (host_path(win, host, n)) return host;
   char full[2048];
   full_win(win, full, sizeof full);
   size_t g = sizeof GAME_WIN - 1;
@@ -679,9 +747,8 @@ static int find_next(w32_obj *o, uint32_t fd, int wide) {
 }
 static uint32_t find_first(rc_ctx *c, const char *win, uint32_t fd, int wide) {
   char full[1024], host[PATH_MAX];
-  int on_host = win[0] == '/';  // a host path (the Steam shim's folders), as map_path keeps it
-  if (on_host) snprintf(full, sizeof full, "%s", win);
-  else full_win(win, full, sizeof full);
+  int on_host = host_path(win, full, sizeof full);  // as map_path keeps it
+  if (!on_host) full_win(win, full, sizeof full);
   char *sl = strrchr(full, on_host ? '/' : '\\');
   const char *pat = sl ? sl + 1 : full;
   // only * and ? are wild on Windows: fnmatch's [ is a character here, in names like "[Band] Song"
@@ -694,7 +761,8 @@ static uint32_t find_first(rc_ctx *c, const char *win, uint32_t fd, int wide) {
   }
   pattern[pn] = 0;
   if (sl) *sl = 0;
-  w32_path(!on_host && sl == full + 2 ? (strcat(full, "\\"), full) : full, host, sizeof host);
+  if (on_host) snprintf(host, sizeof host, "%s", sl == full ? "/" : full);  // checked with its last part
+  else w32_path(sl == full + 2 ? (strcat(full, "\\"), full) : full, host, sizeof host);
   DIR *d = opendir(host);
   if (!d) {
     set_open_err(c, host);

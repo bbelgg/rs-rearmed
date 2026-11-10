@@ -8,11 +8,23 @@
 #include "d3d9_thunk.h"
 
 // --- objects -------------------------------------------------------------------------------
-static d3d9_obj **objs;
-static uint32_t nobjs, capobjs;
+// The table is read without a lock (every D3D call starts with d3d9_obj_get): it is pieces that
+// never move, an entry is one word, and the count only grows. obj_mu is for what changes it.
+#define OBJ_PIECE 1024
+#define OBJ_PIECES 1024
+static d3d9_obj **obj_piece[OBJ_PIECES];
+static uint32_t nobjs;
 static uint32_t *free_idx;
 static uint32_t nfree, capfree;
 static pthread_mutex_t obj_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static d3d9_obj *obj_at(uint32_t idx) {
+    if (idx >= __atomic_load_n(&nobjs, __ATOMIC_ACQUIRE)) return 0;
+    return __atomic_load_n(&obj_piece[idx / OBJ_PIECE][idx % OBJ_PIECE], __ATOMIC_ACQUIRE);
+}
+static void obj_put(uint32_t idx, d3d9_obj *o) {  // obj_mu held
+    __atomic_store_n(&obj_piece[idx / OBJ_PIECE][idx % OBJ_PIECE], o, __ATOMIC_RELEASE);
+}
 
 uint32_t d3d9_obj_publish(d3d9_obj *o, uint32_t vtable) {
     uint32_t g = w32_galloc(16);
@@ -22,17 +34,23 @@ uint32_t d3d9_obj_publish(d3d9_obj *o, uint32_t vtable) {
     if (nfree) {
         idx = free_idx[--nfree];
     } else {
-        if (nobjs == capobjs) {
-            capobjs = capobjs ? 2 * capobjs : 1024;
-            objs = realloc(objs, capobjs * sizeof *objs);
+        idx = nobjs;
+        if (idx % OBJ_PIECE == 0) {
+            d3d9_obj **piece = idx / OBJ_PIECE < OBJ_PIECES ? calloc(OBJ_PIECE, sizeof *piece) : 0;
+            if (!piece) {
+                pthread_mutex_unlock(&obj_mu);
+                w32_gfree(g, 16);
+                return 0;
+            }
+            __atomic_store_n(&obj_piece[idx / OBJ_PIECE], piece, __ATOMIC_RELEASE);
         }
-        idx = nobjs++;
     }
-    objs[idx] = o;
-    pthread_mutex_unlock(&obj_mu);
     o->guest = g;
     o->index = idx;
     o->ref = 1;
+    obj_put(idx, o);
+    if (idx == nobjs) __atomic_store_n(&nobjs, idx + 1, __ATOMIC_RELEASE);  // after its piece and entry
+    pthread_mutex_unlock(&obj_mu);
     d3d9_wr32(g, vtable);
     d3d9_wr32(g + 4, D3D9_OBJ_MAGIC);
     d3d9_wr32(g + 8, idx);
@@ -42,10 +60,7 @@ uint32_t d3d9_obj_publish(d3d9_obj *o, uint32_t vtable) {
 d3d9_obj *d3d9_obj_get(uint32_t guest, int kind) {
     if (guest < 0x10000) return 0;
     if (d3d9_rd32(guest + 4) != D3D9_OBJ_MAGIC) return 0;
-    uint32_t idx = d3d9_rd32(guest + 8);
-    pthread_mutex_lock(&obj_mu);
-    d3d9_obj *o = idx < nobjs ? objs[idx] : 0;
-    pthread_mutex_unlock(&obj_mu);
+    d3d9_obj *o = obj_at(d3d9_rd32(guest + 8));
     if (!o || o->guest != guest || (kind >= 0 && o->kind != kind)) return 0;
     return o;
 }
@@ -54,8 +69,8 @@ static void obj_maybe_destroy(d3d9_obj *o) {
     if (__atomic_load_n(&o->ref, __ATOMIC_ACQUIRE) > 0 || __atomic_load_n(&o->iref, __ATOMIC_ACQUIRE) > 0)
         return;
     pthread_mutex_lock(&obj_mu);
-    if (o->index < nobjs && objs[o->index] == o) {
-        objs[o->index] = 0;
+    if (o->index < nobjs && obj_at(o->index) == o) {
+        obj_put(o->index, 0);
         if (nfree == capfree) {
             capfree = capfree ? 2 * capfree : 1024;
             free_idx = realloc(free_idx, capfree * sizeof *free_idx);
@@ -97,9 +112,9 @@ void d3d9_obj_idrop(d3d9_obj *o) {
 
 void d3d9_obj_kill(d3d9_obj *o) {
     pthread_mutex_lock(&obj_mu);
-    int mine = o->index < nobjs && objs[o->index] == o;
+    int mine = o->index < nobjs && obj_at(o->index) == o;
     if (mine) {
-        objs[o->index] = 0;
+        obj_put(o->index, 0);
         if (nfree == capfree) {
             capfree = capfree ? 2 * capfree : 1024;
             free_idx = realloc(free_idx, capfree * sizeof *free_idx);

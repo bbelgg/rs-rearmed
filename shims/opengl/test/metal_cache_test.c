@@ -969,6 +969,10 @@ int main(int argc, char **argv) {
           "throttle: limit %d, %d threads, peak %d", (int)num(th.log, "pool_limit="), (int)num(th.log, "pool_threads="),
           (int)num(th.log, "pool_peak="));
     check(strstr(th.log, "pool_qos=utility") != NULL, "throttle: link compiles at utility QoS");
+    // The drawing thread's waits for those compiles raise the worker (a QoS override) while they last.
+    check(num(th.log, "wait_boosted=") == th.lib_waited + th.pipe_waited,
+          "throttle: %d of the drawing thread's %d waits for a utility worker boosted it",
+          (int)num(th.log, "wait_boosted="), th.lib_waited + th.pipe_waited);
     check(th.lib_compiled >= NPROG, "throttle: %d libraries compiled (%d on the pool, %d by the drawing thread)",
           th.lib_compiled, (int)num(th.log, "lib_async="), (int)num(th.log, "lib_stolen="));
     snprintf(tsalt, sizeof tsalt, "RS_MTL_SALT=to%d-%d", g_nonce, (int)getpid());

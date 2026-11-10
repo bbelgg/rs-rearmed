@@ -1,7 +1,7 @@
 // The file half of kernel32 (win32_kfile.c) on a folder of its own: paths resolved from two threads
 // at once stay each thread's own, a find gives its handle back (FindClose, and a find with no match),
 // a name with [ matches itself, a folder in both the overlay and the game folder lists both, a host
-// path works in a find, a move out of the game folder leaves the file there, GetFullPathNameW's
+// path works in a find and only inside the guest's folders, a move out of the game folder leaves the file there, GetFullPathNameW's
 // file part.
 #include <fcntl.h>
 #include <pthread.h>
@@ -155,6 +155,35 @@ int main(void) {
   // 5. a host path in a find, as map_path takes it
   snprintf(p, sizeof p, "%s/one.txt", game);
   CHECK(find_all(c, p, out, sizeof out) == 1);
+
+  // 5b. a host path outside the guest's folders is not one: it is the Windows path from the drive's
+  // root, in the user folder, and ".." does not lead out of a folder the guest has
+  snprintf(p, sizeof p, "%s/outside.txt", root); put(p);
+  uint32_t oa[1] = {gstr(p)};
+  CHECK(call(c, "GetFileAttributesA", 1, oa) == INVALID);
+  CHECK(find_all(c, p, out, sizeof out) == 0);
+  snprintf(p, sizeof p, "%s/../outside.txt", game);
+  oa[0] = gstr(p);
+  CHECK(call(c, "GetFileAttributesA", 1, oa) == INVALID);
+  uint32_t ocf[7] = {gstr("/made.txt"), 0x40000000u, 0, 0, 2, 0x80, 0};  // GENERIC_WRITE, CREATE_ALWAYS
+  f = call(c, "CreateFileA", 7, ocf);
+  CHECK(f != INVALID);
+  CHECK(call(c, "CloseHandle", 1, &f));
+  struct stat ost;
+  snprintf(p, sizeof p, "%s/c/made.txt", user);
+  CHECK(!stat(p, &ost) && stat("/made.txt", &ost));
+  // a folder the seam handed out (w32_host_root) is the guest's from then on
+  char extra[1100];
+  snprintf(extra, sizeof extra, "%s/extra", root);
+  mkdir(extra, 0755);
+  snprintf(p, sizeof p, "%s/in.txt", extra); put(p);
+  oa[0] = gstr(p);
+  CHECK(call(c, "GetFileAttributesA", 1, oa) == INVALID);
+  w32_host_root(extra);
+  CHECK(call(c, "GetFileAttributesA", 1, oa) != INVALID);
+  snprintf(p, sizeof p, "%s/./sub/../in.txt", extra);
+  oa[0] = gstr(p);
+  CHECK(call(c, "GetFileAttributesA", 1, oa) != INVALID);
 
   // 6. a move out of the game folder leaves the game folder as it is
   snprintf(p, sizeof p, "%s/move.txt", game); put(p);

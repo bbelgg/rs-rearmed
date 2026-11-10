@@ -21,6 +21,7 @@
 #include "steam32_host.h"
 #include "steam32_slots.h"
 #include "win32_guestobj.h"
+#include "win32_shims.h"
 
 #define LOG(...) steam32h_log(__VA_ARGS__)
 
@@ -189,7 +190,12 @@ M(c_GetI2) { UNUSED; return lookup(hstr(a[1])); }  // (pipe, version)
 
 // ISteamUser
 M(u_GetSteamID) { UNUSED; w32_wr64(a[0], steam32h_steam_id()); return a[0]; }
-M(u_GetUserDataFolder) { UNUSED; return a[0] && (int32_t)a[1] > 0 && steam32h_user_data_folder(RC32_H(a[0]), (int)a[1]); }
+M(u_GetUserDataFolder) {  // a host path: the file seam takes it from the guest from here on
+  UNUSED;
+  if (!a[0] || (int32_t)a[1] <= 0 || !steam32h_user_data_folder(RC32_H(a[0]), (int)a[1])) return 0;
+  w32_host_root(RC32_H(a[0]));
+  return 1;
+}
 M(u_GetAvailableVoice) { UNUSED; put32(a[0], 0); put32(a[1], 0); return 2; }  // k_EVoiceResultNotRecording
 M(u_two) { UNUSED; return 2; }
 M(u_GetAuthSessionTicket) { UNUSED; put32(a[2], 0); return 0; }  // k_HAuthTicketInvalid

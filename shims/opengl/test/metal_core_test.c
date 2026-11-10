@@ -2177,6 +2177,228 @@ static void case_pbo_bounds(void) {
     glDeleteBuffers(1, &pbo);
 }
 
+// Draws one after another in one pass, each after one call that changes something the pipeline key is made
+// of (the Metal core keeps the last draw's key until a change marks it): every draw must show its change.
+static void case_key_reuse(void) {
+    int metal = !strcmp(g_backend, "metal");
+    glClearColor(0.5f, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint p = program(kVScol, kFSvcol, "pos", "col", NULL);
+    static const float quad[8] = {-1, -1, 1, -1, -1, 1, 1, 1};
+    static const unsigned char red[16] = {255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255, 255, 0, 0, 255};
+    static const float green[16] = {0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1};
+    // The first vertex has no weight at a cell's centre: red per vertex, cyan per instance.
+    static const float cyan_first[16] = {0, 1, 1, 1, 1, 0, 0, 1, 1, 0, 0, 1, 1, 0, 0, 1};
+    static const float magenta[16] = {1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1, 1, 0, 1, 1};
+    float mixed[4 * 6];  // a pos and a yellow col, interleaved
+    for (int i = 0; i < 4; i++) {
+        float m[6] = {quad[i * 2], quad[i * 2 + 1], 1, 1, 0, 1};
+        memcpy(mixed + i * 6, m, sizeof m);
+    }
+    GLuint b[6];
+    glGenBuffers(6, b);
+    const void *data[5] = {quad, red, green, cyan_first, mixed};
+    const size_t size[5] = {sizeof quad, sizeof red, sizeof green, sizeof cyan_first, sizeof mixed};
+    for (int i = 0; i < 5; i++) {
+        glBindBuffer(GL_ARRAY_BUFFER, b[i]);
+        glBufferData(GL_ARRAY_BUFFER, (GLsizeiptr)size[i], data[i], GL_STATIC_DRAW);
+    }
+    glBindBuffer(GL_ARRAY_BUFFER, b[0]);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    glBindBuffer(GL_ARRAY_BUFFER, b[1]);
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+    glEnableVertexAttribArray(1);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glAlphaFunc(GL_LESS, 0.5f);
+    int n = 0, want[40][4];
+#define DRAW(r, g, b, a)                                   \
+    do {                                                   \
+        glViewport((n % 8) * 8, (n / 8) * 8, 8, 8);        \
+        glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);             \
+        int w_[4] = {r, g, b, a};                          \
+        memcpy(want[n++], w_, sizeof w_);                  \
+    } while (0)
+    DRAW(255, 0, 0, 255);  // normalised bytes
+    DRAW(255, 0, 0, 255);  // the same again
+    // The attributes.
+    glBindBuffer(GL_ARRAY_BUFFER, b[2]);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    DRAW(0, 255, 0, 255);  // another type
+    glDisableVertexAttribArray(1);
+    DRAW(0, 0, 0, 255);  // no array: the constant (0, 0, 0, 1)
+    glEnableVertexAttribArray(1);
+    DRAW(0, 255, 0, 255);
+    glBindBuffer(GL_ARRAY_BUFFER, b[4]);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 24, (void *)8);
+    DRAW(255, 255, 0, 255);  // another stride and offset
+    glBindBuffer(GL_ARRAY_BUFFER, b[3]);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    DRAW(255, 0, 0, 255);
+    glVertexAttribDivisorARB(1, 1);
+    DRAW(0, 255, 255, 255);  // per instance: the first element
+    glVertexAttribDivisorARB(1, 0);
+    DRAW(255, 0, 0, 255);
+    glBindBuffer(GL_ARRAY_BUFFER, 0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, magenta);
+    DRAW(255, 0, 255, 255);  // a client array: every attribute is copied now
+    glBindBuffer(GL_ARRAY_BUFFER, b[2]);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    DRAW(0, 255, 0, 255);  // and none is again
+    // A buffer that gets its storage between two draws. Without storage the Metal core reads the constant;
+    // GL leaves that undefined, so there the array is off for the first of them.
+    glBindBuffer(GL_ARRAY_BUFFER, b[5]);
+    glVertexAttribPointer(1, 4, GL_UNSIGNED_BYTE, GL_TRUE, 0, 0);
+    if (!metal)
+        glDisableVertexAttribArray(1);
+    DRAW(0, 0, 0, 255);
+    glBufferData(GL_ARRAY_BUFFER, sizeof red, red, GL_STATIC_DRAW);
+    if (!metal)
+        glEnableVertexAttribArray(1);
+    DRAW(255, 0, 0, 255);
+    // Another vertex array object, with only pos.
+    GLuint vao;
+    glGenVertexArraysAPPLE(1, &vao);
+    glBindVertexArrayAPPLE(vao);
+    glBindBuffer(GL_ARRAY_BUFFER, b[0]);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 0, 0);
+    glEnableVertexAttribArray(0);
+    DRAW(0, 0, 0, 255);
+    glBindVertexArrayAPPLE(0);
+    DRAW(255, 0, 0, 255);
+    // The program.
+    GLuint p2 = program(kVS, kFScolor, "pos", NULL);
+    uniform4(p2, "color", 1, 1, 1, 1);
+    DRAW(255, 255, 255, 255);
+    glUseProgram(p);
+    DRAW(255, 0, 0, 255);
+    // Blend, colour mask and alpha test, over the clear colour (0.5, 0, 0, 1).
+    glBindBuffer(GL_ARRAY_BUFFER, b[2]);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 0, 0);
+    DRAW(0, 255, 0, 255);
+    glEnable(GL_BLEND);
+    DRAW(128, 255, 0, 255);  // added
+    glBlendFunc(GL_ONE, GL_ZERO);
+    DRAW(0, 255, 0, 255);
+    glBlendEquation(GL_FUNC_REVERSE_SUBTRACT);
+    DRAW(0, 0, 0, 0);  // 0 * destination - source
+    glColorMask(GL_FALSE, GL_TRUE, GL_FALSE, GL_TRUE);
+    DRAW(128, 0, 0, 0);  // red is kept
+    glDisable(GL_BLEND);
+    DRAW(128, 255, 0, 255);
+    glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+    DRAW(0, 255, 0, 255);
+    glEnable(GL_ALPHA_TEST);
+    DRAW(128, 0, 0, 255);  // alpha 1 is not less than 0.5
+    glAlphaFunc(GL_GREATER, 0.5f);
+    DRAW(0, 255, 0, 255);
+    glAlphaFunc(GL_NEVER, 0.5f);
+    DRAW(128, 0, 0, 255);
+    glDisable(GL_ALPHA_TEST);
+    DRAW(0, 255, 0, 255);
+    // Another pass in between.
+    GLuint color, ds, fbo = make_fbo(&color, &ds, 16, 16);
+    glViewport(0, 0, 16, 16);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    DRAW(0, 255, 0, 255);
+#undef DRAW
+    glViewport(0, 0, W, H);
+    snap();
+    for (int i = 0; i < n; i++) {
+        char what[32];
+        snprintf(what, sizeof what, "draw %d", i);
+        check_px((i % 8) * 8 + 4, (i / 8) * 8 + 4, want[i][0], want[i][1], want[i][2], want[i][3], what);
+    }
+    glBlendEquation(GL_FUNC_ADD);
+    glAlphaFunc(GL_ALWAYS, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &color);
+    glDeleteRenderbuffers(1, &ds);
+    glDeleteVertexArraysAPPLE(1, &vao);
+    glDeleteBuffers(6, b);
+    glDisableVertexAttribArray(1);
+    glok("key reuse");
+}
+
+// GL_R11F_G11F_B10F: client floats, half floats and packed texels in and out.
+static void case_packed_float(void) {
+    int metal = !strcmp(g_backend, "metal");
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint p = program(kVStex, kFStex, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(p, "tex"), 0);
+    GLuint t;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    // Every value fits 6 (blue: 5) bits of mantissa, so it comes back as it went in.
+    static const float f[4][3] = {{1, 0.5f, 0.25f}, {0, 1, 0}, {0.125f, 0.75f, 1}, {2, 3, 0.5f}};
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F_EXT, 2, 2, 0, GL_RGB, GL_FLOAT, f);
+    glok("float upload");
+    GLint bits[3] = {0, 0, 0};
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_RED_SIZE, &bits[0]);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_GREEN_SIZE, &bits[1]);
+    glGetTexLevelParameteriv(GL_TEXTURE_2D, 0, GL_TEXTURE_BLUE_SIZE, &bits[2]);
+    check(bits[0] == 11 && bits[1] == 11 && bits[2] == 10, "component sizes %d %d %d", bits[0], bits[1], bits[2]);
+    float back[4][3];
+    memset(back, 0, sizeof back);
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, back);
+    check(!memcmp(back, f, sizeof f), "floats read back (%g %g %g, %g %g %g)", back[0][0], back[0][1], back[0][2],
+          back[3][0], back[3][1], back[3][2]);
+    // Red in bits 0-10, green 11-21, blue 22-31; exponent bias 15.
+    unsigned int pk[4] = {0, 0, 0, 0};
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV_EXT, pk);
+    check(pk[0] == (0x3C0u | 0x380u << 11 | 0x1A0u << 22) && pk[3] == (0x400u | 0x420u << 11 | 0x1C0u << 22),
+          "packed texels read back (%08x %08x)", pk[0], pk[3]);
+    draw_tex_rect(0, 0, 32, 32);
+    // Half floats into one texel, a packed texel into another.
+    static const unsigned short hf[3] = {0x3800, 0x3400, 0x3C00};  // 0.5 0.25 1
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 1, 0, 1, 1, GL_RGB, GL_HALF_FLOAT, hf);
+    static const unsigned int one = 0x340u | 0x3C0u << 11 | 0x1C0u << 22;  // 0.25 1 0.5
+    glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 1, 1, 1, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV_EXT, &one);
+    glok("half float and packed uploads");
+    glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, back);
+    check(back[1][0] == 0.5f && back[1][1] == 0.25f && back[1][2] == 1 && back[2][0] == 0.25f && back[2][1] == 1 &&
+              back[2][2] == 0.5f && back[0][0] == 1,
+          "half floats and a packed texel read back (%g %g %g, %g %g %g)", back[1][0], back[1][1], back[1][2],
+          back[2][0], back[2][1], back[2][2]);
+    draw_tex_rect(32, 0, 64, 32);
+    snap();
+    check_px(8, 8, 255, 128, 64, 255, "texel 0");
+    check_px(24, 8, 0, 255, 0, 255, "texel 1");
+    check_px(8, 24, 32, 191, 255, 255, "texel 2");
+    check_px(24, 24, 255, 255, 128, 255, "texel 3, over 1");
+    check_px(56, 8, 128, 64, 255, 255, "half floats");
+    check_px(40, 24, 64, 255, 128, 255, "packed");
+    if (metal) {
+        // What has no place in the format (EXT_packed_float): a negative number and -Inf are 0, a number over
+        // the largest finite one is that one, +Inf and NaN stay, the rest rounds to the nearest (ties to even).
+        // GL drivers differ here, so only the Metal core is held to it.
+        const float edge[4][3] = {{-1, 1e10f, NAN},
+                                  {INFINITY, -INFINITY, 1e10f},
+                                  {1 + 1 / 128.0f, 1 + 3 / 128.0f, 1 + 1 / 64.0f},
+                                  {0x1p-15f, 0x1p-21f, 65500}};
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_R11F_G11F_B10F_EXT, 2, 2, 0, GL_RGB, GL_FLOAT, edge);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_UNSIGNED_INT_10F_11F_11F_REV_EXT, pk);
+        check((pk[0] & 0x7FF) == 0 && ((pk[0] >> 11) & 0x7FF) == 0x7BF && pk[0] >> 27 == 31 && ((pk[0] >> 22) & 31),
+              "negative, too large, NaN (%08x)", pk[0]);
+        check(pk[1] == (0x7C0u | 0u << 11 | 0x3DFu << 22), "+Inf, -Inf, too large (%08x)", pk[1]);
+        check(pk[2] == (0x3C0u | 0x3C2u << 11 | 0x1E0u << 22), "ties round to even (%08x)", pk[2]);
+        check(pk[3] == (0x020u | 0u << 11 | 0x3DFu << 22), "denormal, underflow, rounding up to too large (%08x)",
+              pk[3]);
+        glGetTexImage(GL_TEXTURE_2D, 0, GL_RGB, GL_FLOAT, back);
+        check(back[0][0] == 0 && back[0][1] == 65024 && isnan(back[0][2]) && isinf(back[1][0]) && back[1][2] == 64512 &&
+                  back[3][0] == 0x1p-15f,
+              "special values as floats (%g %g %g, %g)", back[0][0], back[0][1], back[0][2], back[1][0]);
+    }
+    glDeleteTextures(1, &t);
+    glok("packed float");
+}
+
 typedef struct {
     const char *name;
     void (*fn)(void);
@@ -2224,6 +2446,8 @@ static const test_case kCases[] = {
     {"stream_subdata", case_stream_subdata, 0},
     {"stencil_clear_ref", case_stencil_clear_ref, 0},
     {"pbo_bounds", case_pbo_bounds, 0},
+    {"key_reuse", case_key_reuse, 1},
+    {"packed_float", case_packed_float, 1},
     {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };

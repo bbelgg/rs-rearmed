@@ -101,6 +101,7 @@ enum {
     // that reaches the game's menus links about 90) or no complete corpus warm is recorded.
     RSM_CORPUS_MIN_MANIFEST = 32,
     RSM_MAX_ARCHIVE_FILES = 8,
+    RSM_MAX_BUILDERS = 64,       // builds running at once that a waiter can find (two a thread at most)
     RSM_MAX_LIBS = 8192,
     RSM_MAX_PIPES = 65536,
 };
@@ -133,6 +134,7 @@ typedef struct {
 static struct {
     _Atomic int lib_compiled, lib_warmed, lib_reused, lib_waited, lib_failed, lib_async, lib_stolen;
     _Atomic int pipe_hits, pipe_misses, pipe_built, pipe_warmed, pipe_reused, pipe_waited;
+    _Atomic int wait_boosted;  // waits of the game's threads that raised the builder's QoS (rsm_claim)
     _Atomic uint64_t lib_ns, pipe_ns, wait_ns, warm_ns, serialize_ns;
     _Atomic int serialized, discarded, compacted;
     // Compile pool: peak of jobs running at once and the highest QoS class a job ran at, both
@@ -172,6 +174,12 @@ static uint64_t rsm_now_ns(void) {
     NSMutableDictionary<NSString *, RSMLibEntry *> *libs;
     pthread_mutex_t m;
     pthread_cond_t cv;
+    // Who builds what (under m): every state that is RSM_BUILDING, with its thread (rsm_building).
+    struct {
+        int *state;
+        pthread_t thread;
+        qos_class_t qos;
+    } builders[RSM_MAX_BUILDERS];
 
     // Disk (persist only).
     bool persist;
@@ -762,13 +770,55 @@ static void rsm_note_pipeline(RSMShaderCache *c, RSMLibEntry *e, const rsm_pkey 
 // Library states (RSMLibEntry.state); pipeline slots and fragment variants use the first three.
 enum { RSM_NEW = 0, RSM_BUILDING = 1, RSM_DONE = 2, RSM_QUEUED = 3 };
 
+// Under c->m: this thread builds *state, which the caller has just set to RSM_BUILDING. The entry goes when
+// the state is published (rsm_publish_state), by the same thread and before it returns from the build, so a
+// thread found here is alive and still in that build for as long as c->m is held. No free slot: the build is
+// not listed, and a wait for it gets no boost.
+static void rsm_building(RSMShaderCache *c, int *state) {
+    for (int i = 0; i < RSM_MAX_BUILDERS; i++)
+        if (!c->builders[i].state) {
+            c->builders[i].state = state;
+            c->builders[i].thread = pthread_self();
+            c->builders[i].qos = qos_class_self();
+            return;
+        }
+}
+
+// Under c->m, before a wait for *state on one of the game's threads: a condition variable hands no priority
+// on, so a builder at a lower QoS than the waiter (a pool worker at utility: warming, or any job once the pool
+// is throttled) is raised to the waiter's, at least user-initiated, until rsm_boost_end. NULL: no boost. The
+// override reaches only that thread: a worker has nothing claimed while it waits for another worker's build
+// (rsm_pipeline_for waits for the library before it claims the slot, and one job makes all of a library's
+// warmed pipelines), so there is no chain to follow.
+static pthread_override_t rsm_boost_start(RSMShaderCache *c, int *state) {
+    for (int i = 0; i < RSM_MAX_BUILDERS; i++) {
+        if (c->builders[i].state != state)
+            continue;
+        qos_class_t want = qos_class_self();
+        if (want < QOS_CLASS_USER_INITIATED)
+            want = QOS_CLASS_USER_INITIATED;
+        // A builder with no QoS class is one of the game's own threads, which has its own priority.
+        if (c->builders[i].qos == QOS_CLASS_UNSPECIFIED || c->builders[i].qos >= want)
+            return NULL;
+        pthread_override_t o = pthread_override_qos_class_start_np(c->builders[i].thread, want, 0);
+        if (o)
+            st.wait_boosted++;
+        return o;
+    }
+    return NULL;
+}
+
 // Under c->m: true = the caller builds (state set to BUILDING); false = done (waited for if needed).
+// render: one of the game's threads asks (a wait is counted in *waited when given, and boosts the builder).
 static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *waited) {
     if (*state == RSM_BUILDING) {
         uint64_t t0 = render ? rsm_now_ns() : 0;
+        pthread_override_t boost = render ? rsm_boost_start(c, state) : NULL;
         while (*state == RSM_BUILDING)
             pthread_cond_wait(&c->cv, &c->m);
-        if (render) {
+        if (boost)
+            pthread_override_qos_class_end_np(boost);
+        if (render && waited) {
             (*waited)++;
             st.wait_ns += rsm_now_ns() - t0;
         }
@@ -776,6 +826,7 @@ static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *w
     // NEW again after the wait: a warming build failed and left it to be retried (rsm_publish_built).
     if (*state == RSM_NEW || *state == RSM_QUEUED) {
         *state = RSM_BUILDING;
+        rsm_building(c, state);
         return true;
     }
     return false;
@@ -784,6 +835,9 @@ static bool rsm_claim(RSMShaderCache *c, int *state, bool render, _Atomic int *w
 static void rsm_publish_state(RSMShaderCache *c, int *state, int to) {
     pthread_mutex_lock(&c->m);
     __atomic_store_n(state, to, __ATOMIC_RELEASE);  // rsm_cache_library_state reads it without the lock
+    for (int i = 0; i < RSM_MAX_BUILDERS; i++)
+        if (c->builders[i].state == state)
+            c->builders[i].state = NULL;
     pthread_cond_broadcast(&c->cv);
     pthread_mutex_unlock(&c->m);
 }
@@ -1031,8 +1085,10 @@ static void rsm_run_job(RSMJob *j) {
         }
         pthread_mutex_lock(&c->m);
         bool mine = e->state == RSM_QUEUED || e->state == RSM_NEW;
-        if (mine)
+        if (mine) {
             e->state = RSM_BUILDING;
+            rsm_building(c, &e->state);
+        }
         pthread_mutex_unlock(&c->m);
         bool failed = false;
         if (mine) {
@@ -1247,7 +1303,7 @@ static id<MTLFunction> rsm_fragment(RSMShaderCache *c, RSMLibEntry *e, int alpha
     if (alpha < 0 || alpha > 8 || !e->lib)
         return nil;
     pthread_mutex_lock(&c->m);
-    bool mine = rsm_claim(c, &e->fs_state[alpha], false, NULL);
+    bool mine = rsm_claim(c, &e->fs_state[alpha], render, NULL);  // uncounted: part of the pipeline's build
     pthread_mutex_unlock(&c->m);
     if (mine) {
         MTLFunctionConstantValues *cv = [MTLFunctionConstantValues new];
@@ -1627,12 +1683,12 @@ static void rsm_print_stats(const char *when) {
     fprintf(stderr,
             "[rs-mtl] cache stats (%s): lib_compiled=%d lib_ms=%.1f lib_async=%d lib_stolen=%d lib_reused=%d "
             "lib_waited=%d lib_warmed=%d lib_failed=%d pipe_built=%d pipe_ms=%.1f pipe_reused=%d pipe_waited=%d pipe_warmed=%d "
-            "archive_hits=%d archive_misses=%d wait_ms=%.1f warm_ms=%.1f archive_writes=%d write_ms=%.1f "
+            "archive_hits=%d archive_misses=%d wait_ms=%.1f wait_boosted=%d warm_ms=%.1f archive_writes=%d write_ms=%.1f "
             "discarded=%d compacted=%d pool_threads=%d pool_limit=%d pool_peak=%d pool_qos=%s prepare_ms=%.1f "
             "corpus_warmed=%d corpus_failed=%d corpus_ms=%.1f\n",
             when, st.lib_compiled, st.lib_ns / 1e6, st.lib_async, st.lib_stolen, st.lib_reused, st.lib_waited, st.lib_warmed, st.lib_failed,
             st.pipe_built, st.pipe_ns / 1e6, st.pipe_reused, st.pipe_waited, st.pipe_warmed, st.pipe_hits,
-            st.pipe_misses, st.wait_ns / 1e6, st.warm_ns / 1e6, st.serialized, st.serialize_ns / 1e6, st.discarded,
+            st.pipe_misses, st.wait_ns / 1e6, (int)st.wait_boosted, st.warm_ns / 1e6, st.serialized, st.serialize_ns / 1e6, st.discarded,
             st.compacted, g_pool_threads, g_throttled ? g_pool_limit : rsm_pool_max(), st.pool_peak,
             rsm_qos_name(st.pool_qos), st.prepare_ns / 1e6, (int)st.corpus_warmed, (int)st.corpus_failed,
             st.corpus_ns / 1e6);

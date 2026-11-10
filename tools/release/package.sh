@@ -19,6 +19,7 @@ log="$rel_out/installer-build.log"
 
 RS_LP_SEED=$RS_LP_SEED "$rel_root/tools/installer/build.sh" > "$log" 2>&1 || { cat "$log" >&2; rel_die "the installer did not build"; }
 grep -q '^with the seed: ' "$log" || rel_die "the installer was built without the seed ($log)"
+grep -q '^source digest: ' "$log" || rel_die "the installer was built without its source's digest ($log)"
 cmp -s "$RS_LP_SEED" "$app/Contents/Resources/seed.bin" || rel_die "the app's seed.bin is not $RS_LP_SEED"
 built=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")
 [[ $built == "$version" ]] || rel_die "the app says $built, VERSION says $version"

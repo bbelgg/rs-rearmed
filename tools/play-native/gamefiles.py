@@ -947,6 +947,15 @@ class Copier:
             return True
         return None  # same size, another time: compare the contents
 
+    @staticmethod
+    def _as_recorded(entry, src_st, dst):
+        """Whether the source and DEST's file are both as the last copy's manifest ENTRY has them: the source's
+        size and time, and the time the copy read back as then (copy_mtime_ns)."""
+        if not isinstance(entry, dict) or entry.get("copy_mtime_ns") is None:
+            return False
+        return (entry.get("size") == src_st.st_size and entry.get("mtime_ns") == src_st.st_mtime_ns
+                and entry["copy_mtime_ns"] == os.lstat(dst).st_mtime_ns)
+
     def _stale_logo(self, files, pending):
         """A title logo made in the copy goes before a new static.psarc comes: it was made from the old one. Before
         the copying, so a stopped run does not leave it behind."""
@@ -1074,11 +1083,17 @@ class Copier:
 
         self.progress(0, "Checking the game files")
         files = plan(self.edition, self.source, self.dlc_from)
+        # What the last copy wrote down: a volume that keeps coarser file times than the source's gives each
+        # copy another time than its source, and without this every refresh would read every file again.
+        recorded = (read_json(os.path.join(meta, MANIFEST)) or {}).get("files")
+        recorded = recorded if isinstance(recorded, dict) else {}
         entries, pending = self._dlc_away(meta, previous, files), []
         for rel, src in sorted(files.items()):
             st = os.stat(src)
             dst = os.path.join(self.dest, rel)
             same = self._same(st, dst)
+            if same is None and self._as_recorded(recorded.get(rel), st, dst):
+                same = True
             if same is None:
                 if sha256(src) == sha256(dst):
                     os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns))
@@ -1205,6 +1220,13 @@ class Copier:
         if readable:
             self._overlay()
         nbytes = sum(e["size"] for e in entries.values())
+        for rel, e in entries.items():  # the time each copy has on this volume, where it is not its source's
+            try:
+                t = os.lstat(os.path.join(self.dest, rel)).st_mtime_ns
+            except OSError:
+                continue
+            if t != e.get("mtime_ns"):
+                e["copy_mtime_ns"] = t
         write_json(os.path.join(meta, MANIFEST), {
             "format": FORMAT, "edition": self.edition, "source": self.source, "dlc_from": self.dlc_from,
             "made": time.strftime("%Y-%m-%d %H:%M:%S UTC", time.gmtime()), "bytes": nbytes, "files": entries})

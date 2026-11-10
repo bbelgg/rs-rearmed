@@ -40,8 +40,10 @@ static uint32_t cap_for(uint32_t n) {
 uint32_t w32_heap_alloc(uint32_t size) {
   if (size > 0x7fff0000u) return 0;
   uint32_t cap = cap_for(size + 16), g = 0;
+  // Only what was asked for is cleared in a block that is used again, not its whole class or
+  // capacity: heap_realloc clears what a block grows into.
   if (cap <= BIG) {
-    g = w32_galloc(cap);
+    g = w32_galloc_part(cap, size + 16);
   } else {
     pthread_mutex_lock(&big_mu);
     for (big **p = &big_free; *p; p = &(*p)->next)
@@ -54,7 +56,7 @@ uint32_t w32_heap_alloc(uint32_t size) {
         break;
       }
     pthread_mutex_unlock(&big_mu);
-    if (g) memset(RC32_H(g), 0, cap);
+    if (g) memset(RC32_H(g), 0, size + 16);
     else g = rc32_alloc(cap);
   }
   if (!g) return 0;

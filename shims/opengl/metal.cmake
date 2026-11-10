@@ -46,7 +46,8 @@ set(ogl_metal_cases
   clear triangle indexed instanced instance_id client_arrays blend depth stencil scissor viewport
   fbo pass_targets render_to_texture depth_texture cube_map dxt bgra luminance texture_1d mipmaps alpha_test polygon_mode subdata_in_flight
   map_buffer readback_orientation tex_subimage unpack_alignment uniforms rebind_attrib queries errors object_lifetime
-  mip_redefine fbo_mipmap orphans restart_index stream_subdata stencil_clear_ref pbo_bounds api)
+  mip_redefine fbo_mipmap orphans restart_index stream_subdata stencil_clear_ref pbo_bounds key_reuse packed_float
+  api)
 # Programs need the translator (msl.cmake's rsmsl).
 if(TARGET rsmsl)
   foreach(c ${ogl_metal_cases})
@@ -58,9 +59,11 @@ if(TARGET rsmsl)
   add_test(NAME opengl.metal.cache
     COMMAND metal_cache_test "${CMAKE_CURRENT_BINARY_DIR}/metal-cache-test")
   set_tests_properties(opengl.metal.cache PROPERTIES ${ogl_pass} TIMEOUT 600)
-  # All cases in one process on Metal, with error checking: every game import is called.
+  # All cases in one process on Metal, with error checking: every game import is called. And with the
+  # pipeline key check (mtl_draw.m): no draw may take a kept key that building it again would not give.
   add_test(NAME opengl.metal.coverage COMMAND metal_core_test --all)
   set_tests_properties(opengl.metal.coverage PROPERTIES
-    ENVIRONMENT "RS_GL_BACKEND=metal;RS_GL_CHECK=1"
-    PASS_REGULAR_EXPRESSION "COVERAGE 107/107.*all on metal: [0-9]+ passed, 0 failed")
+    ENVIRONMENT "RS_GL_BACKEND=metal;RS_GL_CHECK=1;RS_METAL_PKEY_CHECK=1"
+    PASS_REGULAR_EXPRESSION "COVERAGE 107/107.*all on metal: [0-9]+ passed, 0 failed"
+    FAIL_REGULAR_EXPRESSION "pipeline key check: the kept key is stale")
 endif()

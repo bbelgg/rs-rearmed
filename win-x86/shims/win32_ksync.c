@@ -733,6 +733,7 @@ static void *thread_main(void *p) {
   pthread_cond_broadcast(&w32_hwake);
   if (--a.o->refs == 0) obj_free(a.o);
   pthread_mutex_unlock(&w32_hlock);
+  rc32_thread_end();  // its stack, TEB and TLS blocks: the next thread's
   return 0;
 }
 
@@ -1055,11 +1056,15 @@ static void tls_note(rc_ctx *c) {
   if (tls_noted) return;
   tls_noted = 1;
   pthread_mutex_lock(&tls_mu);
-  if (tls_ntebs == tls_captebs) {
-    tls_captebs = tls_captebs ? 2 * tls_captebs : 64;
-    tls_tebs = realloc(tls_tebs, tls_captebs * sizeof *tls_tebs);
+  uint32_t t = 0;
+  while (t < tls_ntebs && tls_tebs[t] != c->fs) t++;  // there already: an ended thread's TEB (rc32_thread_end)
+  if (t == tls_ntebs) {
+    if (tls_ntebs == tls_captebs) {
+      tls_captebs = tls_captebs ? 2 * tls_captebs : 64;
+      tls_tebs = realloc(tls_tebs, tls_captebs * sizeof *tls_tebs);
+    }
+    tls_tebs[tls_ntebs++] = c->fs;
   }
-  tls_tebs[tls_ntebs++] = c->fs;
   pthread_mutex_unlock(&tls_mu);
 }
 static void k_TlsAlloc(rc_ctx *c) { w32_ret(c, tls_alloc(), 0); }

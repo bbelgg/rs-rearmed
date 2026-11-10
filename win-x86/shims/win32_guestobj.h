@@ -66,6 +66,9 @@ uint32_t w32_guest_call(rc_ctx *c, uint32_t fn, int conv, uint32_t self, const u
 // Guest memory that can be freed (rc32_alloc never frees): power-of-two classes over rc32_alloc,
 // zero-filled. 0 when out of memory.
 uint32_t w32_galloc(uint32_t size);
+// The same block with only its first `clear` bytes sure to be zero: for a caller that clears the
+// rest itself as it comes into use (the heap, whose blocks grow into their class).
+uint32_t w32_galloc_part(uint32_t size, uint32_t clear);
 void w32_gfree(uint32_t g, uint32_t size);
 // A guest copy of a NUL-terminated host string, interned: the same text gives the same address,
 // which stays valid for the life of the process (for `const char *` results). 0 for 0.

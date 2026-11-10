@@ -673,6 +673,8 @@ static int rsm_packed_components(GLenum type) {  // >0: packed type with that ma
         return 4;
     case 0x84FA /* GL_UNSIGNED_INT_24_8 */:
         return 2;
+    case GL_UNSIGNED_INT_10F_11F_11F_REV_EXT:
+        return 3;
     }
     return 0;
 }
@@ -687,7 +689,7 @@ static int rsm_type_size(GLenum type) {
         return 2;
     case GL_UNSIGNED_INT: case GL_INT: case GL_FLOAT: case GL_UNSIGNED_INT_8_8_8_8:
     case GL_UNSIGNED_INT_8_8_8_8_REV: case GL_UNSIGNED_INT_10_10_10_2: case GL_UNSIGNED_INT_2_10_10_10_REV:
-    case 0x84FA /* GL_UNSIGNED_INT_24_8 */:
+    case 0x84FA /* GL_UNSIGNED_INT_24_8 */: case GL_UNSIGNED_INT_10F_11F_11F_REV_EXT:
         return 4;
     }
     return 0;
@@ -737,13 +739,66 @@ static uint16_t rsm_float_to_half(float v) {
     return h;
 }
 
+// Unsigned floats of GL_R11F_G11F_B10F (EXT_packed_float): no sign, a 5-bit exponent (bias 15) and `mbits` of
+// mantissa, 6 for red and green and 5 for blue. One texel is red | green << 11 | blue << 22, which is also
+// GL_UNSIGNED_INT_10F_11F_11F_REV and MTLPixelFormatRG11B10Float. Packing rounds to the nearest (ties to even);
+// a negative number or -Inf is 0, a number over the largest finite one is the largest finite one, +Inf and NaN
+// stay what they are.
+static uint32_t rsm_float_to_uf(float v, int mbits) {
+    uint32_t u;
+    memcpy(&u, &v, 4);
+    uint32_t e = (u >> 23) & 0xFF, m = u & 0x7FFFFF, inf = 31u << mbits;
+    if (e == 0xFF)
+        return m ? inf | 1 : u >> 31 ? 0 : inf;
+    if (u >> 31)
+        return 0;
+    int ex = (int)e - 127 + 15, shift = 23 - mbits;
+    uint32_t top = 0;
+    if (ex >= 31)
+        return inf - 1;
+    if (ex <= 0) {  // a denormal here (or 0): the implicit 1 becomes a mantissa bit
+        shift += 1 - ex;
+        if (shift > 24 || !e)
+            return 0;
+        m |= 0x800000;
+    } else {
+        top = (uint32_t)ex << mbits;
+    }
+    uint32_t q = m >> shift, rest = m & ((1u << shift) - 1), half = 1u << (shift - 1);
+    if (rest > half || (rest == half && (q & 1)))
+        q++;  // may carry into the exponent, which is the next number up
+    q += top;
+    return q >= inf ? inf - 1 : q;
+}
+
+static float rsm_uf_to_float(uint32_t v, int mbits) {
+    uint32_t e = v >> mbits, m = v & ((1u << mbits) - 1);
+    if (e == 31)
+        return m ? NAN : INFINITY;
+    return e ? ldexpf((float)(m | 1u << mbits), (int)e - 15 - mbits) : ldexpf((float)m, -14 - mbits);
+}
+
+static uint32_t rsm_rg11b10_pack(float r, float g, float b) {
+    return rsm_float_to_uf(r, 6) | rsm_float_to_uf(g, 6) << 11 | rsm_float_to_uf(b, 5) << 22;
+}
+
+static void rsm_rg11b10_unpack(uint32_t v, float c[3]) {
+    c[0] = rsm_uf_to_float(v & 0x7FF, 6);
+    c[1] = rsm_uf_to_float((v >> 11) & 0x7FF, 6);
+    c[2] = rsm_uf_to_float(v >> 22, 5);
+}
+
 // One client pixel -> components in format order (normalized to [0,1] for
 // unsigned normalized types, as GL converts them).
 static void rsm_decode_px(const uint8_t *p, GLenum format, GLenum type, float out[4]) {
     int n = rsm_format_components(format);
     int pk = rsm_packed_components(type);
     float c[4] = {0, 0, 0, 1};
-    if (pk) {
+    if (type == GL_UNSIGNED_INT_10F_11F_11F_REV_EXT) {
+        uint32_t v;
+        memcpy(&v, p, 4);
+        rsm_rg11b10_unpack(v, c);
+    } else if (pk) {
         uint32_t v = type == GL_UNSIGNED_BYTE_3_3_2 || type == GL_UNSIGNED_BYTE_2_3_3_REV ? p[0]
                      : rsm_type_size(type) == 2 ? *(const uint16_t *)p
                                                 : *(const uint32_t *)p;
@@ -835,6 +890,11 @@ static void rsm_encode_texel(const float c[4], MTLPixelFormat fmt, int swz, uint
     case MTLPixelFormatR32Float: case MTLPixelFormatDepth32Float: ((float *)d)[0] = s0; break;
     case MTLPixelFormatRG32Float: ((float *)d)[0] = s0; ((float *)d)[1] = s1; break;
     case MTLPixelFormatRGBA32Float: memcpy(d, c, 16); break;
+    case MTLPixelFormatRG11B10Float: {
+        uint32_t v = rsm_rg11b10_pack(r, g, b);
+        memcpy(d, &v, 4);
+        break;
+    }
     default: break;
     }
 }
@@ -860,6 +920,12 @@ static void rsm_decode_texel(const uint8_t *s, MTLPixelFormat fmt, int swz, floa
     case MTLPixelFormatR32Float: case MTLPixelFormatDepth32Float: v[0] = ((const float *)s)[0]; break;
     case MTLPixelFormatRG32Float: v[0] = ((const float *)s)[0]; v[1] = ((const float *)s)[1]; break;
     case MTLPixelFormatRGBA32Float: memcpy(v, s, 16); break;
+    case MTLPixelFormatRG11B10Float: {
+        uint32_t t;
+        memcpy(&t, s, 4);
+        rsm_rg11b10_unpack(t, v);
+        break;
+    }
     default: break;
     }
     switch (swz) {
@@ -892,6 +958,11 @@ static void rsm_encode_px(const float c[4], GLenum format, GLenum type, uint8_t 
     case GL_ABGR_EXT: v[0] = c[3]; v[1] = c[2]; v[2] = c[1]; v[3] = c[0]; break;
     }
     int pk = rsm_packed_components(type);
+    if (type == GL_UNSIGNED_INT_10F_11F_11F_REV_EXT) {
+        uint32_t out = rsm_rg11b10_pack(v[0], v[1], v[2]);
+        memcpy(p, &out, 4);
+        return;
+    }
     if (pk) {
         static const struct { GLenum t; int rev; int bits[4]; } L[] = {
             {GL_UNSIGNED_SHORT_5_6_5, 0, {5, 6, 5, 0}}, {GL_UNSIGNED_SHORT_5_6_5_REV, 1, {5, 6, 5, 0}},
@@ -961,6 +1032,8 @@ static const void *rsm_unpack(RSMContext *ctx, const void *data, int w, int h, G
                       ? type == GL_UNSIGNED_BYTE && (format == GL_LUMINANCE_ALPHA || format == GL_RG)
                   : fmt == MTLPixelFormatRGBA32Float ? format == GL_RGBA && type == GL_FLOAT
                   : fmt == MTLPixelFormatRGBA16Float ? format == GL_RGBA && type == GL_HALF_FLOAT
+                  : fmt == MTLPixelFormatRG11B10Float
+                      ? format == GL_RGB && type == GL_UNSIGNED_INT_10F_11F_11F_REV_EXT
                   : fmt == MTLPixelFormatR32Float || fmt == MTLPixelFormatDepth32Float
                       ? type == GL_FLOAT && rsm_format_components(format) == 1
                       : false;
@@ -1133,7 +1206,6 @@ void rsmtl_glDeleteTextures(GLsizei n, const GLuint *textures) {
         }
         rsm_names_set(&ctx->textures, t, nil);
     }
-    ctx->dirty |= RSM_DIRTY_TEXTURES;
 }
 
 GLboolean rsmtl_glIsTexture(GLuint texture) {
@@ -1175,10 +1247,7 @@ void rsmtl_glBindTexture(GLenum target, GLuint texture) {
         t->target = target;
         t->bound = true;
     }
-    if (*slot != texture) {
-        *slot = texture;
-        ctx->dirty |= RSM_DIRTY_TEXTURES;
-    }
+    *slot = texture;
 }
 
 static void *rsm_bound_texture_(__unsafe_unretained RSMContext *ctx, GLenum target, int *face) {
@@ -1240,7 +1309,6 @@ static void rsm_tex_param(__unsafe_unretained RSMContext *ctx, GLenum target, GL
     if (memcmp(&p, &t->p, sizeof p)) {
         t->p = p;
         t->sampler = nil;
-        ctx->dirty |= RSM_DIRTY_TEXTURES;
     }
 }
 
@@ -1442,7 +1510,6 @@ static void rsm_tex_grow(RSMContext *ctx, RSMTexture *t, int levels) {
     t->last_use = ctx->serial;
     // New storage: a framebuffer with it attached must render into the new texture.
     ctx->fb_dirty = true;
-    ctx->dirty |= RSM_DIRTY_TEXTURES;
 }
 
 // Make storage for (level, w, h) of `fmt`. Level 0 decides the texture; other
@@ -1465,7 +1532,6 @@ static bool rsm_tex_define(RSMContext *ctx, RSMTexture *t, int level, GLenum int
             t->levels = levels;
             t->defined = 0;
             t->last_use = 0;
-            ctx->dirty |= RSM_DIRTY_TEXTURES;
             rsm_fb_changed(ctx);  // a render target may have been replaced
         }
         t->internal = internal;
@@ -1726,7 +1792,6 @@ void rsmtl_glGenerateMipmap(GLenum target) {
             t->last_use = ctx->serial;
         }
         t->defined = (1u << full) - 1;
-        ctx->dirty |= RSM_DIRTY_TEXTURES;
     }
 }
 
@@ -1767,6 +1832,8 @@ void rsmtl_glGetTexLevelParameteriv(GLenum target, GLint level, GLenum pname, GL
         break;
     case GL_TEXTURE_RED_SIZE: case GL_TEXTURE_GREEN_SIZE: case GL_TEXTURE_BLUE_SIZE:
     case GL_TEXTURE_ALPHA_SIZE: case GL_TEXTURE_LUMINANCE_SIZE: case GL_TEXTURE_INTENSITY_SIZE:
+        if (def && t->fmt == MTLPixelFormatRG11B10Float)
+            ch = pname == GL_TEXTURE_RED_SIZE || pname == GL_TEXTURE_GREEN_SIZE ? 11 : pname == GL_TEXTURE_BLUE_SIZE ? 10 : 0;
         *params = ch; break;
     case GL_TEXTURE_DEPTH_SIZE: *params = depth; break;
     case GL_TEXTURE_STENCIL_SIZE_EXT: *params = stencil; break;

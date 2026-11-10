@@ -25,8 +25,12 @@ int rc32_mem_init(void);
 int rc32_mem_commit(uint32_t g, uint32_t size);
 void rc32_mem_guard(uint32_t g, uint32_t size);  // no access: a page-aligned range, a stack's guard
 // A guest heap block inside the window (bump allocator over a committed arena, 16-aligned;
-// never freed; it steps over the ranges of mapped images). 0 when the arena is full.
+// never freed; it steps over the ranges of mapped images). 0 when the arena is full. The block
+// reads as zero: it is pages nothing has written, not cleared here.
 uint32_t rc32_alloc(uint32_t size);
+// Replace [g, g + size), whole pages of a block, with fresh pages: they read as zero and the old
+// ones leave memory. 0 on success.
+int rc32_mem_fresh(uint32_t g, uint32_t size);
 extern uint64_t rc_img_lo, rc_img_hi;  // the game's image, host addresses: what a mod reads as on the Mac (rc_rt.h)
 uint32_t rc32_arena_used(void);  // bytes of the arena handed out so far (it never shrinks)
 // Keep [g, g + size) for an image: the arena will not hand it out. -1 when it overlaps another
@@ -173,6 +177,10 @@ uint64_t rc32_rdtsc(void);
 // the default, whichever is more; the default is 1 MB or the main image's SizeOfStackReserve. Below
 // it is a guard, so an overflow faults instead of running into the next block of the arena.
 rc_ctx *rc32_thread_ctx(void);
+// The calling thread is done with guest code for good: its stack, TEB and TLS blocks go to the
+// next thread that asks for a stack of the same size, and its context is freed. The thread's own
+// last call; a later rc32_thread_ctx on it would start over with a new context.
+void rc32_thread_end(void);
 void rc32_thread_stack(uint32_t size);
 void rc32_stack_default(uint32_t size);
 // TEB fields the runtime keeps (offsets of the 32-bit NT_TIB / TEB).

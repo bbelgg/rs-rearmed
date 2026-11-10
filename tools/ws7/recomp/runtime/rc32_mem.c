@@ -93,7 +93,15 @@ uint32_t rc32_alloc(uint32_t size) {
       r = (uint32_t)a;
     }
   }
-  if (r) memset(rc_mem + r, 0, size);
+  // No clearing: the arena only grows, so a block is pages of the window nothing has written yet,
+  // which read as zero, and one that is never written (most of a stack) stays out of memory.
   pthread_mutex_unlock(&arena_mu);
   return r;
+}
+
+int rc32_mem_fresh(uint32_t g, uint32_t size) {
+  uint64_t pg = (uint64_t)getpagesize();
+  if ((g & (pg - 1)) || (size & (pg - 1)) || g < 0x10000 || (uint64_t)g + size > WINDOW) return -1;
+  void *p = mmap(rc_mem + g, size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANON | MAP_NORESERVE | MAP_FIXED, -1, 0);
+  return p == MAP_FAILED ? -1 : 0;
 }

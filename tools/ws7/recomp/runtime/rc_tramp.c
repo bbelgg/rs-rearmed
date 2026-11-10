@@ -14,7 +14,9 @@ static uint64_t fn_of[POOL];     // guest function (host address) of entry k
 static uint32_t flags_of[POOL];  // RC_TR_* of entry k
 static int used;
 #define HSIZE 8192  // open addressing, > 2 * POOL
-static struct { uint64_t fn; uint32_t flags; int idx; } hash[HSIZE];
+// A slot is written once, under mu, and never changes: fn and flags first, then idx1 (its entry + 1),
+// which is what a lookup reads first, without the lock. 0 there is an empty slot, or one being made.
+static struct { uint64_t fn; uint32_t flags; int idx1; } hash[HSIZE];
 
 // rc_tramp_get_fixfn: RC_TR_FIXFN | nfields << 8
 #define RC_TR_FIXFN 64
@@ -42,10 +44,18 @@ void *rc_tramp_get_ex(uint64_t guest_fn, unsigned flags) {
   guest_fn = rc_tramp_unwrap(guest_fn);  // a trampoline already: wrap the function behind it
   if (!rc_in_image(guest_fn)) return (void *)guest_fn;
   if ((size_t)(rc_tramp_pool_end - rc_tramp_pool) != 8 * POOL) rc_fail("trampoline pool layout", 0);
-  pthread_mutex_lock(&mu);
+  // Found without the lock when it is there already, as it is for every call but a pointer's first:
+  // an import with a callback argument asks on each call.
   unsigned h = hslot(guest_fn, flags);
-  while (hash[h].fn && (hash[h].fn != guest_fn || hash[h].flags != flags)) h = (h + 1) & (HSIZE - 1);
-  if (!hash[h].fn) {
+  int k;
+  while ((k = __atomic_load_n(&hash[h].idx1, __ATOMIC_ACQUIRE))) {
+    if (hash[h].fn == guest_fn && hash[h].flags == flags) return (void *)(rc_tramp_pool + 8 * (size_t)(k - 1));
+    h = (h + 1) & (HSIZE - 1);
+  }
+  pthread_mutex_lock(&mu);
+  // from the empty slot on: one made since is at it or after it
+  while (hash[h].idx1 && (hash[h].fn != guest_fn || hash[h].flags != flags)) h = (h + 1) & (HSIZE - 1);
+  if (!hash[h].idx1) {
     if (used == POOL) {
       pthread_mutex_unlock(&mu);
       rc_fail("trampoline pool exhausted", guest_fn - rc_slide);
@@ -54,9 +64,9 @@ void *rc_tramp_get_ex(uint64_t guest_fn, unsigned flags) {
     flags_of[used] = flags;
     hash[h].fn = guest_fn;
     hash[h].flags = flags;
-    hash[h].idx = used++;
+    __atomic_store_n(&hash[h].idx1, ++used, __ATOMIC_RELEASE);
   }
-  void *p = (void *)(rc_tramp_pool + 8 * (size_t)hash[h].idx);
+  void *p = (void *)(rc_tramp_pool + 8 * (size_t)(hash[h].idx1 - 1));
   pthread_mutex_unlock(&mu);
   return p;
 }

@@ -78,14 +78,18 @@ are in git and on the [Releases](https://github.com/bbelgg/rs-rearmed/releases) 
 - Not checked yet: a second Mac or GPU, 120 Hz ProMotion displays, sleep and wake, unplugging a display, the
   Retina mouse in songs, and a fresh player's first answer to macOS's
   question about another disk with the compiled launcher (an earlier Allow covered the one run).
-- From the code review of 2026-11-09, read from the code and not measured or fixed: on Metal a draw waits
-  without a priority boost for a shader compile a utility-priority worker has started; every draw rebuilds its
-  pipeline key and vertex bindings (the dirty bits are set and never read); pixel data for a
-  `GL_R11F_G11F_B10F` texture is not converted; an import call with a callback argument takes one
-  process-wide lock (`rc_tramp.c`); the Steam layer's `auto` mode (not the app's, which is `stub`) loses
-  callbacks registered before a failed `SteamAPI_Init`; a refresh onto a volume with coarse file times
-  hashes every file again. The standalone installer runs the source it downloads by tag with no check of what
-  it got beyond the archive being whole.
+- The fixes for what the code review of 2026-11-09 left open (not released), run in their suites and in one game
+  run of each edition to the note highway and through 150 s of a song (`tools/perf/run.py`, 2026-11-10: this
+  edition at 60.0 fps, 43.3% of a core and 1.23 GB, as 1.13.0): a draw that waits for a shader compile raises the worker that has it (`wait_boosted` in
+  `RS_METAL_CACHE_STATS`); a draw keeps its pipeline key while nothing it is made of has changed
+  (`RS_METAL_PKEY_CHECK=1` builds it anyway and says when the kept one was stale; in both games' runs no draw
+  kept a key at all, since the game sets vertex state or the program before every draw, so this saves nothing
+  there until the marks compare values, which is open); `GL_R11F_G11F_B10F` pixel data is converted both ways; a callback's
+  trampoline is found without the process-wide lock (`rc_tramp.c`); the Steam layer's `auto` mode keeps the
+  listeners registered before a failed `SteamAPI_Init`; a refresh onto a volume with coarse file times reads no
+  file again; the standalone installer builds only a download that adds up to the source it was made from. None
+  of the three renderer changes shows in the numbers. The boost was taken in Learn & Play's run (98 waits of 98,
+  on a cold shader cache), with nothing to compare its 25 s of waits against; the Mac run had no wait.
 - The installer keeps its preferences in the user's defaults even when run with a test `HOME`
   ([TESTING.md](TESTING.md#installer-tests)).
 

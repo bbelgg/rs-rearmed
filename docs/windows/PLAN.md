@@ -97,15 +97,18 @@ Released since 1.4.0. The Mac port's plan: [Mac plan](../mac/PLAN.md). Results o
   same. So an install-time converter is simple in itself, but it needs the other platform's key, which is
   not in the game a player has here, and nothing from the game may be in this repository. So RS Re-ARMed
   has no converter and will not get one: an archive has to be the edition's own kind.
-- From the code review of 2026-11-09, read from the code and not measured or fixed: a guest thread's stack,
-  TEB and TLS blocks are never given back (`rc32_teb.c`, `win32_ksync.c`; the Mac runtime frees its own), so a
-  session that makes many short threads uses up the guest window; `rc32_alloc` clears every block it hands out,
-  which makes a thread's whole stack and a reserved region resident, under the arena lock; a guest path that
-  starts with `/` is taken as a host path as it is (`win32_kfile.c` `map_path`), past the user folder's
-  confinement; `HeapAlloc` clears a reused block's whole size class; each D3D call takes the process-wide object
-  lock before the device's; the function discovery sorts the whole function set once a candidate
-  (`x86_32.py`), minutes of the translation. The Mac plan lists what the shared renderer, the recompiler's
-  runtime and the installer have open from the same review ([Mac plan](../mac/PLAN.md#open-issues)).
+- The fixes for what the code review of 2026-11-09 left open (not released), run in their suites and in one game
+  run to the note highway and through 150 s of a song (`tools/perf/run.py`, 2026-11-10, relinked on the
+  translation of 2026-11-09: 59.6 fps, 51.5% of a core, 1.44 GB where 1.13.0 had 1.5 GB; its four frames over
+  50 ms were first-use shader compiles on a cold cache): a thread that ends gives its stack, TEB and TLS blocks to the next (`rc32_thread_end`), and
+  `rc32_alloc` no longer clears what it hands out, so a stack is in memory only as far as it is used; a guest
+  path that starts with `/` is a host path only inside the game folder, the user folder or the Steam layer's
+  data folder (`win32_kfile.c`); `HeapAlloc` clears what was asked for in a block it uses again; a D3D call
+  finds its object without the process-wide lock; the function discovery keeps its function set as it goes
+  (`x86_32.py`: the same 61,755 functions of the game in 164 s where it took 545 s). A long
+  session, where the threads' reused blocks matter, has not been played. The Mac plan
+  lists what the shared renderer, the recompiler's runtime and the installer got from the same review
+  ([Mac plan](../mac/PLAN.md#open-issues)).
 - D3DX paths not exercised yet: `D3DXCreateEffectCompiler`, `D3DXCreateTextureFromFileExA`, the cube and
   volume loaders, `D3DXSaveSurfaceToFileInMemory`, effects with textures.
 - Fixed function not implemented (logged once): vertex blending, sphere maps, bump mapping, user clip

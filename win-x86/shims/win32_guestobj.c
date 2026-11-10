@@ -151,7 +151,7 @@ static int gclass(uint32_t size) {
   return k;
 }
 
-uint32_t w32_galloc(uint32_t size) {
+uint32_t w32_galloc_part(uint32_t size, uint32_t clear) {
   if (!size) size = 1;
   if (size > 0x80000000u) return 0;
   int k = gclass(size);
@@ -160,11 +160,13 @@ uint32_t w32_galloc(uint32_t size) {
   if (g) gfree_head[k] = w32_rd32(g);
   pthread_mutex_unlock(&gmem_mu);
   if (g) {
-    memset(RC32_H(g), 0, (size_t)1 << k);
+    size_t all = (size_t)1 << k;
+    memset(RC32_H(g), 0, clear < 4 ? 4 : clear < all ? clear : all);  // the list's link at least
     return g;
   }
   return rc32_alloc(1u << k);
 }
+uint32_t w32_galloc(uint32_t size) { return w32_galloc_part(size, 0xffffffffu); }
 
 void w32_gfree(uint32_t g, uint32_t size) {
   if (!g) return;

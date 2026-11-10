@@ -415,7 +415,7 @@ void rsmtl_glLinkProgram(GLuint program) {
         p->linked = true;
         p->log = @"";
         if (ctx->prog == p)
-            ctx->dirty |= RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX | RSM_DIRTY_TEXTURES | RSM_DIRTY_UNIFORMS;
+            ctx->dirty |= RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX;
     }
 }
 
@@ -457,7 +457,7 @@ void rsmtl_glUseProgram(GLuint program) {
         RSMProgram *old = ctx->prog;
         ctx->prog = p;
         rsm_program_reap(ctx, old);
-        ctx->dirty |= RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX | RSM_DIRTY_TEXTURES | RSM_DIRTY_UNIFORMS;
+        ctx->dirty |= RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX;
     }
 }
 
@@ -605,10 +605,8 @@ static void rsm_set_uniform(GLint loc, GLsizei count, int kind, int comps, const
         const GLint *iv = data;
         for (int i = 0; i < n && comps == 1; i++)
             p->int_values[loc + i] = kind == U_INT ? iv[i] : (int)((const GLfloat *)data)[i];
-        if (is_sampler) {
-            ctx->dirty |= RSM_DIRTY_TEXTURES;
+        if (is_sampler)
             return;
-        }
     }
     for (int st = 0; st < 2; st++) {
         int off = st ? u->u.fs_offset : u->u.vs_offset;
@@ -650,7 +648,6 @@ static void rsm_set_uniform(GLint loc, GLsizei count, int kind, int comps, const
         else
             p->vs_dirty = true;
     }
-    ctx->dirty |= RSM_DIRTY_UNIFORMS;
 }
 
 void rsmtl_glUniform1f(GLint location, GLfloat v0) { rsm_set_uniform(location, 1, U_FLOAT, 1, &v0, false); }

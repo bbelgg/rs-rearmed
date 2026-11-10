@@ -297,16 +297,16 @@ typedef struct {
 
 // --- Context -----------------------------------------------------------------
 enum {
-    RSM_DIRTY_PIPELINE = 1u << 0,
+    // PIPELINE and VERTEX: what a draw's rsm_pkey is made of, besides the pass (rsm_draw rebuilds the key when
+    // either is set). Textures and uniforms have no bit: every draw compares them with what the encoder has.
+    RSM_DIRTY_PIPELINE = 1u << 0, // program, blend, colour mask, alpha test
     RSM_DIRTY_DEPTH = 1u << 1,
     RSM_DIRTY_VIEWPORT = 1u << 2,
     RSM_DIRTY_SCISSOR = 1u << 3,
     RSM_DIRTY_RASTER = 1u << 4,   // cull, winding, fill mode
     RSM_DIRTY_STENCIL_REF = 1u << 5,
     RSM_DIRTY_BLEND_COLOR = 1u << 6,
-    RSM_DIRTY_VERTEX = 1u << 7,   // attribute layout or bindings
-    RSM_DIRTY_TEXTURES = 1u << 8,
-    RSM_DIRTY_UNIFORMS = 1u << 9,
+    RSM_DIRTY_VERTEX = 1u << 7,   // the VAO, an attribute's layout or buffer, a buffer's storage
     RSM_DIRTY_ALPHA_REF = 1u << 10,
     RSM_DIRTY_ALL = 0xFFFFu,
 };
@@ -403,6 +403,7 @@ typedef struct {
     id<MTLRenderPipelineState> cur_pipeline;
     rsm_pkey cur_pkey;
     bool cur_pkey_valid;
+    bool cur_pkey_copy;            // rsm_draw's `copy` when cur_pkey was built
     uint64_t cur_prog_uid;         // program whose uniforms the encoder has
     __unsafe_unretained id<MTLBuffer> enc_vb[RSM_MAX_ATTRIBS];
     NSUInteger enc_vb_off[RSM_MAX_ATTRIBS];

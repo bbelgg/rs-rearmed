@@ -1123,19 +1123,41 @@ class Translator32(X87Mixin, core.Translator):
             bad = next((i for i in seen.values() if junk(i, seen)), None)
             return None if bad is None else "data decodes to %s at 0x%x" % (bad.mnemonic, bad.address)
 
+        # The function set while a candidate is looked at is every start tried so far, the
+        # candidate and what is queued. It is kept as it changes (fset, and fsorted by insertion):
+        # making and sorting it again for each candidate was minutes of a translation.
+        queued = collections.Counter()
+
+        def known(t):
+            if t not in self.fset:
+                self.fset.add(t)
+                bisect.insort(self.fsorted, t)
+
+        def forget(t):
+            """t is neither tried nor queued any more."""
+            if t in self.fset and t not in funcs and not queued[t]:
+                self.fset.discard(t)
+                del self.fsorted[bisect.bisect_left(self.fsorted, t)]
+
         def run(work):
             seh = self.seh_targets
+            for t in work:
+                queued[t] += 1
+                known(t)
             while work:
                 f = work.pop()
+                queued[f] -= 1
                 if f in funcs or f in seh:   # an __except block: the body of the function it is in
+                    forget(f)
                     continue
                 if f in strict and f in cover:   # inside a function found since it was queued
+                    forget(f)
                     continue
                 if f in strict and not_code(f, {}):
                     funcs[f] = None
                     rejected.add(f)
                     continue
-                self.set_functions(set(funcs) | {f} | set(work), clear=False)
+                self.__dict__.pop("_jt_cache", None)
                 self._trial = not img.is_code(f)
                 try:
                     seen, _ = self.discover(f)
@@ -1174,6 +1196,8 @@ class Translator32(X87Mixin, core.Translator):
                         if (img.is_code(t) or (self.code_in_data and in_data(t))) and t not in funcs \
                                 and t != a + i.size:
                             work.append(t)
+                            queued[t] += 1
+                            known(t)
                     # relocated immediates in the instruction: function pointers (push offset f,
                     # mov [x], offset f); not displacements (table bases)
                     k = bisect.bisect_left(relocs, a)
@@ -1269,6 +1293,7 @@ class Translator32(X87Mixin, core.Translator):
                     found = funcs.get(a)
                     if found is None or found.junk:
                         funcs.pop(a, None)
+                        forget(a)
                         self.discovery_failed.pop(a, None)
                         gaps_rejected += 1
                 a = max(b, a + 1)
@@ -1291,6 +1316,7 @@ class Translator32(X87Mixin, core.Translator):
                 break
             for f in again:
                 funcs.pop(f, None)
+                forget(f)
                 self.discovery_failed.pop(f, None)
             run(again[::-1])
         self.set_data_code(self.merge_ranges(self._dc_insns, self.insn))

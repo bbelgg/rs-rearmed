@@ -44,7 +44,18 @@ NO_STEAM := HOME=$(CURDIR)/build/emptyhome
 build/test_enumerate: tests/test_enumerate.cpp $(HDRS)
 	$(CXX) $(ARCHS) $(CXXFLAGS) tests/test_enumerate.cpp -o $@
 
-test: build/test_shim build/test_vtables build/test_enumerate
+build/libfake_real.dylib: tests/fake_real.cpp
+	@mkdir -p build
+	$(CXX) $(ARCHS) -std=c++17 -O1 -mmacosx-version-min=11.0 -dynamiclib $< -o $@
+	codesign -f -s - $@
+
+build/test_auto: tests/test_auto.cpp $(LIB)
+	$(CXX) $(ARCHS) -std=c++17 -O1 -mmacosx-version-min=11.0 $< -Lbuild -lsteam_api \
+	    -Wl,-rpath,@executable_path -o $@
+	install_name_tool -change @loader_path/libsteam_api.dylib @rpath/libsteam_api.dylib $@ 2>/dev/null
+	codesign -f -s - $@
+
+test: build/test_shim build/test_vtables build/test_enumerate build/test_auto build/libfake_real.dylib
 	@if [ -e build/steam_shim.ini ]; then echo "build/steam_shim.ini would change the tests' settings: move it away" >&2; exit 1; fi
 	arch -arm64 build/test_vtables
 	arch -x86_64 build/test_vtables
@@ -53,6 +64,8 @@ test: build/test_shim build/test_vtables build/test_enumerate
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=248750,258341 arch -x86_64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) RS_STEAM_DLC=all arch -arm64 build/test_shim
 	$(TEST_ENV) $(NO_STEAM) arch -arm64 build/test_shim
+	@# Mode "auto" with a library whose Init fails: the listeners registered before it are the stub's.
+	$(TEST_ENV) $(NO_STEAM) RS_STEAM_MODE=auto RS_STEAM_REAL_LIB=$(CURDIR)/build/libfake_real.dylib arch -arm64 build/test_auto
 	@# The native launcher's stage: symlinks to an install in another Steam library (e.g. on an external
 	@# drive), whose appmanifest has the DLC and language. Steam's own folder has another appmanifest.
 	@rm -rf build/stage build/testlib build/stagehome

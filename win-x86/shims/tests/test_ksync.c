@@ -71,6 +71,21 @@ static void *one_waiter(void *arg) {
   return 0;
 }
 // n waits on h, begun in order, ended by one pulse or by their timeout of ms
+// a thread with guest memory that ends at once: what it finds must be clear, and it leaves marks
+static atomic_int ender_dirty, ender_tebs;
+static uint32_t ender_teb;
+static void *ender(void *arg) {
+  rc_ctx *c = rc32_thread_ctx();
+  uint32_t sp = (uint32_t)c->r[4], teb = (uint32_t)c->fs;
+  if (w32_rd32(sp - 0x1000) || w32_rd32(teb + 0x800) || w32_rd32(teb + RC32_TEB_SELF) != teb) atomic_fetch_add(&ender_dirty, 1);
+  if (teb != ender_teb) atomic_fetch_add(&ender_tebs, 1);
+  ender_teb = teb;
+  w32_wr32(sp - 0x1000, 0xdeadbeef);
+  w32_wr32(teb + 0x800, 0xdeadbeef);
+  rc32_thread_end();
+  return 0;
+}
+
 static void pulse_waits(uint32_t h, struct one *w, int n, uint32_t ms) {
   pthread_t t[8];
   for (int k = 0; k < n; k++) {
@@ -224,6 +239,18 @@ int main(int argc, char **argv) {
   }
   for (int k = 0; k < 4; k++) pthread_join(idle[k], 0);
   CHECK(atomic_load(&idle_returns) == 4);
+  // 13. a thread that ends leaves its stack, TEB and TLS to the next: the arena stops growing, and
+  // the next thread finds them clear
+  atomic_store(&ender_dirty, 0);
+  uint32_t used = 0;
+  for (int k = 0; k < 40; k++) {
+    pthread_create(&t, 0, ender, 0);
+    pthread_join(t, 0);
+    if (k == 0) used = rc32_arena_used();
+  }
+  CHECK(rc32_arena_used() == used);
+  CHECK(atomic_load(&ender_dirty) == 0);
+  CHECK(atomic_load(&ender_tebs) == 1);
   printf("ok%s\n", herd ? " (LP_WAKE_ALL=1)" : "");
   return 0;
 }

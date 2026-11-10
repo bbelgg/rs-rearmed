@@ -570,6 +570,32 @@ class Refresh(Base):
         self.assertEqual(c.stats["copied"], 1)
         self.assertEqual(self.read("audio.psarc"), b"AUDIO.PSARC")
 
+    def test_coarse_file_times_are_hashed_once(self):
+        """A volume that keeps whole seconds: the copy's time is never its source's, and the files are read
+        once more, not on every refresh."""
+        self.mac_game()
+        real_utime = os.utime
+
+        def coarse(path, times=None, *, ns=None, **kw):
+            if ns is not None and os.path.abspath(path).startswith(os.path.abspath(self.dest) + os.sep):
+                ns = tuple(t - t % 10 ** 9 for t in ns)
+            return real_utime(path, times, ns=ns, **kw) if ns is not None else real_utime(path, times, **kw)
+
+        p = os.path.join(self.src, "audio.psarc")
+        real_utime(p, ns=(1900000000123456789, 1900000000123456789))
+        with mock.patch.object(gamefiles.os, "utime", coarse):
+            self.copier(clone=no_clone).run()
+            self.assertNotEqual(os.stat(os.path.join(self.dest, "audio.psarc")).st_mtime_ns, os.stat(p).st_mtime_ns)
+            with mock.patch.object(gamefiles, "sha256", side_effect=AssertionError("read again")):
+                c = self.copier(clone=no_clone)
+                c.run()
+            self.assertEqual(c.stats["copied"], 0)
+            self.assertEqual(c.stats["touched"], 0)
+            write(p, b"AUDIO.PSARC"[:len(b"audio.psarc")], mtime=1950000000)  # a changed source is still seen
+            c = self.copier(clone=no_clone)
+            c.run()
+            self.assertEqual(c.stats["copied"], 1)
+
     def test_source_gone_keeps_the_copy(self):
         self.mac_game()
         self.copier().run()

@@ -56,6 +56,7 @@ rc_fn rc32_lookup(uint32_t g) {
 }
 int rc32_tls_images(const rc32_tls_image **out) { *out = 0; return 0; }
 void rc32_hostfn_hook_add(rc32_hostfn_hook h) { (void)h; }
+void w32_host_root(const char *dir) { (void)dir; }  // win32_kfile.c: the folder GetUserDataFolder hands out
 _Noreturn void rc_fail(const char *what, uint64_t addr) {
   fprintf(stderr, "rc_fail: %s at 0x%llx\n", what, (unsigned long long)addr);
   abort();

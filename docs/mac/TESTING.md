@@ -72,6 +72,11 @@ messages). The Built-in Mods sheet was checked the same way for both games: the 
 unchecked, Save writing the file into the test home, Turn All On and Save removing it. `tools/steamless/test_decrypt.py` (ctest `steamless.decrypt`) tries the decryption on a made-up Mach-O;
 with `RS_DEPOT_GAME` set to the clean Mac depot folder it also checks the real output against the pin.
 
+The standalone installer's check of its download: `build.sh` prints `source digest:` and builds it in, and the app
+logs `The source is the one this installer was made from` before it runs anything. An archive of another commit in
+`RS_SOURCE_URL` must stop it at Downloading source. Tried by hand on two unpackings of one commit (the same digest)
+and a changed file (another); not yet through the app.
+
 A whole first install through the app, for a home of its own: link `<home>/Library/Application Support/Steam/
 steamapps/common/Rocksmith2014` to the clean depot, start the app as in that section with `-Game mac`, from outside the
 repository (it takes the current folder's repository if there is one), and click Build & Install: that is the only
@@ -414,6 +419,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each level set, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
 | `RS_GL_LOG`, `RS_GL_CHECK`, `RS_GL_STATS`, `RS_GL_VERBOSE=1` | GL calls, errors after each call, counts, the load and every first error |
+| `RS_METAL_PKEY_CHECK=1` | every draw that keeps its pipeline key builds it too: `pipeline key check: the kept key is stale` when they differ (and the built one is used), a count every 100,000 draws |
 | `RS_GL_TRACE_DIR=DIR`, `RS_GL_TRACE_START=S`, `RS_GL_TRACE_KEY=1\|PATH`, `RS_GL_TRACE_FRAMES=N` | a trace of N frames (default 30), from the second frame, S seconds after the first, or when `DIR/go` or PATH appears |
 | `RS_MSL_LOG=1`, `RS_MTL_DUMP_MSL` | shaders translated at run time, the MSL of slow compiles |
 | `RS_GL_DUMP_SHADERS` | the GLSL the game compiles |

@@ -14,9 +14,25 @@ out="$here/RS Re-ARMed Installer.app"
 rm -rf "$out"
 mkdir -p "$out/Contents/MacOS" "$out/Contents/Resources"
 
+# What the standalone installer checks its download against: the digest of this commit's source, by the command
+# the app itself runs (sourceDigestCommand in the Swift source, read from there so there is one of it).
+digest=
+digest_cmd=$(sed -n 's/^let sourceDigestCommand = #"\(.*\)"#$/\1/p' "$here/RSReARMedInstaller.swift")
+[[ -n $digest_cmd ]] || { echo "error: no sourceDigestCommand line in RSReARMedInstaller.swift" >&2; exit 1; }
+if git -C "$repo" rev-parse --verify -q HEAD >/dev/null 2>&1; then
+    tree=$(mktemp -d "${TMPDIR:-/tmp}/rs-installer-src.XXXXXX")
+    git -C "$repo" archive HEAD | tar -x -C "$tree"
+    digest=$(cd "$tree" && bash -c "$digest_cmd")
+    rm -rf "$tree"
+    [[ $digest =~ ^[0-9a-f]{64}$ ]] || { echo "error: the source digest came out as '$digest'" >&2; exit 1; }
+    echo "source digest: $digest ($(git -C "$repo" rev-parse --short HEAD))"
+else
+    echo "without a source digest (not a git checkout): the standalone download will not be checked"
+fi
+
 src="$out/Contents/Resources/_build.swift"
 cp "$here/RSReARMedInstaller.swift" "$src"
-sed -i '' "1s/^/let rsVersion = \"$version\"\\n/" "$src"
+sed -i '' "1s/^/let rsVersion = \"$version\"\\nlet rsSourceDigest = \"$digest\"\\n/" "$src"
 
 swiftc -O -o "$out/Contents/MacOS/RS Re-ARMed Installer" \
     "$src" \

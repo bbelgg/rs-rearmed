@@ -347,6 +347,11 @@ static std::vector<Pending> g_pending;
 static std::map<SteamAPICall_t, Pending> g_results;
 static SteamAPICall_t g_next_call = 1;
 static uintptr_t g_init_counter = 0;
+// Mode "auto" before SteamAPI_Init has an answer: a listener registered now goes to Valve's library,
+// which is the backend so far, and is kept here too. If its Init then fails, the stub takes these
+// over; without that they were lost with the library that never ran.
+static bool g_real_inited = false;
+static std::vector<std::pair<CCallbackBase *, int>> g_early;
 
 void shim_post_callback(int id, const void *data, size_t size) {
     std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
@@ -455,9 +460,20 @@ S_EXPORT bool SteamAPI_Init() {
             if (!ok) shim_log("real SteamAPI_Init failed: %s", err);
         }
         shim_log("real SteamAPI_Init -> %d", ok);
-        if (ok || c.mode == "real") return ok;
-        shim_log("falling back to stub backend");
+        std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
+        if (ok || c.mode == "real") {
+            g_real_inited = ok;
+            g_early.clear();
+            return ok;
+        }
+        shim_log("falling back to stub backend, with %zu listener(s) registered so far", g_early.size());
         g_backend = BACKEND_STUB;
+        for (auto &e : g_early) {
+            e.first->m_nCallbackFlags |= k_ECallbackFlagsRegistered;
+            e.first->m_iCallback = e.second;
+            if (!callback_registered(e.first)) g_callbacks.push_back(e.first);
+        }
+        g_early.clear();
     }
     {
         std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
@@ -492,7 +508,13 @@ S_EXPORT bool SteamAPI_IsSteamRunning() { return true; }
 S_EXPORT void SteamAPI_ReleaseCurrentThreadMemory() {}
 
 S_EXPORT void SteamAPI_RegisterCallback(void *p, int id) {
-    if (use_real()) return g_real.RegisterCallback(p, id);
+    if (use_real()) {
+        {
+            std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
+            if (!g_real_inited) g_early.emplace_back((CCallbackBase *)p, id);
+        }
+        return g_real.RegisterCallback(p, id);
+    }
     CCallbackBase *cb = (CCallbackBase *)p;
     std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
     cb->m_nCallbackFlags |= k_ECallbackFlagsRegistered;
@@ -502,7 +524,14 @@ S_EXPORT void SteamAPI_RegisterCallback(void *p, int id) {
 }
 
 S_EXPORT void SteamAPI_UnregisterCallback(void *p) {
-    if (use_real()) return g_real.UnregisterCallback(p);
+    if (use_real()) {
+        {
+            std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
+            for (auto it = g_early.begin(); it != g_early.end();)
+                it = it->first == p ? g_early.erase(it) : it + 1;
+        }
+        return g_real.UnregisterCallback(p);
+    }
     CCallbackBase *cb = (CCallbackBase *)p;
     std::lock_guard<std::recursive_mutex> lock(g_cb_mutex);
     cb->m_nCallbackFlags &= ~k_ECallbackFlagsRegistered;

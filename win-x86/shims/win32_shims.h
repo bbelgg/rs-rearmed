@@ -76,8 +76,12 @@ void w32_input_cursor(int32_t *x, int32_t *y);
 // The host path of a Windows path the guest names: "C:\Rocksmith2014\..." (the game folder, also
 // the starting current directory) maps into LP_GAME_DIR, every other drive path into
 // LP_USER_DIR/<drive letter>/...; relative paths are taken from the current directory. A host
-// path (starting with '/') is kept as it is (the Steam shim hands those out). Returns host.
+// path (starting with '/') is kept, without its "." and ".." parts, when it is inside the game
+// folder, LP_USER_DIR or a folder w32_host_root named (the Steam shim hands those out); any other
+// is the Windows path from the current drive's root. Returns host.
 char *w32_path(const char *win, char *host, size_t n);
+// A host folder the guest was handed and may use by its host path, with everything in it.
+void w32_host_root(const char *dir);
 // The Windows path of the game's own folder, "C:\Rocksmith2014" (no trailing separator).
 const char *w32_game_dir_win(void);
 

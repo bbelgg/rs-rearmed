@@ -16,6 +16,10 @@ let repoWebURL = "https://github.com/bbelgg/rs-rearmed"
 func sourceArchiveURL(_ tag: String) -> String {
     ProcessInfo.processInfo.environment["RS_SOURCE_URL"] ?? "\(repoWebURL)/archive/refs/tags/\(tag).tar.gz"
 }
+// What the source this installer was built from adds up to: every file's SHA-256 and every link's target, by
+// path. tools/installer/build.sh runs this same line (it reads it from here) over `git archive HEAD` and
+// builds the result in as rsSourceDigest; downloadSource runs it over what it downloaded.
+let sourceDigestCommand = #"export LC_ALL=C; { find . -type l -exec sh -c 'printf "%s -> %s\n" "$1" "$(readlink "$1")"' _ {} \; | sort; find . -type f -print0 | sort -z | xargs -0 shasum -a 256; } | shasum -a 256 | cut -d' ' -f1"#
 let releasesURL = "https://api.github.com/repos/bbelgg/rs-rearmed/releases/latest"
 // No spaces: the recompiler's build scripts pass lists of paths as space-separated strings.
 let buildFolderName = "rs-rearmed-build"
@@ -583,6 +587,22 @@ enum Steps {
         try? fm.removeItem(atPath: archive)
         guard fm.fileExists(atPath: newDir + "/CMakeLists.txt") else {
             throw InstallerError.fileNotFound("CMakeLists.txt in the downloaded source")
+        }
+        // The scripts in it are run next, so it has to be the source this installer was made from, file for
+        // file: a tag can be moved, and an archive can be whole and still be something else.
+        if rsSourceDigest.isEmpty {
+            r.appendLog("This installer was built without its source's digest: the download is not checked.")
+        } else {
+            let got = try await r.shell(sourceDigestCommand, workDir: newDir)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            guard got == rsSourceDigest else {
+                try? fm.removeItem(atPath: newDir)
+                throw InstallerError.downloadFailed(
+                    "the source of \(tag) at \(repoWebURL) is not the source this installer was made from "
+                    + "(\(got.prefix(12)), not \(rsSourceDigest.prefix(12))). Nothing of it was run. "
+                    + "Download the installer again from \(repoWebURL)/releases")
+            }
+            r.appendLog("The source is the one this installer was made from (\(got.prefix(12))).")
         }
 
         if fm.fileExists(atPath: srcDir + "/build") {

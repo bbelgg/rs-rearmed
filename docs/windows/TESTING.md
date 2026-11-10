@@ -89,7 +89,9 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
 ```
 
 - `RS_SOURCE_URL`: a `git archive --prefix=rs-rearmed/` of the commit under test, for the tag that isn't published
-  yet. Delete `.installer-version` in the source folder to make it unpack a new one.
+  yet. Delete `.installer-version` in the source folder to make it unpack a new one. It has to be the commit the
+  app was built at: the app checks the download against the digest `build.sh` built in
+  ([Mac testing](../mac/TESTING.md#installer-tests)).
 - `-BuildFolder`: typing into the field does not work from the background (`app_click` then `app_type` is refused),
   so the folder comes as a launch argument. Starting a run writes it to the real defaults: note
   `defaults read io.github.bbelgg.rs-rearmed.installer` first and put `BuildFolder` back afterwards.

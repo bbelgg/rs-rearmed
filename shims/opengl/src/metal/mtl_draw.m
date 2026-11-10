@@ -884,6 +884,87 @@ static void rsm_index_range(const void *isrc, GLenum itype, GLsizei count, uint3
     *hi = mx;
 }
 
+// The pipeline key of a draw with the context's state: the layout of the attributes the program uses (`used`),
+// the pass and the blend state. `copy`: the draw copies its per-vertex data (rsm_draw).
+static void rsm_build_pkey(__unsafe_unretained RSMContext *ctx, uint32_t used, bool copy, rsm_pkey *k) {
+    memset(k, 0, sizeof *k);
+    for (int i = 0; i < RSM_MAX_ATTRIBS; i++) {
+        if (!(used & (1u << i)))
+            continue;
+        const rsm_attrib *a = &ctx->vao->a[i];
+        MTLVertexFormat f = a->enabled ? rsm_vertex_format(a->size, a->type, a->normalized) : MTLVertexFormatInvalid;
+        // A buffer with no storage yet (no glBufferData) reads as the constant, like rsm_draw's binding.
+        if (!a->enabled || f == MTLVertexFormatInvalid || (a->bo && !a->bo->mtl)) {
+            k->vl.fmt[i] = MTLVertexFormatFloat4;
+            k->vl.step[i] = RSM_STEP_CONSTANT;
+            k->vl.stride[i] = 16;
+            continue;
+        }
+        size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
+        k->vl.fmt[i] = (uint8_t)f;
+        k->vl.step[i] = a->divisor ? RSM_STEP_INSTANCE : RSM_STEP_VERTEX;
+        k->vl.rate[i] = a->divisor ? a->divisor : 1;
+        bool direct = a->bo && !((uintptr_t)a->ptr & 3) && !(stride & 3) && (a->divisor || !copy);
+        k->vl.stride[i] = (uint16_t)(direct ? stride : (es + 3) & ~(size_t)3);
+    }
+    k->color_fmt = (uint16_t)ctx->pass_color_fmt;
+    k->depth_fmt = (uint16_t)ctx->pass_depth_fmt;
+    k->stencil_fmt = (uint16_t)ctx->pass_stencil_fmt;
+    k->samples = ctx->pass_samples > 1 ? (uint8_t)ctx->pass_samples : 0;
+    k->blend = ctx->blend;
+    k->color_mask = (ctx->color_mask[0] ? MTLColorWriteMaskRed : 0) | (ctx->color_mask[1] ? MTLColorWriteMaskGreen : 0) |
+                    (ctx->color_mask[2] ? MTLColorWriteMaskBlue : 0) | (ctx->color_mask[3] ? MTLColorWriteMaskAlpha : 0);
+    k->alpha_func = ctx->alpha_test && ctx->alpha_func != GL_ALWAYS ? (uint8_t)(ctx->alpha_func - GL_NEVER) : 8;
+    if (ctx->blend) {
+        k->src_rgb = rsm_blend_factor(ctx->blend_src_rgb);
+        k->dst_rgb = rsm_blend_factor(ctx->blend_dst_rgb);
+        k->src_a = rsm_blend_factor(ctx->blend_src_a);
+        k->dst_a = rsm_blend_factor(ctx->blend_dst_a);
+        k->eq_rgb = rsm_blend_op(ctx->blend_eq_rgb);
+        k->eq_a = rsm_blend_op(ctx->blend_eq_a);
+    }
+}
+
+// RS_METAL_PKEY_CHECK=1, a diagnostic: a draw that takes the last draw's key builds it as well and the two are
+// compared. A difference is a change that set no dirty bit; it is logged (the first 16) and the built key is used.
+static bool rsm_pkey_check_on(void) {
+    static int on = -1;
+    if (on < 0) {
+        const char *e = getenv("RS_METAL_PKEY_CHECK");
+        on = e && *e && *e != '0';
+        if (on)
+            rsm_log("pipeline key check on (RS_METAL_PKEY_CHECK)");
+    }
+    return on;
+}
+
+static bool rsm_pkey_checked(const rsm_pkey *built, const rsm_pkey *kept) {
+    static uint64_t checked, bad;
+    bool same = !memcmp(built, kept, sizeof *built);
+    if (!same && bad++ < 16) {
+        int i = 0;
+        while (i < RSM_MAX_ATTRIBS && built->vl.fmt[i] == kept->vl.fmt[i] && built->vl.step[i] == kept->vl.step[i] &&
+               built->vl.offset[i] == kept->vl.offset[i] && built->vl.stride[i] == kept->vl.stride[i] &&
+               built->vl.rate[i] == kept->vl.rate[i])
+            i++;
+        if (i < RSM_MAX_ATTRIBS)
+            rsm_log("pipeline key check: the kept key is stale at attribute %d (format %d, step %d, stride %d; kept "
+                    "%d, %d, %d)",
+                    i, built->vl.fmt[i], built->vl.step[i], built->vl.stride[i], kept->vl.fmt[i], kept->vl.step[i],
+                    kept->vl.stride[i]);
+        else
+            rsm_log("pipeline key check: the kept key is stale in the pass or blend state (formats %d/%d/%d x%d, blend "
+                    "%d, mask %d, alpha %d; kept %d/%d/%d x%d, %d, %d, %d)",
+                    built->color_fmt, built->depth_fmt, built->stencil_fmt, built->samples, built->blend,
+                    built->color_mask, built->alpha_func, kept->color_fmt, kept->depth_fmt, kept->stencil_fmt,
+                    kept->samples, kept->blend, kept->color_mask, kept->alpha_func);
+    }
+    if (++checked % 100000 == 0)
+        rsm_log("pipeline key check: %llu kept keys checked, %llu stale", (unsigned long long)checked,
+                (unsigned long long)bad);
+    return same;
+}
+
 static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint first, GLsizei count, GLenum itype, const void *indices,
                      GLsizei instances, bool indexed) {
     rsm_prim pr;
@@ -1020,58 +1101,40 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
             return;
         __unsafe_unretained id<MTLRenderCommandEncoder> e = ctx->enc;
 
-        // Pipeline key.
-        rsm_pkey k;
-        memset(&k, 0, sizeof k);
-        for (int i = 0; i < RSM_MAX_ATTRIBS; i++) {
-            if (!(used & (1u << i)))
-                continue;
-            const rsm_attrib *a = &ctx->vao->a[i];
-            MTLVertexFormat f = a->enabled ? rsm_vertex_format(a->size, a->type, a->normalized) : MTLVertexFormatInvalid;
-            // A buffer with no storage yet (no glBufferData) reads as the constant, like the binding below.
-            if (!a->enabled || f == MTLVertexFormatInvalid || (a->bo && !a->bo->mtl)) {
-                k.vl.fmt[i] = MTLVertexFormatFloat4;
-                k.vl.step[i] = RSM_STEP_CONSTANT;
-                k.vl.stride[i] = 16;
-                continue;
+        // Pipeline key: the last draw's, unless something it is made of has changed since. That is the program
+        // and the VAO's layout (the two dirty bits; `copy` follows from them and is compared all the same) and
+        // the pass, whose formats and sample count change only with a new encoder, which drops cur_pkey.
+        const unsigned key_bits = RSM_DIRTY_PIPELINE | RSM_DIRTY_VERTEX;
+        bool reuse = ctx->cur_pkey_valid && ctx->cur_prog_uid == p->uid && ctx->cur_pkey_copy == copy &&
+                     !(ctx->dirty & key_bits);
+        rsm_pkey nk;
+        bool built = false;
+        if (reuse && rsm_pkey_check_on()) {
+            rsm_build_pkey(ctx, used, copy, &nk);
+            built = true;
+            reuse = rsm_pkey_checked(&nk, &ctx->cur_pkey);
+        }
+        if (!reuse) {
+            if (!built)
+                rsm_build_pkey(ctx, used, copy, &nk);
+            if (!ctx->cur_pkey_valid || ctx->cur_prog_uid != p->uid || memcmp(&nk, &ctx->cur_pkey, sizeof nk)) {
+                __unsafe_unretained id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, &nk);  // keeps it alive
+                if (!ps)
+                    ps = rsm_pipeline(ctx, p, &nk);
+                if (!ps)
+                    return;
+                if (ps != ctx->cur_pipeline) {
+                    [e setRenderPipelineState:ps];
+                    ctx->cur_pipeline = ps;
+                }
+                ctx->cur_pkey = nk;
+                ctx->cur_pkey_valid = true;
+                ctx->dirty |= RSM_DIRTY_ALPHA_REF;
             }
-            size_t es = rsm_attrib_bytes(a), stride = a->stride ? (size_t)a->stride : es;
-            k.vl.fmt[i] = (uint8_t)f;
-            k.vl.step[i] = a->divisor ? RSM_STEP_INSTANCE : RSM_STEP_VERTEX;
-            k.vl.rate[i] = a->divisor ? a->divisor : 1;
-            bool direct = a->bo && !((uintptr_t)a->ptr & 3) && !(stride & 3) && (a->divisor || !copy);
-            k.vl.stride[i] = (uint16_t)(direct ? stride : (es + 3) & ~(size_t)3);
+            ctx->cur_pkey_copy = copy;
+            ctx->dirty &= ~key_bits;
         }
-        k.color_fmt = (uint16_t)ctx->pass_color_fmt;
-        k.depth_fmt = (uint16_t)ctx->pass_depth_fmt;
-        k.stencil_fmt = (uint16_t)ctx->pass_stencil_fmt;
-        k.samples = ctx->pass_samples > 1 ? (uint8_t)ctx->pass_samples : 0;
-        k.blend = ctx->blend;
-        k.color_mask = (ctx->color_mask[0] ? MTLColorWriteMaskRed : 0) | (ctx->color_mask[1] ? MTLColorWriteMaskGreen : 0) |
-                       (ctx->color_mask[2] ? MTLColorWriteMaskBlue : 0) | (ctx->color_mask[3] ? MTLColorWriteMaskAlpha : 0);
-        k.alpha_func = ctx->alpha_test && ctx->alpha_func != GL_ALWAYS ? (uint8_t)(ctx->alpha_func - GL_NEVER) : 8;
-        if (ctx->blend) {
-            k.src_rgb = rsm_blend_factor(ctx->blend_src_rgb);
-            k.dst_rgb = rsm_blend_factor(ctx->blend_dst_rgb);
-            k.src_a = rsm_blend_factor(ctx->blend_src_a);
-            k.dst_a = rsm_blend_factor(ctx->blend_dst_a);
-            k.eq_rgb = rsm_blend_op(ctx->blend_eq_rgb);
-            k.eq_a = rsm_blend_op(ctx->blend_eq_a);
-        }
-        if (!ctx->cur_pkey_valid || ctx->cur_prog_uid != p->uid || memcmp(&k, &ctx->cur_pkey, sizeof k)) {
-            __unsafe_unretained id<MTLRenderPipelineState> ps = rsm_map_get(&p->pipelines, &k);  // keeps it alive
-            if (!ps)
-                ps = rsm_pipeline(ctx, p, &k);
-            if (!ps)
-                return;
-            if (ps != ctx->cur_pipeline) {
-                [e setRenderPipelineState:ps];
-                ctx->cur_pipeline = ps;
-            }
-            ctx->cur_pkey = k;
-            ctx->cur_pkey_valid = true;
-            ctx->dirty |= RSM_DIRTY_ALPHA_REF;
-        }
+        const rsm_pkey *k = &ctx->cur_pkey;
         if (!rsm_apply_dynamic(ctx)) {
             // Skipped (empty scissor): the pipeline is p's but the uniforms are still cur_prog_uid's,
             // so the next draw must not take the pipeline as current.
@@ -1087,7 +1150,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
             if (slot > 30)
                 continue;
             const rsm_attrib *a = &ctx->vao->a[i];
-            if (k.vl.step[i] == RSM_STEP_CONSTANT) {
+            if (k->vl.step[i] == RSM_STEP_CONSTANT) {
                 [e setVertexBytes:ctx->vattr[i] length:16 atIndex:(NSUInteger)slot];
                 ctx->enc_vb[i] = nil;
                 continue;
@@ -1125,7 +1188,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                 continue;
             }
             // Copy the elements the draw reads into transient memory, packed.
-            size_t ns = k.vl.stride[i];
+            size_t ns = k->vl.stride[i];
             uint32_t lo = inst ? 0 : vmin;
             uint32_t n = inst ? ((uint32_t)instances + a->divisor - 1) / a->divisor : vmax - vmin + 1;
             if (b && (size_t)a->ptr + (size_t)(lo + n - 1) * stride + es > b->size) {
@@ -1232,7 +1295,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
         }
 
         if (rsm_texlog_on)
-            rsm_texlog_draw(p->uid, mode, count, k.vl.stride[0], instances, log_ids);
+            rsm_texlog_draw(p->uid, mode, count, k->vl.stride[0], instances, log_ids);
         if (hidden)
             return;
 

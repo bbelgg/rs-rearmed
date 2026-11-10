@@ -1,7 +1,8 @@
 // Files a mod serves (runtime/rc_file.h), without a game: the functions both editions' file layers call, on a folder
 // of its own. Before a provider registers they are the system's; after, a served file is opened, sized, read, seeked,
 // duplicated and closed as a descriptor and as a FILE, a folder lists the added name once and not the hidden one, and
-// every other file is untouched.
+// every other file is untouched. A served file has one identity (its inode number), however it is asked about, and
+// no other served file has it.
 #include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
@@ -13,25 +14,30 @@
 #define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); exit(1); } } while (0)
 #define SIZE 300000
 
-static char dir[1024], served[1100], real[1100];
+static char dir[1024], served[1100], real[1100], other[2][1100];  // other: two more served files, not counted
 static int opens, closes, fail_reads;
 static uint8_t pat(int64_t i) { return (uint8_t)(i * 13 + 5); }
 static void *p_open(void *user, const char *path, rc_file_info *info) {
+  for (int k = 0; k < 2; k++)
+    if (!strcmp(path, other[k])) {
+      *info = (rc_file_info){SIZE, 1234567890};
+      return other[k];
+    }
   if (strcmp(path, served)) return 0;
   *info = (rc_file_info){SIZE, 1234567890};
   opens++;
   return served;
 }
 static int64_t p_read(void *user, void *file, void *buf, uint64_t n, int64_t off) {
-  CHECK(file == served && off >= 0 && off + (int64_t)n <= SIZE);
+  CHECK((file == served || file == other[0] || file == other[1]) && off >= 0 && off + (int64_t)n <= SIZE);
   if (fail_reads) return -1;
   if (n > 1000) n = 1000;
   for (uint64_t k = 0; k < n; k++) ((uint8_t *)buf)[k] = pat(off + (int64_t)k);
   return (int64_t)n;
 }
-static void p_close(void *user, void *file) { closes++; }
+static void p_close(void *user, void *file) { closes += file == served; }
 static int p_stat(void *user, const char *path, rc_file_info *info) {
-  if (strcmp(path, served)) return 0;
+  if (strcmp(path, served) && strcmp(path, other[0]) && strcmp(path, other[1])) return 0;
   *info = (rc_file_info){SIZE, 1234567890};
   return 1;
 }
@@ -71,6 +77,8 @@ int main(void) {
   CHECK(!mkdir(p, 0755) && realpath(p, dir));
   snprintf(served, sizeof served, "%s/served.bin", dir);
   snprintf(real, sizeof real, "%s/real.bin", dir);
+  snprintf(other[0], sizeof other[0], "%s/other/one.bin", dir);
+  snprintf(other[1], sizeof other[1], "%s/other/two.bin", dir);
   snprintf(p, sizeof p, "%s/hidden.bin", dir);
   for (int k = 0; k < 2; k++) {
     int fd = open(k ? p : real, O_WRONLY | O_CREAT, 0644);
@@ -92,9 +100,29 @@ int main(void) {
   // a descriptor
   CHECK(!rc_file_stat(served, &st) && st.st_size == SIZE && S_ISREG(st.st_mode) && st.st_mtimespec.tv_sec == 1234567890);
   CHECK(opens == 0);  // stat answered
+  ino_t by_path = st.st_ino;
   int fd = rc_file_open(served, O_RDONLY);
   CHECK(fd >= 0 && opens == 1 && rc_file_served(fd));
   CHECK(!rc_file_fstat(fd, &st) && st.st_size == SIZE);
+  CHECK(st.st_ino && st.st_ino == by_path);  // one file by its path and by its descriptor
+  {
+    // as a game mounts archives: one opened, looked at and closed, then the next. Each is a file of its own, the
+    // same one when it is opened again, also while it is open and under a name of another case
+    ino_t ino[2], again;
+    struct stat s2;
+    for (int k = 0; k < 2; k++) {
+      int o = rc_file_open(other[k], O_RDONLY);
+      CHECK(o >= 0 && rc_file_served(o) && !rc_file_fstat(o, &s2) && !rc_file_close(o));
+      ino[k] = s2.st_ino;
+      CHECK(!rc_file_stat(other[k], &s2) && s2.st_ino == ino[k]);
+    }
+    CHECK(ino[0] && ino[1] && ino[0] != ino[1] && ino[0] != by_path && ino[1] != by_path);
+    int o1 = rc_file_open(other[0], O_RDONLY), o2 = rc_file_open(other[0], O_RDONLY), o3 = rc_file_dup(o1);
+    CHECK(o1 >= 0 && o2 >= 0 && o3 >= 0 && !rc_file_fstat(o1, &s2));
+    again = s2.st_ino;
+    CHECK(!rc_file_fstat(o2, &s2) && s2.st_ino == again && !rc_file_fstat(o3, &s2) && s2.st_ino == again && again == ino[0]);
+    CHECK(!rc_file_close(o1) && !rc_file_close(o2) && !rc_file_close(o3));
+  }
   CHECK(rc_file_read(fd, buf, 5000) == 5000 && ok_pat(buf, 5000, 0));
   CHECK(rc_file_lseek(fd, 0, SEEK_CUR) == 5000);
   CHECK(rc_file_pread(fd, buf, 70, 123456) == 70 && ok_pat(buf, 70, 123456));

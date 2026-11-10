@@ -29,6 +29,7 @@ typedef struct vfile {
   const rc_file_provider *p;
   void *file;
   rc_file_info info;
+  uintptr_t id;  // what the file is known by (path_id)
   _Atomic int64_t pos;
   int refs;  // descriptors, under mu
 } vfile;
@@ -66,6 +67,17 @@ static const char *absolute(const char *path, char *buf, size_t n) {
   if (!getcwd(cwd, sizeof cwd)) return path;
   snprintf(buf, n, "%s/%s", cwd, path);
   return buf;
+}
+
+// What a served file is known by, where the system has an inode number: a number of its path, the same whenever and
+// however the file is asked about (by path, by any descriptor on it) and another for another file. Letter case
+// apart: Learn & Play opens a file under a name of another case than the folder listed it by. (A number of the
+// open record would be given to the next file opened once this one is closed: a game that tells its files apart by
+// volume and file index, as Windows programs do, then takes one served file for another.)
+static uintptr_t path_id(const char *abs) {
+  uint64_t id = 0xcbf29ce484222325ull;  // FNV-1a
+  for (const char *s = abs; *s; s++) id = (id ^ (uint8_t)(*s >= 'A' && *s <= 'Z' ? *s + 32 : *s)) * 0x100000001b3ull;
+  return (uintptr_t)id;
 }
 
 static vfile *vf_of(int fd) { return fd >= 0 && fd < MAX_FD ? atomic_load(&vfds[fd]) : 0; }
@@ -109,6 +121,7 @@ static int vf_open(const char *path) {
     v->p = &providers[i];
     v->file = file;
     v->info = info;
+    v->id = path_id(abs);
     v->refs = 1;
     pthread_mutex_lock(&mu);
     atomic_store(&vfds[fd], v);
@@ -201,7 +214,7 @@ static void fill_stat(struct stat *st, const rc_file_info *info, uintptr_t id) {
   memset(st, 0, sizeof *st);
   st->st_mode = S_IFREG | 0444;
   st->st_nlink = 1;
-  st->st_ino = (ino_t)(id | 1);
+  st->st_ino = (ino_t)(id | 1);  // never 0
   st->st_uid = getuid();
   st->st_gid = getgid();
   st->st_size = (off_t)info->size;
@@ -214,7 +227,7 @@ static void fill_stat(struct stat *st, const rc_file_info *info, uintptr_t id) {
 int rc_file_fstat(int fd, struct stat *st) {
   vfile *v = nprov() ? vf_of(fd) : 0;
   if (!v) return fstat(fd, st);
-  fill_stat(st, &v->info, (uintptr_t)v);
+  fill_stat(st, &v->info, v->id);
   return 0;
 }
 
@@ -242,9 +255,7 @@ int rc_file_stat(const char *path, struct stat *st) {
   const char *abs = absolute(path, buf, sizeof buf);
   rc_file_info info;
   if (!vf_stat(abs, &info)) return stat(path, st);
-  uintptr_t id = 5381;
-  for (const char *s = abs; *s; s++) id = id * 33 + (unsigned char)*s;
-  fill_stat(st, &info, id << 1);
+  fill_stat(st, &info, path_id(abs));
   return 0;
 }
 

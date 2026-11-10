@@ -7,7 +7,7 @@ external display and the built-in 60 Hz Retina screen. The Windows port's measur
 ## Summary
 
 In a song the native build holds the display's rate at 44% of a core (74.9 fps on a 75 Hz display,
-[Final pass](#final-pass-for-140)), about the same CPU as the original game under Rosetta. It renders at the
+[Final pass](#final-pass-for-140)); on the Mac's own 60 Hz screen at 42-43%, where the original game under Rosetta takes 51% ([Against Rosetta](#against-rosetta)). It renders at the
 display's refresh rate, so a 75 Hz or 120 Hz display gets 75 or 120 fps (`RS_FPS=N` fixes a rate). Metal uses about 5%
 less CPU per frame than OpenGL. The compiler switches (ThinLTO, PGO, `-O3`) change little. The figures here predate 4x MSAA and 16x
 anisotropic filtering (on by default since 2026-11-08, [METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)), which cost mostly GPU time rather than
@@ -37,12 +37,43 @@ CPU; with them the GPU hasn't been measured (`RS_METAL_MSAA=1 RS_METAL_ANISO=1` 
 
 ### Against Rosetta
 
+2026-11-10, the original game under Rosetta beside the [measured runs](#measured-runs-for-1130) of both editions: the same Mac and screen, Cherub Rock, 150 s
+from about 45 s into the song, one run.
+
+| Song | Original under Rosetta | Mac | Learn & Play |
+|---|---|---|---|
+| Frame rate | 59.95 | 59.9-60.0 | 59.9-60.0 |
+| CPU (% of a core) | 51.0 | 41.7-43.1 | 52.0-53.6 |
+| CPU per frame | 8.5 ms | 6.97-7.18 ms | 8.66-8.93 ms |
+| the frame's thread | 35.1 | 26.7-27.7 | 32.6-33.3 |
+| note detection | 1.9 | 2.5-2.7 | 5.8-6.3 |
+| Frames handed over more than 33 ms apart | 8 | 0-3 | 0-1 |
+| Footprint | 0.93 GB | 1.22-1.23 GB | 1.51-1.52 GB |
+
+So the Mac edition takes about a sixth less processor time than the original under Rosetta and Learn & Play about the same, each while doing more for the picture and
+the sound than the original does. What was not the same:
+
+- **The picture.** All three draw 1470x956, the screen's size in points, with the game's High quality and every effect on. The original draws through Apple's OpenGL and
+  the screen scales the frame up; the editions draw through Metal with 4x MSAA on the 3D picture, 16x anisotropic filtering and MetalFX upscaling to the screen's
+  2940x1912 pixels, about a quarter of their GPU time ([where it goes](#measured-runs-for-1130)). The original's GPU read 68% and the editions' 89-90%; neither is the
+  GPU's work at a fixed frame rate.
+- **The audio engine.** The original ran at `LatencyBuffer=2`: at 1 it does not hold on this Mac. The editions ran at 1, half the output buffer.
+- **Mods.** The original has none. The editions ran rearmed-mods with Song Stems and the rest of the maintainer's settings.
+- **The songs.** The original's copy had the game's own songs and Cherub Rock's archive; the editions had 147 and 150 archives in `dlc`, which is part of their memory.
+- **Input.** The same profile, whose INPUT is DIRECT CONNECT, a value the original has no name for. Its tuner came up and its note detection ran (1.9 points of a core),
+  on which input was not looked at. No guitar was played in any of the runs.
+- **How it was run.** The original is the clean download's own binary, decrypted (`tools/steamless/decrypt.py`), started directly with the offline Steam layer on a copy
+  of the profile and the network guard, which refused its one lookup of a Ubisoft host. Its keys were timed by hand, so its window starts within a few seconds of where
+  the editions' does. Its frame times are the calls of `flushBuffer` (a spy library, `libglspy`), not what the screen got.
+
+The venue was up in the original's song with no note played.
+
+Before the editions had this script, measured before Metal existed (the exact figures were not kept in this repository):
+
 | Song | CPU |
 |---|---|
 | original under Rosetta | about half a core at 60 fps |
 | native, OpenGL, 60 fps | about the same, a little less on average |
-
-(Measured before Metal existed; the exact figures were not kept in this repository.)
 
 The latency figures are the other difference: the native build runs the output device at 256 frames
 instead of the system's 512, and at 128 with `LatencyBuffer=1` without crackling, which the game under

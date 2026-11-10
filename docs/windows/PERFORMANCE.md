@@ -215,6 +215,9 @@ microphone and no guitar; 150 s from 45 s after the note highway came up, about 
 What it says is in the [Mac edition's](../mac/PERFORMANCE.md#measured-runs-for-1130): 10 points of a core and 0.29 GB over the Mac edition, with the steadier frames.
 The threads are `w32 game`, `w32 thread 1a823c0` (Wwise) and `w32 thread 149ab10` (note detection).
 
+The original Mac game under Rosetta on the same song and screen took 51.0% of a core, about what this edition does, with a plainer picture and twice the audio buffer:
+the table and what differed are in the [Mac edition's](../mac/PERFORMANCE.md#against-rosetta).
+
 With the renderer's own times in the log, one more run: all 9,001 frames went on the screen one refresh apart. The GPU's 90% is its clock slowed to fill the
 refresh, not its limit, and the one frame of 0.37 s is a pipeline's first use: [the Mac edition's](../mac/PERFORMANCE.md#measured-runs-for-1130) has both. The
 free frame rate and the GPU's time by pass were run in the Mac edition only; Learn & Play draws through the same renderer.

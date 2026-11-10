@@ -333,6 +333,9 @@ static uint32_t create_file(rc_ctx *c, const char *win, uint32_t access, uint32_
   o->u.file.fd = fd;
   o->u.file.path = strdup(host);
   o->u.file.access = access;
+  size_t hl = strlen(host);
+  o->u.file.dlc = hl > 8 && !strcasecmp(host + hl - 8, "_p.psarc") && strcasestr(host, "/dlc/") != 0;
+  if (o->u.file.dlc) atomic_fetch_add(&w32_dlc_archives_open, 1), atomic_fetch_add(&w32_dlc_archive_opens, 1);
   o->u.file.dir = existed && S_ISDIR(st.st_mode);
   w32_set_error(c, existed && (disp == 2 || disp == 4) ? W32_ERROR_ALREADY_EXISTS : 0);
   if (flog()) fprintf(stderr, "w32: file: open \"%s\" -> 0x%x\n", win, h);
@@ -371,6 +374,7 @@ static void k_ReadFile(rc_ctx *c) {
     }
   }
   if (rd) w32_wr32(rd, got);
+  if (got && o->u.file.dlc) o->u.file.dlc = 2;  // read: the one a mount opened, not one of its checks
   if (t0) lp_frame_event(LPF_FILE_READ, lp_frame_now() - t0, 0);
   if (flog() > 1)
     fprintf(stderr, "w32: file: read 0x%x \"%s\" at %lld: %u of %u\n", h, o->u.file.path ? o->u.file.path : "",

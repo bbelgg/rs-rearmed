@@ -14,6 +14,7 @@
 #include <string.h>
 #include <strings.h>
 #include <time.h>
+#include <unistd.h>
 
 #include "rc32.h"
 #include "rc_nofile.h"
@@ -416,6 +417,8 @@ void F_10f41c0(rc_ctx *c) {
 // 0x1448b10 (thiscall, the AppID on the stack, `ret 4`; the Mac steam_dlc_owned) stays translated as W_1448b10 for
 // everyone else and for RS_MODS_BYPASS=0.
 void W_1448b10(rc_ctx *c);
+extern _Atomic int w32_dlc_archives_open;  // win32_ksync.c: the song archives of dlc/ open now
+extern _Atomic unsigned w32_dlc_archive_opens;
 static int dlc_mounting;  // the game thread's
 
 void N_1448b10(rc_ctx *c) {
@@ -448,13 +451,39 @@ void F_1449310(rc_ctx *c) {
   if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*g8(self + 6)) {
     rc32_call(c, DLC_INSTALL_STEP, 0, 0, 0, 0, 0);
   } else {
+    // The step takes a name off the list and starts mounting that archive, whose file it leaves open. The mount is
+    // finished by the update's head (0x1446570, above: it closes the file; seen with LP_LOG_DLC_CLOSE), which the
+    // game calls once a frame, and a step taken before that takes the next name off the list and mounts nothing.
+    // (Steps alone for as long as a frame budget allowed mounted one archive a frame and dropped the rest: of 2250
+    // about 150, their songs missing until an enumeration. One step a frame mounts every one, in 47 s for 2250.)
+    // So after a step that left its archive open, the head is called until that file is closed, and only then the
+    // next step is taken: several archives a frame, none dropped. `level`: how many archives were open before the
+    // step whose mount is not finished yet (another may be open for as long as it likes: a song playing), -1: none.
+    // One that does not finish within the frame is waited for in the next, without a step; after a second of that
+    // it is taken to be an archive the game keeps open, and the steps go on.
+    static int level = -1;
+    static double waiting_since;
+    static unsigned n_dropped;
     double t0 = now_s();
-    if (!n_frames++) t_first = t0;
+    if (!n_frames++) t_first = t0, n_dropped = 0, level = -1;
     do {
+      if (level >= 0) {
+        while (atomic_load(&w32_dlc_archives_open) > level && now_s() - t0 < g_cfg.budget_s) {
+          rc32_call(c, DLC_UPDATE_HEAD, 0, 0, self, 0, 0);
+          if (atomic_load(&w32_dlc_archives_open) > level) usleep(50);  // what the head waits for is another thread's
+        }
+        if (atomic_load(&w32_dlc_archives_open) > level && now_s() - waiting_since < 1.0) break;
+        level = -1;
+      }
+      int before = atomic_load(&w32_dlc_archives_open);
+      unsigned opens = atomic_load(&w32_dlc_archive_opens);
       c->r[6] = self;
       rc32_call(c, DLC_INSTALL_STEP, 0, 0, 0, 0, 0);
       if (*(volatile uint8_t *)g8(self + 6)) n_installed++;  // the step that finds the list empty mounts none
+      if (atomic_load(&w32_dlc_archive_opens) - opens == 3) n_dropped++;  // opened three times to look, not a fourth
+      if (atomic_load(&w32_dlc_archives_open) > before) level = before, waiting_since = now_s();
     } while (*(volatile uint8_t *)g8(self + 6) && now_s() - t0 < g_cfg.budget_s);
+    if (!*g8(self + 6) && g_cfg.log && n_dropped) fprintf(stderr, "mods: DLC: %u archives were not mounted\n", n_dropped);
     if (!*g8(self + 6)) {
       if (g_cfg.log) {
         fprintf(stderr, "mods: DLC: %u archives mounted in %u frames, %.2f s\n", n_installed, n_frames,

@@ -2,9 +2,11 @@
 // critical sections, interlocked operations and SLists, TLS and FLS (win32_handles.h).
 #include <dirent.h>
 #include <errno.h>
+#include <pthread.h>
 #include <setjmp.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <strings.h>
 #include <time.h>
 #include <unistd.h>
@@ -19,6 +21,8 @@ static w32_obj *objs[MAXH];
 static uint32_t hint;
 int w32_log;  // LP_LOG, set by w32_init (defined here: the audio test links this file without the rest)
 pthread_mutex_t w32_hlock = PTHREAD_RECURSIVE_MUTEX_INITIALIZER;
+_Atomic int w32_dlc_archives_open;
+_Atomic unsigned w32_dlc_archive_opens;
 pthread_cond_t w32_hwake = PTHREAD_COND_INITIALIZER;
 
 // The waits (wait_tid) sleep on a condition of their own, listed with the objects they wait for,
@@ -128,6 +132,7 @@ static void obj_free(w32_obj *o) {
   switch (o->type) {
   case H_FILE:
     if (!o->u.file.console && o->u.file.fd >= 0) rc_file_close(o->u.file.fd);
+    if (o->u.file.dlc) atomic_fetch_sub(&w32_dlc_archives_open, 1);
     free(o->u.file.path);
     break;
   case H_FIND:
@@ -192,6 +197,28 @@ int w32_handle_close(uint32_t h) {
 static void k_CloseHandle(rc_ctx *c) {
   uint32_t h = w32_arg(c, 0);
   if (h == 0xffffffffu || h == 0xfffffffeu) { w32_ret(c, 1, 1); return; }  // pseudo handles
+  // LP_LOG_DLC_CLOSE=1: for the first closes of a song archive the game had read from, the code addresses on the
+  // caller's stack (what finishes a mount, and from where in a frame)
+  static int trace = -1, traced;
+  if (trace < 0) {
+    const char *e = getenv("LP_LOG_DLC_CLOSE");
+    trace = e && *e && *e != '0';
+  }
+  if (trace && traced < 6) {
+    w32_obj *fo = w32_handle_get(h, H_FILE);
+    if (fo && fo->u.file.dlc == 2) {
+      uint32_t sp = (uint32_t)c->r[4];
+      char line[2048];
+      int n = snprintf(line, sizeof line, "w32: dlc archive closed on thread %p, stack:", (void *)pthread_self());
+      for (uint32_t k = 0; k < 400 && n < (int)sizeof line - 12; k++) {
+        uint32_t v;
+        memcpy(&v, RC32_H(sp + 4 * k), 4);
+        if (v >= 0xf81000u && v < 0x1c36becu) n += snprintf(line + n, sizeof line - (size_t)n, " %x", v);
+      }
+      fprintf(stderr, "%s\n", line);
+      traced++;
+    }
+  }
   int ok = w32_handle_close(h);
   if (!ok) w32_set_error(c, W32_ERROR_INVALID_HANDLE);
   w32_ret(c, (uint32_t)ok, 1);

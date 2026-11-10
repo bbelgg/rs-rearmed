@@ -8,6 +8,7 @@
 #ifndef WIN32_HANDLES_H
 #define WIN32_HANDLES_H
 
+#include <stdatomic.h>
 #include <pthread.h>
 #include <stdint.h>
 
@@ -20,7 +21,7 @@ typedef struct w32_obj {
   int refs;            // handles open on it (DuplicateHandle, a named object opened again), waits on it
   char *name;          // a named event / mutex / semaphore / timer, else 0
   union {
-    struct { int fd; int console; int dir; char *path; uint32_t access; } file;
+    struct { int fd; int console; int dir; int dlc; char *path; uint32_t access; } file;  // dlc: a song archive of dlc/
     struct { void *dir, *dir2; char *hostdir, *hostdir2, *over; char *pattern; } find;  // 2: the game folder's, after an overlay's
     struct { int fd; uint32_t size; } map;
     struct { int manual, signaled; } ev;
@@ -32,6 +33,11 @@ typedef struct w32_obj {
 } w32_obj;
 
 extern pthread_mutex_t w32_hlock;
+// The song archives of dlc/ (*_p.psarc) that are open now. The game mounts one in two parts: the install step opens
+// it and reads its start, and the rest is done after the step has returned, the file staying open until then
+// (win32_overrides.c, the batched mounting, waits for that).
+extern _Atomic int w32_dlc_archives_open;
+extern _Atomic unsigned w32_dlc_archive_opens;  // every open of one, ever
 extern pthread_cond_t w32_hwake;
 
 // Under w32_hlock, after a change of o's state: wake the threads waiting for o (win32_ksync.c).

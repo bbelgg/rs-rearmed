@@ -3,6 +3,7 @@
 #include "mtl_internal.h"
 
 #include <ImageIO/ImageIO.h>
+#include <mach/mach_time.h>
 #import <MetalFX/MetalFX.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -204,6 +205,25 @@ static void rsm_note_completed(RSMContext *ctx, uint64_t s) {
     }
 }
 
+// With RS_GL_FRAMETIMES (nsgl_hook.m's log), what only Metal knows about a frame: 'P', the time a drawable
+// went on the screen (flags 1: it never did), and 'U', a command buffer's time on the GPU from its start to
+// its end (flags 1: the frame's last, the one with the present). The handlers run on Metal's own queues.
+void rs_gl_frametime_mark(int kind, uint64_t t0, uint64_t t1, uint64_t x, unsigned flags);
+static bool rsm_ft_on(void) {
+    static int on = -1;  // idempotent
+    if (on < 0) {
+        const char *e = getenv("RS_GL_FRAMETIMES");
+        on = e && *e;
+    }
+    return on;
+}
+static uint64_t rsm_ft_ticks(CFTimeInterval seconds) {  // CACurrentMediaTime's seconds in mach ticks
+    static mach_timebase_info_data_t tb;
+    if (!tb.denom)
+        mach_timebase_info(&tb);
+    return (uint64_t)(seconds * 1e9 * tb.denom / tb.numer);
+}
+
 static void rsm_commit_ex(RSMContext *ctx, bool wait, bool present) {
     rsm_end_pass(ctx);
     if (ctx->cmd) {
@@ -212,7 +232,8 @@ static void rsm_commit_ex(RSMContext *ctx, bool wait, bool present) {
         dispatch_semaphore_t sem = present ? ctx->frames : NULL;
         __weak RSMContext *wctx = ctx;
         [cb addCompletedHandler:^(id<MTLCommandBuffer> b) {
-          (void)b;
+          if (rsm_ft_on() && b.GPUEndTime > 0)
+              rs_gl_frametime_mark('U', rsm_ft_ticks(b.GPUStartTime), rsm_ft_ticks(b.GPUEndTime), 0, present);
           RSMContext *c = wctx;
           if (c)
               rsm_note_completed(c, s);
@@ -733,9 +754,15 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];
             if (d) {
                 rsm_present_frame(ctx, d.texture);
+                if (rsm_ft_on())
+                    [d addPresentedHandler:^(id<MTLDrawable> shown) {
+                      uint64_t t = shown.presentedTime > 0 ? rsm_ft_ticks(shown.presentedTime) : 0;
+                      rs_gl_frametime_mark('P', t ? t : mach_absolute_time(), t ? t : mach_absolute_time(), 0, !t);
+                    }];
                 [rsm_cmd(ctx) presentDrawable:d];
             }
         }
+        rsm_pt_frame(ctx, rsm_cmd(ctx));
         rsm_commit_ex(ctx, false, true);
         // The next frame starts with a fresh pass on the default framebuffer.
         ctx->fb_dirty = true;

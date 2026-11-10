@@ -375,10 +375,15 @@ What is the same in every run, in both editions:
   `song: CherubRock`), Play Song, Skip Tuner and its "continue". The window is 150 s from 45 s after
   `menu: LearnASong_Game`.
 
-What is measured over the window: the frame intervals (`RS_GL_FRAMETIMES`: rate, median, p95, p99, worst, frames over
-20, 33 and 50 ms, and this edition's game frame), the game's CPU and each thread's (from `libproc`, exact, with no
+What is measured over the window: when frames went on the screen (`RS_GL_FRAMETIMES`' `P` events, from Metal: the
+intervals, frames shown late and refreshes without a new one), when the game handed them over (`F`: rate, median, p95,
+p99, worst, over 33 and 50 ms; this moves with the game's work in a frame and is not what is seen), this edition's game
+frame, a command buffer's time on the GPU from start to end (`U`), the game's CPU and each thread's (from `libproc`, exact, with no
 sampler stopping the game), the helpers' CPU, the memory footprint and its growth, and the GPU's utilisation (`ioreg`,
-the whole system's). `OUT/<edition>-<n>/result.json` has them with what the run was: the commit, the executable's and
+the whole system's). At a fixed frame rate the GPU's utilisation and its start-to-end time are not its work: it slows
+its clock to fill the refresh. For what it can do, a run with `"RS_FPS": "300"` in `CONFIG`'s `env` (the Mac edition),
+one at a time on a cool Mac: a MacBook Air has no fan, and the fourth such run in a row drew a third fewer frames than
+the first. `OUT/<edition>-<n>/result.json` has them with what the run was: the commit, the executable's and
 the mods' hashes, the settings and the display.
 
 Checked 2026-11-10 on an M2 MacBook Air's own screen (1470x956 points, 60 Hz), test builds of both editions, a
@@ -415,6 +420,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | Metal: each new texture content with its hash, RSMods' checksum, size and format, and in `FILE.draws` each kind of draw (program, mode, count, vertex stride, the textures of units 0-3); each content saved to DIR; textures of those hashes drawn as solid magenta, to see what uses them |
 | `RS_GL_SNAPSHOT_DIR`, `RS_GL_SNAPSHOT_SECS` | frame snapshots |
 | `RS_GL_FRAMETIMES` | frame times |
+| `RS_METAL_PASS_TIMES=FILE` | Metal: the GPU's time in each render pass of a frame, by its place in the frame, from every eighth frame; with the present, and "between" for the upscaler. The file is rewritten about every 8 s. Read the shares: at a fixed frame rate the GPU's clock follows the load |
 | `--renderer-check` | the renderer a start would use, without starting the game |
 | `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
 | `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |

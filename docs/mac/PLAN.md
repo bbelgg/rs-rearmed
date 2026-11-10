@@ -103,8 +103,8 @@ Being looked into, with no promise of if or when:
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's input list is
   hard-wired to Player 1 (0x1001e6660), and SWAP CABLE ASSIGNMENT could open it for Player 2.
 - **Measured runs** (`tools/perf`, [TESTING.md](TESTING.md#measured-runs)): the script runs both editions the same way. The first
-  set is in [PERFORMANCE.md](PERFORMANCE.md#measured-runs-for-1130). Left: a run with the frame rate free (vsync holds both at the display's rate,
-  so the rate says little); the GPU's time a frame from Metal instead of the system's utilisation; the guitar input from a file, so that
+  set is in [PERFORMANCE.md](PERFORMANCE.md#measured-runs-for-1130). The GPU's time by pass is in (`RS_METAL_PASS_TIMES`). Left: the free frame rate and the passes in Learn & Play;
+  a check of the GPU's heat before a run; the guitar input from a file, so that
   notes are hit and no interface is needed; draws and passes a frame, to see that two runs drew the same; and a loop of songs that
   watches the memory for leaks.
 - **One code base for both games**: the shared pieces (renderer, Steam layer, audio policy, installer)

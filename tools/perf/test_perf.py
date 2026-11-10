@@ -36,6 +36,16 @@ class FrameTimes(unittest.TestCase):
         ft = stats.parse_frametimes(["W 0 5", "F 1 2 0 7 0", "F 12", "F x y", "X lost 3", "", "W 9 99"])
         self.assertEqual((len(ft["F"]), ft["lost"], ft["wall"]), (1, 3, 5))
 
+    def test_what_the_screen_got(self):
+        lines = frames(100, 10 ** 7)
+        shown = [i * 10 ** 7 for i in range(100) if i != 50]          # one refresh without a new frame
+        lines += ["P %d 0 0 9 0" % t for t in shown] + ["P 500000000 0 0 9 1"]
+        lines += ["U %d 3000000 0 9 1" % t for t in shown] + ["U %d 1000000 0 9 0" % t for t in shown]
+        s = stats.frame_stats(stats.parse_frametimes(lines), 1000, 1001)
+        self.assertEqual((s["shown_median_ms"], s["shown_late"], s["shown_missed"], s["never_shown"]), (10.0, 1, 1, 1))
+        self.assertEqual((s["gpu_ms"], s["gpu_last_ms"], s["gpu_buffers"]), (4.0, 3.0, 2.0))
+        self.assertNotIn("gpu_ms", stats.frame_stats(stats.parse_frametimes(frames(100, 10 ** 7)), 1000, 1001))
+
     def test_nothing_to_measure(self):
         self.assertIn("error", stats.frame_stats(stats.parse_frametimes(["F 1 2 0 7 0"]), 0, 1))
         self.assertIn("error", stats.frame_stats(stats.parse_frametimes(["W 0 0", "F 1 2 0 7 0"]), 0, 1))

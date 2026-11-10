@@ -167,6 +167,37 @@ Learn & Play takes 10 points of a core more than this edition, 1.7 ms a frame, a
 ([Final pass](#final-pass-for-140)). One frame of about 0.36 s came in one run of each edition. The stems helper used no CPU: the song's backing track was in its cache from
 the warm-up. Not looked at: whether the venue showed, with no notes played.
 
+**What the screen got** (the same day, one more run of each with the renderer's own times in the log: `P`, a frame on the screen, and `U`, a command buffer
+on the GPU). The Mac edition's 8,976 frames went on the screen one refresh apart but one, which stayed for two; Learn & Play's 9,001 all did. So the wider
+intervals above are not what is seen: they are taken where the game hands a frame to Metal, and this edition's game frame is 4 ms on most frames and 6 ms on one in
+five, which moves that moment and not the refresh the frame makes. The frame waits about 3 ms from there to the screen here and 10 ms in Learn & Play.
+
+**The GPU is not near its limit.** Its 89% at 60 fps is the GPU slowing its clock to fill the refresh: with 4x MSAA switched off the command buffer still took
+14.5 ms from start to end (14.4 with it) and the utilisation stayed at 89%. With the frame rate free (`RS_FPS=300`, 40 s, the Mac cool) this edition drew 102
+frames a second at these settings and 107 without MSAA, the GPU at 99.6% and the game thread at 40% of a core: about 9.7 ms of GPU work a frame, 58% of a refresh,
+and MSAA about 4% of it. Two more such runs straight after, for the upscaler's and the post effects' shares, gave 73 and 87 frames a second with more switched
+off: the MacBook Air has no fan and was warm by then, so they say nothing.
+
+**Where the GPU's time goes** (`RS_METAL_PASS_TIMES`, 960 frames of the song at 60 fps, the same settings; shares, since the clock is slowed):
+
+| | of the frame | |
+|---|---|---|
+| MetalFX upscaling, 1470x956 to 2940x1912 | 27% | 3.7 of 14.1 ms; 0.006 ms with `RS_METAL_UPSCALE=0`, where the frame is 12.4 ms |
+| The scene, 34 draws at full size with 4x MSAA | 25% | pass 6 |
+| Two half-size passes (735x478), 20 and 8 draws | 24% | passes 7 and 8: full-screen effects, about three times the scene's cost for each pixel |
+| The pass before the scene, 54 draws | 4% | pass 5 |
+| The game's last passes onto the screen's target, the note highway among them, about 100 draws | 4% | |
+| The copy to the drawable | 2% | |
+| Twenty small passes | the rest | |
+
+So half of it is the game's own scene and effects, a quarter is the upscaler, and the note highway is cheap. Nothing here can go without the picture changing but small
+things: the upscaler could write to the drawable itself and spare the copy (2%, and a texture of 22 MB), at the price of a drawable that is not framebuffer-only, which
+the system may then composite instead of showing directly; not done. With the GPU at 58% of a refresh at full clock there is no need.
+
+**The frames of about 0.36 s**, one in one run of each edition (91 s and 109 s into the song), are the size of a pipeline built on first use
+([Shader preparation](#shader-preparation)), and neither came back in a later run. The warm-up of that set played only the first 75 s of the song; it plays the
+whole window now.
+
 ## Learn & Play's route
 
 2026-11-06, an Apple M2, the 75 Hz 2560x1440 display. One run each, the game's executable started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal cache (a

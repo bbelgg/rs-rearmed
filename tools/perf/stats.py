@@ -4,20 +4,23 @@ CPU and memory samples, and the settings file the run pinned. No game and no Mac
 A frame-time file (shims/opengl/src/nsgl_hook.m) has a line per event, times in ns since the library loaded:
   F t0 dur x tid flags   a present (flags bit 0: a snapshot was taken inside it)
   G t0 dur x tid flags   the Mac edition's game frame, from the lock to the game's return
+  P t0 dur x tid flags   Metal: the time a frame went on the screen (flags bit 0: it never did)
+  U t0 dur x tid flags   Metal: a command buffer on the GPU, from its start to its end
   W now unix_ns          the wall clock, at every write-out
   X lost N               events the writer could not keep
 """
 
 
 def parse_frametimes(lines):
-    """-> {"F": [(t0, dur, flags)], "G": [...], "wall": unix_ns - t0 of the same moment or None, "lost": N}"""
-    out = {"F": [], "G": [], "wall": None, "lost": 0}
+    """-> {"F": [(t0, dur, flags)], "G": [...], "P": [...], "U": [...], "wall": unix_ns - t0 of the same moment
+    or None, "lost": N}"""
+    out = {"F": [], "G": [], "P": [], "U": [], "wall": None, "lost": 0}
     for line in lines:
         p = line.split()
         if not p:
             continue
         try:
-            if p[0] in ("F", "G") and len(p) >= 3:
+            if p[0] in ("F", "G", "P", "U") and len(p) >= 3:
                 out[p[0]].append((int(p[1]), int(p[2]), int(p[5]) if len(p) > 5 else 0))
             elif p[0] == "W" and len(p) >= 3 and out["wall"] is None:
                 out["wall"] = int(p[2]) - int(p[1])
@@ -50,7 +53,7 @@ def frame_stats(ft, start_unix, end_unix):
     iv = sorted((y - x) / 1e6 for x, y in zip(t, t[1:]))
     game = sorted(e[1] / 1e6 for e in ft["G"] if a <= e[0] < b)
     span = (t[-1] - t[0]) / 1e9
-    return {
+    return dict(shown_stats(ft, a, b), **{
         "frames": len(iv),
         "seconds": round(span, 3),
         "fps": round(len(iv) / span, 2),
@@ -64,7 +67,30 @@ def frame_stats(ft, start_unix, end_unix):
         "snapshots": sum(1 for e in ft["F"] if a <= e[0] < b and e[2] & 1),
         "game_frame_ms": round(percentile(game, 0.5), 2) if game else None,
         "lost": ft["lost"],
-    }
+    })
+
+
+def shown_stats(ft, a, b):
+    """What the screen got, from Metal's own times: the intervals between frames going on the screen, the
+    refreshes that passed without a new one, and the GPU's time a frame. {} without those events."""
+    shown = sorted(e[0] for e in ft["P"] if a <= e[0] < b and not e[2] & 1)
+    out = {}
+    if len(shown) >= 3:
+        iv = sorted((y - x) / 1e6 for x, y in zip(shown, shown[1:]))
+        period = percentile(iv, 0.5)
+        out.update(shown_median_ms=round(period, 2), shown_p99_ms=round(percentile(iv, 0.99), 2),
+                   shown_worst_ms=round(iv[-1], 2),
+                   # a frame that stayed for more than one refresh, and how many refreshes went without one
+                   shown_late=sum(1 for v in iv if v > period * 1.5),
+                   shown_missed=sum(int(round(v / period)) - 1 for v in iv if v > period * 1.5),
+                   never_shown=sum(1 for e in ft["P"] if a <= e[0] < b and e[2] & 1))
+    gpu = [e for e in ft["U"] if a <= e[0] < b]
+    if gpu and len(shown) >= 3:
+        busy = sum(e[1] for e in gpu) / 1e6
+        out.update(gpu_ms=round(busy / len(shown), 2),
+                   gpu_last_ms=round(percentile(sorted(e[1] / 1e6 for e in gpu if e[2] & 1), 0.5) or 0, 2),
+                   gpu_buffers=round(len(gpu) / len(shown), 2))
+    return out
 
 
 def spread(values):

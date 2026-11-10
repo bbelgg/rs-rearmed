@@ -540,6 +540,7 @@ MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunctio
 // Draws (mtl_draw.m).
 void rsm_draw_init(RSMContext *ctx);
 void rsm_present_draw(RSMContext *ctx, id<MTLTexture> drawable, id<MTLTexture> src, id<MTLSamplerState> smp);
+void rsm_pt_frame(RSMContext *ctx, id<MTLCommandBuffer> cb);  // RS_METAL_PASS_TIMES: the frame's last command buffer
 
 enum { RSM_SWZ_NONE, RSM_SWZ_RGB1, RSM_SWZ_LUM, RSM_SWZ_ALPHA, RSM_SWZ_LUM_ALPHA,
        RSM_SWZ_INTENSITY, RSM_SWZ_RED, RSM_SWZ_RG };

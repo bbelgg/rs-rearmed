@@ -123,6 +123,179 @@ static RSMMsaa *rsm_msaa_twin(RSMContext *ctx, id<MTLTexture> t, int n) {
     return m;
 }
 
+// --- GPU time of each pass (RS_METAL_PASS_TIMES=FILE) ------------------------------------
+// A diagnostic: what each render pass of a frame costs on the GPU, by its place in the frame. Every eighth frame
+// gets a counter sample buffer; each of its passes samples the GPU's timestamp at the start and end of its vertex
+// and fragment stages (the stage boundary is the only place an Apple GPU samples), and when the frame's command
+// buffer is done the times are added up by the pass' number. FILE is rewritten every 64 sampled frames:
+//   pass N: seen in F frames, WxH xS format, depth, loaded or cleared, draws, vertex ms, fragment ms
+// with the present as "present", and "between" for the time from the last game pass' end to the present's
+// start, which is the upscaler when it runs. At a fixed frame rate the GPU's clock follows the load, so read the
+// shares, not the milliseconds.
+enum { RSM_PT_PASSES = 62, RSM_PT_PRESENT = 62, RSM_PT_SLOTS = 63, RSM_PT_EVERY = 8, RSM_PT_WRITE = 64 };
+typedef struct {
+    uint32_t w, h, samples, fmt, draws;
+    bool depth, loads;
+} rsm_pt_pass;
+@interface RSMPassTimes : NSObject {
+  @public
+    id<MTLCounterSampleBuffer> buf;
+    int n;
+    bool present;
+    rsm_pt_pass pass[RSM_PT_SLOTS];
+}
+@end
+@implementation RSMPassTimes
+@end
+
+static const char *rsm_pt_file;
+static RSMPassTimes *rsm_pt_cur;  // the frame being sampled; the render thread's
+static uint32_t *rsm_pt_draws;    // the open pass' draw count
+static pthread_mutex_t rsm_pt_mu = PTHREAD_MUTEX_INITIALIZER;
+static struct {
+    uint64_t seen;
+    double vert, frag, draws;
+    rsm_pt_pass last;
+} rsm_pt_sum[RSM_PT_SLOTS];
+static double rsm_pt_between, rsm_pt_span;
+static uint64_t rsm_pt_frames, rsm_pt_bad;
+
+static bool rsm_pt_on(void) {
+    static int on = -1;
+    if (on < 0) {
+        rsm_pt_file = getenv("RS_METAL_PASS_TIMES");
+        on = rsm_pt_file && *rsm_pt_file;
+    }
+    return on;
+}
+
+// The sample buffer's slots of pass i in the descriptor, or none.
+static void rsm_pt_attach(MTLRenderPassDescriptor *rp, RSMPassTimes *pt, int i) {
+    MTLRenderPassSampleBufferAttachmentDescriptor *a = rp.sampleBufferAttachments[0];
+    a.sampleBuffer = pt ? pt->buf : nil;
+    a.startOfVertexSampleIndex = pt ? (NSUInteger)(4 * i) : MTLCounterDontSample;
+    a.endOfVertexSampleIndex = pt ? (NSUInteger)(4 * i + 1) : MTLCounterDontSample;
+    a.startOfFragmentSampleIndex = pt ? (NSUInteger)(4 * i + 2) : MTLCounterDontSample;
+    a.endOfFragmentSampleIndex = pt ? (NSUInteger)(4 * i + 3) : MTLCounterDontSample;
+}
+
+static void rsm_pt_write(void) {  // rsm_pt_mu held
+    FILE *f = fopen(rsm_pt_file, "w");
+    if (!f)
+        return;
+    double fr = (double)rsm_pt_frames;
+    fprintf(f, "frames sampled %llu (failed %llu), first pass' start to the present's end %.3f ms a frame\n",
+            (unsigned long long)rsm_pt_frames, (unsigned long long)rsm_pt_bad, rsm_pt_span / fr / 1e6);
+    for (int i = 0; i < RSM_PT_SLOTS; i++) {
+        if (!rsm_pt_sum[i].seen)
+            continue;
+        const rsm_pt_pass *p = &rsm_pt_sum[i].last;
+        double n = (double)rsm_pt_sum[i].seen;
+        char name[16];
+        snprintf(name, sizeof name, i == RSM_PT_PRESENT ? "present" : "pass %d", i);
+        fprintf(f, "%s: seen %llu, %ux%u x%u fmt %u%s %s, draws %.1f, vertex %.3f ms, fragment %.3f ms\n", name,
+                (unsigned long long)rsm_pt_sum[i].seen, p->w, p->h, p->samples, p->fmt, p->depth ? " depth" : "",
+                p->loads ? "loaded" : "cleared", rsm_pt_sum[i].draws / n, rsm_pt_sum[i].vert / fr / 1e6,
+                rsm_pt_sum[i].frag / fr / 1e6);
+    }
+    fprintf(f, "between: %.3f ms\n", rsm_pt_between / fr / 1e6);
+    fclose(f);
+}
+
+static void rsm_pt_resolve(RSMPassTimes *pt) {
+    NSData *d = [pt->buf resolveCounterRange:NSMakeRange(0, 4 * RSM_PT_SLOTS)];
+    const MTLCounterResultTimestamp *t = d.bytes;
+    pthread_mutex_lock(&rsm_pt_mu);
+    if (!t || d.length < 4 * RSM_PT_SLOTS * sizeof *t || !pt->n) {
+        rsm_pt_bad++;
+        pthread_mutex_unlock(&rsm_pt_mu);
+        return;
+    }
+    uint64_t first = 0, last_end = 0;
+    for (int k = 0; k < pt->n + (pt->present ? 1 : 0); k++) {
+        int i = k < pt->n ? k : RSM_PT_PRESENT;
+        uint64_t s[4] = {t[4 * i].timestamp, t[4 * i + 1].timestamp, t[4 * i + 2].timestamp, t[4 * i + 3].timestamp};
+        if (s[0] == MTLCounterErrorValue || s[1] == MTLCounterErrorValue || s[2] == MTLCounterErrorValue ||
+            s[3] == MTLCounterErrorValue || s[1] < s[0] || s[3] < s[2])
+            continue;
+        rsm_pt_sum[i].seen++;
+        rsm_pt_sum[i].vert += (double)(s[1] - s[0]);
+        rsm_pt_sum[i].frag += (double)(s[3] - s[2]);
+        rsm_pt_sum[i].draws += pt->pass[i].draws;
+        rsm_pt_sum[i].last = pt->pass[i];
+        if (!first || s[0] < first)
+            first = s[0];
+        if (i == RSM_PT_PRESENT) {
+            if (last_end && s[2] > last_end)
+                rsm_pt_between += (double)(s[2] - last_end);
+            if (first && s[3] > first)
+                rsm_pt_span += (double)(s[3] - first);
+        } else if (s[3] > last_end) {
+            last_end = s[3];
+        }
+    }
+    if (++rsm_pt_frames % RSM_PT_WRITE == 0)
+        rsm_pt_write();
+    pthread_mutex_unlock(&rsm_pt_mu);
+}
+
+// A pass begins: its slot in the frame being sampled.
+static void rsm_pt_pass_begin(MTLRenderPassDescriptor *rp, id<MTLTexture> target, int slot, int samples, bool depth,
+                              bool loads) {
+    RSMPassTimes *pt = rsm_pt_cur;
+    rsm_pt_draws = NULL;
+    if (pt && slot < 0)
+        slot = pt->n < RSM_PT_PASSES ? pt->n++ : -1;
+    if (!pt || slot < 0) {
+        rsm_pt_attach(rp, nil, 0);
+        return;
+    }
+    rsm_pt_attach(rp, pt, slot);
+    if (slot == RSM_PT_PRESENT)
+        pt->present = true;
+    pt->pass[slot] = (rsm_pt_pass){(uint32_t)target.width, (uint32_t)target.height, (uint32_t)samples,
+                                   (uint32_t)target.pixelFormat, 0, depth, loads};
+    rsm_pt_draws = &pt->pass[slot].draws;
+}
+
+// The frame's command buffer is about to be committed, with its present: the sampled frame's times are read when
+// it is done, and every eighth frame the next one is sampled.
+void rsm_pt_frame(RSMContext *ctx, id<MTLCommandBuffer> cb) {
+    if (!rsm_pt_on())
+        return;
+    static uint64_t frame;
+    static int unsupported;
+    RSMPassTimes *pt = rsm_pt_cur;
+    rsm_pt_cur = nil;
+    rsm_pt_draws = NULL;
+    if (pt)
+        [cb addCompletedHandler:^(id<MTLCommandBuffer> b) {
+          (void)b;
+          rsm_pt_resolve(pt);
+        }];
+    if (unsupported || ++frame % RSM_PT_EVERY)
+        return;
+    id<MTLCounterSet> set = nil;
+    if ([ctx->dev supportsCounterSampling:MTLCounterSamplingPointAtStageBoundary])
+        for (id<MTLCounterSet> c in ctx->dev.counterSets)
+            if ([c.name isEqualToString:MTLCommonCounterSetTimestamp])
+                set = c;
+    MTLCounterSampleBufferDescriptor *d = [MTLCounterSampleBufferDescriptor new];
+    d.counterSet = set;
+    d.sampleCount = 4 * RSM_PT_SLOTS;
+    d.storageMode = MTLStorageModeShared;
+    NSError *err = nil;
+    RSMPassTimes *next = [RSMPassTimes new];
+    next->buf = set ? [ctx->dev newCounterSampleBufferWithDescriptor:d error:&err] : nil;
+    if (!next->buf) {
+        unsupported = 1;
+        rsm_log("pass times: no timestamp samples at stage boundaries on this GPU (%s)",
+                err ? err.localizedDescription.UTF8String : "not supported");
+        return;
+    }
+    rsm_pt_cur = next;
+}
+
 // --- Render pass ------------------------------------------------------------------------
 static RSMTexture *rsm_att_object(const rsm_attachment *a) {
     return a->type == GL_TEXTURE ? a->obj : nil;
@@ -265,6 +438,9 @@ static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     }
     rp.renderTargetWidth = color ? 0 : (NSUInteger)ctx->pass_w;
     rp.renderTargetHeight = color ? 0 : (NSUInteger)ctx->pass_h;
+    if (rsm_pt_on())
+        rsm_pt_pass_begin(rp, color ? color : depth, -1, samples, depth != nil,
+                          !(pc & (color ? GL_COLOR_BUFFER_BIT : GL_DEPTH_BUFFER_BIT)));
     ctx->enc = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
     ctx->pending_clear = 0;
     rsm_mark_targets(ctx);
@@ -1061,6 +1237,8 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
             return;
 
         // Draw.
+        if (rsm_pt_draws)
+            ++*rsm_pt_draws;
         if (use_index) {
             NSInteger base = copy ? -(NSInteger)vmin : 0;
             [e drawIndexedPrimitives:pr.prim indexCount:icount indexType:mit indexBuffer:ibuf indexBufferOffset:ioff
@@ -1119,6 +1297,8 @@ void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src
     rp.colorAttachments[0].texture = target;
     rp.colorAttachments[0].loadAction = MTLLoadActionDontCare;
     rp.colorAttachments[0].storeAction = MTLStoreActionStore;
+    if (rsm_pt_on())
+        rsm_pt_pass_begin(rp, target, RSM_PT_PRESENT, 1, false, false);
     id<MTLRenderCommandEncoder> e = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
     [e setRenderPipelineState:ctx->present_pipeline];
     [e setFragmentTexture:src atIndex:0];

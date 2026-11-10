@@ -8,6 +8,11 @@ Warm-up runs, runs that stopped and runs whose window was not in front are left 
 editions' runs did not have in common (settings, mods, switches, display) is listed under the table: a table of
 runs that differ there is not a comparison. A change smaller than the noise between runs of one build is marked
 "within noise": about 2 points of a core, and the larger of 2% and the runs' own spread for the rest.
+
+Two rows need care. "Handed over" is when the game gave a frame to Metal: it moves with the game's own work in each
+frame, and says nothing of what was seen; "On the screen" does. And at a fixed frame rate neither the GPU's
+utilisation nor its start-to-end time is its work: the GPU slows its clock to fill the refresh. What it can do
+shows only with the frame rate free (RS_FPS above the display's), on a Mac that is cool.
 """
 import argparse
 import glob
@@ -18,12 +23,16 @@ import sys
 # (label, how to read it from a result, digits, noise floor in the row's unit)
 ROWS = [
     ("Frame rate", lambda r: r["frames"].get("fps"), 1, 0.3),
-    ("Frame interval, median (ms)", lambda r: r["frames"].get("median_ms"), 2, 0.1),
+    ("On the screen: interval, p99 (ms)", lambda r: r["frames"].get("shown_p99_ms"), 2, 0.2),
+    ("Frames shown late", lambda r: r["frames"].get("shown_late"), 0, None),
+    ("Refreshes without a new frame", lambda r: r["frames"].get("shown_missed"), 0, None),
+    ("Handed over: interval, median (ms)", lambda r: r["frames"].get("median_ms"), 2, 0.1),
     ("p95 (ms)", lambda r: r["frames"].get("p95_ms"), 1, 0.5),
     ("p99 (ms)", lambda r: r["frames"].get("p99_ms"), 1, 1.0),
     ("Worst (ms)", lambda r: r["frames"].get("worst_ms"), 1, None),
-    ("Frames over 33 ms", lambda r: r["frames"].get("over_33"), 0, None),
-    ("Frames over 50 ms", lambda r: r["frames"].get("over_50"), 0, None),
+    ("Over 33 ms", lambda r: r["frames"].get("over_33"), 0, None),
+    ("Over 50 ms", lambda r: r["frames"].get("over_50"), 0, None),
+    ("On the GPU, start to end (ms)", lambda r: r["frames"].get("gpu_ms"), 2, 0.3),
     ("Game frame, median (ms)", lambda r: r["frames"].get("game_frame_ms"), 2, 0.1),
     ("CPU (% of a core)", lambda r: r.get("cpu_pct"), 1, 2.0),
     ("CPU per frame (ms)", lambda r: r.get("cpu_per_frame_ms"), 2, 0.25),

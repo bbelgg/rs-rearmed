@@ -19,8 +19,8 @@ What a run does (docs/mac/TESTING.md, Measured runs):
     executable with a clean environment, the mods, the network guard and tools/ws8/keyfifo;
   - goes from the title to the song by the mods' `menu:` lines (rearmed-mods logs them with RS_MODS_LOG=1), and
     stops on a screen it doesn't expect;
-  - waits `settle` seconds on the note highway, then measures for `window` seconds: frame times, CPU of the game
-    and of each thread, CPU of the helper processes, memory, GPU, energy;
+  - waits `settle` seconds on the note highway, then measures for `window` seconds: when frames were handed over
+    and when they went on the screen, CPU of the game and of each thread, CPU of the helper processes, memory, GPU;
   - quits the game and writes result.json.
 """
 import argparse
@@ -412,13 +412,13 @@ class Game:
 
 
 def one_run(cfg, name, out, kind, force, snapshots):
-    """kind: "measured", "warmup" (a short window, not in the report), "route" (to the highway and out) or
+    """kind: "measured", "warmup" (the same run, not in the report), "route" (to the highway and out) or
     a list of key sequences (the profile's settings; the profile folder it leaves is OUT/steam)."""
     print("%s: %s (%s)" % (os.path.basename(out), name, "profile" if isinstance(kind, list) else kind), flush=True)
     bad, ds = preflight(cfg)
     if bad and not force:
         raise Stop("not a state to measure in: %s (--force runs anyway and says so in the result)" % "; ".join(bad))
-    run_cfg = dict(cfg, window=30 if kind == "warmup" else cfg["window"])
+    run_cfg = dict(cfg)  # a warm-up plays the whole window: what it doesn't reach is first drawn in a measured run
     g = Game(run_cfg, name, out, snapshots)
     result = {"kind": kind}
     try:

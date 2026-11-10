@@ -220,6 +220,8 @@ static void rs_trace_snap(void *ctx, const char *path) {
 //      CVTimeStamp hostTime of the frame it is asked for (the vsync target)
 //   G  native shell only (shims/platform rsp_shell.m, through
 //      rs_gl_frametime_mark): t0 = CGL lock acquired, t1 = rsp_game_frame returned
+//   P  Metal only (metal/mtl_context.m): t0 = when a drawable went on the screen; flags bit 0: it never did
+//   U  Metal only: a command buffer on the GPU, t0 its start, dur to its end; flags bit 0: the frame's last
 // Line format (times in ns since the library loaded, CLOCK_UPTIME_RAW base):
 //   K t0 dur x tid flags        W now unix_ns (wall clock, every write-out)
 typedef struct {

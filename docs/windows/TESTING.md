@@ -578,6 +578,7 @@ All off unless set (from `getenv` in `win-x86/`, the runtime and the shared shim
 | `RC32_LOG_RAISE=N` | the first N guest exceptions: code, C++ type, guest and host stack |
 | `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
 | `RS_GL_FRAMETIMES=FILE` | a line per Present |
+| `RS_METAL_PASS_TIMES=FILE` | the GPU's time in each render pass of a frame, as on the [Mac](../mac/TESTING.md#diagnostics) |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
 | `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | Metal: each new texture content with its hash, RSMods' checksum, size and format, and in `FILE.draws` each kind of draw (program, mode, count, vertex stride, the textures of units 0-3); each content saved to DIR; textures of those hashes drawn as solid magenta, to see what uses them |
 | `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each level set, each input's peak and clips every few seconds |

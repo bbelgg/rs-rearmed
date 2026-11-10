@@ -137,6 +137,9 @@ ui_note_stats_0             # RSMods' path to the note counts from the UI manage
 ui_note_stats_1             # RSMods' path to the note counts: 2nd
 ui_note_stats_2             # RSMods' path to the note counts: 3rd
 ui_note_stats_3             # RSMods' path to the note counts: 4th, the counts (player_note_stats' object)
+ui_score_attack_stats       # RSMods' path to Score Attack's note counts: its 4th step, in place of ui_note_stats_3, where Score Attack counts in an object of its own
+score_attack_hits           # Score Attack's note counts: s32 notes hit
+score_attack_misses         # Score Attack's note counts: s32 notes missed
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
 guitar_headstock
 headstock_pegs

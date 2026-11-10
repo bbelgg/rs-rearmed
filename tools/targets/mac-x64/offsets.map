@@ -125,6 +125,9 @@ ui_note_stats_0                   unsupported  the Mac's counts are reached from
 ui_note_stats_1                   unsupported  as ui_note_stats_0
 ui_note_stats_2                   unsupported  as ui_note_stats_0
 ui_note_stats_3                   unsupported  as ui_note_stats_0
+ui_score_attack_stats             unsupported  the Mac's Score Attack counts in player_note_stats, as Learn a Song
+score_attack_hits                 unsupported  as ui_score_attack_stats
+score_attack_misses               unsupported  as ui_score_attack_stats
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
 guitar_headstock             0x28  # Rnd_Guitar: Rnd_Headstock (guitar ctor 0x10019e804; N5's callee 0x100199af0 gets [guitar+0x28])
 headstock_pegs               0x18  # Rnd_Headstock: PegSet (0x100198dde)

@@ -127,6 +127,9 @@ ui_note_stats_0                   0xb0    # RSMods' ptr_noteDataOffsets from *0x
 ui_note_stats_1                   0x18    # RSMods' path, read in runs
 ui_note_stats_2                   0x4     # RSMods' path, read in runs
 ui_note_stats_3                   0x84    # RSMods' path, read in runs: the counts (hits +0x30, misses +0x40, the track +0xc); null in Score Attack, whose counts RSMods reads at +0x4c
+ui_score_attack_stats             0x4c    # RSMods' ptr_scoreAttackNoteDataOffsets: +0xb0 +0x18 +0x4 as ui_note_stats_0 to _2, then this; seen in a run (2026-11-10): rearmed-mods' accuracy follows the hits and misses in Score Attack, playing and paused
+score_attack_hits                 0x4c    # RSMods' ScoreAttackNoteData totalNotesHit; seen in that run
+score_attack_misses               0x50    # RSMods' ScoreAttackNoteData totalNotesMissed; seen in that run
 input_slot                        0xc     # 0x11decca: [eax + 0xc]
 autosave_menu                     0x14    # 0x120aece: the slot's reference at +4 (0x120aedd), not the Mac's +8
 autosave_timer                    0x20    # 0x120af2f: 4.0 from 0x1d18d48

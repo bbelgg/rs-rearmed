@@ -24,6 +24,7 @@ in the repository.
 | Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) with made-up game folders: what each edition copies, clones and real copies, the space check, resuming a stopped copy, refreshes (only the copied set is removed, the game's own writes stay), the earlier mirror's links removed without following them, the completeness check |
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (the cable screen's DIRECT CONNECT button, the INPUT slider's fourth value, the main menu's ENUMERATE, the notice) and that a file which has them is left alone; the psarc and 7z readers and writers with made-up archives (a rewritten 7z keeps every other file's stored bytes, order, times and attributes); the overlay made, and left out for a cache that has the entries; `gamefiles.py` making it after a copy. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`, the built-in mods switched off in the installer. The launcher's reader (run with macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same: comments, spaces, CRLF, a repeated key, the environment winning, other lines ignored (the network guard's and Steam's switches among them); the launcher's `--env` pairs carrying the value it logs as used, the environment's too, as `open` gives the game only launchd's environment; the same keys in both and in the installer |
+| Release tools | `release.tools` (`tools/release/test_release.py`) | shared with the Windows port: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`, also `python3 tools/targets/check.py`) | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
 | Hook points and mods | `recomp.hooks` (`tools/ws7/recomp/test/hooks`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
 | Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | the 64-bit front end's edits and mid points (`xlat/inner.py`, `rc_mid.h`) on a made-up x86-64 Mach-O: edited code against Unicorn with the switches off and on, mid point hooks against answers, bad tables refused; Learn & Play's counterpart is `test/x86/innercases.py` |
@@ -378,3 +379,15 @@ The game must never call home.
   `mode=block` after opening `game/Rocksmith2014.app` from the Finder).
 - The Steam layer runs in stub mode (`RS_STEAM_MODE=stub` in the launcher): it never loads Valve's library.
   `crd` is never copied into `steam/` and is deleted from a copy before each launch.
+
+## Release checks
+
+A release runs the suites and the game runs its changes call for, not all of them: `tools/release/scope.py` maps the
+files changed since the last release to editions, suites and runs, and `tools/release/check.py` runs those suites,
+several at a time, with a line each ([Making a release](../release/README.md)). The suites are the ones in
+[Tests in the repository](#tests-in-the-repository); a new suite gets a line in `scope.py`'s table and a rule for
+the paths it covers. The tools' own test is `release.tools` (`tools/release/test_release.py`).
+
+The Mac edition's run for a release is `tools/release/smoke.sh --mac`, which takes its route from `RS_SMOKE_MAC_CMD`
+since the injector is not in this repository ([Game runs](#game-runs)): a command that plays to the note highway and
+exits 0. Without one, play it by hand to the highway and say so in the release commit.

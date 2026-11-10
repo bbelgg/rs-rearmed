@@ -60,7 +60,8 @@ structure in either half of the code and docs. So every change has to consider t
 PLAN, TESTING; Mac also has METAL) with **the same headings where the topics match**, so they can be read side
 by side. When you add or change a section in one, add or adjust the matching section in the other, even
 if it only says "not yet" or "not applicable". Recompiler material goes in `docs/recompiler`, not in
-either edition's docs.
+either edition's docs. What a release needs (the notes' entries, the known issues, the steps) goes in
+`docs/release`, once for both.
 
 ## Rules that hold for both
 
@@ -90,6 +91,18 @@ either edition's docs.
   piece of work, with the same kind of subject and a body that sums up the whole of it. What a branch needed on
   the way (merges from other branches, work in progress, fix-ups, review fixes) stays out of `main`'s history.
   Unrelated pieces land as separate commits. Before any push, check the unpushed history reads this way.
+
+## Releasing
+
+One release covers both editions; the steps and their scripts (`tools/release`) are in
+[docs/release/README.md](docs/release/README.md), and Claude Code's `/release` follows them.
+
+- As work lands: a change a player or a mod's author will notice gets its entry in `docs/release/next.md`, and an
+  issue opened or closed changes `docs/release/known-issues.md`, in the same piece of work. An entry in a `PLAN.md`
+  that isn't out yet says `(not released)`.
+- A release checks what its changes call for (`tools/release/scope.py`), and says what it left unrun. A new
+  directory or test suite gets its rule there.
+- Publishing (`tools/release/publish.sh … --yes`) is the remote change to ask about, every time.
 
 ## Building
 

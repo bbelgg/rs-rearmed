@@ -84,4 +84,6 @@ if(Python3_FOUND)
   # settings.env, the built-in mods switched off in the installer: the Mac launcher's and Learn & Play's readers on
   # the same made-up files, and the same list of keys in both and in the installer.
   add_test(NAME play-native.settings COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/play-native/test_settings.py)
+  # The release tools (tools/release): what a change calls for, and a release's edits, on made-up trees.
+  add_test(NAME release.tools COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/release/test_release.py)
 endif()

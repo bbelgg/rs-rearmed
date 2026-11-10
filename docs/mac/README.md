@@ -11,7 +11,7 @@ otherwise run under Rosetta, recompiled into a native arm64 app. Released; `VERS
 | [METAL.md](METAL.md) | developers | the renderer: the GL-on-Metal layer, defaults and fallback, shader corpus, safe load, status |
 | [PERFORMANCE.md](PERFORMANCE.md) | both | CPU and frame times against Rosetta, Metal against OpenGL, build options |
 | [PLAN.md](PLAN.md) | developers | status, open issues, next work |
-| [TESTING.md](TESTING.md) | developers | the tests in the repository, installer tests, game runs, diagnostics, offline checks |
+| [TESTING.md](TESTING.md) | developers | the tests in the repository, installer tests, game runs, diagnostics, offline checks, release checks |
 
 The shared recompiler: [docs/recompiler](../recompiler/README.md). The Windows port, for side-by-side
 reading (the same headings where the topics match): [docs/windows](../windows/README.md).

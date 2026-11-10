@@ -12,7 +12,7 @@ Mac port ([PLAN.md](PLAN.md#status)).
 | [DESIGN.md](DESIGN.md) | developers | how the port works: the game image, the multi-image runtime and 4 GB window, the Win32 seam, D3D9 and D3DX, the CRT, audio, Bink, Steam, online, input, the installer |
 | [PERFORMANCE.md](PERFORMANCE.md) | both | frame times, CPU per thread, hot spots, what was changed, options, the Mac port on the same Mac |
 | [PLAN.md](PLAN.md) | developers | status, open issues, next work, risks, decisions |
-| [TESTING.md](TESTING.md) | developers | the tests in the repository, unattended and hand-driven game runs, diagnostics switches |
+| [TESTING.md](TESTING.md) | developers | the tests in the repository, unattended and hand-driven game runs, diagnostics switches, release checks |
 
 Code: [win-x86/README.md](../../win-x86/README.md). The shared recompiler: [docs/recompiler](../recompiler/README.md).
 The Mac port, for side-by-side reading (the same headings where the topics match): [docs/mac](../mac/README.md).

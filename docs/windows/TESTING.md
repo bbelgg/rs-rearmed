@@ -24,6 +24,7 @@ where you point them and never copied into the repository.
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export over 3,000-5,500 inputs each (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
+| Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): what a change calls for, and a release's edits and notes |
 | Tables | `python3 tools/targets/check.py` | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
 | Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, an argument it changes, a result it sets, a call it does itself, game code it calls first; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; `probe_mod.dylib` for the game runs |
 
@@ -598,3 +599,16 @@ libRSOpenGL's `RS_GL_*`, `RS_MTL_*` and `RS_METAL_*` switches apply as on the Ma
 - With a mod in `mods/` the app restarts with `libnetguard.dylib` inserted, and no mod runs without it
   ([Mods](#unattended-runs)); `logs/netguard.log` then lists every refused attempt.
   `tools/ws8/netguard/build.sh --test` tests the guard, as on the Mac.
+
+## Release checks
+
+As on the Mac ([Mac testing](../mac/TESTING.md#release-checks), [Making a release](../release/README.md)):
+`tools/release/scope.py` says which of the suites in [Tests in the repository](#tests-in-the-repository) and which
+game runs a release's changes call for, and `tools/release/check.py` runs the suites. The CRT, D3DX and Bink probes
+and the 32-bit difftest need Microsoft's or the game's DLLs and are not among them: run them by hand for a change
+to what they cover.
+
+Learn & Play's run for a release is `tools/release/smoke.sh --lp`: the first input script of
+[Unattended runs](#unattended-runs) on a test build (`RS_SMOKE_LP_EXE`, with `LP_GAME_DIR`, `LP_USER_DIR` and
+`RS_STEAM_DATA_DIR` as in [Game runs](#game-runs)), a wait once the last key is sent, and a check that the game is
+still up; the last snapshot shows the highway. Not run yet as a script: the input script itself is the verified one.

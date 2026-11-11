@@ -1792,7 +1792,21 @@ class InstallerWindow: NSWindow {
     @objc func gameChanged() {
         // Keep what was typed for the other game.
         if selectedGame == "learnplay" { macGameDir = gameDirField.stringValue } else { lpGameDir = gameDirField.stringValue }
+        // A run that ended was the other game's: its result, its log and what its buttons did (Build Again, Start
+        // the Game) go with it, and the window is as it opens, for the game now chosen.
+        if !runner.isRunning && runner.game != selectedGame {
+            result = nil
+            runner.isFinished = false
+            runner.failed = false
+            runner.failure = nil
+            runner.refreshOnly = false
+            runner.lpStopped = ""
+            runner.progress = 0
+            runner.setGuide("", "", "")
+            runner.game = selectedGame
+        }
         applyGame()
+        updateUI()
     }
 
     private func updateUI() {

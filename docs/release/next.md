@@ -10,3 +10,7 @@ notes and empties this file. -->
   without that drive and macOS doesn't ask whether it may use it. Choosing the other one and clicking Build &
   Install or Refresh Game Files moves the copy. Before, only `RS_GAME_COPY_DIR=home` set with `launchctl` did
   this, and only for a new install. Both editions.
+
+- **The installer forgets a finished run when you choose the other game.** After installing one edition, picking
+  the other in the Game list left the first one's "installed" box, log and buttons in the window until the
+  installer was restarted.

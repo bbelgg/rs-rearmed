@@ -18,7 +18,11 @@ into the notes as it stands. -->
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
   in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- Not tested yet with this release: a run of the installer app itself, a build from scratch, a mod serving files in
+- Not tested yet with this release: the Mac game downloaded by Steam when it isn't installed there (checked with a
+  stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
+  the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game
+  files back to the game's drive, the Game files choice in Learn & Play, a run of the installer app for Learn & Play,
+  a build from scratch, a mod serving files in
   the Mac edition on this code (Learn & Play's was played with 2250 archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac
   edition, an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game
   Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an

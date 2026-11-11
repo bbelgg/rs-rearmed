@@ -233,6 +233,34 @@ nothing for it is in RS Re-ARMed). The game's program in the game folder shows i
 - **Stopped copies** continue on the next run. `game/.rearmed/manifest.json`, written last, marks a copy complete;
   until then the launcher asks for a refresh.
 
+### How the game finds DLC
+
+The game looks in one place only, the `dlc` folder of its own copy (`…/RS Re-ARMed/game/dlc`), when it starts.
+Nothing is downloaded by the game, and Steam's folders are read only when you press ENUMERATE.
+
+1. **What gets into `game/dlc`.** Steam installs your DLC into the Mac game's `dlc` folder. A copy or a refresh
+   takes every `*_m.psarc` there, in subfolders too (a `dlc/cdlc/` of custom songs keeps its place), and nothing
+   else: the PC archives, `*_p.psarc`, stay behind. A file the game folder no longer has is removed from the
+   copy at the next refresh.
+2. **Which archives the game shows.** Each archive carries an AppID, and the game mounts it only when Steam
+   lists that AppID as a DLC of the game and says it is installed. RS Re-ARMed's offline Steam layer answers
+   that from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC Steam installed, and the
+   AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever AppID it
+   carries, with the Steam client closed. `RS_STEAM_DLC=all` (with `launchctl setenv`) counts every AppID as
+   owned.
+3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
+   off in Built-in Mods….
+4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
+   (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
+   came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
+   the account RS Re-ARMed plays as. The answer is kept (`RS_STEAM_OWNED` in `steam.env`), so Steam can be
+   closed afterwards.
+5. **New songs.** While you play, **ENUMERATE** in the main menu takes new archives from the game folder's `dlc`
+   (and finds ones put straight into `game/dlc`) with no restart. DLC bought since, and changed or removed
+   songs, need a refresh.
+
+The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
+
 ### The title logo
 
 The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it

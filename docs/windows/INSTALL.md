@@ -204,6 +204,36 @@ that needs neither the image nor the game folder.
 - **Stopped copies** continue on the next run. `game/.rearmed/manifest.json`, written last, marks a copy
   complete; until then the app asks for a refresh and quits.
 
+### How the game finds DLC
+
+The game looks in one place only, the `dlc` folder of its own copy (`…/RS Re-ARMed/learn-play/game/dlc`), when
+it starts. Nothing is downloaded by the game, and Steam's folders are read only when you press ENUMERATE.
+
+1. **What gets into `game/dlc`.** The Windows game is not installed by Steam here, so nothing installs its DLC:
+   the installer has Steam download each DLC your account owns as a download of its own
+   ([the steps](#the-steps)). A copy or a refresh then takes every `*_p.psarc`, in subfolders too, from those
+   downloads, from the Windows game folder's `dlc`, and from the Mac game's `dlc` folder in each Steam library
+   (Steam puts the PC archives there as well), and nothing else: the Mac archives, `*_m.psarc`, stay behind. A
+   file the sources no longer have is removed from the copy at the next refresh.
+2. **Which archives the game shows.** Each archive carries an AppID, and the game mounts it only when Steam
+   lists that AppID as a DLC of the game and says it is installed. The app's offline Steam layer answers that
+   from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC your account's license
+   lists, and the AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever
+   AppID it carries, with the Steam client closed. `RS_STEAM_DLC=all` counts every AppID as owned
+   ([Settings and switches](#settings-and-switches)).
+3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
+   off in Built-in Mods…, and they must be the PC version, `_p.psarc`.
+4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
+   (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
+   came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
+   the account the app plays as. The answer is kept (`RS_STEAM_OWNED` in `steam.env`), so Steam can be closed
+   afterwards.
+5. **New songs.** While you play, **ENUMERATE** in the main menu takes new archives from the folders the copy is
+   made from (and finds ones put straight into `game/dlc`) with no restart. DLC bought since, and changed or
+   removed songs, need a refresh, which has Steam fetch the new DLC first.
+
+The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
+
 ### The title logo
 
 The build makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it

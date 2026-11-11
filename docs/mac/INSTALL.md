@@ -6,9 +6,11 @@ recompiles the game to C and compiles that into an arm64 app. Nothing it produce
 ## Requirements
 
 - A Mac with Apple Silicon (M1 or later), macOS 12 Monterey or later.
-- The Steam macOS version of **Rocksmith 2014 (Remastered)**, installed through Steam. The installer finds it
-  in any Steam library; by hand, set `RS_GAME_DIR` when it isn't in
-  `~/Library/Application Support/Steam/steamapps/common/Rocksmith2014`.
+- The Steam macOS version of **Rocksmith 2014 (Remastered)**, on your Steam account. It doesn't have to be
+  installed in Steam: the installer finds it in any Steam library, and when it isn't installed it has Steam
+  download it, as it does for [Learn & Play](../windows/INSTALL.md#the-steps); then you need **Steam** itself
+  on the Mac, signed in with that account. By hand, set `RS_GAME_DIR` when the game is somewhere else
+  ([The game image](#3-the-game-image)).
 - A Real Tone cable, or another audio input the game accepts. macOS asks for microphone access the first
   time the game listens for your guitar ([What macOS will ask](#what-macos-will-ask)).
 - Apple's command line tools, with their `python3`. The installer starts their installation when they are
@@ -21,6 +23,8 @@ recompiles the game to C and compiles that into an arm64 app. Nothing it produce
 - Room for RS Re-ARMed's own copy of the game files ([Game files](#game-files)): none extra when the game
   is on an APFS volume (the startup disk, or an external drive: the copy then goes onto that drive), else
   about 6.5 GB plus the DLC on the startup disk.
+- For a game that isn't installed in Steam: about 7 GB for Steam's download of it, plus your DLC (16 MB each on
+  average). The installer checks first, and offers a folder on another disk.
 
 ### What macOS will ask
 
@@ -58,19 +62,25 @@ ends the run; what is done is kept, and Build & Install goes on from there.
 1. **Checking Apple's tools.** If Apple's command line tools are missing, macOS's own window for them opens (it
    may be behind the installer): click Install, then Agree. It takes a few minutes. If you have Xcode and it
    isn't set up, it opens: click Agree and Install, with your Mac's password.
-2. **Downloading source**, then **Checking prerequisites**, which finds your game folder in any Steam library. If
-   the game isn't installed, the installer leads you there box by box, as for
-   [Learn & Play](../windows/INSTALL.md#the-steps): install Steam, sign in with the account that owns the game,
-   click Install in Steam's window, wait. If Steam says the game isn't available for Mac, your account has
-   Learn & Play: click Stop and choose it under Game.
-3. **Setting up Python environment**, then **Decrypting the game**, a few seconds: the game's code is read from
-   the Steam copy on disk, which doesn't change. The game isn't started, and it doesn't matter which account
-   Steam is signed in with. If it isn't the build RS Re-ARMed is made for, it says so; Verify integrity in Steam
-   usually mends that.
-4. **Building shims**, **Building the app** and **Packaging**, about 15 minutes in all, then **Preparing shaders**.
-
-Your DLC needs no step of its own: Steam installs it with the game, and the copy takes it from the game's `dlc`
-folder ([Learn & Play](../windows/INSTALL.md#the-steps) has a step for it).
+2. **Downloading source** and **Checking prerequisites**, then **Finding the Mac game**: in any Steam library,
+   where nothing more happens. If the game isn't installed in Steam, the installer has Steam download it, with
+   your own account, into Steam's download folder, without installing it, as for
+   [Learn & Play](../windows/INSTALL.md#the-steps): it opens Steam if it isn't open and tells it what to
+   download. Steam's window doesn't show this download; the progress is in the installer. The boxes that can
+   come up are the same ones (Install Steam, Sign in to Steam, the download stopped), with one of its own:
+   **This Steam account doesn't have the Mac game**. If that account has the Windows edition, click Stop and
+   choose Learn & Play under Game; otherwise change to the account that owns the game. If there isn't room on
+   the startup disk, it asks for a folder on another disk. A game Steam is installing or updating just then is
+   waited for instead.
+3. **Downloading your DLC**: nothing for a game installed in Steam, which installs your DLC with the game. For
+   a game from Steam's download, each DLC is a Steam download of its own: the installer reads which DLC your
+   Steam account owns and has Steam fetch them one after another ("12 of 73"). If it is stopped, the next run
+   continues. One that fails doesn't stop the install: the box at the end names it, and Refresh Game Files tries
+   again.
+4. **Setting up Python environment**, then **Decrypting the game**, a few seconds: the game's code is read from
+   the Steam copy on disk, which doesn't change. The game isn't started. If it isn't the build RS Re-ARMed is
+   made for, it says so; Verify integrity in Steam usually mends that for an installed game.
+5. **Building shims**, **Building the app** and **Packaging**, about 15 minutes in all, then **Preparing shaders**.
 
 - **Renderer** chooses how the game draws: **Metal (recommended)** or **OpenGL** (see
   [Renderer](#renderer)). It starts on the renderer your install uses (OpenGL after a fallback), else on
@@ -81,9 +91,10 @@ folder ([Learn & Play](../windows/INSTALL.md#the-steps) has a step for it).
   `rs-rearmed-build` folder inside the one you pick and remembers it). Its path must not contain spaces.
   **Delete build files after install** removes them when it is done. For a folder on an external drive,
   macOS asks once whether the installer may use it.
-- **Rocksmith 2014 game folder** starts on the folder your install's game files come from, else Steam's
-  default library. **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy with it:
-  after new DLC or custom songs, or a Steam update ([Game files](#game-files)).
+- **Mac game folder** stays empty for the game in Steam (installed in a library, else Steam's download);
+  choose a folder only for a game that is somewhere else, and it shows the folder you chose for the install
+  you have. **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy with the game
+  folder: after new DLC or custom songs, or a Steam update ([Game files](#game-files)).
 - **Game files** matters only when the game is on another drive than your home folder: **On the game's drive**
   keeps RS Re-ARMed's copy there, with no extra space, and the game needs that drive connected; **On this Mac**
   makes a full copy in your home folder, and the game plays without the drive. It shows where the copy is now.
@@ -127,6 +138,16 @@ export PATH="$PWD/build/venv/bin:$PATH"     # the venv's cmake and ninja for ste
 
 ### 3. The game image
 
+The game folder is `RS_GAME_DIR`, by default the game installed in Steam's own library
+(`~/Library/Application Support/Steam/steamapps/common/Rocksmith2014`). When the game isn't installed in Steam,
+`gamefiles.py mac-game` finds it in another Steam library, or has the running Steam download it into its download
+folder (it says what to do in Steam, if anything, and prints the folder last; `mac-game-space` and
+`mac-game-redirect DIR` are the room check and the folder on another disk):
+
+```bash
+export RS_GAME_DIR="$(python3 tools/play-native/gamefiles.py mac-game | sed -n 's/^game-folder //p')"
+```
+
 `tools/steamless` makes the decrypted image from your Steam copy in a few seconds, without running or changing it:
 
 ```bash
@@ -165,7 +186,7 @@ Variables the build reads:
 | `RC_IMAGE` | `build/steamless/Rocksmith2014_x64_decrypted` | the game image (step 3) |
 | `RC_TARGET` | `mac-x64` | the per-game tables in `tools/targets/<target>` |
 | `RC_PY` | `venv/bin/python` in `RS_BUILD_DIR` | Python with Capstone (step 2) |
-| `RS_GAME_DIR` | the default Steam library | the game folder; the app's icon is copied from it |
+| `RS_GAME_DIR` | the default Steam library, else Steam's download of the game | the game folder; the app's icon is copied from it |
 | `SHIM_STEAM`, `SHIM_BINK`, `SHIM_CG` | the builds from step 4 | other arm64 builds of those shims |
 | `SHIMS_BUILD` | `build/shims/game` | where the game libraries from step 4 are |
 | `RC_OPT` | `-O2` | optimisation level of the generated C |
@@ -194,6 +215,10 @@ the path you pass) and the network guard in `~/Library/Application Support/RS Re
 later installs; `RS_WARM_SHADERS=0` skips it, `tools/play-native/warm-shaders.sh` does it later). Quit the game
 first. Always start the game through the launcher: opening `Rocksmith2014.app` directly doesn't work.
 
+With a game from Steam's download (`RS_GAME_DIR` is its folder, or unset with the game not installed in Steam),
+it first has Steam download the DLC your signed-in account owns, as the installer does (`gamefiles.py dlc-fetch`;
+`RS_DLC_FETCH=0` skips it).
+
 `RS_RENDERER=metal` or `opengl` chooses the renderer (default: the one the install has, else Metal).
 `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.
 
@@ -205,6 +230,20 @@ folders, `metadata`, `Rocksmith.ini`, and from `dlc/` the Mac archives, `*_m.psa
 DLC, the language and the account the game plays as in `game/.rearmed/steam.env`: the account whose license has
 the Mac game, whichever is logged in later. To choose it yourself, set `RS_STEAM_ID` (a SteamID64 or the number in
 `Steam/userdata/<number>`) when you refresh, or with `launchctl setenv` for the launcher.
+
+**A game from Steam's download** (not installed in Steam) is copied the same way, with what Steam's install would
+have brought coming from elsewhere:
+
+| | Installed in Steam | From Steam's download |
+|---|---|---|
+| DLC | the game's `dlc` folder, where Steam installs it | the DLC downloads in Steam's download folder (each has the Mac and the PC archive), fetched by the install and by each refresh |
+| Custom songs | the game's `dlc` folder | the `dlc` folder of `steamapps/common/Rocksmith2014` in a Steam library (make it if it isn't there) |
+| The DLC you own | Steam's appmanifest | your account's ownership ticket in Steam's folder, and the AppIDs the archives carry |
+| The account | the license with the Mac game | the same |
+| The language | Steam's appmanifest | English, as for Learn & Play, unless `RS_STEAM_LANGUAGE` says otherwise (`launchctl setenv RS_STEAM_LANGUAGE german`) |
+| Saves | copied in once from `Steam/userdata/<number>/221680/remote` | the same, when the game has run through Steam on this Mac before; otherwise the game starts with a new profile |
+
+Steam may clear its download folder later: the copy is what the game reads, and a refresh then only adds DLC.
 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
 (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed: it adds DIRECT CONNECT
@@ -229,7 +268,9 @@ nothing for it is in RS Re-ARMed). The game's program in the game folder shows i
   the copy where it is.
 - **Refresh** after new DLC or custom songs, or a Steam update: **Refresh Game Files**, or
   `tools/play-native/install.sh --refresh-game`. It copies new and changed files, removes what the game folder no
-  longer has, and touches nothing else. If the game folder is gone it changes nothing and says so.
+  longer has, and touches nothing else. If the game folder is gone it changes nothing and says so. For a game
+  from Steam's download it first has Steam fetch the DLC bought since (Steam open and signed in; otherwise it
+  says so and goes on).
 - **Stopped copies** continue on the next run. `game/.rearmed/manifest.json`, written last, marks a copy complete;
   until then the launcher asks for a refresh.
 
@@ -238,13 +279,15 @@ nothing for it is in RS Re-ARMed). The game's program in the game folder shows i
 The game looks in one place only, the `dlc` folder of its own copy (`…/RS Re-ARMed/game/dlc`), when it starts.
 Nothing is downloaded by the game, and Steam's folders are read only when you press ENUMERATE.
 
-1. **What gets into `game/dlc`.** Steam installs your DLC into the Mac game's `dlc` folder. A copy or a refresh
-   takes every `*_m.psarc` there, in subfolders too (a `dlc/cdlc/` of custom songs keeps its place), and nothing
+1. **What gets into `game/dlc`.** Steam installs your DLC into the Mac game's `dlc` folder; for a game that
+   isn't installed in Steam, the installer has Steam download each DLC your account owns as a download of its own
+   ([the steps](#the-steps)). A copy or a refresh takes every `*_m.psarc` there, in subfolders too (a `dlc/cdlc/` of custom songs keeps its place), and nothing
    else: the PC archives, `*_p.psarc`, stay behind. A file the game folder no longer has is removed from the
    copy at the next refresh.
 2. **Which archives the game shows.** Each archive carries an AppID, and the game mounts it only when Steam
    lists that AppID as a DLC of the game and says it is installed. RS Re-ARMed's offline Steam layer answers
-   that from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC Steam installed, and the
+   that from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC Steam installed (for a
+   game from Steam's download, the DLC your account's license lists), and the
    AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever AppID it
    carries, with the Steam client closed. `RS_STEAM_DLC=all` (with `launchctl setenv`) counts every AppID as
    owned.

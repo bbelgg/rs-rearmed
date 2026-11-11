@@ -123,10 +123,7 @@ DLLS = [
 ]
 
 
-class Failure(Exception):
-    def __init__(self, msg, code=1):
-        Exception.__init__(self, msg)
-        self.code = code
+Failure = gamefiles.Failure  # (msg, code=1): code is the exit status
 
 
 def load_config(path=None):
@@ -408,80 +405,51 @@ class Redist:
 
 # --- the game ----------------------------------------------------------------------------------------------
 
-# The native (arm64) Steam client keeps its own steamapps inside its bundle, and download_depot writes there;
-# older clients wrote to <Steam>/steamapps/content.
-APP_BUNDLE = os.path.join("Steam.AppBundle", "Steam", "Contents", "MacOS")
+# Getting a game from Steam's console (the download folder, the command, the room, the link to another disk, Steam's
+# log, the wait) is gamefiles.py's, shared with the Mac game: here are Learn & Play's figures (target.toml) and
+# words for it, and what only its build adds (the room for the build and its swap).
+APP_BUNDLE = gamefiles.BUNDLE_MACOS
+content_dirs = gamefiles.steam_content_dirs
+download_content_dir = gamefiles.download_content_dir
+folder_bytes = gamefiles.folder_bytes
+free_bytes = gamefiles.free_bytes
+describe_space = gamefiles.describe_space
+startup_folder = gamefiles.startup_folder
+on_startup_disk = gamefiles.on_startup_disk
+existing = gamefiles.existing
+Located = gamefiles.Located
+SteamLog = gamefiles.SteamLog
+download_running = gamefiles.download_running
+LABEL = "Downloading the Windows game"
+TARGET = os.path.join("tools", "targets", "win-x86", "target.toml")
 
 
-def content_dirs(steam):
-    return [os.path.join(steam, APP_BUNDLE, "steamapps", "content"), os.path.join(steam, "steamapps", "content")]
-
-
-def download_content_dir(steam):
-    """The content folder the next download_depot writes to."""
-    return content_dirs(steam)[0 if os.path.isdir(os.path.join(steam, APP_BUNDLE)) else 1]
+def depot_of(cfg):
+    """Learn & Play's depot as gamefiles.py downloads and checks it."""
+    return gamefiles.Depot(cfg, lambda folder: find_exe(cfg, folder), "the Windows game", LABEL, gamefiles.GAME_LP,
+                           TARGET)
 
 
 def depot_dirs(cfg, steam):
-    sub = os.path.join("app_%d" % cfg["steam_app"], "depot_%d" % cfg["steam_depot"])
-    return [os.path.join(c, sub) for c in content_dirs(steam)]
+    return depot_of(cfg).dirs(steam)
 
 
 def depot_dir(cfg, steam):
     """The depot folder: the one that exists, else where the next download goes."""
-    for d in depot_dirs(cfg, steam):
-        if os.path.isdir(d):
-            return d
-    return os.path.join(download_content_dir(steam), "app_%d" % cfg["steam_app"], "depot_%d" % cfg["steam_depot"])
+    return depot_of(cfg).dir(steam)
 
 
 def locate_default(cfg, steam):
-    """locate() over every depot folder Steam may have used: the supported build if one has it. An exe of either
-    kind while Steam's log shows a download of the depot that has not finished is "unfinished": Steam makes
-    every file at its full size first, so an unfinished exe has the right size and the wrong contents, and a
-    finished exe says nothing about the files still being filled."""
-    found = [locate(cfg, d) for d in depot_dirs(cfg, steam)]
-    rank = {"ok": 0, "different": 1, "incomplete": 2, "missing": 3}
-    best = min(found, key=lambda loc: rank[loc.status])
-    if best.status == "missing":
-        return locate(cfg, depot_dir(cfg, steam))
-    if best.status in ("ok", "different") and (download_unfinished(steam, cfg["steam_depot"])
-                                               or (best.status == "ok" and depot_short(cfg, best.folder))):
-        best.status = "unfinished"
-    return best
-
-
-def depot_short(cfg, folder):
-    """A depot folder holds less than the whole depot: a finished one has every byte of depot_disk_bytes on
-    disk (checked on both clean downloads), and Steam makes the files at full size long before they are filled,
-    so a good exe says nothing about the rest. Half a percent of room for other file systems."""
-    return folder_bytes(folder)[0] < cfg.get("depot_disk_bytes", 0) * 0.995
-
-
-def download_unfinished(steam, depot):
-    """Steam's logs show a download of depot that started after the last one finished."""
-    log = SteamLog(steam, depot, from_start=True).poll()
-    return log.started and not log.complete
-
-
-def free_bytes(path):
-    while path and not os.path.exists(path):
-        path = os.path.dirname(path)
-    st = os.statvfs(path or "/")
-    return st.f_bavail * st.f_frsize
+    """locate() over every depot folder Steam may have used (gamefiles.Depot.locate_default)."""
+    return depot_of(cfg).locate_default(steam)
 
 
 def space(cfg, steam, build_dir=None):
     """(free, need, folder): free space where the download goes, and what it needs (the depot's size on disk
     and a margin, less what is already there; with build_dir, also the build, when that is on the same disk). A
     link to a drive that is not connected has no room."""
-    content = download_content_dir(steam)
-    target = os.path.realpath(content)
-    depot = os.path.join(content, "app_%d" % cfg["steam_app"], "depot_%d" % cfg["steam_depot"])
-    have = folder_bytes(depot)[0] if os.path.isdir(depot) else 0
-    need = max(cfg["depot_disk_bytes"] - have, 0) + cfg["disk_margin_bytes"]
-    need += dlc_room(cfg, steam)
-    if os.path.islink(content) and not os.path.isdir(content):
+    need, target, there = depot_of(cfg).room(steam)
+    if not there:
         return 0, need, target
     if build_dir and same_disk(target, build_dir):
         need += build_left(cfg, build_dir)
@@ -508,16 +476,6 @@ def swap_room(cfg):
     return max(cfg.get("build_peak_memory_bytes", 0) - memory_bytes(), 0)
 
 
-def startup_folder():
-    return "/System/Volumes/Data" if os.path.isdir("/System/Volumes/Data") else "/"
-
-
-def on_startup_disk(path):
-    """On the startup disk: macOS's system volume and the data volume are two devices of it."""
-    dev = os.stat(existing(path)).st_dev
-    return dev in (os.stat("/").st_dev, os.stat(startup_folder()).st_dev)
-
-
 def startup_space(cfg, build_dir):
     """(free, need, words): the room the build wants on the startup disk, the download apart."""
     swap = swap_room(cfg)
@@ -532,83 +490,28 @@ def startup_space(cfg, build_dir):
 
 
 def dlc_room(cfg, steam):
-    """Room for the DLC still to come: what is owned at the average size, when the signed-in account's ticket is on
-    disk, else all of it as a Mac library holds it."""
-    account = gamefiles.steam_connection(steam)[1]
-    owned = gamefiles.account_dlc(steam, account) if account else None
-    if owned is None:
-        return cfg.get("dlc_disk_bytes", 0)
-    return min(len(owned) * cfg.get("dlc_average_bytes", 0), cfg.get("dlc_disk_bytes", 0))
-
-
-def existing(path):
-    while path and not os.path.exists(path):
-        path = os.path.dirname(path)
-    return path or "/"
+    """Room for the DLC still to come (gamefiles.dlc_room)."""
+    return gamefiles.dlc_room(steam, cfg.get("dlc_disk_bytes", 0), cfg.get("dlc_average_bytes", 0))
 
 
 def same_disk(a, b):
     return os.stat(existing(a)).st_dev == os.stat(existing(b)).st_dev
 
 
-def describe_space(free, need, where):
-    if not free and not os.path.isdir(where):
-        return "Steam's download folder is %s, on a drive that isn't connected." % where
-    return "%s free in %s; about %s is needed%s" % (human(free), where, human(need), "" if free >= need else ": not enough")
-
-
-def download_note():
-    return os.path.join(lp_build.default_home(), "download-dir")
+def download_notes():
+    """Where game-redirect's folder is remembered: this edition's note, then the Mac edition's."""
+    return [os.path.join(lp_build.default_home(), gamefiles.DOWNLOAD_NOTE),
+            os.path.join(os.path.dirname(lp_build.default_home()), gamefiles.DOWNLOAD_NOTE)]
 
 
 def redirect(steam, folder):
-    """Make Steam's content folder a link to folder (Steam follows it), so the download goes to another disk.
-    What is in a real content folder moves to folder (a stopped download continues there)."""
-    content = download_content_dir(steam)
-    folder = os.path.abspath(os.path.expanduser(folder))
-    if os.path.ismount(folder):  # a whole disk was chosen: not all over its top folder
-        folder = os.path.join(folder, gamefiles.FOLDER, "steam-content")
-    os.makedirs(folder, exist_ok=True)
-    if os.path.islink(content):
-        if os.path.realpath(content) == os.path.realpath(folder):
-            remember_download(folder)
-            return content
-        os.remove(content)
-    elif os.path.isdir(content):
-        left = [f for f in os.listdir(content) if f != ".DS_Store"]
-        clash = [f for f in left if os.path.exists(os.path.join(folder, f))]
-        if clash:
-            raise Failure("%s and %s both hold %s: move or delete one of them, then run this again"
-                          % (content, folder, ", ".join(sorted(clash))))
-        for f in left:
-            shutil.move(os.path.join(content, f), os.path.join(folder, f))
-        shutil.rmtree(content)
-    os.makedirs(os.path.dirname(content), exist_ok=True)
-    os.symlink(folder, content)
-    remember_download(folder)
-    return content
-
-
-def remember_download(folder):
-    os.makedirs(os.path.dirname(download_note()), exist_ok=True)
-    with open(download_note(), "w") as f:
-        f.write(folder + "\n")
+    """Make Steam's content folder a link to folder, so the download goes to another disk (gamefiles.redirect)."""
+    return gamefiles.redirect(steam, folder, download_notes()[0])
 
 
 def restore_redirect(steam):
-    """A Steam update can drop the link game-redirect made, with the download still on the other disk: link it
-    again, when that folder is there and Steam has not started a new content folder of its own."""
-    try:
-        with open(download_note()) as f:
-            folder = f.read().strip()
-    except OSError:
-        return
-    content = download_content_dir(steam)
-    if not folder or not os.path.isdir(folder) or os.path.isdir(content):
-        return
-    if os.path.islink(content):  # a link to nowhere: the folder it led to is not the one noted
-        os.remove(content)
-    redirect(steam, folder)
+    """A Steam update can drop the link game-redirect made: link it again (gamefiles.restore_redirect)."""
+    gamefiles.restore_redirect(steam, download_notes())
 
 
 def find_exe(cfg, folder):
@@ -634,47 +537,17 @@ def find_exe(cfg, folder):
     return None
 
 
-class Located:
-    """status: "ok" (the pinned build), "missing" (no exe), "incomplete" (smaller than the pinned exe, as
-    while Steam writes it) or "different" (another build)."""
-
-    def __init__(self, status, folder, exe=None, size=0, sha=""):
-        self.status, self.folder, self.exe, self.size, self.sha = status, folder, exe, size, sha
-
-
-def locate(cfg, folder, _cache={}):
-    exe = find_exe(cfg, folder)
-    if not exe:
-        return Located("missing", folder)
-    st = os.stat(exe)
-    game = os.path.dirname(exe)
-    if st.st_size < cfg["exe_size"]:
-        return Located("incomplete", game, exe, st.st_size)
-    key = (exe, st.st_size, st.st_mtime_ns)
-    if key not in _cache:
-        _cache[key] = sha256(exe)
-    sha = _cache[key]
-    return Located("ok" if sha == cfg["exe_sha256"] else "different", game, exe, st.st_size, sha)
+def locate(cfg, folder):
+    """The game in folder, checked against the pinned build: a gamefiles.Located."""
+    return depot_of(cfg).locate(folder)
 
 
 def describe(cfg, loc):
-    if loc.status == "ok":
-        return "Found the Windows game in %s (the supported build)." % loc.folder
-    if loc.status == "missing":
-        return "No %s in %s." % (cfg["exe_name"], loc.folder)
-    if loc.status == "unfinished":
-        return ("Steam's download of the game into %s has not finished (Steam may have quit); start the download "
-                "again to continue it." % loc.folder)
-    if loc.status == "incomplete":
-        return "%s in %s is incomplete (%s of %s)." % (cfg["exe_name"], loc.folder, human(loc.size), human(cfg["exe_size"]))
-    return ("%s in %s is a different build of the game from the one RS Re-ARMed supports, so it cannot be used "
-            "(found: SHA-256 %s, %d bytes; supported: %s, %d bytes)."
-            % (cfg["exe_name"], loc.folder, loc.sha, loc.size, cfg["exe_sha256"], cfg["exe_size"]))
+    return depot_of(cfg).describe(loc)
 
 
 def game_command(cfg):
-    cmd = "download_depot %d %d" % (cfg["steam_app"], cfg["steam_depot"])
-    return cmd + (" " + cfg["depot_manifest"] if cfg.get("depot_manifest") else "")
+    return depot_of(cfg).command()
 
 
 HARVEST_SRC = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "harvest")
@@ -804,302 +677,20 @@ def harvest_export(dest, progress=None, rebuild=False):
     return dest, rebuilt
 
 
-def folder_bytes(folder):
-    """Bytes written under folder (a file's allocated blocks when smaller than its size: Steam makes files at
-    their full size before it fills them), the file count, and a stamp that changes whenever Steam writes."""
-    total = n = stamp = 0
-    for d, _, files in os.walk(folder):
-        for f in files:
-            try:
-                st = os.lstat(os.path.join(d, f))
-            except OSError:
-                continue
-            blocks = getattr(st, "st_blocks", None)
-            total += min(st.st_size, blocks * 512) if blocks is not None else st.st_size
-            stamp = max(stamp, st.st_mtime_ns)
-            n += 1
-    return total, n, (total, n, stamp)
+class DepotDownload(gamefiles.DepotDownload):
+    """gamefiles.DepotDownload for Learn & Play's depot: the room counted with the build's (space)."""
 
-
-UNITS = {"b": 1, "bytes": 1, "kb": 1 << 10, "mb": 1 << 20, "gb": 1 << 30}
-RATE_UNITS = {"bps": 1 / 8, "kbps": 1e3 / 8, "mbps": 1e6 / 8, "gbps": 1e9 / 8,
-              "b/s": 1, "kb/s": 1 << 10, "mb/s": 1 << 20, "gb/s": 1 << 30}
-STAMP = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d) (\d\d):(\d\d):(\d\d)\]")
-
-
-class SteamLog:
-    """What the Steam client logs about one depot download from now on (content_log.txt, console_log.txt):
-    the download size, the bytes downloaded (from the download rate it logs), the end and the manifest, or
-    a failure."""
-
-    FILES = ("content_log.txt", "console_log.txt")
-
-    def __init__(self, steam, depot, from_start=False):
-        # from_start: the whole log, the one before Steam last started first
-        files = [f.replace(".txt", ".previous.txt") for f in self.FILES] + list(self.FILES) if from_start else self.FILES
-        self.paths = [os.path.join(d, "logs", f) for d in (steam, os.path.join(steam, APP_BUNDLE)) for f in files]
-        self.depot = str(depot)
-        self.pos = {p: 0 if from_start else self._size(p) for p in self.paths}
-        self.started = False
-        self.expected = 0      # bytes to download
-        self.files = 0
-        self.downloaded = 0.0  # estimated from the logged rate
-        self.rate = 0.0        # bytes/s
-        self.rate_at = None
-        self.complete = None   # (files or 0, manifest or "")
-        self.failed = None
-
-    @staticmethod
-    def _size(p):
-        try:
-            return os.path.getsize(p)
-        except OSError:
-            return 0
-
-    def poll(self):
-        for p in self.paths:
-            size = self._size(p)
-            if size < self.pos[p]:  # Steam started again: a new log
-                self.pos[p] = 0
-            if size == self.pos[p]:
-                continue
-            with open(p, "rb") as fh:
-                fh.seek(self.pos[p])
-                data = fh.read(size - self.pos[p])
-            end = data.rfind(b"\n") + 1  # complete lines only
-            self.pos[p] += end
-            for line in data[:end].decode("utf-8", "replace").splitlines():
-                self.line(line)
-        return self
-
-    def line(self, line):
-        d = self.depot
-        ours = re.search(r"(depot[ _]?%s\b|\b%s\b)" % (d, d), line, re.I)
-        m = re.search(r"Downloading depot %s\b[^(]*\((?:\s*(\d+)\s+files?,)?\s*([\d.,]+)\s*(bytes|b|kb|mb|gb)\s*\)"
-                      % d, line, re.I)
-        if m:
-            self.started, self.complete = True, None
-            self.files = int(m.group(1) or 0)
-            self.expected = int(float(m.group(2).replace(",", "")) * UNITS[m.group(3).lower()])
-            self.downloaded, self.rate_at = 0.0, None
-        m = re.search(r"Current download rate\D*?([\d.]+)\s*([kmg]?b(?:ps|/s))", line, re.I)
-        if m and self.expected and not self.complete:
-            t = STAMP.match(line)
-            t = time.mktime(tuple(int(x) for x in t.groups()) + (0, 0, -1)) if t else time.time()
-            if self.rate_at is not None and t > self.rate_at:
-                self.downloaded = min(self.downloaded + self.rate * (t - self.rate_at), float(self.expected))
-            self.rate = float(m.group(1)) * RATE_UNITS[m.group(2).lower()]
-            self.rate_at = t
-        if re.search(r"depot download complete", line, re.I) and ours:
-            files = re.search(r"(\d+)\s+files?", line)
-            manifest = re.search(r"manifest\s+(\d+)", line, re.I)
-            self.complete = (int(files.group(1)) if files else 0, manifest.group(1) if manifest else "")
-        # "Depot download failed : missing license for depot (No subscription)": Steam's line names no depot
-        if re.search(r"depot download failed", line, re.I) or \
-                (re.search(r"no subscription|missing license|access denied", line, re.I)
-                 and (ours or "depot" not in line.lower())):
-            self.failed = STAMP.sub("", line).strip()
-
-
-def download_running(steam, depot):
-    """Steam, since it last started, began a download of depot that has neither finished nor failed."""
-    for d in (steam, os.path.join(steam, APP_BUNDLE)):
-        try:
-            with open(os.path.join(d, "logs", "console_log.txt"), "rb") as f:
-                f.seek(0, os.SEEK_END)
-                f.seek(max(f.tell() - (2 << 20), 0))
-                text = f.read().decode("utf-8", "replace")
-        except OSError:
-            continue
-        text = text[text.rfind("Console Log Start"):] if "Console Log Start" in text else text
-        last = None
-        for last in re.finditer(r"Downloading depot (\d+)|Depot download (?:complete|failed)", text):
-            pass
-        if last and last.group(1) == str(depot):
-            return True
-    return False
-
-
-class DepotDownload:
-    """Gets the download going with nothing for the user to paste, and says what, if anything, they have to
-    do. wait() calls tick() on every round; failed() takes Steam's failure line. The running Steam takes the
-    console command on its command line, so the only steps left to the user are the ones only they can do:
-    installing Steam and signing in. A second command for a download that runs makes Steam fetch every chunk
-    twice (it ends well, but with thousands of assertions in its log), so one goes out only when none runs."""
-
-    PASTE_AFTER = 30.0   # Steam hasn't reacted to the command by then: the console and the clipboard
-    ADOPT = 60.0         # a download Steam says is running, from an earlier run: how long it may be silent
-    STALLED = 180.0      # nothing written for this long: say so
-    RESEND = 600.0       # and for this long: send the command again (Steam may have dropped it)
-    RETRY_AFTER = 30.0   # after a failure of Steam's
-    RETRIES = 3
-
-    def __init__(self, cfg, steam, guide, gate=None, send=None, paste=None, clock=time.monotonic,
-                 running=download_running):
-        self.cfg, self.steam, self.guide, self.clock = cfg, steam, guide, clock
-        self.gate = gate or gamefiles.SteamGate(steam, gamefiles.GAME_LP, guide, clock=clock)
-        self.command = game_command(cfg)
-        self.send = send or (lambda: gamefiles.steam_command(steam, *self.command.split()))
-        self.paste = paste or self.open_console
-        self.running = running
-        self.sent = self.pasting = self.adopted = self.retry = self.looked = False
-        self.sent_at = 0.0
-        self.bad_account = None
-        self.fails = 0
-        self.retry_at = None
-
-    def open_console(self):
-        subprocess.run(["/usr/bin/pbcopy"], input=self.command.encode(), check=False)
-        gamefiles.steam_open("steam://open/console")
-
-    def try_again(self, *_):
-        self.retry = True
-
-    def reset(self, log):
-        self.sent = self.pasting = self.adopted = False
-        log.started, log.complete, log.failed, log.expected = False, None, None, 0
-
-    def tick(self, log, idle):
-        now = self.clock()
-        if not self.gate.ready():
-            if self.sent and not self.gate.st.running:
-                self.reset(log)  # Steam quit, and its download with it
-            return
-        st = self.gate.st
-        if self.bad_account is not None:
-            if st.account == self.bad_account:
-                self.guide("wrong-account", name=st.name, game=gamefiles.GAME_LP)
-                return
-            self.bad_account = None  # another account is signed in now: it may have the game
-            self.reset(log)
-        if self.retry:
-            self.retry = False
-            if self.pasting:
-                self.paste()
-            else:
-                self.retry_at = None
-                self.fails = 0
-                self.reset(log)
-        if self.retry_at is not None and now < self.retry_at:
-            return
-        self.retry_at = None
-        if not self.sent:
-            self.start(log, now)
-        elif self.adopted and idle >= self.ADOPT:
-            self.reset(log)  # nothing is happening after all
-        elif log.started:
-            quiet = min(idle, now - self.sent_at)
-            if quiet >= self.RESEND:
-                self.reset(log)
-            else:
-                self.guide("download-stalled" if quiet >= self.STALLED else "downloading")
-        elif not self.pasting and now - self.sent_at >= self.PASTE_AFTER:
-            self.pasting = True
-            self.paste()
-            self.guide("paste", command=self.command)
-
-    def start(self, log, now):
-        self.sent, self.sent_at = True, now
-        if not self.looked and self.running(self.steam, self.cfg["steam_depot"]):
-            self.looked = self.adopted = log.started = True
-            self.guide("downloading")
-            return
-        self.looked = True
-        free, need, where = space(self.cfg, self.steam)
-        if free < need:
-            raise Failure(describe_space(free, need, where), 4)
-        self.send()
-        self.guide("downloading")
-
-    def failed(self, line):
-        """Steam said the download failed: True when that is handled here, False to give up."""
-        log_line = re.sub(r"^.*?failed\s*:\s*", "", line, flags=re.I)
-        if re.search(r"missing license|no subscription|missing app info", line, re.I):
-            self.bad_account = self.gate.st.account if self.gate.st else 0
-            self.sent = False
-            return True
-        self.fails += 1
-        if self.fails > self.RETRIES:
-            return False
-        self.guide("download-failed", why=log_line)
-        self.retry_at = self.clock() + self.RETRY_AFTER
-        self.sent = False
-        return True
+    def __init__(self, cfg, steam, guide, **kw):
+        kw.setdefault("space", lambda: space(cfg, steam))
+        gamefiles.DepotDownload.__init__(self, depot_of(cfg), steam, guide, **kw)
+        self.cfg = cfg
 
 
 def wait(cfg, folder, steam, progress, timeout=0, interval=2.0, settle=90.0, clock=time.monotonic, sleep=time.sleep,
          driver=None):
-    """Wait until the depot download has finished and the exe checks out (folder: the depot folder, default
-    whichever of Steam's depot folders appears). driver (a DepotDownload) starts the download and looks after it;
-    without one the user has started it. Returns Located."""
-    log = SteamLog(steam, cfg["steam_depot"])
-    label = "Downloading the Windows game"
-    start = clock()
-    last_change, last_seen = start, None
-    last_have, last_at, speed = 0, start, 0.0
-    said_waiting = False
-    while True:
-        log.poll()
-        here = folder or depot_dir(cfg, steam)
-        have, nfiles, stamp = folder_bytes(here) if os.path.isdir(here) else (0, 0, None)
-        if stamp != last_seen:
-            last_seen, last_change = stamp, clock()
-        if driver:
-            driver.tick(log, clock() - last_change)
-        if clock() - last_at >= 5 * interval:
-            speed = 0.6 * speed + 0.4 * max(have - last_have, 0) / (clock() - last_at)
-            last_have, last_at = have, clock()
-        if log.expected:
-            # How far it is: the bytes on disk, or the rate Steam logs once a minute, whichever says more
-            part = log.downloaded / log.expected
-            if cfg.get("depot_disk_bytes"):
-                part = min(max(part, have / cfg["depot_disk_bytes"]), 1.0)
-            done = part * log.expected
-            rate = " (%.1f MB/s)" % (log.rate / (1 << 20)) if log.rate else ""
-            if speed > 1 << 16:
-                rate = " (%.1f MB/s, about %d min left)" % (speed / (1 << 20), (1 - part) * cfg["depot_disk_bytes"]
-                                                            / speed / 60 + 1)
-            progress(part * 0.99, "%s… %s of %s%s" % (label, human(done), human(log.expected), rate))
-        elif have and cfg.get("depot_disk_bytes"):
-            progress(have / cfg["depot_disk_bytes"] * 0.99,
-                     "%s… about %s of %s" % (label, human(have), human(cfg["depot_disk_bytes"])))
-        elif have:
-            progress(0, "%s… %s so far" % (label, human(have)))
-        elif not said_waiting:
-            progress(0, "%s… waiting for Steam to start" % label)
-            said_waiting = True
-        if log.failed:
-            if not driver or not driver.failed(log.failed):
-                raise Failure("Steam says the download failed: %s" % log.failed)
-            log.failed = None
-        loc = locate(cfg, here)
-        if log.complete:
-            files, manifest = log.complete
-            what = ", ".join(x for x in ("%d files" % files if files else "",
-                                         "manifest %s" % manifest if manifest else "") if x)
-            progress.say("Steam finished the download%s." % (" (%s)" % what if what else ""))
-            if loc.status == "ok" and manifest and manifest != cfg.get("depot_manifest"):
-                progress.say("Manifest %s holds the supported build (depot_manifest in tools/targets/win-x86/target.toml)." % manifest)
-            if loc.status != "ok":
-                raise Failure(describe(cfg, loc), 2 if loc.status == "different" else 1)
-            break
-        # Without Steam's word (its log elsewhere, or in a format this does not know): the exe checks out and
-        # Steam has written nothing for `settle` seconds. File counts and sizes do not tell: Steam makes every
-        # file at its full size first.
-        settled = clock() - last_change >= settle
-        if loc.status == "ok" and settled and not driver and not download_running(steam, cfg["steam_depot"]) \
-                and not depot_short(cfg, here):
-            progress.say("Steam's log does not say the download finished; nothing has changed for %d s, so it "
-                         "is taken as finished." % settle)
-            break
-        # Steam makes the exe at its full size first, so a stalled or waiting download looks like this too.
-        if loc.status == "different" and settled and not driver and not download_running(steam, cfg["steam_depot"]):
-            raise Failure(describe(cfg, loc), 2)
-        if timeout and clock() - start >= timeout:
-            raise Failure("timed out waiting for the download (%s in %s so far)" % (human(have), here), 3)
-        sleep(interval)
-    progress(1.0, "%s… done" % label)
-    return loc
+    """Wait until the depot download has finished and the exe checks out (gamefiles.depot_wait). Returns Located."""
+    return gamefiles.depot_wait(depot_of(cfg), folder, steam, progress, timeout, interval, settle, clock, sleep,
+                                driver)
 
 
 # --- the app's own copy of the game files (gamefiles.py) --------------------------------------------------

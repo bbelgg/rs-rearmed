@@ -21,7 +21,7 @@ game is in the repository.
 | Area | Tests | What they check |
 |---|---|---|
 | Decryption | `steamless.decrypt` (`tools/steamless/test_decrypt.py`) | the key found in a made-up Mach-O, and what is refused; with `RS_DEPOT_GAME` set to a clean Mac depot folder, the real output against the pin |
-| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check |
+| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game |
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`. The launcher's reader (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with the Windows port: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
@@ -75,6 +75,23 @@ and `play-native.cache_overlay` cover what it runs. The app is checked by hand, 
 ```bash
 HOME=/path/to/test-home "tools/installer/RS Re-ARMed Installer.app/Contents/MacOS/RS Re-ARMed Installer"
 ```
+
+**The game without a Steam install** (`gamefiles.py mac-game`, and `install.sh` with a downloaded game) runs
+against the stand-ins of [Windows testing](../windows/TESTING.md#the-installer-app), without touching Steam:
+`RS_STEAM_DIR` at a made-up Steam folder (`logs/console_log.txt`, a `[Logged On, 4, 7] [U:1:42]` line in
+`logs/connection_log.txt`, the account's ticket in `userdata/42/config/localconfig.vdf` for the DLC step),
+`LP_STEAM_EXE` at a script that takes `+download_depot APP DEPOT [MANIFEST]`, writes Steam's lines to the
+console log and fills `steamapps/content/app_APP/depot_DEPOT`, `LP_STEAM_PROCESS` at a small program that is
+running, and `RS_MAC_TARGET` at a `target.toml` with the made-up program's `exe_size` and `exe_sha256`
+(`depot_disk_bytes = 0`), so the real depot is not needed. `mac-game --locate` then fails, `mac-game` sends one
+command and prints `game-from download` and the folder, and `RS_NATIVE_HOME=… RS_NATIVE_LAUNCHER=…
+tools/play-native/install.sh <a built app>` with `RS_GAME_DIR` at that folder fetches each DLC of the ticket and
+copies only the `_m` archives. With the real Steam, the rules of the Windows page hold: point Steam's `content`
+link at a test folder first, and never send a second command while a download runs. A clean download of the
+Mac depot made earlier is found by `mac-game --locate` with nothing sent, and
+`gamefiles.py sync <that folder> <test home>/game --edition mac` shows what an install from it copies. Not yet
+run: the download itself from the real Steam through this code, the installer's window on this route (Finding
+the Mac game, Downloading your DLC), and a game started from such a copy.
 
 Its build folder, logs, the launcher and `~/Library/Application Support/RS Re-ARMed` then go under the test
 home. Its preferences do not: the installer keeps its choices (game, build folder, renderer) in the real user's

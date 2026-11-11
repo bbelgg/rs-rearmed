@@ -104,6 +104,8 @@ RULES = {
     # The installer and the install scripts.
     "tools/installer/": rule(BOTH, installer=True),
     "tools/play-native/": rule(BOTH, suites=["gamefiles", "cache_overlay", "settings"], installer=True),
+    # (Learn & Play's installer gets its game from Steam with gamefiles.py's code)
+    "tools/play-native/gamefiles.py": rule(BOTH, suites=["gamefiles", "lp.install"], installer=True),
     "tools/play-native/install.sh": rule([MAC], run=[MAC], installer=True),
     "tools/play-native/launch.sh": rule([MAC], run=[MAC], suites=["settings"]),
     "tools/play-native/launch-stub.c": rule([MAC], run=[MAC]),

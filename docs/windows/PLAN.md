@@ -44,6 +44,10 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
     yet here.
   - *A hook on decoded song audio* (new in 1.12.0): checked against another decoder block by block here too, also
     after a rewind; Song Stems played here with a stand-in for its helper.
+- **The download code is shared with the Mac edition** (not released): the Steam steps, the room check, the link to
+  another disk, Steam's log and the wait are in `tools/play-native/gamefiles.py`, where the Mac game uses them when
+  it isn't installed in Steam ([Mac plan](../mac/PLAN.md#status)); `lp_install.py` keeps this game's figures. The
+  installer's unit tests pass unchanged; no download from the real Steam has been made through the moved code.
 - **Built-in mods switched off in the installer** (new in 1.11.0): as in the [Mac plan](../mac/PLAN.md#status);
   `lp_settings.c` reads `learn-play/settings.env` before anything reads a switch, and logs what it used at the top of
   `last-run.log`, as the Mac launcher does.

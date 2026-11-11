@@ -310,13 +310,28 @@ same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-f
   game it runs the manual steps of [INSTALL.md](INSTALL.md) with a progress bar: prerequisites, the Python
   environment, the game image (`decrypt.py`), the shims, the app, the install and the shader warm-up. What the
   user has to do is shown in a box above the log, from the `guide` lines of `gamefiles.py mac-game`, which finds
-  the game in every Steam library and leads through Steam as Learn & Play's download does
-  ([Windows DESIGN](../windows/DESIGN.md#installer-and-build)). Its Built-in Mods… sheet writes the chosen
+  the game in every Steam library and, when it is installed in none, has Steam download the Mac depot as
+  Learn & Play's is downloaded (below). Its Built-in Mods… sheet writes the chosen
   edition's `settings.env` (`KEY=0` lines, no file when every mod is on), which that edition's launcher reads at
   every start; `tools/play-native/test_settings.py` checks that the installer and both launchers have the same
   keys. The standalone installer builds only a download that is, file for file, the source it was made from:
   `build.sh` builds in a digest of the source, and the app works it out over what it unpacked before anything
   runs.
+- **The game from Steam's console** (`gamefiles.py`: `Depot`, `DepotDownload`, `depot_wait`, `SteamLog`,
+  `redirect`; shared with Learn & Play, whose `lp_install.py` adds its own figures and the room for its build:
+  [Windows DESIGN](../windows/DESIGN.md#installer-and-build)). Neither edition needs its game installed in Steam.
+  `mac-game` takes, in this order, the folder the user names, the game installed in a Steam library (the
+  appmanifest says "installed"), and Steam's download of depot 221682 (`steamapps/content/app_221680/
+  depot_221682`), which it starts when the game is nowhere: `steam_osx +download_depot` with the app, depot and
+  manifest of `tools/targets/mac-x64/target.toml`, the same Steam steps and `guide` lines, the same check for
+  room (`mac-game-space`) and link to another disk (`mac-game-redirect`), and a SHA-256 check of the game's
+  program against `target.toml`. A game Steam is installing or updating right then is waited for instead. A
+  downloaded game has no appmanifest and no DLC with it, so what the copy takes from a Steam install comes from
+  elsewhere: the DLC from the DLC depots (`dlc-fetch`, each depot has the `_m` and the `_p` archive), the owned
+  DLC from the account's ownership ticket, the account from the license that has depot 221682
+  (`edition_depots`), custom songs from a Steam library's `common/Rocksmith2014/dlc`; the language is the Steam
+  layer's default, and the saves are there only when the game has run through Steam on this Mac. A refresh of
+  such a copy fetches new DLC first and goes on with Steam's download folder cleared (`depot_source`).
 - **The game files** (`tools/play-native/gamefiles.py`, shared with Learn & Play): the install is
   self-contained, with RS Re-ARMed's own copy of the game files next to the installed app: APFS clones, which
   share the data with Steam's files until one side changes, when both are on one volume, else a real copy.

@@ -246,6 +246,7 @@ final class BuildRunner {
     var lpStopped = ""  // Learn & Play: why the run stopped before the build (no code image yet), "" if it did not
     var lpUnpinned = false  // Learn & Play: the code image is a capture's, which can differ from the pin
     var lpGameFolder = ""  // the Windows game folder lp_install.py found
+    var macGameFrom = ""   // where gamefiles.py mac-game found the Mac game: folder, library or download
     var logFileURL: URL?
     // The command shell() is running, so Skip and Quit can stop it (with what it started).
     var currentProcess: Process?
@@ -324,7 +325,7 @@ final class BuildRunner {
         appendLog("Repository: \(repoRoot.isEmpty ? "(will download)" : repoRoot)")
         if !embeddedInRepo { appendLog("Build folder: \(buildBase)") }
         appendLog("Game: \(gameChoices.first(where: { $0.value == game })?.title ?? game)")
-        appendLog("Game directory: \(gameDir.isEmpty ? "(Steam's download folder)" : gameDir)")
+        appendLog("Game directory: \(!gameDir.isEmpty ? gameDir : game == "learnplay" ? "(Steam's download folder)" : "(Steam's library, else Steam's download folder)")")
         appendLog("Embedded in repo: \(embeddedInRepo)")
         appendLog("Log file: \(url.path)\n")
     }
@@ -435,7 +436,7 @@ final class BuildRunner {
         }
     }
 
-    // The guide's Try Again: lp_install.py game-download starts over (SIGUSR1). The command is started with
+    // The guide's Try Again: lp_install.py game-download or gamefiles.py mac-game starts over (SIGUSR1). Started with
     // exec, so this is its own process.
     func tryAgain() {
         if let p = currentProcess, p.isRunning { kill(p.processIdentifier, SIGUSR1) }
@@ -489,6 +490,8 @@ final class BuildRunner {
         } else {
             steps += [
                 ("Checking prerequisites",       Steps.checkPrereqs),
+                ("Finding the Mac game",         Steps.macGame),
+                ("Downloading your DLC",         Steps.macDLC),
                 ("Setting up Python environment", Steps.setupVenv),
                 ("Decrypting the game",           Steps.obtainGameImage),
                 ("Building shims",                Steps.buildShims),
@@ -705,18 +708,65 @@ enum Steps {
         // CMake and Ninja are not prerequisites: setupVenv installs them into the build's venv with pip.
         try await checkTools(r)
         try await askForStartupRoom(r)  // the same recompiler, the same memory
+    }
 
-        // The game: the folder chosen, else any Steam library; else the walk through Steam, as Learn & Play
-        // has, until Steam has installed it.
+    // The Mac game (gamefiles.py mac-game): the folder chosen; else the game installed in a Steam library; else
+    // Steam's download of the Mac depot, got as Learn & Play's Windows game is, with nothing to paste: Steam is
+    // opened and given the download command, and the box above the log says what the user has to do, if anything.
+    static func macGame(_ r: BuildRunner) async throws {
+        func found(_ out: String) throws {
+            for line in out.split(separator: "\n") {
+                if line.hasPrefix("game-folder ") { r.gameDir = String(line.dropFirst("game-folder ".count)) }
+                if line.hasPrefix("game-from ") { r.macGameFrom = String(line.dropFirst("game-from ".count)) }
+            }
+            guard FileManager.default.fileExists(atPath: r.gameDir + "/Rocksmith2014.app") else {
+                throw InstallerError.fileNotFound("Rocksmith2014.app not found in \(r.gameDir)")
+            }
+            r.appendLog("  ✓ Game found at \(r.gameDir)")
+        }
+        r.macGameFrom = ""
         let folder = r.gameDir.isEmpty ? "" : " --folder \(shq(r.gameDir))"
-        let out = try await r.shell("exec \(gameFilesTool) --progress-lines mac-game\(folder)")
-        if let line = out.split(separator: "\n").last(where: { $0.hasPrefix("game-folder ") }) {
-            r.gameDir = String(line.dropFirst("game-folder ".count))
+        let look = await r.capture("\(gameFilesTool) mac-game --locate\(folder)")
+        switch look.status {
+        case 0:
+            return try found(look.text)
+        case 2:
+            throw InstallerError.unsupportedGame(
+                "Steam's folder holds a different build of the Mac game from the one RS Re-ARMed is made for "
+                + "(the log says which), so it can't be used.")
+        default:
+            if !r.gameDir.isEmpty { throw InstallerError.fileNotFound("Rocksmith2014.app in \(r.gameDir)") }
         }
-        guard FileManager.default.fileExists(atPath: r.gameDir + "/Rocksmith2014.app") else {
-            throw InstallerError.fileNotFound("Rocksmith2014.app not found in \(r.gameDir)")
+
+        r.appendLog("The Mac game is not installed in Steam: Steam downloads it, without installing it.")
+        while true {
+            try await askForRoom(r, mac: true)
+            let run = await r.capture("exec \(gameFilesTool) --progress-lines mac-game")
+            try r.checkStopped()
+            switch run.status {
+            case 0: return try found(run.text)
+            case 2:
+                throw InstallerError.unsupportedGame(
+                    "Steam downloaded a different build of the Mac game from the one RS Re-ARMed is made for "
+                    + "(the log says which), so it can't be used.")
+            case 4: continue  // no room after all: a Steam update can drop the link to another disk
+            default: throw InstallerError.downloadFailed("the Mac game: \(r.lastError)")
+            }
         }
-        r.appendLog("  ✓ Game found at \(r.gameDir)")
+    }
+
+    // A game from Steam's download has no DLC with it (Steam installs DLC only for a game in its library): every
+    // DLC the signed-in account owns is downloaded as Learn & Play's is (gamefiles.py dlc-fetch), and the copy
+    // takes the Mac archives. Never stops the install. A game installed in Steam, or a folder the user gave, has
+    // its own dlc folder.
+    static func macDLC(_ r: BuildRunner) async throws {
+        guard r.macGameFrom == "download" else {
+            r.appendLog("The game's own dlc folder has its DLC: nothing to download.")
+            return
+        }
+        _ = await r.status("exec \(gameFilesTool) --progress-lines dlc-fetch --edition mac "
+            + shq(nativeHome + "/dlc-fetched.json"))
+        try r.checkStopped()
     }
 
     // The Mac build's venv: requirements.txt, with the CMake and Ninja the shims and the game code are
@@ -803,7 +853,8 @@ enum Steps {
         // to its .app) and ~/Applications/RS Re-ARMed.app is the launcher.
         // The shader warm-up is a step of its own (prepareShaders).
         try await r.shell("tools/play-native/install.sh \(shq(builtApp))",
-                          env: ["RS_GAME_DIR": r.gameDir, "RS_WARM_SHADERS": "0", "RS_RENDERER": r.renderer])
+                          env: ["RS_GAME_DIR": r.gameDir, "RS_WARM_SHADERS": "0", "RS_RENDERER": r.renderer,
+                                "RS_DLC_FETCH": "0"])  // (the DLC has had its own step, macDLC)
         guard FileManager.default.fileExists(atPath: launcherApp + "/Contents/MacOS/launch") else {
             throw InstallerError.fileNotFound(launcherApp)
         }
@@ -890,15 +941,17 @@ enum Steps {
 
     // Room for Steam's download, or a folder on another disk. Steam puts the whole game on the startup disk at
     // once; checked before every download, since a Steam update can undo a redirection.
-    static func askForRoom(_ r: BuildRunner) async throws {
+    static func askForRoom(_ r: BuildRunner, mac: Bool = false) async throws {
         var note = ""
         while true {
-            let check = await r.capture("\(lpInstall) game-space --with-build \(lpWork)")
+            let check = await r.capture(mac ? "\(gameFilesTool) mac-game-space"
+                                            : "\(lpInstall) game-space --with-build \(lpWork)")
             if check.status == 0 { return }
             let choice = showAlert(
                 title: "Not enough space for the download",
                 message: """
-                    Steam downloads the Windows game (about 6 GB) at once, and it needs room for the build too.
+                    Steam downloads the \(mac ? "Mac game (about 7 GB)" : "Windows game (about 6 GB)") at once\
+                    \(mac ? "." : ", and it needs room for the build too.")
                     \(check.text).
 
                     Choose a folder on another disk, such as an external drive, and Steam downloads it there \
@@ -915,9 +968,10 @@ enum Steps {
             panel.canChooseDirectories = true
             panel.canCreateDirectories = true
             panel.directoryURL = URL(fileURLWithPath: "/Volumes")
-            panel.message = "Choose a folder for Steam's download of the Windows game"
+            panel.message = "Choose a folder for Steam's download of the \(mac ? "Mac" : "Windows") game"
             if panel.runModal() == .OK, let url = panel.url {
-                let moved = await r.capture("\(lpInstall) game-redirect \(shq(url.path))")
+                let moved = await r.capture(mac ? "\(gameFilesTool) mac-game-redirect \(shq(url.path))"
+                                                : "\(lpInstall) game-redirect \(shq(url.path))")
                 if moved.status != 0 { note = "\n\nThat folder didn't work: \(moved.text)" }
             }
         }
@@ -987,6 +1041,10 @@ enum Steps {
         if r.game == "learnplay" {  // new DLC from Steam first, as the install gets it
             _ = await r.status("exec python3 -I \(shq(tool)) --progress-lines dlc-fetch --wait 30 "
                 + shq(lpHome + "/dlc-fetched.json"))
+            try r.checkStopped()
+        } else {  // the same for a Mac game from Steam's download (one installed in Steam: nothing, says the tool)
+            _ = await r.status("exec python3 -I \(shq(tool)) --progress-lines dlc-fetch --wait 30 "
+                + "--copy \(shq(gameCopy("mac"))) \(shq(nativeHome + "/dlc-fetched.json"))")
             try r.checkStopped()
         }
         r.appendLog("Syncing \(gameCopy(r.game)) with the game folder it was copied from. Only new and changed "
@@ -1212,7 +1270,8 @@ class InstallerWindow: NSWindow {
         content.wantsLayer = true
 
         // The game folder the current install's copy comes from (install.sh's game-source; earlier versions' game-dir
-        // named it, now the copy), else Steam's default library.
+        // named it, now the copy), else Steam's default library. The field shows it only when it is a folder the
+        // user chose: Steam's default library and Steam's download folder are found without it (empty).
         let installedGameDir = ["/game-source", "/game-dir"].lazy.compactMap {
             (try? String(contentsOfFile: nativeHome + $0, encoding: .utf8))?
                 .trimmingCharacters(in: .whitespacesAndNewlines)
@@ -1221,7 +1280,10 @@ class InstallerWindow: NSWindow {
         let defaultGameDir = installedGameDir.flatMap {
             FileManager.default.fileExists(atPath: $0, isDirectory: &isDir) && isDir.boolValue ? $0 : nil
         } ?? NSHomeDirectory() + "/Library/Application Support/Steam/steamapps/common/Rocksmith2014"
-        runner.gameDir = defaultGameDir
+        let steamFinds = defaultGameDir == NSHomeDirectory() + "/Library/Application Support/Steam/steamapps/common/Rocksmith2014"
+            || defaultGameDir.range(of: #"/app_\d+/depot_\d+/?$"#, options: .regularExpression) != nil
+        let macGameField = steamFinds ? "" : defaultGameDir
+        runner.gameDir = macGameField
 
         let titleLabel = NSTextField(labelWithString: "RS Re-ARMed Installer")
         titleLabel.font = .boldSystemFont(ofSize: 20)
@@ -1264,14 +1326,14 @@ class InstallerWindow: NSWindow {
         gamePopup.action = #selector(gameChanged)
         gamePopup.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(gamePopup)
-        macGameDir = defaultGameDir
+        macGameDir = macGameField
 
         // Game directory
         gameDirLabel.font = .systemFont(ofSize: 12, weight: .medium)
         gameDirLabel.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(gameDirLabel)
 
-        gameDirField.stringValue = defaultGameDir
+        gameDirField.stringValue = macGameField
         gameDirField.isEditable = true
         gameDirField.isBordered = true
         gameDirField.isBezeled = true
@@ -1660,8 +1722,8 @@ class InstallerWindow: NSWindow {
     private func applyGame() {
         let lp = selectedGame == "learnplay"
         gameDirLabel.stringValue = lp ? "Windows game folder (leave empty to download it with Steam):"
-                                      : "Rocksmith 2014 game folder:"
-        gameDirField.placeholderString = lp ? "Steam's download folder" : nil
+                                      : "Mac game folder (leave empty for the game in Steam, or to download it with Steam):"
+        gameDirField.placeholderString = lp ? "Steam's download folder" : "Steam's library, else Steam's download folder"
         gameDirField.stringValue = lp ? lpGameDir : macGameDir
         cleanupCheck.isHidden = runner.embeddedInRepo || lp
         let place = gameCopyPlaceNow(selectedGame)
@@ -1676,7 +1738,7 @@ class InstallerWindow: NSWindow {
             Click Build & Install. The installer does the rest and tells you, in a box above this text, whenever \
             it needs you: \(lp ? "about half an hour" : "about 20 minutes") in all, and you can use the Mac meanwhile.
 
-            What you need: \(lp ? "Steam on this Mac, signed in with the account that owns \(game)" : "\(game) installed in Steam"), \
+            What you need: Steam on this Mac, signed in with the account that owns \(game)\(lp ? "" : " (the game doesn't have to be installed in Steam)"), \
             and an internet connection. If anything is missing, the installer says what to do when it gets there.
 
             """
@@ -1685,7 +1747,7 @@ class InstallerWindow: NSWindow {
     private func guideButton(_ code: String) -> String {
         switch code {
         case "steam-missing": return "Get Steam"
-        case "steam-starting", "sign-in", "wrong-account", "steam-offline", "install-game", "installing-game":
+        case "steam-starting", "sign-in", "wrong-account", "wrong-account-mac", "steam-offline", "installing-game":
             return "Open Steam"
         case "download-stalled", "download-failed", "paste": return "Try Again"
         case "xcode": return "Open Apple's Installer"

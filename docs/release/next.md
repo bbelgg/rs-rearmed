@@ -14,3 +14,9 @@ notes and empties this file. -->
 - **The installer forgets a finished run when you choose the other game.** After installing one edition, picking
   the other in the Game list left the first one's "installed" box, log and buttons in the window until the
   installer was restarted.
+
+- **The Mac game doesn't have to be installed in Steam.** When it isn't, the installer has Steam download it and
+  the DLC your account owns, as it does for Learn & Play: sign in to Steam with the account that owns the game,
+  and the installer does the rest, with the same check for room and the same choice of a folder on another disk.
+  Before, it sent you to Steam to install the game there first. A game that is installed in Steam is used as
+  before. The installer's game folder field is now empty unless you chose a folder yourself.

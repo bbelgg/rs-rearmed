@@ -25,7 +25,7 @@ on the game's drive, moving a copy that is in the other place).
 | `install.sh` | the Mac install: the copy of the game files, the app, the title logo, the launcher, the shader warm-up |
 | `launch.sh`, `launch-stub.c` | the launcher in `RS Re-ARMed.app`; the small program runs the script, so macOS's privacy answers go to the app |
 | `learn-play.sh` | Learn & Play, from the game files to the installed app (the steps are `win-x86/install/lp_install.py`'s) |
-| `gamefiles.py` | the install's own copy of the game files, for both editions: `sync`, `refresh`, `check`, `dlc-fetch`; APFS clones when the game is on the same volume, else a real copy |
+| `gamefiles.py` | the install's own copy of the game files, for both editions: `sync`, `refresh`, `check`, `dlc-fetch`, and the Mac game found or downloaded by Steam (`mac-game`, with the download code Learn & Play's installer shares); APFS clones when the game is on the same volume, else a real copy |
 | `cache_overlay.py` | the menu overlay (Direct Connect, Enumerate, Exit Game), a patch archive made from the user's own `cache.psarc` |
 | `psarc_key.py` | the archives' key, read from the player's own game image; nothing of it is in the repository |
 | `warm-shaders.sh` | runs the installed app with `--warm-shaders`, either edition's |

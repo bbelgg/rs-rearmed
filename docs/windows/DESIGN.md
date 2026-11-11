@@ -477,12 +477,17 @@ runtime. `RS_MODS_LOG=1` logs them.
 ## Installer and build
 
 ```
-choose the game ─┬─ Rocksmith 2014 for Mac → static decrypt → shims, app → install → warm shaders → launcher
+choose the game ─┬─ Rocksmith 2014 for Mac → the game in Steam, else Steam downloads the depot and the DLC
+                 │                            → static decrypt → shims, app → install → warm shaders → launcher
                  └─ Learn & Play → free space → Steam downloads the depot and the DLC → game-copy → Microsoft DLLs
                                     → code image → lp_install.py build → app-install → build-clean → warm shaders
 ```
 
-`win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships):
+`win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships). Getting a game
+from Steam's console is `tools/play-native/gamefiles.py`'s (`Depot`, `DepotDownload`, `depot_wait`, `SteamLog`,
+`redirect`), shared with the Mac game, which is downloaded the same way when it isn't installed in Steam
+(`gamefiles.py mac-game`, [Mac design](../mac/DESIGN.md#installer-and-build)); `lp_install.py` has this game's
+figures and words, and the room its build needs.
 
 1. **The game** (`game-locate`, `game-space`, `game-redirect`, `game-download`). `steam_osx +download_depot`
    with the app, depot and manifest of `target.toml` hands the running Steam the download; only if it ignores

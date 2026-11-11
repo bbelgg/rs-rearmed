@@ -89,7 +89,8 @@ run; what is done is kept, and Build & Install goes on from there.
 
    If there isn't room on the startup disk, it asks for a folder on another disk (an external drive works; if
    macOS asks whether Steam may use it, click Allow), or free some space and click Check Again. What Steam already
-   downloaded moves along.
+   downloaded moves along. The [Mac edition](../mac/INSTALL.md#the-steps) gets its game the same way when it
+   isn't installed in Steam, into the same download folder: a folder chosen for one edition is the other's too.
 3. **Downloading your DLC.** Each DLC is a Steam download of its own. The installer reads which DLC your Steam
    account owns and has Steam fetch them one after another ("12 of 73"). If it is stopped, the next run
    continues. One that fails doesn't stop the install: the box at the end names it, and Refresh Game Files tries
@@ -171,6 +172,10 @@ Windows game folder and, from its `dlc/` and the Mac game's `dlc` folder in each
 archives, `*_p.psarc`. It also records your DLC, the language and the account the game plays as in
 `game/.rearmed/steam.env`: the account whose license has Learn & Play (depot 221683), whichever is logged in later. To choose it
 yourself, set `RS_STEAM_ID` (a SteamID64 or the number in `Steam/userdata/<number>`) for a refresh.
+
+Where each of those comes from, for this game and for a Mac game from Steam's download, which is copied the same
+way: [the Mac edition's table](../mac/INSTALL.md#game-files). The language is English unless the Mac game's
+appmanifest is in Steam's library or `RS_STEAM_LANGUAGE` is set.
 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
 (`tools/play-native/cache_overlay.py`), from the copy's `cache.psarc`, which isn't changed: it adds DIRECT CONNECT

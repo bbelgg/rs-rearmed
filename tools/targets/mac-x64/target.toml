@@ -11,3 +11,26 @@ text = [0x100001b00, 0x1013e4300]   # __TEXT,__text
 image_sha256 = "3716171942ad3b920853a6e7c330d839d2cacd876058989ece5dfa9f466a3c9d"
 # Of its __text alone: a Steam copy with a mod's load commands has this one and another image_sha256.
 text_sha256 = "1176e91ace6ab79297f0d7c7d7fdb648f5f834f8c4fb7d9328bdc8c77a3a1d34"
+
+# --- The game, when it is not installed in Steam: downloaded with the Steam client's console
+# (`download_depot APP DEPOT [MANIFEST]`), as Learn & Play's is (tools/targets/win-x86/target.toml). Read by
+# tools/play-native/gamefiles.py (mac-game).
+steam_app = 221680
+steam_depot = 221682
+# The current public manifest, the one the image above is made from. Empty: the console downloads the latest.
+# Either way gamefiles.py checks the program's hash afterwards.
+depot_manifest = "2035751420671775739"
+# The depot at that manifest on disk: 103 files, 6,857,904,537 bytes. Steam makes every file at its full size
+# before it fills it, so this much free space is needed up front, plus the margin.
+depot_files = 103
+depot_disk_bytes = 6857904537
+disk_margin_bytes = 536870912
+# Left free on the startup disk at the end, for macOS.
+startup_margin_bytes = 2147483648
+# Each DLC is a depot of its own, both kinds of archives: 143 of them took 2.18 GB on a Mac, 16 MB on average.
+dlc_disk_bytes = 2362232012
+dlc_average_bytes = 16777216
+# The game's program in the depot, as Steam ships it (the universal binary, its x86-64 __text still encrypted).
+exe_name = "Rocksmith2014.app/Contents/MacOS/Rocksmith2014"
+exe_size = 54856856
+exe_sha256 = "22d9ddc072bf8dcbeb910b5f4e8b204b907bbbb182bbc6a27ae2b35e73be4e90"

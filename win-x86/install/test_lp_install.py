@@ -430,6 +430,19 @@ class TestGame(Base):
         lp_install.restore_redirect(steam)
         self.assertFalse(os.path.islink(content))
 
+    def test_the_mac_editions_folder_is_this_ones_too(self):
+        # Steam has one download folder for both editions: a folder the Mac install chose comes back here as well.
+        cfg, steam = self.fx.cfg, self.fx.steam
+        os.makedirs(os.path.join(steam, lp_install.APP_BUNDLE))
+        content = os.path.join(steam, lp_install.APP_BUNDLE, "steamapps", "content")
+        other = os.path.join(self.top, "External", "steam-content")
+        mine, macs = lp_install.download_notes()
+        self.assertEqual(os.path.dirname(macs), os.path.dirname(os.path.dirname(mine)))
+        gamefiles.redirect(steam, other, macs)
+        os.remove(content)
+        lp_install.restore_redirect(steam)
+        self.assertEqual(os.path.realpath(content), os.path.realpath(other))
+
     def test_a_link_to_a_drive_that_is_gone_has_no_room(self):
         cfg, steam = self.fx.cfg, self.fx.steam
         os.makedirs(os.path.join(steam, lp_install.APP_BUNDLE, "steamapps"))

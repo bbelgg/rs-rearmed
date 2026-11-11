@@ -109,6 +109,7 @@ Every message of the box can be seen without touching Steam, with stand-ins:
 | `LP_STEAM_PROCESS=<name>` | the process that counts as Steam: a small compiled program under that name (a copy of `/bin/sleep` is killed by macOS). Have it running before Build & Install: with it not running, the DLC step opens the real Steam by its bundle identifier, which `LP_STEAM_EXE` doesn't stand in for |
 | `RS_XCODE_SELECT=<script>` | fails `-p` until a file is there: Apple's tools missing and arriving |
 | `RS_XCODEBUILD=<script>` | with `RS_XCODE_SELECT` printing a path in a `.app`: Xcode not set up. Exit 69 until a file is there. Stop before the run goes on: with the real Steam the next step would fetch DLC |
+| `RS_MAC_TARGET=<target.toml>` | the Mac edition's figures for its download ([Mac testing](../mac/TESTING.md#installer-tests)): a made-up program's `exe_size` and `exe_sha256`, or a huge `depot_disk_bytes` for no room |
 | `LP_CONFIG=<target.toml with a huge depot_disk_bytes>` | no room. Change the file with an atomic `mv` while the alert is up (a `cp` can be read half written), then Check Again |
 
 With the real Steam:

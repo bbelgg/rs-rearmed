@@ -13,6 +13,15 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   that can boost; the output following the system's default; Metal by default with OpenGL as choice and fallback; full
   screen, Retina; Enumerate and EXIT GAME in the main menu; the built-in fixes, no intro screens or Auto Save warning;
   the GUI installer, which decrypts the game statically (no Rosetta, no launch of the game).
+- **The game without a Steam install** (not released): when the Mac game isn't installed in Steam, the installer
+  and `gamefiles.py mac-game` have Steam download depot 221682 and the account's DLC, with the code Learn & Play's
+  download uses ([DESIGN.md](DESIGN.md#installer-and-build)); an installed game is used as before. Checked with a
+  stand-in for Steam, and by copying from a clean download of the depot that was made earlier with the same
+  console command: the same song archives and account as the copy of the installed game, and the pinned image.
+  Not yet done: a download through the new code from the real Steam, the installer's window on that route, and
+  a game run from such a copy ([TESTING.md](TESTING.md#installer-tests)). The language of such an install is
+  English (no appmanifest), and DLC a family member shares is not fetched: the ownership ticket lists only the
+  account's own, as for Learn & Play.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs-for-1130)); 74.9 fps on 75 Hz.

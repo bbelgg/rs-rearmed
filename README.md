@@ -38,8 +38,9 @@ switched off, and the built-in mods with a checkbox in the installer (**Built-in
 ## Requirements
 
 - A Mac with Apple Silicon (M1 or later), macOS 12 or later.
-- **Rocksmith 2014 (Remastered)** for Mac installed through Steam, or **Learn & Play** on your Steam account
-  ([details](docs/windows/INSTALL.md#requirements)). No Rosetta and no Windows PC needed.
+- **Rocksmith 2014 (Remastered)** for Mac or **Learn & Play** on your Steam account
+  ([Mac](docs/mac/INSTALL.md#requirements), [Learn & Play](docs/windows/INSTALL.md#requirements)). Neither has to
+  be installed in Steam: the installer has Steam download it. No Rosetta and no Windows PC needed.
 - A Real Tone cable or another audio input.
 
 ## Install
@@ -89,6 +90,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | Metal renderer, shaders prepared at install | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |
 | Installer app and install script | ✅ | ✅ |
+| The game and your DLC downloaded by Steam, with nothing installed in Steam | ✅ when the game isn't installed in Steam; an installed game is used as it is | ✅ |
 | Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs-for-1130)) | ✅ the display's frame rate, about Rosetta's CPU: 10 points of a core and 0.3 GB more than the Mac port ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 
 ¹ Learn & Play reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC has both, and

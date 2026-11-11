@@ -4,7 +4,10 @@
 #
 # Installs the native arm64 build for everyday play:
 #   ~/Library/Application Support/RS Re-ARMed/   game/: the install's own copy of the game files (from
-#       RS_GAME_DIR, default Steam's library; tools/play-native/gamefiles.py: APFS clones when the game is on
+#       RS_GAME_DIR, default the game in Steam's library, else Steam's download of the Mac depot, which
+#       `gamefiles.py mac-game` gets when the game is not installed in Steam; from a download, the DLC the
+#       signed-in Steam account owns is downloaded first, as Learn & Play's is: gamefiles.py dlc-fetch,
+#       RS_DLC_FETCH=0 skips it; tools/play-native/gamefiles.py: APFS clones when the game is on
 #       the same volume, which take no extra space, else a real copy; a game on another APFS drive: the copy is
 #       on that drive, <drive>/RS Re-ARMed/game, and game/ a link to it) with a copy of APP (default: the
 #       build-m4.sh output, $RS_BUILD_DIR/m4/app/Rocksmith2014.app, RS_BUILD_DIR default <repo>/build),
@@ -14,8 +17,8 @@
 #       steam/ (the shim's offline cloud, made on first launch), logs/
 #   ~/Applications/RS Re-ARMed.app               the launcher (tools/play-native/launch.sh)
 # The game then reads only that copy: a Steam update, uninstall or library move does not change it.
-# --refresh-game syncs the copy with the game folder again (new DLC and custom songs, a Steam update) and
-# changes nothing else; a full install does that too. game-source holds the folder it is copied from.
+# --refresh-game syncs the copy with the game folder again (new DLC and custom songs, a Steam update; for a game
+# from Steam's download, new DLC is downloaded first) and changes nothing else; a full install does that too. game-source holds the folder it is copied from.
 # The renderer: RS_RENDERER=metal|opengl, written to <home>/renderer (the launcher and the game read
 # it; docs/mac/INSTALL.md "Renderer"); without RS_RENDERER an existing setting is kept, else metal.
 # With Metal it then compiles the game's Metal shaders (tools/play-native/warm-shaders.sh: a few
@@ -43,11 +46,15 @@ progress=()
 if [[ ${1:-} == --refresh-game ]]; then
     # (a link to a copy on a drive that is not connected: gamefiles.py says so)
     [[ -d "$home/game/.rearmed" || -L "$home/game" ]] || rs_die "no copy of the game files in $home/game: run install.sh first"
+    # A game from Steam's download: its new DLC first (a game installed in Steam: nothing, Steam installs its DLC).
+    [[ ${RS_DLC_FETCH:-1} == 0 ]] || python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} dlc-fetch \
+        --wait 30 --copy "$home/game" "$home/dlc-fetched.json" || true
     exec python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} refresh "$home/game"
 fi
 app=${1:-${RS_BUILD_DIR:-$root/build}/m4/app/Rocksmith2014.app}
 if [[ ! -x "$app/Contents/MacOS/Rocksmith2014" && ! -d $RS_GAME_APP && -t 0 ]]; then
     echo "Rocksmith 2014 for Mac is not installed ($RS_GAME_APP)."
+    echo "(With an account that owns it, Steam downloads it without installing it: python3 tools/play-native/gamefiles.py mac-game)"
     read -r -p "Set up the Windows game (Learn & Play) instead? [y/N] " answer
     [[ $answer == [yY]* ]] && exec "$here/learn-play.sh"
 fi
@@ -73,6 +80,12 @@ mkdir -p "$home/logs" "$home/steam"
 # game on another APFS drive goes onto that drive (<drive>/RS Re-ARMed/game, clones) and game/ is a link to it;
 # RS_GAME_COPY_DIR=DIR puts it in DIR/game (home: here; drive: on the game's drive; these two also move a copy
 # that is in the other place, as the installer's Game files choice does). A stopped copy continues on the next run.
+# A game from Steam's download (not installed in Steam, so Steam installs no DLC for it): every DLC the signed-in
+# account owns is downloaded into Steam's depot folders first, as Learn & Play's is, and the copy takes the Mac
+# archives from there. Never fails the install; what is missing comes with a later --refresh-game.
+if [[ $RS_GAME_DIR =~ /app_[0-9]+/depot_[0-9]+/?$ && ${RS_DLC_FETCH:-1} != 0 ]]; then
+    python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} dlc-fetch --edition mac "$home/dlc-fetched.json" || true
+fi
 echo "game files: $RS_GAME_DIR -> $home/game"
 python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} sync "$RS_GAME_DIR" "$home/game" --edition mac ||
     rs_die "the game files could not be copied (see above); nothing else was changed"

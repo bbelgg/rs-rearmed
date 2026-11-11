@@ -6,6 +6,7 @@ APFS and HFS+ disk images where hdiutil works): where the copy goes, the link to
 
     python3 tools/play-native/test_gamefiles.py
 """
+import hashlib
 import io
 import json
 import os
@@ -1339,7 +1340,7 @@ class Clock:
 
 
 class SteamSteps(Base):
-    """What the installers read from Steam's folder, and the walk through Steam for the Mac game."""
+    """What the installers read from Steam's folder, and the Steam steps' messages."""
 
     def setUp(self):
         Base.setUp(self)
@@ -1389,33 +1390,6 @@ class SteamSteps(Base):
         write(os.path.join(lib, "steamapps", "common", "Rocksmith2014", gamefiles.MAC_GAME_BIN), b"x")
         write(os.path.join(lib, "steamapps", "appmanifest_221680.acf"), b'"AppState" { "StateFlags" "4" }')
         self.assertEqual(gamefiles.find_mac_game(self.steam), os.path.join(lib, "steamapps", "common", "Rocksmith2014"))
-
-    def test_a_folder_the_user_chose_needs_no_steam(self):
-        folder = os.path.join(self.tmp, "depot")
-        write(os.path.join(folder, gamefiles.MAC_GAME_BIN), b"x")
-        clock = Clock()
-        got = gamefiles.mac_game_wait(self.steam, folder, quiet(), self.guide, clock=clock, sleep=clock.sleep,
-                                      gate=self.gate(gamefiles.SteamState(False, False, False), clock))
-        self.assertEqual(got, folder)
-        self.assertEqual(self.codes(), [])
-
-    def test_the_walk_through_steam(self):
-        clock = Clock()
-        gate = self.gate(gamefiles.SteamState(False, False, False), clock)
-
-        def state(*a):
-            def set_it():
-                self.fake.st = gamefiles.SteamState(*a)
-            return set_it
-        clock.hooks += [(10, state(True, False, False)), (20, state(True, True, False)),
-                        (100, state(True, True, True, 42, "somebody")),
-                        (120, lambda: self.installed(b"1026")), (130, lambda: self.installed())]
-        got = gamefiles.mac_game_wait(self.steam, None, quiet(), self.guide, interval=1, gate=gate, clock=clock,
-                                      sleep=clock.sleep, opener=self.fake.open)
-        self.assertTrue(got.endswith("Rocksmith2014"))
-        self.assertEqual(self.codes(), ["steam-missing", "steam-starting", "sign-in", "install-game",
-                                        "installing-game", "-"])
-        self.assertEqual(self.fake.urls, [None, "steam://install/221680"])
 
     def test_guide_in_a_terminal_says_each_thing_once(self):
         out = io.StringIO()
@@ -1557,6 +1531,272 @@ class Dlc(SteamSteps):
         self.assertEqual(os.listdir(os.path.join(dest, "dlc")), ["s294990_p.psarc"])
         with open(os.path.join(dest, ".rearmed", "steam.env")) as f:
             self.assertIn("294990", f.read())
+
+
+class MacGame(SteamSteps):
+    """The Mac game's folder: the one chosen, the game installed in Steam, else Steam's download of the Mac depot,
+    got with the Steam the test plays."""
+
+    ACCOUNT = 42
+    EXE = b"the Mac game's program, as Steam ships it" * 100
+
+    def setUp(self):
+        SteamSteps.setUp(self)
+        os.environ["RS_NATIVE_HOME"] = os.path.join(self.tmp, "home")
+        os.environ["LP_HOME"] = os.path.join(self.tmp, "home", "learn-play")
+        os.environ.pop("RS_GAME_DIR", None)
+        self.clock = Clock()
+        self.fake = FakeSteamState(gamefiles.SteamState(True, True, True, self.ACCOUNT, "somebody"))
+        self.sends = self.pastes = 0
+        self.console = os.path.join(self.steam, "logs", "console_log.txt")
+        write(self.console, b"")
+        target = os.path.join(self.tmp, "target.toml")
+        with open(target, "w") as f:
+            f.write('# the made-up Mac game\nid = "mac-x64"\ntext = [1, 2]\nsteam_app = 221680\nsteam_depot = 221682\n'
+                    'depot_manifest = "77"  # the manifest\ndepot_disk_bytes = 0\ndisk_margin_bytes = 1024\n'
+                    'exe_name = "%s"\nexe_size = %d\nexe_sha256 = "%s"\n'
+                    % (gamefiles.MAC_GAME_BIN, len(self.EXE), hashlib.sha256(self.EXE).hexdigest()))
+        self.depot = gamefiles.mac_depot(target)
+        self.folder = self.depot.dir(self.steam)
+
+    def log(self, line):
+        with open(self.console, "a") as f:
+            f.write("[2026-11-11 10:00:00] %s\n" % line)
+
+    def send(self):
+        self.sends += 1
+
+    def paste(self):
+        self.pastes += 1
+
+    def downloaded(self, exe=None):
+        write(os.path.join(self.folder, gamefiles.MAC_GAME_BIN), exe or self.EXE)
+        for n in ("static.psarc", "songs.psarc"):
+            write(os.path.join(self.folder, n), n.encode())
+        write(os.path.join(self.folder, "dlc", "rs1compatibilitydlc_m.psarc"), b"rs1")
+
+    def done(self):
+        self.downloaded()
+        self.log('Depot download complete : "%s" (manifest 77)' % self.folder)
+
+    def game(self, folder=None, **kw):
+        gate = gamefiles.SteamGate(self.steam, gamefiles.GAME_MAC, self.guide, state=self.fake,
+                                   opener=self.fake.open, clock=self.clock)
+        self.out = gamefiles.Progress(lines=True, stream=io.StringIO())
+        kw.setdefault("timeout", 2000)
+        return gamefiles.mac_game(self.steam, folder, self.out, self.guide, interval=1, depot=self.depot, gate=gate,
+                                  clock=self.clock, sleep=self.clock.sleep, send=self.send, paste=self.paste,
+                                  running=lambda *a: False, **kw)
+
+    def installed(self, flags=b"4"):
+        write(os.path.join(self.steam, "steamapps", "common", "Rocksmith2014", gamefiles.MAC_GAME_BIN), b"x")
+        write(os.path.join(self.steam, "steamapps", "appmanifest_221680.acf"),
+              b'"AppState" { "StateFlags" "%s" "BytesToDownload" "2097152" "BytesDownloaded" "1048576" }' % flags)
+
+    def test_the_figures_are_the_targets(self):
+        real = gamefiles.mac_depot()  # tools/targets/mac-x64/target.toml
+        self.assertEqual(real.command(), "download_depot 221680 221682 2035751420671775739")
+        self.assertEqual((real.depot, real.cfg["exe_name"]), (gamefiles.MAC_DEPOT, gamefiles.MAC_GAME_BIN))
+        self.assertGreater(real.disk_bytes, 6 << 30)
+        self.assertEqual(self.depot.command(), "download_depot 221680 221682 77")
+        self.assertIsNone(gamefiles.mac_depot(os.path.join(self.tmp, "no-such.toml")))  # the installed copy's case
+
+    def test_a_folder_the_user_chose_needs_no_steam(self):
+        folder = os.path.join(self.tmp, "from-elsewhere")
+        write(os.path.join(folder, gamefiles.MAC_GAME_BIN), b"x")
+        self.fake.st = gamefiles.SteamState(False, False, False)
+        self.assertEqual(self.game(folder), (folder, "folder"))
+        self.assertEqual(self.codes(), [])
+        with self.assertRaises(Failure):
+            self.game(os.path.join(self.tmp, "empty"))  # and it has to be the game's
+        self.assertEqual(self.sends, 0)
+
+    def test_the_game_installed_in_steam_comes_first(self):
+        self.installed()
+        self.downloaded()  # a download next to it is not used
+        self.fake.st = gamefiles.SteamState(False, False, False)
+        self.assertEqual(self.game(), (os.path.join(self.steam, "steamapps", "common", "Rocksmith2014"), "library"))
+        self.assertEqual((self.codes(), self.sends, self.fake.urls), ([], 0, []))
+
+    def test_an_install_steam_is_at_is_waited_for(self):
+        self.installed(b"1026")
+        self.clock.hooks += [(30, self.installed)]
+        game, where = self.game()
+        self.assertEqual(where, "library")
+        self.assertEqual(self.codes(), ["installing-game", "-"])
+        self.assertIn("Installing the game in Steam… 1 of 2 MB", self.out.stream.getvalue())
+        self.assertEqual(self.sends, 0)
+
+    def test_not_installed_steam_downloads_the_depot(self):
+        self.fake.st = gamefiles.SteamState(False, False, False)
+
+        def state(*a):
+            def set_it():
+                self.fake.st = gamefiles.SteamState(*a)
+            return set_it
+        self.clock.hooks += [(10, state(True, False, False)), (20, state(True, True, False)),
+                             (100, state(True, True, True, self.ACCOUNT, "somebody")),
+                             (102, lambda: self.log("Downloading depot 221682 (103 files, 10 MB) ...")),
+                             (110, self.done)]
+        self.assertEqual(self.game(), (self.folder, "download"))
+        self.assertEqual(self.codes(), ["steam-missing", "steam-starting", "sign-in", "downloading", "-"])
+        self.assertEqual((self.sends, self.pastes, self.fake.urls), (1, 0, [None]))  # Steam opened, nothing installed
+        out = self.out.stream.getvalue()
+        self.assertIn("progress 0.0000 Downloading the Mac game… waiting for Steam to start", out)
+        self.assertIn("Steam finished the download (manifest 77).", out)
+        self.assertIn("Found the Mac game in %s (the supported build)." % self.folder, out)
+        # The next run finds it there, with Steam closed.
+        self.fake.st = gamefiles.SteamState(True, False, False)
+        self.assertEqual(self.game(), (self.folder, "download"))
+        self.assertEqual(self.sends, 1)
+
+    def test_only_looking_starts_nothing(self):
+        with self.assertRaises(Failure) as e:
+            self.game(download=False)
+        self.assertEqual((e.exception.code, self.sends, self.codes()), (1, 0, []))
+        self.downloaded(b"another build" * 1000)
+        with self.assertRaises(Failure) as e:
+            self.game(download=False)
+        self.assertEqual(e.exception.code, 2)
+        self.assertIn("different build", str(e.exception))
+
+    def test_an_account_without_the_mac_game(self):
+        self.clock.hooks += [(2, lambda: self.log("Depot download failed : missing license for depot (No subscription)"))]
+        with self.assertRaises(Failure) as e:
+            self.game(timeout=100)
+        self.assertEqual(e.exception.code, 3)
+        self.assertEqual(self.codes(), ["downloading", "wrong-account-mac"])
+        self.assertIn("Learn & Play", self.stream.getvalue())
+        self.assertEqual(self.sends, 1)
+
+    def test_no_room_is_said_before_anything_is_asked_of_steam(self):
+        with mock.patch.object(gamefiles, "free_bytes", lambda p: 100):
+            with self.assertRaises(Failure) as e:
+                self.game()
+        self.assertEqual((e.exception.code, self.sends), (4, 0))
+        self.assertIn("not enough", str(e.exception))
+
+    def test_room_and_another_disk(self):
+        cfg = self.depot.cfg
+        cfg.update(depot_disk_bytes=5000, dlc_disk_bytes=300, startup_margin_bytes=4096)
+        with mock.patch.object(gamefiles, "on_startup_disk", lambda p: False):
+            self.assertEqual(self.depot.space(self.steam)[1], 5000 + 1024 + 300)
+        with mock.patch.object(gamefiles, "on_startup_disk", lambda p: True):
+            self.assertEqual(self.depot.space(self.steam)[1], 5000 + 4096 + 300)  # room for macOS next to it
+        other = os.path.join(self.tmp, "External", "steam-content")
+        note = gamefiles.download_notes("mac")[0]
+        content = gamefiles.redirect(self.steam, other, note)
+        self.assertEqual(os.path.realpath(self.depot.dir(self.steam)),
+                         os.path.realpath(os.path.join(other, "app_221680", "depot_221682")))
+        with open(note) as f:
+            self.assertEqual(f.read().strip(), other)
+        cfg.update(depot_disk_bytes=0)
+        self.downloaded()  # (through the link)
+        os.remove(content)  # a Steam update dropped the link: the next look puts it back
+        self.assertEqual(self.game(download=False)[1], "download")
+        self.assertTrue(os.path.islink(content))
+        # Learn & Play's note does the same: Steam has one download folder for both.
+        os.remove(content)
+        os.makedirs(os.environ["LP_HOME"])
+        os.rename(note, gamefiles.download_notes("learn-play")[0])
+        self.assertEqual(self.game(download=False)[1], "download")
+        self.assertTrue(os.path.islink(content))
+
+    def own(self, dlc):
+        write(os.path.join(self.steam, "userdata", str(self.ACCOUNT), "config", "localconfig.vdf"),
+              ('"UserLocalConfigStore" { "apptickets" { "221680" "%s" } }' % lp_ticket(dlc)).encode())
+
+    def dlc_depot(self, dlc):
+        d = os.path.join(self.steam, "steamapps", "content", "app_221680", "depot_%d" % dlc, "dlc")
+        write(os.path.join(d, "s%d_m.psarc" % dlc), b"mac song")
+        write(os.path.join(d, "s%d_p.psarc" % dlc), b"pc song")
+
+    def copy(self, **kw):
+        dest = os.path.join(self.tmp, "home", "game")
+        with mock.patch.object(gamefiles, "steam_account", lambda *a: (self.ACCOUNT, gamefiles.HOW_LICENSE)):
+            if kw.pop("refresh", False):
+                gamefiles.refresh(dest, quiet(), is_running=lambda e: False)
+            else:
+                Copier("mac", self.folder, dest, gamefiles.steam_dlc_folders(self.steam), self.steam, quiet(),
+                       is_running=lambda e: False).run()
+        return dest
+
+    def test_the_copy_of_a_download_has_its_dlc_and_the_accounts_facts(self):
+        self.downloaded()
+        self.own([294990, 899893])
+        self.dlc_depot(294990)
+        # Custom songs in the dlc folder of a game that is no longer installed in Steam come along.
+        write(os.path.join(self.steam, "steamapps", "common", "Rocksmith2014", "dlc", "cdlc", "Custom_m.psarc"), b"c")
+        dest = self.copy()
+        self.assertEqual(sorted(os.listdir(os.path.join(dest, "dlc"))),
+                         ["cdlc", "rs1compatibilitydlc_m.psarc", "s294990_m.psarc"])
+        self.assertFalse(os.path.exists(os.path.join(dest, "Rocksmith2014.app")))
+        with open(os.path.join(dest, ".rearmed", "steam.env")) as f:
+            env = f.read()
+        self.assertIn("RS_STEAM_DLC=248750,294990,899893\n", env)  # what the ticket lists: no appmanifest says
+        self.assertIn("RS_STEAM_ID=%d\n" % (gamefiles.STEAMID64_BASE + self.ACCOUNT), env)
+        self.assertNotIn("RS_STEAM_LANGUAGE", env)  # the Steam layer's own default
+
+    def test_an_appmanifest_of_another_install_does_not_stop_the_copy(self):
+        self.downloaded()
+        write(os.path.join(self.steam, "steamapps", "appmanifest_221680.acf"), b'"AppState" { "StateFlags" "1026" }')
+        self.copy()  # (a game folder in that library would be "Steam is updating")
+
+    def test_the_license_names_the_account_without_an_appmanifest(self):
+        self.assertEqual(gamefiles.edition_depots("mac", None), {gamefiles.MAC_DEPOT})
+
+    def test_a_refresh_takes_new_dlc_and_outlives_steams_folder(self):
+        self.downloaded()
+        self.own([1, 2])
+        self.dlc_depot(1)
+        dest = self.copy()
+        self.dlc_depot(2)
+        self.copy(refresh=True)
+        self.assertIn("s2_m.psarc", os.listdir(os.path.join(dest, "dlc")))
+        shutil.rmtree(self.folder)  # Steam cleared its download: the copy is what counts
+        self.dlc_depot(3)
+        self.copy(refresh=True)
+        self.assertEqual(sorted(os.listdir(os.path.join(dest, "dlc"))),
+                         ["rs1compatibilitydlc_m.psarc", "s1_m.psarc", "s2_m.psarc", "s3_m.psarc"])
+        self.assertTrue(os.path.isfile(os.path.join(dest, "songs.psarc")))
+        self.assertTrue(gamefiles.check(dest)[0])
+
+    def test_dlc_is_fetched_for_a_download_and_not_for_a_game_in_steam(self):
+        made = []
+
+        class Fetch:
+            def __init__(self, *a, **kw):
+                made.append(kw.get("game"))
+
+            def run(self):
+                return []
+        state = os.path.join(self.tmp, "home", "dlc-fetched.json")
+        self.downloaded()
+        dest = self.copy()
+        with mock.patch.object(gamefiles, "DlcFetch", Fetch):
+            self.assertEqual(gamefiles.main(["dlc-fetch", "--copy", dest, state]), 0)
+            self.assertEqual(made, [gamefiles.GAME_MAC])
+            self.mac_game()  # the game in Steam's library, and a copy of it
+            Copier("mac", self.src, self.dest + "2", (), self.steam, quiet(), is_running=lambda e: False).run()
+            self.assertEqual(gamefiles.main(["dlc-fetch", "--copy", self.dest + "2", state]), 0)
+            self.assertEqual(made, [gamefiles.GAME_MAC])  # Steam installs that one's DLC
+            self.assertEqual(gamefiles.main(["dlc-fetch", state]), 0)
+            self.assertEqual(made, [gamefiles.GAME_MAC, gamefiles.GAME_LP])
+
+    def test_cli(self):
+        py = [sys.executable, "-I", os.path.join(HERE, "gamefiles.py")]
+        env = dict(os.environ, RS_STEAM_DIR=self.steam)
+        r = subprocess.run(py + ["mac-game-command"], capture_output=True, text=True, env=env)
+        self.assertEqual((r.returncode, r.stdout.strip()), (0, "download_depot 221680 221682 2035751420671775739"))
+        r = subprocess.run(py + ["mac-game", "--locate"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("error: No Rocksmith2014.app in", r.stdout)
+        self.installed()
+        r = subprocess.run(py + ["mac-game", "--locate"], capture_output=True, text=True, env=env)
+        self.assertEqual(r.stdout.splitlines(), ["game-from library", "game-folder " + os.path.join(
+            self.steam, "steamapps", "common", "Rocksmith2014")])
+        r = subprocess.run(py + ["mac-game-space"], capture_output=True, text=True, env=env)
+        self.assertIn("is needed", r.stdout)
 
 
 class CommandLine(Base):

@@ -17,7 +17,8 @@ python3 tools/play-native/test_settings.py   # settings.env, read by both editio
 `APP` defaults to the build-m4.sh output under `$RS_BUILD_DIR` (default `build/` in the repo). Then start
 **RS Re-ARMed** from `~/Applications`. `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` move the install's folder and
 the launcher; `RS_RENDERER=metal|opengl` sets the renderer, `RS_WARM_SHADERS=0` skips
-the shader warm-up, `RS_GAME_COPY_DIR=DIR` puts the copy of the game files in `DIR/game`.
+the shader warm-up, `RS_GAME_COPY_DIR=DIR` puts the copy of the game files in `DIR/game` (`home` or `drive`: in the install's folder, or
+on the game's drive, moving a copy that is in the other place).
 
 | File | What |
 |---|---|

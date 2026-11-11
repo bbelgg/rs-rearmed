@@ -71,7 +71,8 @@ mkdir -p "$home/logs" "$home/steam"
 # The game files: the install's own copy (only what the game reads; DLC and custom songs as dlc/*_m.psarc).
 # Clones on the same APFS volume; a real copy otherwise, after a check that there is room. A new copy of a
 # game on another APFS drive goes onto that drive (<drive>/RS Re-ARMed/game, clones) and game/ is a link to it;
-# RS_GAME_COPY_DIR=DIR puts it in DIR/game (home: here). A stopped copy continues on the next run.
+# RS_GAME_COPY_DIR=DIR puts it in DIR/game (home: here; drive: on the game's drive; these two also move a copy
+# that is in the other place, as the installer's Game files choice does). A stopped copy continues on the next run.
 echo "game files: $RS_GAME_DIR -> $home/game"
 python3 -I "$here/gamefiles.py" ${progress[@]+"${progress[@]}"} sync "$RS_GAME_DIR" "$home/game" --edition mac ||
     rs_die "the game files could not be copied (see above); nothing else was changed"

@@ -84,6 +84,11 @@ folder ([Learn & Play](../windows/INSTALL.md#the-steps) has a step for it).
 - **Rocksmith 2014 game folder** starts on the folder your install's game files come from, else Steam's
   default library. **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy with it:
   after new DLC or custom songs, or a Steam update ([Game files](#game-files)).
+- **Game files** matters only when the game is on another drive than your home folder: **On the game's drive**
+  keeps RS Re-ARMed's copy there, with no extra space, and the game needs that drive connected; **On this Mac**
+  makes a full copy in your home folder, and the game plays without the drive. It shows where the copy is now.
+  Choose the other and click Build & Install or Refresh Game Files, and the copy is moved
+  ([Game files](#game-files)).
 - **Built-in Mods…** (also ⌘,) switches off built-in mods of the game chosen above: custom songs, the
   rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title
   logo. A change takes effect the next time the game starts, with nothing to reinstall
@@ -215,8 +220,13 @@ nothing for it is in RS Re-ARMed). The game's program in the game folder shows i
 - **A Steam library on another drive.** On APFS the copy goes onto that drive as clones, in `RS Re-ARMed/game` at
   its top, and `…/RS Re-ARMed/game` is a link to it, so the game needs that drive connected. On a drive that can't
   clone (exFAT, HFS+, a network volume) it is a real copy in your home folder, about 6.5 GB without DLC, after a
-  check for room. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game` (`home`: your home folder; for the
-  installer, `launchctl setenv`). A refresh keeps the copy where it is.
+  check for room. The installer's **Game files** choice picks the place, and moves a copy that is in the other
+  one: to your home folder as a real copy (about 6.5 GB without DLC, after a check for room; the game then starts
+  without the drive and macOS doesn't ask about it), or to the game's drive as clones. Everything in the copy
+  moves, and the old one is removed only when the new one is whole. By hand that is `RS_GAME_COPY_DIR=home` or
+  `RS_GAME_COPY_DIR=drive` for an install or a refresh. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game`
+  (for the installer, `launchctl setenv`; its choice is then switched off). Without any of them a refresh keeps
+  the copy where it is.
 - **Refresh** after new DLC or custom songs, or a Steam update: **Refresh Game Files**, or
   `tools/play-native/install.sh --refresh-game`. It copies new and changed files, removes what the game folder no
   longer has, and touches nothing else. If the game folder is gone it changes nothing and says so.

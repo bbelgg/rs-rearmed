@@ -995,6 +995,126 @@ class ExternalDrive(Base):
         self.copier().run()
         self.assertFalse(os.path.islink(self.dest))
 
+    def extras(self, top):
+        """What a copy has that the game folder doesn't: a note of its own, the title logo, the built program."""
+        write(os.path.join(top, ".rearmed", "toc-key"), b"a note the copy keeps")
+        write(os.path.join(top, "static.psarc.rearmed"), b"logo")
+        exe = write(os.path.join(top, "Rocksmith2014.app", "Contents", "MacOS", "Rocksmith2014"), b"native")
+        os.chmod(exe, 0o755)
+        os.symlink("MacOS", os.path.join(top, "Rocksmith2014.app", "Contents", "Current"))
+        os.makedirs(os.path.join(top, "Tmp", "empty"))
+
+    def assert_extras(self):
+        self.assertEqual(self.read(".rearmed/toc-key"), b"a note the copy keeps")
+        self.assertEqual(self.read("static.psarc.rearmed"), b"logo")
+        exe = os.path.join(self.dest, "Rocksmith2014.app", "Contents", "MacOS", "Rocksmith2014")
+        self.assertEqual(self.read("Rocksmith2014.app/Contents/MacOS/Rocksmith2014"), b"native")
+        self.assertTrue(os.access(exe, os.X_OK))
+        self.assertEqual(os.readlink(os.path.join(self.dest, "Rocksmith2014.app", "Contents", "Current")), "MacOS")
+        self.assertTrue(os.path.isdir(os.path.join(self.dest, "Tmp", "empty")))
+        self.assertEqual(self.read("dlc/cdlc/Custom_m.psarc"), b"custom mac")
+        self.assertTrue(gamefiles.check(self.dest)[0])
+
+    def test_move_home(self):
+        self.copier().run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "game")
+        self.extras(target)
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        out = io.StringIO()
+        self.copier(clone=no_clone, progress=gamefiles.Progress(lines=True, stream=out)).run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assert_extras()
+        self.assertFalse(os.path.exists(os.path.join(self.dest, ".rearmed", "link.json")))
+        self.assertFalse(os.path.exists(os.path.join(self.ext, "RS Re-ARMed")))  # the old copy and its folder
+        self.assertFalse(os.path.lexists(self.dest + ".moving"))
+        self.assertIn("the game starts without that drive", out.getvalue())
+        self.assertIn("unchanged", out.getvalue())  # the sync after it finds every file in place
+        self.assertNotIn(" copied (", out.getvalue())
+        self.copier().run()  # and again: nothing to move
+        self.assertFalse(os.path.islink(self.dest))
+
+    def test_move_home_no_room(self):
+        self.copier().run()
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        with self.assertRaises(Failure) as e:
+            self.copier(clone=no_clone, free=lambda p: 0).run()
+        self.assertIn("not enough free space to move", str(e.exception))
+        self.assertTrue(os.path.islink(self.dest))  # as it was, and it still works
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertFalse(os.path.lexists(self.dest + ".moving"))
+
+    def test_move_home_stopped_then_again(self):
+        self.copier().run()
+        write(os.path.join(self.dest + ".moving", "half"), b"x")  # a stopped move's
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertFalse(os.path.exists(os.path.join(self.dest, "half")))
+        self.assertTrue(gamefiles.check(self.dest)[0])
+
+    def test_move_home_drive_not_connected(self):
+        self.copier().run()
+        away = self.ext + "-unmounted"
+        os.rename(self.ext, away)
+        self.mounted(False)
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        with self.assertRaises(Failure) as e:
+            gamefiles.refresh(self.dest, quiet(), is_running=lambda e: False)
+        self.assertIn("isn't connected", str(e.exception))
+        self.assertTrue(os.path.islink(self.dest))
+
+    def test_move_home_other_installs_copy_is_left(self):
+        self.copier().run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "game")
+        gamefiles.write_json(os.path.join(target, ".rearmed", "link.json"), {"format": 1, "link": "/elsewhere/game"})
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(os.path.isdir(target))
+
+    def test_move_to_drive(self):
+        self.copier(placement=None).run()  # a real copy at home
+        self.extras(self.dest)
+        if not self._clones_here():
+            self.skipTest("no clones on this volume")
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        out = io.StringIO()
+        self.copier(progress=gamefiles.Progress(lines=True, stream=out)).run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "game")
+        self.assertEqual(os.readlink(self.dest), target)
+        self.assert_extras()
+        self.assertEqual(gamefiles.read_json(os.path.join(target, ".rearmed", "link.json"))["link"], self.dest)
+        self.assertFalse(os.path.lexists(self.dest + ".moved"))
+        self.assertFalse(os.path.lexists(target + ".moving"))
+        self.assertIn("the game needs that drive connected", out.getvalue())
+        self.copier().run()  # and again: it stays
+        self.assertEqual(os.readlink(self.dest), target)
+        os.environ["RS_GAME_COPY_DIR"] = "home"  # and back
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assert_extras()
+
+    def test_move_to_drive_that_cannot_clone(self):
+        self.copier(placement=None).run()
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        self.copier(clone=no_clone).run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertFalse(os.path.exists(os.path.join(self.ext, "RS Re-ARMed")))
+
+    def test_move_to_drive_stopped_at_the_swap(self):
+        self.copier(placement=None).run()
+        os.rename(self.dest, self.dest + ".moved")  # stopped before the link was made
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        self.copier().run()
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertFalse(os.path.lexists(self.dest + ".moved"))
+
+    def test_drive_is_the_default_for_a_new_copy(self):
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        self.copier().run()
+        self.assertEqual(os.readlink(self.dest), os.path.join(self.ext, "RS Re-ARMed", "game"))
+
     def test_same_volume_no_link(self):
         src = os.path.join(self.tmp, "Steam", "steamapps", "common", "Rocksmith2014")
         shutil.copytree(self.src, src)
@@ -1039,6 +1159,29 @@ class DiskImage(Base):
         self.assertGreater(gamefiles.free_bytes(self.mnt), before - (12 << 20))
         self.assertEqual(os.path.getsize(os.path.join(self.dest, "big.psarc")), 8 << 20)
 
+    def test_move_home_and_back(self):
+        """Real volumes: home is a real copy read from the image, and back on the image it is clones again."""
+        self.mac_game()
+        write(os.path.join(self.src, "big.psarc"), b"\1" * (8 << 20))
+        self.copier().run()
+        target = os.path.join(os.path.realpath(self.mnt), "RS Re-ARMed", "game")
+        write(os.path.join(target, "static.psarc.rearmed"), b"logo")
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertEqual(self.read("big.psarc"), b"\1" * (8 << 20))
+        self.assertEqual(self.read("static.psarc.rearmed"), b"logo")
+        self.assertFalse(os.path.exists(os.path.join(self.mnt, "RS Re-ARMed")))
+        before = gamefiles.free_bytes(self.mnt)
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        self.copier(free=lambda p: 1 << 40).run()  # the image is smaller than the margin kept free
+        self.assertEqual(os.readlink(self.dest), target)
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertEqual(self.read("static.psarc.rearmed"), b"logo")
+        self.assertGreater(gamefiles.free_bytes(self.mnt), before - (4 << 20))  # clones of the game folder's files
+        self.assertFalse(os.path.lexists(self.dest + ".moved"))
+
 
 class DiskImageHFS(DiskImage):
     FS = "HFS+"
@@ -1050,6 +1193,14 @@ class DiskImageHFS(DiskImage):
         self.assertTrue(gamefiles.check(self.dest)[0])
         self.assertFalse(os.path.exists(os.path.join(self.mnt, "RS Re-ARMed")))
         self.assertEqual(self.read("dlc/cdlc/Custom_m.psarc"), b"custom mac")
+
+    def test_move_home_and_back(self):
+        self.mac_game()
+        self.copier().run()
+        os.environ["RS_GAME_COPY_DIR"] = "drive"  # no clones there: the copy stays at home
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(gamefiles.check(self.dest)[0])
 
 
 class Review(Base):

@@ -48,7 +48,8 @@
         ~/Library/Application Support/RS Re-ARMed/learn-play/game). APFS clones on the same volume (no extra
         space), else a real copy after a free-space check; again later, only what changed. A new copy of a
         game on another APFS drive (a download redirected there) goes onto that drive as clones,
-        <drive>/RS Re-ARMed/learn-play/game, and DEST is a link to it (RS_GAME_COPY_DIR chooses the place).
+        <drive>/RS Re-ARMed/learn-play/game, and DEST is a link to it (RS_GAME_COPY_DIR chooses the place; home or drive
+        there also moves a copy that is in the other place).
         The app reads only this copy.
     lp_install.py game-refresh [--dest DIR]
         the same from the folders the copy was made from (new DLC, a new download): the installer app's

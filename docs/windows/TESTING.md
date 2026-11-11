@@ -164,7 +164,7 @@ LP_GAME_DIR=<game folder> LP_USER_DIR=<test user folder> RS_STEAM_DATA_DIR=<test
   `steam/`: a run that goes astray can change or delete the profile.
 - **A changed game file**: run with a game folder of its own (`cp -Rc` clones it; set `LP_GAME_DIR`) rather than
   changing the installed copy. With the game files on another APFS drive, `game-copy --dest` makes `game/` a
-  link to that drive; `RS_GAME_COPY_DIR=home` makes a real copy at DEST.
+  link to that drive; `RS_GAME_COPY_DIR=home` makes a real copy at DEST, or moves the one on the drive there.
 - **Another volume and `open`**: a bundle without the permission stops in `open()` at its first look at that
   volume, with no window, until macOS's question is answered. It is not a hang; start the executable directly,
   or keep the app, its home and the game copy on the internal disk.

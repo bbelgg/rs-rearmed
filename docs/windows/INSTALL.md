@@ -111,6 +111,11 @@ run; what is done is kept, and Build & Install goes on from there.
 
 - **Windows game folder** stays empty for Steam's download; choose a folder only for a game copied from
   elsewhere, such as a Windows PC.
+- **Game files** matters only when Steam's download is on another drive than your home folder: **On the game's
+  drive** keeps the app's copy there, with no extra space, and the game needs that drive connected; **On this
+  Mac** makes a full copy in your home folder, and the game plays without the drive. It shows where the copy is
+  now. Choose the other and click Build & Install or Refresh Game Files, and the copy is moved
+  ([Game files](#game-files)).
 - **Refresh Game Files** (shown once the game is installed) has Steam fetch DLC you bought since, and syncs the
   app's copy of the game files with Steam's folders again ([Game files](#game-files)).
 - **Built-in Mods…** (also ⌘,) switches off built-in mods of the game chosen above: custom songs, the
@@ -143,7 +148,7 @@ An earlier run's code image is kept only if it is the one this version is made f
 | `RS_BUILD_DIR` | the build folder (default `build/` in the repository; no spaces in its path). The build goes to `$RS_BUILD_DIR/win-x86/lp`, the DLLs to `…/win-x86/dlls`, the image to `…/win-x86/image` |
 | `LP_GAME_DIR` | the Windows game folder to copy from, when it is not Steam's download folder (for example a copy from a Windows PC) |
 | `LP_HOME` | the app's folder (default `~/Library/Application Support/RS Re-ARMed/learn-play`); the copy goes to its `game/` (or, for a game on another APFS drive, that is a link to the copy there) |
-| `RS_GAME_COPY_DIR` | where a new copy goes: `DIR/learn-play/game`, with `game/` a link to it; `home`: in `LP_HOME` whatever the drive ([Game files](#game-files)) |
+| `RS_GAME_COPY_DIR` | where a new copy goes: `DIR/learn-play/game`, with `game/` a link to it; `home`: in `LP_HOME` whatever the drive, `drive`: on the game's drive, and these two also move a copy that is in the other place ([Game files](#game-files)) |
 | `LP_DOWNLOAD_DIR` | a folder on another disk for Steam's download, when the startup disk is short of space |
 | `LP_SEED` | the unpacker's seed, when it is not `win-x86/unpack/seed.bin` |
 | `LP_HARVEST`, `LP_HARVEST_V1` | the capture folder, when it is not given as `CAPTURE`; a harvester v1 capture of the same build, as its reference |
@@ -183,8 +188,13 @@ that needs neither the image nor the game folder.
 - **Steam's download on another drive.** On APFS the copy goes onto that drive as clones, in
   `RS Re-ARMed/learn-play/game` at its top, and `…/learn-play/game` is a link to it, so the game needs that drive
   connected. From a drive that can't clone it is a real copy, about 6 GB plus DLC, after a check for room.
-  `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/learn-play/game` (`home`: the app's folder). A refresh keeps
-  the copy where it is.
+  The installer's **Game files** choice picks the place, and moves a copy that is in the other one: to the
+  app's folder as a real copy (after a check for room; the game then starts without the drive and macOS doesn't
+  ask about it), or to the game's drive as clones. Everything in the copy moves, and the old one is removed only
+  when the new one is whole. By hand that is `RS_GAME_COPY_DIR=home` or `RS_GAME_COPY_DIR=drive` for an install
+  or a refresh. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/learn-play/game` (for the installer,
+  `launchctl setenv`; its choice is then switched off). Without any of them a refresh keeps the copy where it
+  is.
 - **New songs while you play**: put a song in a folder the copy is made from (the Mac game's `dlc/` for its
   `*_p.psarc`) or in `game/dlc`, and press **ENUMERATE** in the main menu: it is in the list a moment later,
   with no restart. Changed or removed songs need a refresh.

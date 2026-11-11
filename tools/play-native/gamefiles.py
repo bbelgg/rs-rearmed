@@ -9,7 +9,8 @@
         is room for it, with progress. An interrupted run continues where it was when run again.
         A new copy of a game on another drive (an external Steam library) goes onto that drive as clones,
         <volume>/RS Re-ARMed/game or .../learn-play/game, and DEST becomes a link to it (see "where the copy
-        is" below; RS_GAME_COPY_DIR chooses the place); a copy already there stays where it is.
+        is" below; RS_GAME_COPY_DIR chooses the place); a copy already there stays where it is, unless
+        RS_GAME_COPY_DIR=home (to DEST, a real copy) or =drive (to the game's drive, clones) asks for the other.
     gamefiles.py refresh DEST
         the same again, from the SOURCE (and options) the copy was made from.
     gamefiles.py check DEST
@@ -71,6 +72,7 @@ import json
 import os
 import re
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -614,11 +616,14 @@ def steam_account(edition, steam, appmanifest, override=None):
 # the top of the volume is not writable, the first writable folder on the way down to the game folder (not in
 # Steam's steamapps) holds RS Re-ARMed/ instead. Only when a clone from the game folder into that place works
 # (APFS); otherwise (exFAT, HFS+, a network volume) a real copy at DEST, as before. RS_GAME_COPY_DIR=DIR puts
-# a new copy in DIR/game or DIR/learn-play/game whatever the volumes (RS_GAME_COPY_DIR=home: at DEST). A copy
-# that is already there (a real folder at DEST, or a link to one) stays where it is. The copy records the link
+# a new copy in DIR/game or DIR/learn-play/game whatever the volumes (RS_GAME_COPY_DIR=home: at DEST;
+# RS_GAME_COPY_DIR=drive: as without it). A copy that is already there (a real folder at DEST, or a link to one)
+# stays where it is, unless home or drive asks for the other place (see _move). The copy records the link
 # that leads to it in .rearmed/link.json: a copy another link leads to (a second install) is not taken over.
 
 COPY_DIR_ENV = "RS_GAME_COPY_DIR"
+CHOICE_HOME, CHOICE_DRIVE = "home", "drive"  # its two words; anything else is a folder
+MOVING, MOVED = ".moving", ".moved"  # a copy on its way to a new place, and the old one at DEST on its way out
 FOLDER = "RS Re-ARMed"
 LINK_INFO = "link.json"
 VOLUMES = "/Volumes"
@@ -738,62 +743,217 @@ def _free_name(target, dest):
     raise Failure("no free folder name for the copy next to %s" % target)
 
 
-def place(edition, source, dest, clone=None, device=_device, say=None, env=None):
-    """Where a new copy of SOURCE for DEST goes (see above): makes DEST a link to it and returns it, or returns
+def _drive_target(edition, src, dest, clone, device, say):
+    """The folder for the copy on the drive of the game folder SRC, or None: the game is on DEST's volume (or the
+    startup disk's), or no place there takes clones (said)."""
+    probe_src = os.path.join(src, MARKERS[edition][0])
+    src_dev = device(src)
+    here = {device(existing(os.path.dirname(dest)))}
+    for p in (os.path.expanduser("~"), "/"):
+        try:
+            here.add(device(p))
+        except OSError:
+            pass
+    if src_dev in here:
+        return None  # the game is on DEST's volume (or the startup disk's): the copy is at DEST
+    top = mount_point(src, device)
+    rel = os.path.relpath(os.path.dirname(src), top)
+    parts = [] if rel == os.curdir else rel.split(os.sep)
+    candidates = [top]
+    for part in parts:
+        if part.lower() == "steamapps":
+            break
+        candidates.append(os.path.join(candidates[-1], part))
+    for c in candidates:
+        base = os.path.join(c, FOLDER)
+        t = os.path.join(base, edition_path(edition))
+        if os.access(c, os.W_OK) and _usable(os.path.dirname(t), probe_src, clone, True):
+            return t
+    say("The game is on another drive (%s), but RS Re-ARMed's copy cannot be clones there (not APFS, or "
+        "no folder there is writable): a real copy in %s." % (os.path.basename(top) or top, dest))
+    return None
+
+
+# A copy that is there moves only when asked: RS_GAME_COPY_DIR=home brings a copy on another drive to DEST as a
+# real copy (the game then starts without that drive), RS_GAME_COPY_DIR=drive takes a copy at DEST to the game's
+# drive as clones (the installer's "Game files" choice sets one or the other). Everything of the copy moves,
+# also what is not from the game folder (its notes, the title logo, the Mac edition's program): made
+# whole in "<new place>.moving" first, then swapped in, and the old copy is removed last. A stopped move leaves
+# the old copy in use.
+
+def _move(old, new, clone, device, free, progress):
+    """Everything of the copy OLD, made in NEW + MOVING. A file the game folder still has as the copy recorded it
+    is a clone of that one where the volume clones, else it is copied from OLD. Returns the bytes copied."""
+    part = new + MOVING
+    if os.path.lexists(part):
+        shutil.rmtree(part)  # a stopped move's
+    files = (read_json(os.path.join(old, META, MANIFEST)) or {}).get("files")
+    files = files if isinstance(files, dict) else {}
+    there = device(existing(os.path.dirname(part)))
+    dirs, todo, need = [], [], 0
+    for d, subdirs, names in os.walk(old):
+        rel_d = os.path.relpath(d, old)
+        for n in list(subdirs):
+            if os.path.islink(os.path.join(d, n)):
+                subdirs.remove(n)
+                names.append(n)
+            else:
+                dirs.append(os.path.normpath(os.path.join(rel_d, n)))
+        for n in names:
+            rel, p = os.path.normpath(os.path.join(rel_d, n)), os.path.join(d, n)
+            st = os.lstat(p)
+            origin = None
+            if stat.S_ISREG(st.st_mode):
+                e = files.get(rel)
+                src = e.get("src") if isinstance(e, dict) else None
+                try:
+                    s = os.stat(src) if src else None
+                    if s and s.st_size == e.get("size") == st.st_size and s.st_mtime_ns == e.get("mtime_ns"):
+                        origin = os.path.realpath(src)
+                except OSError:
+                    pass
+                if device(origin or p) != there:
+                    need += st.st_size
+            elif not stat.S_ISLNK(st.st_mode):
+                continue
+            todo.append((rel, p, st, origin))
+    if need and free(part) < need + MARGIN:
+        raise Failure("not enough free space to move the game files: %s are copied to %s, which has %s free "
+                      "(about %s needed). The copy stays where it is." % (
+                          human(need), os.path.dirname(part), human(free(part)), human(need + MARGIN)))
+    label = "Moving the game files"
+    done, shown, copied = [0], [0.0], [0]
+
+    def on_bytes(n):
+        done[0] += n
+        copied[0] += n
+        now = time.monotonic()
+        if now - shown[0] >= 0.2:
+            shown[0] = now
+            progress((done[0] / need if need else 1.0) * 0.99, "%s… %s of %s" % (label, human(done[0]), human(need)))
+
+    os.makedirs(part)
+    for rel in dirs:
+        os.makedirs(os.path.join(part, rel), exist_ok=True)
+    for rel, p, st, origin in todo:
+        dst = os.path.join(part, rel)
+        if stat.S_ISLNK(st.st_mode):
+            t = os.readlink(p)
+            if t == old or t.startswith(old + os.sep):
+                t = new + t[len(old):]
+            os.symlink(t, dst)
+            continue
+        cloned = False
+        for s in ([origin] if origin else []) + [p]:
+            try:
+                cloned = clone(s, dst)
+            except OSError:
+                cloned = False
+            if cloned:
+                break
+            if os.path.lexists(dst):
+                os.unlink(dst)
+        if not cloned:
+            copy_data(p, dst, on_bytes)
+            shutil.copymode(p, dst)
+        os.utime(dst, ns=(st.st_atime_ns, st.st_mtime_ns))
+    return copied[0]
+
+
+def _discard(old, dest, say):
+    """The copy OLD that DEST led to, removed with the RS Re-ARMed folders it leaves empty; left when another
+    install's link is recorded in it."""
+    link = (read_json(os.path.join(old, META, LINK_INFO)) or {}).get("link")
+    if link and os.path.abspath(link) != dest:
+        say("The old copy in %s is left there (another install's)." % old)
+        return
+    shutil.rmtree(old)
+    d = os.path.dirname(old)
+    while os.path.basename(d) in (FOLDER, os.path.dirname(edition_path("learn-play"))):
+        try:
+            os.rmdir(d)
+        except OSError:
+            break
+        d = os.path.dirname(d)
+
+
+def _move_home(dest, clone, device, free, progress):
+    """The copy DEST links to, as a real folder at DEST."""
+    old = os.path.realpath(dest)
+    n = _move(old, dest, clone, device, free, progress)
+    os.unlink(dest)
+    os.rename(dest + MOVING, dest)
+    info = os.path.join(dest, META, LINK_INFO)
+    if os.path.exists(info):
+        os.unlink(info)
+    _discard(old, dest, progress.say)
+    progress.say("The game files are now in %s (%s copied from %s): the game starts without that drive." % (
+        dest, human(n), old))
+
+
+def _move_to_drive(dest, target, clone, device, free, progress):
+    """The copy at DEST, in TARGET on the game's drive, with DEST a link to it."""
+    if os.path.isdir(target):
+        shutil.rmtree(target)  # empty, or an earlier copy of this install that nothing leads to (_free_name)
+    n = _move(dest, target, clone, device, free, progress)
+    os.rename(target + MOVING, target)
+    write_json(os.path.join(target, META, LINK_INFO), {"format": FORMAT, "link": dest})
+    os.rename(dest, dest + MOVED)
+    os.symlink(target, dest)
+    shutil.rmtree(dest + MOVED)
+    progress.say("The game files are now in %s, on the drive with the game%s, and %s leads there: the game needs "
+                 "that drive connected." % (target, ", %s copied" % human(n) if n else " as clones", dest))
+
+
+def place(edition, source, dest, clone=None, device=_device, say=None, env=None, progress=None, free=free_bytes):
+    """Where the copy of SOURCE for DEST goes (see above): makes DEST a link to it and returns it, or returns
     None (the copy is at DEST: one is there already, or the game is on DEST's volume, or no clones there)."""
     clone = clone or clonefile
     env = os.environ if env is None else env
     say = say or (lambda m: None)
+    if progress is None:
+        progress = Progress()
+        progress.say = say
     dest = os.path.abspath(dest)
+    override = env.get(COPY_DIR_ENV, "").strip()
+    choice = override.lower() if override.lower() in (CHOICE_HOME, CHOICE_DRIVE) else ""
+    src = os.path.realpath(source)
+    if os.path.isdir(dest + MOVED):  # a move to the drive stopped at its last step
+        if os.path.lexists(dest):
+            shutil.rmtree(dest + MOVED)
+        else:
+            os.rename(dest + MOVED, dest)
     if os.path.islink(dest):
         if os.path.exists(dest):
-            return None  # a copy on another drive already: it stays there
+            if choice == CHOICE_HOME:
+                _move_home(dest, clone, device, free, progress)
+            return None  # a copy on another drive already: it stays there, unless asked home
         connected, why = missing_copy(dest)
         if not connected:
             raise Failure(why)
         os.unlink(dest)  # the copy it led to is gone: a new one
     elif os.path.lexists(dest) and not (os.path.isdir(dest) and not os.listdir(dest)):
-        return None  # a copy at DEST already (or something the copy's checks refuse): it stays there
-    override = env.get(COPY_DIR_ENV, "").strip()
-    if override.lower() == "home":
+        # a copy at DEST already (or something the copy's checks refuse): it stays there, unless asked away
+        if choice != CHOICE_DRIVE or not os.path.isfile(os.path.join(dest, META, SOURCE_INFO)):
+            return None
+        target = _drive_target(edition, src, dest, clone, device, say)
+        if not target:
+            return None
+        target = _free_name(target, dest)
+        _move_to_drive(dest, target, clone, device, free, progress)
+        return target
+    if choice == CHOICE_HOME:
         return None
-    src = os.path.realpath(source)
-    probe_src = os.path.join(src, MARKERS[edition][0])
-    if override:
+    if override and not choice:
         base = os.path.abspath(os.path.expanduser(override))
         target = os.path.join(base, edition_path(edition))
         if os.path.realpath(target) == os.path.realpath(dest):
             return None
-        if not _usable(os.path.dirname(target), probe_src, clone, False):
+        if not _usable(os.path.dirname(target), os.path.join(src, MARKERS[edition][0]), clone, False):
             raise Failure("%s=%s: cannot make a folder there" % (COPY_DIR_ENV, override))
     else:
-        src_dev = device(src)
-        here = {device(existing(os.path.dirname(dest)))}
-        for p in (os.path.expanduser("~"), "/"):
-            try:
-                here.add(device(p))
-            except OSError:
-                pass
-        if src_dev in here:
-            return None  # the game is on DEST's volume (or the startup disk's): the copy is at DEST
-        top = mount_point(src, device)
-        rel = os.path.relpath(os.path.dirname(src), top)
-        parts = [] if rel == os.curdir else rel.split(os.sep)
-        candidates = [top]
-        for part in parts:
-            if part.lower() == "steamapps":
-                break
-            candidates.append(os.path.join(candidates[-1], part))
-        target = None
-        for c in candidates:
-            base = os.path.join(c, FOLDER)
-            t = os.path.join(base, edition_path(edition))
-            if os.access(c, os.W_OK) and _usable(os.path.dirname(t), probe_src, clone, True):
-                target = t
-                break
+        target = _drive_target(edition, src, dest, clone, device, say)
         if not target:
-            say("The game is on another drive (%s), but RS Re-ARMed's copy cannot be clones there (not APFS, or "
-                "no folder there is writable): a real copy in %s." % (os.path.basename(top) or top, dest))
             return None
     target = _free_name(target, dest)
     os.makedirs(os.path.join(target, META), exist_ok=True)
@@ -803,8 +963,8 @@ def place(edition, source, dest, clone=None, device=_device, say=None, env=None)
     os.makedirs(os.path.dirname(dest), exist_ok=True)
     os.symlink(target, dest)
     say("The game files go to %s (%s), and %s leads there." % (
-        target, "%s=%s" % (COPY_DIR_ENV, override) if override else "on the drive with the game, %s, as clones"
-        % (drive_of(target) or mount_point(target, device)), dest))
+        target, "%s=%s" % (COPY_DIR_ENV, override) if override and not choice
+        else "on the drive with the game, %s, as clones" % (drive_of(target) or mount_point(target, device)), dest))
     return target
 
 
@@ -1049,7 +1209,7 @@ class Copier:
         if self.is_running(self.edition):
             raise Failure("quit the game first (%s is running)" % PROCESS[self.edition])
         if self.placement and self.placement(self.edition, self.source, self.dest, clone=self.clone,
-                                             say=self.progress.say):
+                                             say=self.progress.say, progress=self.progress, free=self.free):
             self._check_paths()  # the place chosen must not be in the game folder either
         missing = missing_copy(self.dest)
         if missing:

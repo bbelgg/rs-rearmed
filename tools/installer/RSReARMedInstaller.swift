@@ -93,6 +93,26 @@ func gameCopyElsewhereNote(_ game: String) -> String {
         "to uninstall, delete that folder too."
 }
 
+// Where the copy is kept when the game is on another drive (gamefiles.py's RS_GAME_COPY_DIR): on that drive as
+// clones, or on this Mac as a real copy. An install or a refresh moves a copy that is in the other place.
+let gameCopyPlaceEnv = "RS_GAME_COPY_DIR"
+let gameCopyPlaces: [(title: String, value: String)] = [
+    ("On the game's drive (no extra space)", "drive"),
+    ("On this Mac (plays without that drive)", "home")]
+let gameCopyPlaceDefaultsKey = "gameCopyPlace"
+// A folder of the user's own choosing there (launchctl setenv): the installer leaves it alone.
+func gameCopyPlaceFixed() -> Bool {
+    let v = (ProcessInfo.processInfo.environment[gameCopyPlaceEnv] ?? "").trimmingCharacters(in: .whitespaces).lowercased()
+    return !v.isEmpty && !gameCopyPlaces.contains(where: { $0.value == v })
+}
+// Where the edition's copy is now, else what was chosen last time, else the game's drive.
+func gameCopyPlaceNow(_ game: String) -> String {
+    if gameCopyElsewhere(game) != nil { return "drive" }
+    if FileManager.default.fileExists(atPath: gameCopy(game) + "/.rearmed/source.json") { return "home" }
+    let saved = UserDefaults.standard.string(forKey: gameCopyPlaceDefaultsKey)
+    return gameCopyPlaces.contains(where: { $0.value == saved }) ? saved! : "drive"
+}
+
 // What macOS asks the game, for the last window of the install: both editions the same.
 func macOSQuestions(_ game: String) -> String {
     let drive = gameCopyElsewhere(game) == nil ? "" : "The game files are on another drive, so macOS asks too whether "
@@ -211,6 +231,7 @@ final class BuildRunner {
     var cleanupAfterInstall = false
     var renderer = "metal"  // rendererChoices' value
     var game = "mac"        // gameChoices' value
+    var gameCopyPlace = ""  // gameCopyPlaces' value for the run's commands; empty: the environment's own
     var refreshOnly = false // the run only refreshes the game's own copy of the game files (Refresh Game Files)
     // What the user has to do now, in the box above the log: "guide" lines of lp_install.py and gamefiles.py,
     // the same words in both editions and in a terminal, or the installer's own. Empty code: nothing.
@@ -325,6 +346,7 @@ final class BuildRunner {
         // macOS's own tools and the Xcode command line tools only (launchd's PATH, what an app opened from
         // the Finder gets), whatever else the user's shell has: CMake and Ninja come from the build's venv.
         environment["PATH"] = "/usr/bin:/bin:/usr/sbin:/sbin"
+        if !gameCopyPlace.isEmpty { environment[gameCopyPlaceEnv] = gameCopyPlace }
         if let env = env {
             for (k, v) in env { environment[k] = v }
         }
@@ -971,6 +993,11 @@ enum Steps {
             + "files are copied; your settings and saves are not touched.")
         try await r.shell("python3 -I \(shq(tool)) --progress-lines refresh \(shq(gameCopy(r.game)))",
                           workDir: NSHomeDirectory())
+        // The copy's tool of an install from before the choice keeps the copy where it is.
+        if r.gameCopyPlace == "home", gameCopyElsewhere(r.game) != nil {
+            r.appendLog("The game files are still on the other drive: this install is from before they could be "
+                + "moved. Click Install to move them.")
+        }
     }
 
     // msvcr100, msvcp100, d3dx9_42 and D3DCompiler_42: from Steam's Common Redistributables, else from
@@ -1151,6 +1178,7 @@ class InstallerWindow: NSWindow {
     let refreshButton = NSButton(title: "Refresh Game Files", target: nil, action: nil)
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
     let rendererPopup = NSPopUpButton(frame: .zero, pullsDown: false)
+    let gameCopyPlacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let modsButton = NSButton(title: "Built-in Mods…", target: nil, action: nil)
     var modsSheet: BuiltInModsSheet?  // while it is shown
     let gamePopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -1313,6 +1341,29 @@ class InstallerWindow: NSWindow {
         rendererHint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         rendererHint.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(rendererHint)
+
+        // Game files: where the copy is kept when the game is on another drive (applyGame selects where it is now).
+        let placeLabel = NSTextField(labelWithString: "Game files:")
+        placeLabel.font = .systemFont(ofSize: 12, weight: .medium)
+        placeLabel.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(placeLabel)
+
+        gameCopyPlacePopup.addItems(withTitles: gameCopyPlaces.map { $0.title })
+        gameCopyPlacePopup.font = .systemFont(ofSize: 12)
+        gameCopyPlacePopup.toolTip = "Only for a game on another drive than your home folder. On the game's drive the "
+            + "copy takes no extra space, but the game needs that drive connected and macOS asks whether it may use "
+            + "it. On this Mac it is a full copy. Install or Refresh Game Files moves a copy that is in the other place."
+        gameCopyPlacePopup.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(gameCopyPlacePopup)
+
+        let placeHint = NSTextField(labelWithString: "For a game on another drive")
+        placeHint.font = .systemFont(ofSize: 11)
+        placeHint.textColor = .secondaryLabelColor
+        placeHint.toolTip = gameCopyPlacePopup.toolTip
+        placeHint.lineBreakMode = .byTruncatingTail
+        placeHint.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        placeHint.translatesAutoresizingMaskIntoConstraints = false
+        content.addSubview(placeHint)
 
         // Built-in mods to switch off, for the game chosen above (the sheet says which).
         modsButton.bezelStyle = .rounded
@@ -1540,7 +1591,17 @@ class InstallerWindow: NSWindow {
             modsButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
             modsButton.widthAnchor.constraint(equalToConstant: 140),
 
-            sourceLabel.topAnchor.constraint(equalTo: rendererPopup.bottomAnchor, constant: 12),
+            placeLabel.centerYAnchor.constraint(equalTo: gameCopyPlacePopup.centerYAnchor),
+            placeLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
+
+            gameCopyPlacePopup.topAnchor.constraint(equalTo: rendererPopup.bottomAnchor, constant: 10),
+            gameCopyPlacePopup.leadingAnchor.constraint(equalTo: placeLabel.trailingAnchor, constant: 8),
+
+            placeHint.centerYAnchor.constraint(equalTo: gameCopyPlacePopup.centerYAnchor),
+            placeHint.leadingAnchor.constraint(equalTo: gameCopyPlacePopup.trailingAnchor, constant: 10),
+            placeHint.trailingAnchor.constraint(lessThanOrEqualTo: content.trailingAnchor, constant: -20),
+
+            sourceLabel.topAnchor.constraint(equalTo: gameCopyPlacePopup.bottomAnchor, constant: 12),
             sourceLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
 
             sourceField.topAnchor.constraint(equalTo: sourceLabel.bottomAnchor, constant: 2),
@@ -1603,6 +1664,8 @@ class InstallerWindow: NSWindow {
         gameDirField.placeholderString = lp ? "Steam's download folder" : nil
         gameDirField.stringValue = lp ? lpGameDir : macGameDir
         cleanupCheck.isHidden = runner.embeddedInRepo || lp
+        let place = gameCopyPlaceNow(selectedGame)
+        gameCopyPlacePopup.selectItem(at: gameCopyPlaces.firstIndex(where: { $0.value == place }) ?? 0)
         if !runner.isRunning && !runner.isFinished && !runner.failed { runner.log = whatHappens(lp) }
     }
 
@@ -1778,6 +1841,7 @@ class InstallerWindow: NSWindow {
         buildDirField.isEditable = !runner.isRunning
         cleanupCheck.isEnabled = !runner.isRunning
         rendererPopup.isEnabled = !runner.isRunning && selectedGame == "mac"
+        gameCopyPlacePopup.isEnabled = !runner.isRunning && !gameCopyPlaceFixed()
         showLogButton.isHidden = runner.logFileURL == nil
 
         // Ten times a second: only what the log grew by is added (a build's log is thousands of lines, and
@@ -1885,10 +1949,19 @@ class InstallerWindow: NSWindow {
         runner.cleanupAfterInstall = cleanupCheck.state == .on
         runner.renderer = rendererChoices[max(0, rendererPopup.indexOfSelectedItem)].value
         UserDefaults.standard.set(runner.renderer, forKey: rendererDefaultsKey)
+        takeGameCopyPlace()
         Task { @MainActor in
             await runner.run()
             updateUI()
             finished()
+        }
+    }
+
+    // The Game files choice, for the run's commands (not when the environment names a folder of its own).
+    private func takeGameCopyPlace() {
+        runner.gameCopyPlace = gameCopyPlaceFixed() ? "" : gameCopyPlaces[max(0, gameCopyPlacePopup.indexOfSelectedItem)].value
+        if !runner.gameCopyPlace.isEmpty {
+            UserDefaults.standard.set(runner.gameCopyPlace, forKey: gameCopyPlaceDefaultsKey)
         }
     }
 
@@ -1899,6 +1972,7 @@ class InstallerWindow: NSWindow {
         runner.refreshOnly = true
         runner.game = selectedGame
         runner.lpStopped = ""
+        takeGameCopyPlace()
         Task { @MainActor in
             await runner.run()
             updateUI()

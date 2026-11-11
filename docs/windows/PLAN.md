@@ -44,6 +44,9 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
     yet here.
   - *A hook on decoded song audio* (new in 1.12.0): checked against another decoder block by block here too, also
     after a rewind; Song Stems played here with a stand-in for its helper.
+- **Where the game files are kept** (not released): the installer's Game files choice and the move of the copy
+  between the game's drive and this Mac, the same as the Mac edition's ([Mac plan](../mac/PLAN.md#status)). Checked
+  by the game-files tests; not yet tried by hand on this edition.
 - **The download code is shared with the Mac edition** (not released): the Steam steps, the room check, the link to
   another disk, Steam's log and the wait are in `tools/play-native/gamefiles.py`, where the Mac game uses them when
   it isn't installed in Steam ([Mac plan](../mac/PLAN.md#status)); `lp_install.py` keeps this game's figures. The

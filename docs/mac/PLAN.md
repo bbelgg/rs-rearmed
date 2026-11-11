@@ -13,6 +13,11 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   that can boost; the output following the system's default; Metal by default with OpenGL as choice and fallback; full
   screen, Retina; Enumerate and EXIT GAME in the main menu; the built-in fixes, no intro screens or Auto Save warning;
   the GUI installer, which decrypts the game statically (no Rosetta, no launch of the game).
+- **Where the game files are kept** (not released): for a game on another drive the installer's Game files choice
+  keeps the copy on that drive as clones or on this Mac as a real copy, and an install or a refresh moves a copy
+  that is in the other place (`place()` in `gamefiles.py`, shared with Learn & Play). Checked by the game-files
+  tests, with a move both ways between two real volumes, and by hand: an install of this edition with the copy on
+  this Mac. Not yet done by hand: a move of an installed copy back to the drive.
 - **The game without a Steam install** (not released): when the Mac game isn't installed in Steam, the installer
   and `gamefiles.py mac-game` have Steam download depot 221682 and the account's DLC, with the code Learn & Play's
   download uses ([DESIGN.md](DESIGN.md#installer-and-build)); an installed game is used as before. Checked with a

@@ -266,6 +266,7 @@ sng_song_templates
 sng_song_chord_notes
 sng_song_tuning
 sng_song_capo
+sng_song_tones
 sng_level_size
 sng_level_notes
 sng_note_size

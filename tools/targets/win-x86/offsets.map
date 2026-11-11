@@ -260,6 +260,7 @@ sng_song_templates             0x94    # SNG_Song: std::vector of chord template
 sng_song_chord_notes           0xac    # SNG_Song: std::vector of ChordNotes records, sng_chord_notes_size each (SNG_Song_GetChordNotes 0x10d9df7)
 sng_song_tuning                0x110   # SNG_Song: std::vector<int16_t>, the MetaData tuning (SNG_Song_Load 0x10da58b; the destructor frees it 0x10d9aab)
 sng_song_capo                  0x11c   # SNG_Song: u8, the capo fret, 0xff none (PostProcessNotes 0x10dc7fa, 0x10dc862: a template fret equal to it becomes 0)
+sng_song_tones                 0xdc    # SNG_Song: std::vector of tone changes, 8 bytes each: float time, int32 slot 0-3 for Tone_A-D (SNG_Song_Load 0x10da32e, between the events 0xd0 and the DNA 0xe8)
 sng_level_size                 0x64    # SNG level (PostProcessNotes 0x10dc83c)
 sng_level_notes                0x30    # SNG level: std::vector of notes, sng_note_size each (0x10dc817, 0x10dcdcf)
 sng_note_size                  0x1c8   # SNG note (0x10dc832)

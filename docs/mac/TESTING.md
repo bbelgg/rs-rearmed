@@ -23,7 +23,7 @@ game is in the repository.
 | Decryption | `steamless.decrypt` (`tools/steamless/test_decrypt.py`) | the key found in a made-up Mach-O, and what is refused; with `RS_DEPOT_GAME` set to a clean Mac depot folder, the real output against the pin |
 | Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game |
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
-| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`. The launcher's reader (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
+| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env` and `options.env`. The launchers' readers (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the Mac launcher's `--env` pairs; the same keys in both and in the installer |
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with the Windows port: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with the Windows port: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
@@ -98,9 +98,9 @@ home. Its preferences do not: the installer keeps its choices (game, build folde
 defaults (`UserDefaults`), so a test run changes what the next real run starts with.
 
 - **Cases**: a fresh build and install, Skip during Preparing shaders, an update after a simulated renderer
-  fallback (the popup shows OpenGL), quitting mid-build, the download of a release's source, and the Built-in
-  Mods sheet (the switches a `settings.env` has shown unchecked, Save writing the file into the test home, Turn
-  All On and Save removing it).
+  fallback (the popup shows OpenGL), quitting mid-build, the download of a release's source, and the Settings
+  and switches sheet (the switches a `settings.env` and `options.env` have shown set, Save writing the files
+  into the test home, Clear to defaults and Save removing them, Advanced collapsed at first).
 - **A whole first install**, for a home of its own: link `<home>/Library/Application Support/Steam/steamapps/
   common/Rocksmith2014` to the clean depot, start the app with `-Game mac` from outside the repository (it takes
   the current folder's repository if there is one), and click Build & Install: the only click until the run

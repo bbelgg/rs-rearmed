@@ -68,12 +68,16 @@ fi
 mkdir -p "$logs" "$HOME_DIR/steam"
 
 # settings.env (docs/mac/INSTALL.md "Settings and switches"): the built-in mods switched off in the installer
-# (Built-in Mods...). Lines KEY=0 or KEY=1 of the keys below, whitespace ignored, # a comment; each is passed
+# (Settings and switches...). Lines KEY=0 or KEY=1 of the keys below, whitespace ignored, # a comment; each is passed
 # to the game unless the environment has another value (launchctl setenv wins), and what was used goes at the
 # top of last-run.log. A value that wins is passed too: open starts the game with launchd's environment, so one
 # this launcher was given some other way (open --env, a Terminal) would not reach it, though the log says it won.
 # Learn & Play reads its own the same way (win-x86/app/lp_settings.c); the installer writes both, and
 # tools/play-native/test_settings.py checks the three lists agree.
+#
+# options.env beside it holds every other switch the installer's sheet offers (options_keys below): toggles as
+# KEY=0 or KEY=1, every other key as KEY=value with the ends' whitespace ignored so values may hold spaces.
+# Same first-counts and environment-wins rules, "[options] ..." log lines, and the same three-way agreement.
 settings_keys=(RS_MODS_BYPASS RS_MODS_FIXES RS_MODS_INTRO RS_MODS_AUTOSAVE RS_MODS_OVERLAY RS_MODS_MULTIPLAYER RS_REARMED)
 settings_env() {  # FILE -> settings_args (--env K=V for open, the value used) and settings_log; K set here
     settings_args=() settings_log=()
@@ -99,7 +103,47 @@ settings_env() {  # FILE -> settings_args (--env K=V for open, the value used) a
         fi
     done < "$1"
 }
+options_keys=(RS_AUDIO_FRAMES RS_LATENCY_BUFFER RS_AUDIO_RT RS_AUDIO_INPUT_TRIM RS_AUDIO_INPUT
+    RS_AUDIO_INPUT_CHANNEL RS_AUDIO_INPUT_GAIN_DB RS_AUDIO_INPUT_FILE RS_AUDIO_INPUT_LEVEL
+    RS_AUDIO_CHANNEL_ENTRIES RS_AUDIO_SET_RATE RS_AUDIO_RS_NAMES RS_AUDIO_STABLE_UIDS
+    RS_AUDIO_INPUTS_FIRST RS_FPS RS_WINDOW_ANY_SHAPE RS_GL_MTENGINE RS_METAL_RETINA
+    RS_METAL_UPSCALE RS_METAL_COLORS RS_METAL_ANISO RS_METAL_MSAA RS_FULLSCREEN
+    RS_D3D9_DISPLAY RS_STEAM_DLC RS_STEAM_OWNED RS_STEAM_LANGUAGE RS_STEAM_ID
+    RS_STEAM_PERSONA RS_MODS_BUDGET_MS RS_MODS_LOG RS_LOAD_MODS RS_AUDIO_LOG RS_STEAM_LOG
+    RS_FILE_LOG)
+options_toggles=" RS_AUDIO_RT RS_AUDIO_INPUT_TRIM RS_AUDIO_INPUT RS_AUDIO_INPUT_LEVEL RS_AUDIO_SET_RATE RS_AUDIO_RS_NAMES RS_AUDIO_STABLE_UIDS RS_AUDIO_INPUTS_FIRST RS_WINDOW_ANY_SHAPE RS_GL_MTENGINE RS_METAL_RETINA RS_METAL_UPSCALE RS_LOAD_MODS RS_MODS_LOG RS_AUDIO_LOG RS_STEAM_LOG RS_FILE_LOG "
+options_env() {  # FILE -> options_args (--env K=V, the value used) and options_log; K set here
+    options_args=() options_log=()
+    local line k v seen=" "
+    [[ -f $1 ]] || return 0
+    while IFS= read -r line || [[ -n $line ]]; do
+        line=${line%$'\r'}
+        line=${line#"${line%%[![:space:]]*}"}  # trim the ends only: values may hold spaces
+        line=${line%"${line##*[![:space:]]}"}
+        [[ -z $line || $line == \#* ]] && continue
+        k=${line%%=*} v=${line#*=}
+        k=${k#"${k%%[![:space:]]*}"}; k=${k%"${k##*[![:space:]]}"}
+        v=${v#"${v%%[![:space:]]*}"}; v=${v%"${v##*[![:space:]]}"}
+        if [[ $line != *=* || " ${options_keys[*]} " != *" $k "* || -z $v ]]; then
+            options_log+=("[options] ignored: $line")
+        elif [[ " $options_toggles " == *" $k "* && $v != 0 && $v != 1 ]]; then
+            options_log+=("[options] ignored: $line")
+        elif [[ $seen == *" $k "* ]]; then
+            options_log+=("[options] ignored: $line (repeated)")
+        elif [[ -n ${!k:-} && ${!k} != "$v" ]]; then
+            seen+=" $k "
+            options_args+=(--env "$k=${!k}")
+            options_log+=("[options] $k=$v not used: the environment has $k=${!k}")
+        else
+            seen+=" $k "
+            printf -v "$k" %s "$v"
+            options_args+=(--env "$k=$v")
+            options_log+=("[options] $k=$v")
+        fi
+    done < "$1"
+}
 settings_env "$HOME_DIR/settings.env"
+options_env "$HOME_DIR/options.env"
 
 # The title logo: static.psarc is a link to one of the two copies.
 if [[ -f "$stage/static.psarc.rearmed" && "${RS_REARMED:-1}" != 0 ]]; then
@@ -187,7 +231,8 @@ fi
 
 [[ -f "$logs/last-run.log" ]] && mv -f "$logs/last-run.log" "$logs/previous-run.log"
 # The game's output is added after these lines (open --stdout appends).
-[[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}" > "$logs/last-run.log"
+{ [[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}";
+  [[ ${#options_log[@]} == 0 ]] || printf '%s\n' "${options_log[@]}"; } > "$logs/last-run.log"
 # Started through LaunchServices as an app of its own: exec'ing the game from this (LSUIElement)
 # launcher leaves it without a window when the launcher itself was opened from the Finder. The
 # environment comes from launchd plus --env, so nothing else of this shell's leaks in.
@@ -197,4 +242,5 @@ exec /usr/bin/open -n -a "$stage/Rocksmith2014.app" \
     --env DYLD_INSERT_LIBRARIES="$HOME_DIR/libnetguard.dylib" \
     --env RS_NATIVE_HOME="$HOME_DIR" ${renderer_env[@]+"${renderer_env[@]}"} \
     ${steam_env[@]+"${steam_env[@]}"} ${settings_args[@]+"${settings_args[@]}"} \
+    ${options_args[@]+"${options_args[@]}"} \
     --stdout "$logs/last-run.log" --stderr "$logs/last-run.log"

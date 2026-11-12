@@ -119,10 +119,12 @@ run; what is done is kept, and Build & Install goes on from there.
   ([Game files](#game-files)).
 - **Refresh Game Files** (shown once the game is installed) has Steam fetch DLC you bought since, and syncs the
   app's copy of the game files with Steam's folders again ([Game files](#game-files)).
-- **Built-in Mods…** (also ⌘,) switches off built-in mods of the game chosen above: custom songs, the
+- **Settings and switches…** (also ⌘,) sets the game chosen above: the built-in mods (custom songs, the
   rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title
-  logo. A change takes effect the next time the game starts, with nothing to reinstall
-  ([Settings and switches](#settings-and-switches)).
+  logo) and every other switch below, grouped with the common ones first and the rest under Advanced. A change
+  takes effect the next time the game starts, with nothing to reinstall
+  ([Settings and switches](#settings-and-switches)). The page starts at what the installed app has, can copy
+  the Mac edition's, and Clear returns everything to the defaults.
 - **Build folder**, quitting, the log and a newer release are as in the
   [Mac edition](../mac/INSTALL.md#the-steps). **Renderer** has no effect here ([Renderer](#renderer)).
 
@@ -227,7 +229,7 @@ it starts. Nothing is downloaded by the game, and Steam's folders are read only 
    AppID it carries, with the Steam client closed. `RS_STEAM_DLC=all` counts every AppID as owned
    ([Settings and switches](#settings-and-switches)).
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
-   off in Built-in Mods…, and they must be the PC version, `_p.psarc`.
+   off in Settings and switches…, and they must be the PC version, `_p.psarc`.
 4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
    (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
    came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
@@ -243,7 +245,7 @@ The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
 
 The build makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it
 needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` (or the logo off in the installer's
-Built-in Mods…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next build
+Settings and switches…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next build
 makes it again.
 
 ## Where things are
@@ -261,6 +263,7 @@ makes it again.
 | `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
 | `…/learn-play/mods/` | mods loaded at startup |
 | `…/learn-play/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
+| `…/learn-play/options.env` | if you set any: every other switch set in the installer ([Settings and switches](#settings-and-switches)) |
 | `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 | `~/Library/Application Support/RS Re-ARMed/learn-play/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
@@ -339,18 +342,25 @@ only.
 
 ## Settings and switches
 
-The rows below that say **Built-in Mods…** can be switched off in the installer. It writes them to `settings.env`
-in `~/Library/Application Support/RS Re-ARMed/learn-play/`, which the app reads at every start; without the file
-every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches: other lines are ignored, and
-the top of `logs/last-run.log` says what was used. The Mac edition has its own file, read the same way.
+Every `RS_*` switch below is set in the installer (**Settings and switches…**), except `RS_MODS_PATH` (only
+with `launchctl setenv` or `open --env`) and the diagnostics-only switches in [TESTING.md](TESTING.md#diagnostics).
+The installer writes the built-in mods to
+`settings.env` and every other switch to `options.env` in `~/Library/Application Support/RS Re-ARMed/learn-play/`,
+which the app reads at every start; without the files everything is the game's own setting. By hand they are
+lines of `KEY=0` (off) or `KEY=1` for the built-in mods and `KEY=value` for the rest: other lines are ignored, and
+the top of `logs/last-run.log` says what was used. The Mac edition has its own files, read the same way.
 
 ```
 RS_MODS_INTRO=0
 RS_REARMED=0
 ```
 
-The other switches are environment variables. To pass one, start the app with `open`, or set it with
-`launchctl setenv`; either wins over `settings.env` too:
+```
+RS_METAL_MSAA=2
+RS_AUDIO_FRAMES=128
+```
+
+Switches can also be set per start or for the login session; either wins over both files too:
 
 ```bash
 open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
@@ -369,16 +379,16 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_SET_RATE=0` | on | the real-time audio thread, the stale-input trim, switching devices to 48 kHz |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](../mac/INSTALL.md#guitar-input) |
-| `RS_MODS_MULTIPLAYER=0` | any input | [two players](#two-players): Player 2 on a Real Tone cable only (Built-in Mods…) |
+| `RS_MODS_MULTIPLAYER=0` | any input | [two players](#two-players): Player 2 on a Real Tone cable only (Settings and switches…) |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
-| `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed (Built-in Mods…) |
-| `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off (Built-in Mods…) |
+| `RS_MODS_BYPASS=0` | on | the song-file signature check and the list of known song keys work as in the original: custom songs are not listed (Settings and switches…) |
+| `RS_MODS_FIXES=0` | on | the batched DLC mounting, the open-file limit, the song path cache and the number-table hash, off (Settings and switches…) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC |
-| `RS_MODS_INTRO=0` | on | the intro screens play (Built-in Mods…) |
-| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Built-in Mods…) |
+| `RS_MODS_INTRO=0` | on | the intro screens play (Settings and switches…) |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Settings and switches…) |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Built-in Mods…) |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Built-in Mods…); set for the build, no logo is made |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Settings and switches…) |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Settings and switches…); set for the build, no logo is made |
 | `RS_STEAM_DLC=all`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned |
 | `LP_NATIVE_MATH=0` | on | the CRT's math translated instead of the host's libm |
 | `LP_NATIVE_MEM=0` | on | the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` translated instead of the host's |
@@ -389,7 +399,8 @@ open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 Diagnostics switches: [TESTING.md](TESTING.md#diagnostics).
 
 Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/learn-play/mods/` is loaded at startup
-(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). A mod has to be
+(`RS_LOAD_MODS=0`, in Settings and switches… too, starts without them; `RS_MODS_PATH` loads another folder or
+one library and is only set with `launchctl setenv`). A mod has to be
 built with `rc_mod.h` ([how](../mac/INSTALL.md#settings-and-switches)); the same dylib then runs in the Mac
 edition, and one built without it is left out, with a line in the log. Mods load only with the network guard in
 the process, which logs to `logs/netguard.log`. How mods hook the game:

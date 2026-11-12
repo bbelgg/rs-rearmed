@@ -32,7 +32,7 @@ it better. The priorities:
   without a restart. No intro screens, and mods load from a `mods/` folder, such as [rearmed-mods](https://github.com/glebb/rearmed-mods), RSMods' features and more with an app to set them up.
 
 Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can be
-switched off, and the built-in mods with a checkbox in the installer (**Built-in Mods…**):
+switched off, and every switch set in the installer (**Settings and switches…**):
 [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
 
 ## Requirements
@@ -74,7 +74,7 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ✅ played with a guitar; a chart needs a Mac archive (`_m.psarc`) | ✅ played with a guitar |
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
-| Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |
+| Switches set in the installer (Settings and switches…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |

@@ -67,7 +67,7 @@ let lpHome = nativeHome + "/learn-play"  // lp_install.py app-install's folder (
 // Steam's folders; "Refresh Game Files" syncs it again. The copy's tool is installed next to it.
 func gameCopy(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/game" }
 func gameCopyTool(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/gamefiles.py" }
-// The built-in mods switched off (Built-in Mods…), which the edition's launcher reads at every start.
+// The built-in mods switched off (Settings and switches…), which the edition's launcher reads at every start.
 func settingsFile(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/settings.env" }
 func gameCopyExists(_ game: String) -> Bool {
     (FileManager.default.fileExists(atPath: gameCopy(game) + "/.rearmed/source.json") || gameCopyElsewhere(game) != nil)
@@ -1237,8 +1237,8 @@ class InstallerWindow: NSWindow {
     let cleanupCheck = NSButton(checkboxWithTitle: "Delete build files after install (saves ~5 GB)", target: nil, action: nil)
     let rendererPopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let gameCopyPlacePopup = NSPopUpButton(frame: .zero, pullsDown: false)
-    let modsButton = NSButton(title: "Built-in Mods…", target: nil, action: nil)
-    var modsSheet: BuiltInModsSheet?  // while it is shown
+    let modsButton = NSButton(title: "Settings and switches…", target: nil, action: nil)
+    var modsSheet: OptionsSheet?  // while it is shown
     let gamePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     let gameDirLabel = NSTextField(labelWithString: "Rocksmith 2014 game folder:")
     var macGameDir = ""  // the Mac game folder field, kept while Learn & Play is chosen
@@ -1427,11 +1427,11 @@ class InstallerWindow: NSWindow {
         placeHint.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(placeHint)
 
-        // Built-in mods to switch off, for the game chosen above (the sheet says which).
+        // Settings and switches, for the game chosen above (the sheet says which).
         modsButton.bezelStyle = .rounded
         modsButton.target = self
-        modsButton.action = #selector(showBuiltInMods)
-        modsButton.toolTip = "Switch off built-in mods, such as custom songs or the intro skip. Takes effect the next "
+        modsButton.action = #selector(showOptions)
+        modsButton.toolTip = "Set the game's options, such as custom songs or the output buffer. Takes effect the next "
             + "time the game starts; nothing to reinstall."
         modsButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(modsButton)
@@ -1651,7 +1651,7 @@ class InstallerWindow: NSWindow {
 
             modsButton.centerYAnchor.constraint(equalTo: rendererPopup.centerYAnchor),
             modsButton.trailingAnchor.constraint(equalTo: content.trailingAnchor, constant: -20),
-            modsButton.widthAnchor.constraint(equalToConstant: 140),
+            modsButton.widthAnchor.constraint(equalToConstant: 180),
 
             placeLabel.centerYAnchor.constraint(equalTo: gameCopyPlacePopup.centerYAnchor),
             placeLabel.leadingAnchor.constraint(equalTo: content.leadingAnchor, constant: 20),
@@ -1937,9 +1937,9 @@ class InstallerWindow: NSWindow {
         }
     }
 
-    @objc func showBuiltInMods() {
+    @objc func showOptions() {
         guard modsSheet == nil else { return }
-        let s = BuiltInModsSheet(game: selectedGame)
+        let s = OptionsSheet(game: selectedGame)
         modsSheet = s
         beginSheet(s.sheet) { [weak self] _ in self?.modsSheet = nil }
     }
@@ -2168,13 +2168,14 @@ class InstallerWindow: NSWindow {
     }
 }
 
-// MARK: - Built-in mods
+// MARK: - Settings and switches
 
 // The built-in mods a player can switch off: KEY=0 lines in each edition's settings.env, which its launcher reads
 // at every start (tools/play-native/launch.sh; Learn & Play: win-x86/app/lp_settings.c), so a change needs no
 // reinstall. The keys are switches of docs/mac/INSTALL.md and docs/windows/INSTALL.md, "Settings and switches",
 // and the same list as both launchers' (tools/play-native/test_settings.py checks it); nothing that touches the
-// offline layer can be set this way. No file is every mod on, as before there was one.
+// offline layer can be set this way. No file is every mod on, as before there was one. Every other switch the
+// sheet offers goes to options.env beside it (optionSpecs, readOptions, saveOptions).
 struct BuiltInMod {
     let key: String
     let title: String
@@ -2234,6 +2235,146 @@ func saveModsSwitchedOff(_ game: String, _ off: Set<String>) throws {
     try text.write(toFile: path, atomically: true, encoding: .utf8)
 }
 
+// The options file each edition reads at every start beside settings.env: options.env in the edition's
+// folder, one KEY=value line each. Toggles are 0 or 1; every other key takes any non-empty value. The first of
+// a key counts, the environment (launchctl setenv) wins over the file, and the keys are the switches of
+// docs/mac/INSTALL.md and docs/windows/INSTALL.md, "Settings and switches", that are safe to keep in a file:
+// nothing that weakens the offline layer (tools/play-native/test_settings.py checks that).
+func optionsFile(_ game: String) -> String { (game == "learnplay" ? lpHome : nativeHome) + "/options.env" }
+
+struct OptionSpec {
+    enum Kind {
+        case toggle(defaultOn: Bool)  // a checkbox: default, or 0/1
+        case choice([(title: String, value: String)])  // a popup: Default, then the values
+        case text(check: ((String) -> Bool)?, hint: String)  // a field: empty is the default
+    }
+    let key: String
+    let title: String
+    let detail: String
+    let kind: Kind
+    let editions: String  // "both", "mac" or "lp"
+    let group: String  // the common section; advanced options share one section
+    let advanced: Bool
+}
+
+// In the same order as the Mac launcher's options_keys and Learn & Play's lp_options_keys.
+func intRange(_ lo: Int, _ hi: Int) -> ((String) -> Bool) {
+    { s in Int(s).map { $0 >= lo && $0 <= hi } ?? false }
+}
+func numRange(_ lo: Double, _ hi: Double) -> ((String) -> Bool) {
+    { s in Double(s).map { $0 >= lo && $0 <= hi } ?? false }
+}
+func fullMatch(_ pattern: String) -> ((String) -> Bool) {
+    { s in s.range(of: pattern, options: .regularExpression) != nil }
+}
+let optionSpecs: [OptionSpec] = [
+    OptionSpec(key: "RS_AUDIO_FRAMES", title: "Output device buffer", detail: "Frames per callback; 0 leaves the device's. Default 256.",
+               kind: .text(check: intRange(0, 4096), hint: "256"), editions: "both", group: "Audio and guitar input", advanced: false),
+    OptionSpec(key: "RS_LATENCY_BUFFER", title: "Latency buffer", detail: "The game's output buffer in steps of 256 frames, 1-16. Empty: the game's saved choice.",
+               kind: .text(check: intRange(1, 16), hint: "1-16"), editions: "mac", group: "Audio and guitar input", advanced: false),
+    OptionSpec(key: "RS_AUDIO_RT", title: "Real-time audio thread", detail: "The audio thread runs in the device's workgroup. Off: as the original.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_INPUT_TRIM", title: "Drop stale guitar input", detail: "Up to 8 ms of old input never reaches the speakers. Off: as the original.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_INPUT", title: "Guitar input fixes", detail: "The channel, gain and list below. Off: the game's input as it is.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_INPUT_CHANNEL", title: "Input channel", detail: "From 1, for every device. Empty: every channel is listed.",
+               kind: .text(check: intRange(1, 256), hint: "1-256"), editions: "both", group: "Audio and guitar input", advanced: false),
+    OptionSpec(key: "RS_AUDIO_INPUT_GAIN_DB", title: "Input gain", detail: "Fixed gain in dB, -24 to 36. Empty: none.",
+               kind: .text(check: numRange(-24, 36), hint: "dB"), editions: "both", group: "Audio and guitar input", advanced: false),
+    OptionSpec(key: "RS_AUDIO_INPUT_FILE", title: "Guitar input file", detail: "Another per-device Channel and GainDb file. Empty: guitar-input.ini.",
+               kind: .text(check: nil, hint: "path"), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_INPUT_LEVEL", title: "Calibration boost", detail: "Calibration can boost a quiet interface by up to 24 dB. Off: the level stays the device's own volume.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_CHANNEL_ENTRIES", title: "Input list length", detail: "How many inputs are listed; 0: one entry per device. Default 10.",
+               kind: .text(check: intRange(0, 256), hint: "10"), editions: "both", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_SET_RATE", title: "Set devices to 48 kHz", detail: "Off: devices keep their sample rate.",
+               kind: .toggle(defaultOn: true), editions: "lp", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_RS_NAMES", title: "Rocksmith device names", detail: "Only the cable is called Rocksmith. Off: CoreAudio's names.",
+               kind: .toggle(defaultOn: true), editions: "lp", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_STABLE_UIDS", title: "Stable device identities", detail: "An interface isn't lost when another device fails to open. Off: as the original.",
+               kind: .toggle(defaultOn: true), editions: "mac", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_AUDIO_INPUTS_FIRST", title: "Inputs listed first", detail: "An unreadable output-only device can't end the device scan. Off: as the original.",
+               kind: .toggle(defaultOn: true), editions: "mac", group: "Audio and guitar input", advanced: true),
+    OptionSpec(key: "RS_FPS", title: "Frame rate", detail: "Frames per second; a fixed rate turns vsync off. Empty: follows the display.",
+               kind: .text(check: intRange(1, 1000), hint: "60"), editions: "mac", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_WINDOW_ANY_SHAPE", title: "Window takes any shape", detail: "Off: 16:9 with bars, as on Windows.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_GL_MTENGINE", title: "Multithreaded GL engine", detail: "OpenGL only, off by default. On: Apple's multithreaded engine.",
+               kind: .toggle(defaultOn: false), editions: "mac", group: "Picture", advanced: true),
+    OptionSpec(key: "RS_METAL_RETINA", title: "Full Retina resolution", detail: "Renders every pixel, about 4x the GPU work. Off: scaled up with MetalFX.",
+               kind: .toggle(defaultOn: false), editions: "both", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_METAL_UPSCALE", title: "MetalFX upscaling", detail: "Off: a plain bilinear scale.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Picture", advanced: true),
+    OptionSpec(key: "RS_METAL_COLORS", title: "Colour", detail: "Vivid leaves the picture untagged: more saturated on wide-colour screens.",
+               kind: .choice([("Default (sRGB)", ""), ("Vivid", "vivid")]), editions: "both", group: "Picture", advanced: true),
+    OptionSpec(key: "RS_METAL_ANISO", title: "Texture filtering", detail: "Least anisotropic filtering, 1-16; 1 keeps the game's.",
+               kind: .choice([("Default (16x)", ""), ("1x (the game's)", "1"), ("2x", "2"), ("4x", "4"), ("8x", "8"), ("16x", "16")]), editions: "both", group: "Picture", advanced: true),
+    OptionSpec(key: "RS_METAL_MSAA", title: "Anti-aliasing", detail: "MSAA on the game's 3D picture.",
+               kind: .choice([("Default (4x)", ""), ("Off", "1"), ("2x", "2"), ("4x", "4"), ("8x", "8")]), editions: "both", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_FULLSCREEN", title: "Window mode", detail: "Whatever the game's setting, or forced.",
+               kind: .choice([("Default (the game's setting)", ""), ("Window", "0"), ("Full screen", "1")]), editions: "lp", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_D3D9_DISPLAY", title: "Desktop size", detail: "As in 1920x1080. Empty: the screen's.",
+               kind: .text(check: fullMatch("^[0-9]+x[0-9]+$"), hint: "1920x1080"), editions: "lp", group: "Picture", advanced: true),
+    OptionSpec(key: "RS_STEAM_DLC", title: "Owned songs", detail: "all, or AppIDs like 248750,258341. Empty: your DLC and every AppID in the copy.",
+               kind: .text(check: nil, hint: "all or AppIDs"), editions: "both", group: "Songs and Steam account", advanced: false),
+    OptionSpec(key: "RS_STEAM_OWNED", title: "First Rocksmith DLC owned", detail: "AppIDs, kept by a copy or refresh that asked Steam. Empty: the copy's.",
+               kind: .text(check: nil, hint: "AppIDs"), editions: "both", group: "Songs and Steam account", advanced: true),
+    OptionSpec(key: "RS_STEAM_LANGUAGE", title: "Language", detail: "As in german. Empty: the copy's.",
+               kind: .text(check: nil, hint: "english"), editions: "both", group: "Songs and Steam account", advanced: true),
+    OptionSpec(key: "RS_STEAM_ID", title: "Steam account", detail: "The account whose saves and profiles play. Empty: the copy's.",
+               kind: .text(check: fullMatch("^[0-9]+$"), hint: "SteamID64"), editions: "both", group: "Songs and Steam account", advanced: true),
+    OptionSpec(key: "RS_STEAM_PERSONA", title: "Player name", detail: "Empty: the copy's.",
+               kind: .text(check: nil, hint: "Player"), editions: "both", group: "Songs and Steam account", advanced: true),
+    OptionSpec(key: "RS_MODS_BUDGET_MS", title: "DLC mounting budget", detail: "Ms per frame for mounting archives; 0 mounts one a frame. Default 50.",
+               kind: .text(check: intRange(0, 10000), hint: "50"), editions: "both", group: "Startup and logging", advanced: false),
+    OptionSpec(key: "RS_MODS_LOG", title: "Log the built-in fixes", detail: "To last-run.log.",
+               kind: .toggle(defaultOn: false), editions: "both", group: "Startup and logging", advanced: true),
+    OptionSpec(key: "RS_LOAD_MODS", title: "Load mods at startup", detail: "Off: starts without the mods in mods/.",
+               kind: .toggle(defaultOn: true), editions: "both", group: "Startup and logging", advanced: false),
+    OptionSpec(key: "RS_AUDIO_LOG", title: "Log the audio setup", detail: "To last-run.log.",
+               kind: .toggle(defaultOn: false), editions: "both", group: "Startup and logging", advanced: true),
+    OptionSpec(key: "RS_STEAM_LOG", title: "Log the Steam layer", detail: "To last-run.log.",
+               kind: .toggle(defaultOn: false), editions: "both", group: "Startup and logging", advanced: true),
+    OptionSpec(key: "RS_FILE_LOG", title: "Log files mods serve", detail: "To last-run.log.",
+               kind: .toggle(defaultOn: false), editions: "both", group: "Startup and logging", advanced: true),
+]
+
+// This edition's options.env, first of each key wins, as the launchers read it: ends trimmed, # a comment.
+func readOptions(_ game: String) -> [String: String] {
+    guard let text = try? String(contentsOfFile: optionsFile(game), encoding: .utf8) else { return [:] }
+    let keys = Set(optionSpecs.map { $0.key })
+    var seen = Set<String>(), out: [String: String] = [:]
+    for raw in text.components(separatedBy: "\n") {
+        let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !line.isEmpty, !line.hasPrefix("#"), let eq = line.firstIndex(of: "=") else { continue }
+        let key = String(line[..<eq]).trimmingCharacters(in: .whitespaces)
+        let value = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
+        guard keys.contains(key), !value.isEmpty, !seen.contains(key) else { continue }
+        seen.insert(key)
+        out[key] = value
+    }
+    return out
+}
+
+// The installer writes the whole file: the options set to something other than their default, or no file.
+func saveOptions(_ game: String, _ values: [String: String]) throws {
+    let path = optionsFile(game)
+    if values.isEmpty {
+        if FileManager.default.fileExists(atPath: path) { try FileManager.default.removeItem(atPath: path) }
+        return
+    }
+    try FileManager.default.createDirectory(atPath: (path as NSString).deletingLastPathComponent,
+                                            withIntermediateDirectories: true)
+    let docs = game == "learnplay" ? "docs/windows/INSTALL.md" : "docs/mac/INSTALL.md"
+    let text = """
+        # The options set in the RS Re-ARMed Installer (Settings and switches…) and read at every
+        # start of the game. Each line is KEY=value; the switches are in \(docs), "Settings and switches".
+
+        """ + optionSpecs.filter { values[$0.key] != nil }.map { "\($0.key)=\(values[$0.key]!)\n" }.joined()
+    try text.write(toFile: path, atomically: true, encoding: .utf8)
+}
+
 // A value `launchctl setenv` gives every app started from now on: it wins over the file.
 func launchctlValue(_ key: String) -> String? {
     let p = Process()
@@ -2249,20 +2390,34 @@ func launchctlValue(_ key: String) -> String? {
     return value.isEmpty ? nil : value
 }
 
-// The sheet: one checkbox per mod for the game chosen in the window, every one on unless the file says off.
+// The sheet: the settings and switches of the game chosen in the window. Built-in mods and the common
+// options show in grouped sections; the rest share one Advanced section, collapsed by default. Every control
+// starts at what the installed app has (settings.env and options.env, which a previous install kept, or the
+// defaults when there is none), Import copies the other edition's, and Clear returns everything to the defaults.
 @MainActor
-final class BuiltInModsSheet: NSObject {
+final class OptionsSheet: NSObject {
     let game: String
-    let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 520, height: 200), styleMask: [.titled],
+    let sheet = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 640, height: 200), styleMask: [.titled],
                          backing: .buffered, defer: false)
-    private var checks: [(key: String, box: NSButton)] = []
+    private var modChecks: [(key: String, box: NSButton)] = []
+    struct Row {
+        let spec: OptionSpec
+        var box: NSButton?
+        var popup: NSPopUpButton?
+        var values: [String] = []
+        var field: NSTextField?
+    }
+    private var rows: [Row] = []
+    private var advancedBox: NSStackView?
+    private var advancedToggle = NSButton(checkboxWithTitle: "Show advanced options", target: nil, action: nil)
+    private var overridesBox: NSStackView?
+    private var overriddenKeys: [String] = []
 
     init(game: String) {
         self.game = game
         super.init()
         let lp = game == "learnplay"
-        let width: CGFloat = 480  // inside the margins
-        let off = modsSwitchedOff(game)
+        let width: CGFloat = 560  // inside the margins
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -2284,76 +2439,278 @@ final class BuiltInModsSheet: NSObject {
             return row
         }
 
-        let title = NSTextField(labelWithString: "Built-in mods: \(lp ? gameLP : gameMac)")
+        func header(_ text: String) -> NSView {
+            let l = NSTextField(labelWithString: text)
+            l.font = .boldSystemFont(ofSize: 13)
+            return l
+        }
+
+        var built: [Row] = []
+        func addOption(_ spec: OptionSpec, to parent: NSStackView) -> NSStackView {
+            let holder = NSStackView()
+            holder.orientation = .vertical
+            holder.alignment = .leading
+            holder.spacing = 0
+            var row = Row(spec: spec)
+            switch spec.kind {
+            case .toggle:
+                let box = NSButton(checkboxWithTitle: spec.title, target: nil, action: nil)
+                box.toolTip = "\(spec.key) in \((optionsFile(game) as NSString).abbreviatingWithTildeInPath)"
+                holder.addArrangedSubview(box)
+                holder.setCustomSpacing(2, after: box)
+                row.box = box
+            case .choice(let items):
+                let line = NSStackView()
+                line.orientation = .horizontal
+                line.spacing = 8
+                let name = NSTextField(labelWithString: spec.title + ":")
+                name.font = .systemFont(ofSize: 13)
+                line.addView(name, in: .leading)
+                let popup = NSPopUpButton(frame: .zero, pullsDown: false)
+                popup.addItems(withTitles: items.map { $0.title })
+                popup.font = .systemFont(ofSize: 12)
+                line.addView(popup, in: .leading)
+                holder.addArrangedSubview(line)
+                holder.setCustomSpacing(2, after: line)
+                row.popup = popup
+                row.values = items.map { $0.value }
+            case .text(_, let hint):
+                let line = NSStackView()
+                line.orientation = .horizontal
+                line.spacing = 8
+                let name = NSTextField(labelWithString: spec.title + ":")
+                name.font = .systemFont(ofSize: 13)
+                line.addView(name, in: .leading)
+                let field = NSTextField()
+                field.placeholderString = hint
+                field.font = .systemFont(ofSize: 12)
+                field.translatesAutoresizingMaskIntoConstraints = false
+                field.widthAnchor.constraint(equalToConstant: 200).isActive = true
+                line.addView(field, in: .leading)
+                holder.addArrangedSubview(line)
+                holder.setCustomSpacing(2, after: line)
+                row.field = field
+            }
+            holder.addArrangedSubview(label(spec.detail, size: 11, indent: 20))
+            parent.addArrangedSubview(holder)
+            parent.setCustomSpacing(10, after: holder)
+            built.append(row)
+            return holder
+        }
+
+        let title = NSTextField(labelWithString: "Settings and switches: \(lp ? gameLP : gameMac)")
         title.font = .boldSystemFont(ofSize: 14)
         stack.addArrangedSubview(title)
         stack.setCustomSpacing(6, after: title)
-        let intro = label("Uncheck what you don't want. A change takes effect the next time the game starts, with "
-                          + "nothing to reinstall.", size: 12)
+        let intro = label("Set what you want. A change takes effect the next time the game starts, with "
+                          + "nothing to reinstall. Empty fields and Default popups are the game's own settings.", size: 12)
         stack.addArrangedSubview(intro)
         stack.setCustomSpacing(16, after: intro)
 
+        stack.addArrangedSubview(header("Built-in mods"))
+        stack.setCustomSpacing(8, after: stack.arrangedSubviews.last!)
         for mod in builtInMods {
             let box = NSButton(checkboxWithTitle: mod.title, target: nil, action: nil)
-            box.state = off.contains(mod.key) ? .off : .on
             box.toolTip = "\(mod.key) in \((settingsFile(game) as NSString).abbreviatingWithTildeInPath)"
             stack.addArrangedSubview(box)
             stack.setCustomSpacing(2, after: box)
             let detail = label((lp ? mod.lpDetail : nil) ?? mod.detail, size: 11, indent: 20)
             stack.addArrangedSubview(detail)
             stack.setCustomSpacing(10, after: detail)
-            checks.append((mod.key, box))
-        }
-
-        // A switch set with launchctl setenv (the earlier way, docs' "Settings and switches") wins over these.
-        let overridden = builtInMods.compactMap { m in launchctlValue(m.key).map { "\(m.key)=\($0)" } }
-        if !overridden.isEmpty {
-            let note = label("Set with launchctl setenv, which wins over this page until you log out: "
-                             + overridden.joined(separator: ", ") + ". launchctl unsetenv clears it.",
-                             size: 11, color: .systemOrange)
-            stack.addArrangedSubview(note)
-            stack.setCustomSpacing(10, after: note)
+            modChecks.append((mod.key, box))
         }
         stack.setCustomSpacing(16, after: stack.arrangedSubviews.last!)
 
-        let restore = NSButton(title: "Turn All On", target: self, action: #selector(allOn))
+        func shows(_ spec: OptionSpec) -> Bool { spec.editions == "both" || (spec.editions == "lp") == lp }
+        for group in ["Audio and guitar input", "Picture", "Songs and Steam account", "Startup and logging"] {
+            let common = optionSpecs.filter { $0.group == group && !$0.advanced && shows($0) }
+            guard !common.isEmpty else { continue }
+            stack.addArrangedSubview(header(group))
+            stack.setCustomSpacing(8, after: stack.arrangedSubviews.last!)
+            for spec in common { _ = addOption(spec, to: stack) }
+            stack.setCustomSpacing(16, after: stack.arrangedSubviews.last!)
+        }
+
+        // Advanced: one section, collapsed by default.
+        let advanced = optionSpecs.filter { $0.advanced && shows($0) }
+        if !advanced.isEmpty {
+            stack.addArrangedSubview(header("Advanced"))
+            stack.setCustomSpacing(8, after: stack.arrangedSubviews.last!)
+            advancedToggle.target = self
+            advancedToggle.action = #selector(toggleAdvanced)
+            stack.addArrangedSubview(advancedToggle)
+            stack.setCustomSpacing(8, after: advancedToggle)
+            let box = NSStackView()
+            box.orientation = .vertical
+            box.alignment = .leading
+            box.spacing = 0
+            box.isHidden = true
+            for spec in advanced { _ = addOption(spec, to: box) }
+            stack.addArrangedSubview(box)
+            stack.setCustomSpacing(16, after: box)
+            advancedBox = box
+        }
+        rows = built
+
+        // A switch set with launchctl setenv (the earlier way, docs' "Settings and switches") wins over this page;
+        // the button clears them, after asking first.
+        let pageKeys = builtInMods.map { $0.key } + optionSpecs.filter { shows($0) }.map { $0.key }
+        overriddenKeys = pageKeys.filter { launchctlValue($0) != nil }
+        if !overriddenKeys.isEmpty {
+            let set = overriddenKeys.compactMap { key in launchctlValue(key).map { "\(key)=\($0)" } }
+            let box = NSStackView()
+            box.orientation = .vertical
+            box.alignment = .leading
+            box.spacing = 6
+            box.addArrangedSubview(label("Set with launchctl setenv, which wins over this page until you log out: "
+                                         + set.joined(separator: ", ") + ".", size: 11, color: .systemOrange))
+            let clear = NSButton(title: "Clear overrides…", target: self, action: #selector(clearOverrides))
+            clear.bezelStyle = .rounded
+            clear.toolTip = overriddenKeys.map { "launchctl unsetenv \($0)" }.joined(separator: "; ")
+            box.addArrangedSubview(clear)
+            stack.addArrangedSubview(box)
+            stack.setCustomSpacing(10, after: box)
+            overridesBox = box
+        }
+        stack.setCustomSpacing(16, after: stack.arrangedSubviews.last!)
+
+        // The installed app's files, kept by a reinstall: this page starts where the app is.
+        show(modsSwitchedOff(game), readOptions(game))
+
+        let scroll = NSScrollView()
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.borderType = .noBorder
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.documentView = stack
+        scroll.heightAnchor.constraint(equalToConstant: 440).isActive = true
+        scroll.widthAnchor.constraint(equalToConstant: width + 40).isActive = true
+
+        let importButton = NSButton(title: lp ? "Import from Mac" : "Import from Learn & Play",
+                                    target: self, action: #selector(imported))
+        importButton.toolTip = "Copy the other edition's settings and switches into this page (Save keeps them)."
+        let clear = NSButton(title: "Clear to defaults", target: self, action: #selector(cleared))
+        clear.toolTip = "Every mod on and every other switch the game's own setting (Save keeps it)."
         let cancel = NSButton(title: "Cancel", target: self, action: #selector(cancelled))
         cancel.keyEquivalent = "\u{1b}"
         let save = NSButton(title: "Save", target: self, action: #selector(saved))
         save.keyEquivalent = "\r"
-        for b in [restore, cancel, save] { b.bezelStyle = .rounded }
+        for b in [importButton, clear, cancel, save] { b.bezelStyle = .rounded }
         let buttons = NSStackView()
         buttons.orientation = .horizontal
-        buttons.addView(restore, in: .leading)
+        buttons.spacing = 8
+        buttons.addView(importButton, in: .leading)
+        buttons.addView(clear, in: .leading)
         buttons.addView(cancel, in: .trailing)
         buttons.addView(save, in: .trailing)
         buttons.translatesAutoresizingMaskIntoConstraints = false
-        stack.addArrangedSubview(buttons)
-        buttons.widthAnchor.constraint(equalToConstant: width).isActive = true
+        buttons.widthAnchor.constraint(equalToConstant: width + 40).isActive = true
         save.widthAnchor.constraint(greaterThanOrEqualToConstant: 90).isActive = true
         cancel.widthAnchor.constraint(equalTo: save.widthAnchor).isActive = true
 
+        let column = NSStackView()
+        column.orientation = .vertical
+        column.alignment = .leading
+        column.spacing = 12
+        column.translatesAutoresizingMaskIntoConstraints = false
+        column.addArrangedSubview(scroll)
+        column.addArrangedSubview(buttons)
+
         let content = NSView()
-        content.addSubview(stack)
+        content.addSubview(column)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: content.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: content.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: content.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: content.trailingAnchor),
+            column.topAnchor.constraint(equalTo: content.topAnchor),
+            column.bottomAnchor.constraint(equalTo: content.bottomAnchor),
+            column.leadingAnchor.constraint(equalTo: content.leadingAnchor),
+            column.trailingAnchor.constraint(equalTo: content.trailingAnchor),
         ])
         sheet.contentView = content
         content.layoutSubtreeIfNeeded()
         sheet.setContentSize(content.fittingSize)
     }
 
-    @objc func allOn() { for c in checks { c.box.state = .on } }
+    // What the page shows: the mods switched off, and the options set to other than their defaults.
+    private func show(_ modsOff: Set<String>, _ opts: [String: String]) {
+        for c in modChecks { c.box.state = modsOff.contains(c.key) ? .off : .on }
+        for i in rows.indices {
+            let spec = rows[i].spec, v = opts[spec.key]
+            switch spec.kind {
+            case .toggle(let dflt):
+                rows[i].box?.state = v == nil ? (dflt ? .on : .off) : (v == "1" ? .on : .off)
+            case .choice:
+                if let v = v, let at = rows[i].values.firstIndex(of: v), at > 0 {
+                    rows[i].popup?.selectItem(at: at)
+                } else {
+                    rows[i].popup?.selectItem(at: 0)
+                }
+            case .text:
+                rows[i].field?.stringValue = v ?? ""
+            }
+        }
+    }
+
+    // What the page says now: the mods switched off, the options set to other than their defaults, and the
+    // first key whose field fails its check, if any.
+    private func current() -> (modsOff: Set<String>, opts: [String: String], bad: String?) {
+        let modsOff = Set(modChecks.filter { $0.box.state == .off }.map { $0.key })
+        var opts: [String: String] = [:]
+        for r in rows {
+            switch r.spec.kind {
+            case .toggle(let dflt):
+                let on = r.box?.state == .on
+                if on != dflt { opts[r.spec.key] = on ? "1" : "0" }
+            case .choice:
+                let at = r.popup?.indexOfSelectedItem ?? 0
+                if at > 0, at < r.values.count, !r.values[at].isEmpty { opts[r.spec.key] = r.values[at] }
+            case .text(let check, _):
+                let v = (r.field?.stringValue ?? "").trimmingCharacters(in: .whitespaces)
+                if v.isEmpty { continue }
+                if let check = check, !check(v) { return (modsOff, opts, r.spec.key) }
+                opts[r.spec.key] = v
+            }
+        }
+        return (modsOff, opts, nil)
+    }
+
+    @objc func toggleAdvanced() { advancedBox?.isHidden = advancedToggle.state != .on }
+
+    @objc func clearOverrides() {
+        let commands = overriddenKeys.map { "launchctl unsetenv \($0)" }.joined(separator: "\n")
+        guard showAlert(title: "Clear the launchctl overrides?",
+                        message: "This runs, for this login session:\n\n\(commands)\n\n"
+                            + "The page's own settings then take effect at the next start of the game.",
+                        buttons: ["Clear", "Cancel"]) == "Clear" else { return }
+        for key in overriddenKeys {
+            let p = Process()
+            p.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+            p.arguments = ["unsetenv", key]
+            try? p.run()
+            p.waitUntilExit()
+        }
+        overriddenKeys = overriddenKeys.filter { launchctlValue($0) != nil }
+        if overriddenKeys.isEmpty { overridesBox?.isHidden = true }
+    }
+
+    @objc func imported() {
+        let other = game == "learnplay" ? "mac" : "learnplay"
+        show(modsSwitchedOff(other), readOptions(other))
+    }
+
+    @objc func cleared() { show([], [:]) }
 
     @objc func cancelled() { sheet.sheetParent?.endSheet(sheet, returnCode: .cancel) }
 
     @objc func saved() {
-        let off = Set(checks.filter { $0.box.state == .off }.map { $0.key })
+        let cur = current()
+        if let bad = cur.bad, let spec = optionSpecs.first(where: { $0.key == bad }) {
+            _ = showAlert(title: "That \(spec.title.lowercased()) isn't valid",
+                          message: "\(bad): \(spec.detail)",
+                          buttons: ["OK"])
+            return
+        }
         do {
-            try saveModsSwitchedOff(game, off)
+            try saveModsSwitchedOff(game, cur.modsOff)
+            try saveOptions(game, cur.opts)
         } catch {
             _ = showAlert(title: "The settings could not be saved",
                           message: "\((settingsFile(game) as NSString).abbreviatingWithTildeInPath): "
@@ -2469,7 +2826,7 @@ func makeMainMenu() -> NSMenu {
     let main = NSMenu()
 
     let appMenu = NSMenu()
-    appMenu.addItem(withTitle: "Built-in Mods…", action: #selector(InstallerWindow.showBuiltInMods), keyEquivalent: ",")
+    appMenu.addItem(withTitle: "Settings and switches…", action: #selector(InstallerWindow.showOptions), keyEquivalent: ",")
     appMenu.addItem(.separator())
     appMenu.addItem(withTitle: "Hide RS Re-ARMed Installer", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
     appMenu.addItem(.separator())

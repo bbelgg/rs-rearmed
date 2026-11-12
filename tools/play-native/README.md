@@ -42,7 +42,8 @@ How the Mac launcher runs the game, every launch:
   move does not change it, and the Steam install itself is never changed. `--refresh-game` copies only new
   and changed files, and removes from the copy what the game folder lost.
 - **The ini.** `Rocksmith.ini` in the copy is the game's own from its first save on (the install's, when it
-  has one, is only the start). `RS_LATENCY_BUFFER=N` (1-16, `launchctl setenv`) overrides its
+  has one, is only the start). `RS_LATENCY_BUFFER=N` (1-16, in the installer's Settings and switches… or
+  `launchctl setenv`) overrides its
   `[Audio] LatencyBuffer`.
 - **The title logo.** `static.psarc` is linked to `static.psarc.rearmed` when it is there
   (`tools/loadscreen`; `RS_REARMED=0` for the original).

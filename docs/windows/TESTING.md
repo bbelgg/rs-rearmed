@@ -15,7 +15,7 @@ where you point them and never copied into the repository. `OUT=DIR` is a build 
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md#tests-in-the-repository) |
 | Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac port: the app's own copy of the game files, for both editions, on made-up game folders |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
-| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac port: `settings.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launcher's read the same made-up files and must set and log the same; the same keys in both and in the installer |
+| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac port: `settings.env` and `options.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launchers' readers read the same made-up files and must set and log the same; the same keys in both and in the installer |
 | Kernel32 and input | `make -C win-x86/shims/tests test OUT=DIR` | waits (`test_ksync`, run again with `LP_WAKE_ALL=1`): events, mutexes, semaphores, wait-any and wait-all, timeouts, `PulseEvent`, an idle waiter not woken by other objects, a wait keeping objects whose handles are closed; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); files (`test_kfile`: paths per thread, finds, the overlay folder, moves, a file a mod's provider serves); the open-file limit from 256 (`test_nofile`, `rc_nofile.h`, shared with the Mac port); `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
 | Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac port: `guitar-input.ini` and the switches, on made-up buffers |
@@ -93,9 +93,10 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
   first button, then Stop); alerts are a window of their own (`app_list_windows`, then `app_screenshot` with its
   `window_id`). The app's Quit menu item reads as disabled from the background; the window's close button works.
   Steam's windows are not listed by `app_list_windows`, and it has no menu bar for `app_menu`: read its logs.
-- **Built-in Mods…**: the button on the Renderer row, or the app menu's item through `app_menu`. The checkboxes
-  and the sheet's buttons are plain AX elements; Save writes `settings.env` in the test home's `RS Re-ARMed/` or
-  `RS Re-ARMed/learn-play/`, and Turn All On with Save removes it.
+- **Settings and switches…**: the button on the Renderer row, or the app menu's item through `app_menu`. The
+  checkboxes, popups, fields and the sheet's buttons are plain AX elements; Save writes `settings.env` and
+  `options.env` in the test home's `RS Re-ARMed/` or `RS Re-ARMed/learn-play/`, and Clear to defaults with Save
+  removes them. Advanced starts collapsed behind Show advanced options.
 - **Skip on Preparing shaders**: the step is 16 s on Learn & Play, so put a `sleep` at the top of the build
   folder's copy of `warm-shaders.sh`; Build Again takes under a minute and leaves it there. The box says the
   shaders are not prepared. A finished run, then Build Again and Skip, is the case to try.

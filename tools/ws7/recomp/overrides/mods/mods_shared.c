@@ -144,6 +144,8 @@ static int before_dlc_owned(rc_ctx *c, void *user) {
 // `force` folded away, 0 in every call of either game (each one's symbols.map has the reading), and the hook sees
 // the Mac's call. What it reads is the same in both: the ten slots (input_binding: 0-3 an input, 5 nothing), the
 // profile's keys (pointers to their text), a string of the profile, the input of a name and its slot.
+// Each edition's own version of this left the profile's text to the game when it was too long to be in the
+// string, a block of the game's memory at every call; this one frees it.
 // ------------------------------------------------------------------------------------------------
 #define INPUT_P1_MIC 1
 #define INPUT_P2_GUITAR 2
@@ -162,8 +164,10 @@ static void put_ptr(uint8_t *at, const void *p) {
 // The string of Player 2's profile under `key`, as text in `name` (P2_NAME bytes of the game's memory, as is `s`):
 // empty when the profile has none. The game writes it into a small string of its own: the text in place or behind
 // a pointer at its start, its end at efd_str_size, and efd_str_inline holds the address of that word while the
-// text is in place. A text behind the pointer is the game's allocation, and is left to it, as each edition's own
-// version left it: a name too long for the string costs the game a block a call (efd_str_destroy would free it).
+// text is in place. A text behind the pointer is the game's allocation, for a name too long to be in place: once
+// the name is copied the string is destroyed as the game's own callers of input_profile_string destroy theirs
+// (efd_str_destroy, a call in Learn & Play at 0x11dee5e, the same steps inlined on the Mac at 0x1003594b9), which
+// frees that text and nothing when it is in place.
 static void profile_string(const void *key, uint8_t *s, char *name) {
   uint8_t *end = s + RC_OFF(efd_str_size), *in_place = s + RC_OFF(efd_str_inline);
   memset(s, 0, P2_STRING);
@@ -176,6 +180,7 @@ static void profile_string(const void *key, uint8_t *s, char *name) {
   if (len >= P2_NAME) len = P2_NAME - 1;
   if (len) memcpy(name, from, len);
   name[len] = 0;
+  OV_GUEST(efd_str_destroy, (uint64_t)(uintptr_t)s);
 }
 
 static int before_input_bind(rc_ctx *c, void *user) {

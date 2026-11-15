@@ -28,7 +28,7 @@ const char rc_target_id[] = "test";
 
 // --- the target's tables: the hook points of the fixes, each game's own convention and field offsets, and what
 // the fixes call and read in the game by name: its functions at ADDR, its data at DATA
-enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME };
+enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY };
 #define ADDR(k) (0x401000u + 0x100u * (k))
 #define DATA 0x402000u
 enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0, D_SIZE = 0x100 };
@@ -60,6 +60,7 @@ const rc_hook_name rc_target_hooks[] = {{"boot_intro_update", ADDR(INTRO), ADDR(
 #define CC(cc) RC_CC_SYSV
 #endif
 const rc_target_value rc_target_symbols[] = {
+    {"efd_str_destroy", ADDR(DESTROY), CC(THISCALL)},
     {"input_binding", DATA + D_BINDING, -1},     {"input_by_name", ADDR(BYNAME), CC(STDCALL)},
     {"input_key_direct", DATA + D_KEY_DIRECT, -1}, {"input_key_mic", DATA + D_KEY_MIC, -1},
     {"input_manager", ADDR(MANAGER), CC(CDECL)}, {"input_mode", ADDR(MODE), CC(CDECL)},
@@ -137,6 +138,8 @@ static char by_name_seen[600];
 #define TEXT_HEAP 512
 static const char *input_name;    // the one input the manager has, and the object it is
 static uint8_t *input_obj, *manager_obj, *text_heap;
+static uint8_t *profile_out;      // the string the profile's text was last written into
+static int text_live, text_frees, destroy_calls;  // text_heap holds a text the game has not freed; frees of it
 
 // input_mode(player) -> al, the rest of eax whatever it was
 static uint32_t game_mode(uint32_t player) {
@@ -152,9 +155,11 @@ static void game_profile_string(uint32_t player, const char *key, uint8_t *out) 
   profile_calls++;
   profile_player = player;
   profile_key = key;
+  profile_out = out;
   CHECK(key && out);  // null: the runtime could not hand the game what it was given
   CHECK(get_ptr(end) == out && get_ptr(in_place) == end);
   CHECK(n < TEXT_HEAP);
+  CHECK(!text_live);  // the text of the call before was never freed
   if (!profile_text) {
     put_ptr(out, 0);
     put_ptr(end, 0);
@@ -166,8 +171,21 @@ static void game_profile_string(uint32_t player, const char *key, uint8_t *out) 
     memcpy(text_heap, profile_text, n);
     put_ptr(out, text_heap);
     put_ptr(end, text_heap + n);
-    put_ptr(in_place, 0);
+    put_ptr(in_place, text_heap + n);  // the end of what was allocated
+    text_live = 1;
   }
+}
+// efd_str_destroy(string *): frees the text unless it is in place, as the game's own callers do once they have
+// read the string; what was there is gone
+static void game_str_destroy(uint8_t *s) {
+  uint8_t *end = s + rc_off("efd_str_size"), *in_place = s + rc_off("efd_str_inline");
+  destroy_calls++;
+  CHECK(s && s == profile_out);
+  if (get_ptr(in_place) == end || !get_ptr(s)) return;
+  CHECK(get_ptr(s) == text_heap && text_live);
+  memset(text_heap, 0xdd, TEXT_HEAP);
+  text_live = 0;
+  text_frees++;
 }
 // input_by_name(manager, name) -> the input, or null
 static void *game_by_name(void *manager, const char *name) {
@@ -202,9 +220,13 @@ static void f_manager(rc_ctx *c) {
 static void f_by_name(rc_ctx *c) {  // stdcall
   ret32(c, (uint32_t)as_game(game_by_name(as_host(arg32(c, 0)), as_host(arg32(c, 1)))), 8);
 }
+static void f_destroy(rc_ctx *c) {  // thiscall: the string in ecx
+  game_str_destroy(as_host((uint32_t)c->r[1]));
+  ret32(c, 0, 0);
+}
 rc_fn rc32_lookup(uint32_t g) {
   return g == ADDR(MODE) ? f_mode : g == ADDR(PROFILE) ? f_profile : g == ADDR(MANAGER) ? f_manager
-       : g == ADDR(BYNAME) ? f_by_name : 0;
+       : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : 0;
 }
 int rc32_tls_images(const rc32_tls_image **out) {
   *out = 0;
@@ -227,6 +249,10 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
     case ADDR(BYNAME):
       CHECK_EQ(nint, 2);
       return as_game(game_by_name(as_host(ints[0]), as_host(ints[1])));
+    case ADDR(DESTROY):
+      CHECK_EQ(nint, 1);
+      game_str_destroy(as_host(ints[0]));
+      return 0;
   }
   return 0;
 }
@@ -543,11 +569,12 @@ static void bind_at(int mode, const char *in_profile, const char *name, uint32_t
   input_name = name;
   memcpy(input_obj + rc_off("input_slot"), &slot, 4);
   for (int k = -1; k <= SLOTS; k++) binding[k] = k ? NONE : P1_GUITAR;
-  mode_calls = profile_calls = manager_calls = by_name_calls = seen = 0;
+  mode_calls = profile_calls = manager_calls = by_name_calls = seen = text_frees = destroy_calls = 0;
   profile_key = 0;
   by_name_seen[0] = 0;
 }
-// A call for `input`: the game's own search runs after the fix whatever it did, with the input it was called with
+// A call for `input`: the game's own search runs after the fix whatever it did, with the input it was called with.
+// A string the fix had the game fill is destroyed by then, and so a text the game allocated for it is freed.
 static void bind(uint32_t input) {
   call_bind(input);
   CHECK_EQ(orig_ran, 1);
@@ -555,6 +582,8 @@ static void bind(uint32_t input) {
   CHECK_EQ(seen, 1);
   CHECK_EQ(seen_input, input);
   CHECK_EQ(seen_force, 0);
+  CHECK_EQ(destroy_calls, profile_calls);
+  CHECK(!text_live);
 }
 static int slots_as_set(void) {
   for (int k = -1; k <= SLOTS; k++)
@@ -596,6 +625,7 @@ static void saved_input(void) {
   CHECK_EQ(manager_calls, 1);
   CHECK_EQ(by_name_calls, 1);
   CHECK(!strcmp(by_name_seen, SHORT));
+  CHECK_EQ(text_frees, 0);  // in place: nothing of the game's to free
   CHECK_EQ(binding[4], P2_GUITAR);
   binding[4] = NONE;
   CHECK(slots_as_set());
@@ -610,7 +640,8 @@ static void saved_input(void) {
     log_stop();
     CHECK_EQ(logged_lines("[rs-mods] player 2 on \"Interface with a long name: Input 2\""), 1);
     CHECK(profile_key == (const char *)data + D_TEXT_MIC);
-    CHECK(!strcmp(by_name_seen, LONG));
+    CHECK(!strcmp(by_name_seen, LONG));  // the name as it was before its text was freed
+    CHECK_EQ(text_frees, 1);
     CHECK_EQ(binding[9], P2_GUITAR);
   }
   // a slot a guitar holds stays that guitar's, and nothing is said
@@ -640,9 +671,10 @@ static void saved_input(void) {
     CHECK_EQ(by_name_calls, 0);
     CHECK(slots_as_set());
   }
-  bind_at(3, LONG, SHORT, 4);
+  bind_at(3, LONG, SHORT, 4);  // the interface of a long name unplugged: its text is freed all the same
   bind(P2_GUITAR);
   CHECK_EQ(by_name_calls, 1);
+  CHECK_EQ(text_frees, 1);
   CHECK(slots_as_set());
   // a slot out of the table, by one, by a byte's worth and by all of its word: no slot is written, in it or past it
   static const uint32_t out_of_table[] = {SLOTS, 0x104, 0xffffffffu};

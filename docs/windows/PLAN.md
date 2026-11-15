@@ -29,7 +29,8 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   own and why). The log's lines start `[rs-mods] ` as the Mac's. Checked by unit tests of the shared object on both
   runtimes and a run to the note highway. Player 2's saved input came over last: this game's `input_bind` is the
   Mac's call with its second argument folded away, so it is a hook point here now, and the fix is the Mac's pre
-  hook on it. Not yet done: two players played on two inputs with it. A single player's way to the note
+  hook on it. It also frees the saved name's text when the game had to allocate it, which this port's own version left
+  behind at every call. Not yet done: two players played on two inputs with it. A single player's way to the note
   highway never calls `input_bind` (`RC_HOOK_TRACE=input_bind` logs no call), so in the game only the hook's place
   in the table is checked, and the unit tests stand for what it does.
 - **Batched DLC mounting**: since 1.14.1 the loop waits for each mount to be finished, so every archive of a

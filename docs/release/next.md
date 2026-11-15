@@ -29,3 +29,7 @@ notes and empties this file. -->
   so a hook now sees the Mac's call with that 0; a hook that changes it changes nothing there, the game's code
   having no place for it. The fix that finds Player 2's saved input is the Mac's pre hook on it, added before any
   mod's. The player sees no difference. Not yet played with two inputs since.
+- **Two players: looking for Player 2's input no longer costs the game memory.** With Player 2's profile on Direct
+  Connect or the microphone and a saved input whose name is longer than about 15 characters, each time the game
+  looked for a slot for their guitar a copy of the name stayed in the game's memory, at every look while that
+  input was unplugged. Both editions, since 1.8.0. Not yet played with two inputs since.

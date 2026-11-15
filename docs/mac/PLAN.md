@@ -38,9 +38,10 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   fixes, the intro skip, the song ownership during a mount and Player 2's saved input are one source for both
   editions (`overrides/mods/mods_shared.c`, beside `framerate.c`), and Learn & Play's own fixes name the game
   through the tables as these do ([Windows plan](../windows/PLAN.md#status)). Nothing changes for this edition's
-  player. Checked by unit tests of the shared object on both runtimes and a run to the note highway. Not yet
-  done: two players played on two inputs since Player 2's saved input moved; what the hook hands the game is now
-  memory kept for it, where it was the hook's own stack.
+  player. Checked by unit tests of the shared object on both runtimes and a run to the note highway. The shared hook
+  frees the saved name's text when the game had to allocate it (a name longer than the 16 bytes the game's small string holds in place), which this
+  edition's own hook left behind at every call. Not yet done: two players played on two inputs since Player 2's
+  saved input moved; what the hook hands the game is now memory kept for it, where it was the hook's own stack.
 - **Batched DLC mounting** (not released): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. The fault Learn & Play's had until 1.14.1, archives dropped when several steps ran in a frame, was looked
   for here and not found: with 147 archives in `dlc/` the game lists the same 263 songs with the budget as with a

@@ -255,7 +255,10 @@ name, looked up when they run. What is still written twice, and why, is in the [
   saved input is restored for Player 1 alone, while Player 2 takes the first free slot; here `input_bind` finds
   Player 2's saved input first. It has to be that early: moving the input of a running stream crashes the I/O
   thread. `input_bind` has a second argument, `force`, with which an input takes another's slot when none is
-  free; the game passes 0 in each of its four calls. The menu overlay rewords the notice MULTIPLAYER INPUT
+  free; the game passes 0 in each of its four calls. The hook has the game write the saved name into one of its
+  small strings and destroys the string afterwards, as the game's own readers of the profile do: a name too long
+  to sit in the string is a block of the game's memory, which the hook left behind at every call until this was
+  one source. The menu overlay rewords the notice MULTIPLAYER INPUT
   SUPPORT, which said Player 2 must use the cable.
 - **The same at any frame rate** (`framerate.c`, hooks at eight mid points, `fps_*`; `RS_MODS_FRAME_RATE=0` is
   the original). The game's frame time is whole milliseconds with no lower bound, and some of its code counts

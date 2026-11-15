@@ -437,7 +437,9 @@ functions, and the song-key table is this image's alone.
   `force`, is 0 in each of the Mac game's four calls, and the compiler folded it away here with the code under
   it, so `symbols.map` gives the hook the Mac's call with that 0 (`void(int input@eax, int force=0)`; the entry
   has the reading of both images). The profile keys the hook reads are pointers in this image's data as on the
-  Mac, though this game's code has their values as literals.
+  Mac, though this game's code has their values as literals. The string the game writes the saved name into is
+  destroyed with `efd_str_destroy`, which this game's own readers of the profile call; the native function that
+  was here left a long name's text behind at every call.
 - **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original): the Mac's source,
   `tools/ws7/recomp/overrides/mods/framerate.c`, built as a mod is built, with this game's eight mid points in
   `tools/targets/win-x86/mids.map` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). The Windows code

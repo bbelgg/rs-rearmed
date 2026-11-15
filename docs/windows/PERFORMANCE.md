@@ -10,7 +10,7 @@ own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the ga
 
 | Song | Learn & Play | |
 |---|---|---|
-| Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Start-up and first play](#start-up-and-first-play)) |
+| Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Start-up and first play](#start-up-and-first-play)). `RS_FPS=N` fixes a rate |
 | CPU | 52.0-53.6% of a core, 8.66-8.93 ms a frame | game thread 32.6-33.3, Wwise 7.2-7.5, note detection 5.8-6.3 |
 | Memory footprint | 1.51-1.52 GB | 1.28-1.36 GB on a 1x display without MSAA, upscaling and mods |
 

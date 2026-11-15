@@ -133,7 +133,8 @@ RULES = {
     "tools/metal/": rule(BOTH, run=BOTH, suites=["ct.msl", "lp.shaders"]),
     "shims/opengl/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.opengl", "ct.msl", "lp.d3d9"]),
     "shims/coreaudio/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.audio", "lp.audio"]),
-    "shims/platform/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.platform", "lp.screen"]),
+    # (Learn & Play's Present paces its frames on the shell's clock: include/rsp_fps.h)
+    "shims/platform/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.platform", "lp.screen", "lp.d3d9"]),
     "shims/include/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.shims", "ct.opengl", "ct.platform"]),
     "tools/ws8/netguard/": rule(BOTH, build=[LP], run=[MAC], suites=["netguard"]),
     # (Learn & Play's Steam face compiles the Mac layer's state and answers: win-x86/shims/steam/Makefile)

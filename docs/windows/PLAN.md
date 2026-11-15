@@ -49,6 +49,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (not released): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (not released): as the Mac edition, from the same source with this game's point.
+- **A fixed frame rate** (not released): `RS_FPS=N`, the Mac edition's test switch, with its rule and clock
+  (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
 - **Shared with the Mac edition** (not released): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
   and the start, the intro skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are
   the Mac's source (`overrides/mods/mods_shared.c`, `framerate.c`; DESIGN.md says what stays this port's own and why).
@@ -138,8 +140,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   not been played since Player 2's saved input became the shared hook; a single player's way to the note highway never
   calls `input_bind`, so in the game only the hook's place in the table is checked, and the unit tests stand for what
   it does.
-- **Calibration and the tuner at any frame rate**: above 60 Hz, with or without a guitar. This edition has no switch
-  for the frame rate, so that takes a faster display; on a 60 Hz screen the hooks leave the game as it is.
+- **Calibration and the tuner at any frame rate**: with a guitar above 60 Hz, alone and with two players. One route
+  to the note highway ran at `RS_FPS=120` with the hooks on (119-120 fps in the menus); what they do to calibration
+  and the tuner there has not been played. `RS_FPS` itself has not been run on a 60 Hz or a 120 Hz screen, in a
+  window, or above 120.
 - **The fixes from the code review of 2026-11-09** (a thread that ends gives its stack, TEB and TLS blocks to the next,
   a guest path that starts with `/` is a host path only inside the game's own folders, and `HeapAlloc` clears a block it
   uses again): four songs played with a guitar since, in Learn a Song, with no fault; no long session, where the reused

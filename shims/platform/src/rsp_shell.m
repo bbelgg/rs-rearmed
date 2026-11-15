@@ -3,6 +3,7 @@
 // game's method at the address in its comment (unslid, decrypted binary). MRC.
 #import "rsp_shell.h"
 #import "rsp_present.h"
+#include "rsp_fps.h"
 #include "rsp_renderer.h"
 
 #include <OpenGL/OpenGL.h>
@@ -129,37 +130,18 @@ static int rsp_render_thread_on(void) {
   return v;
 }
 
-// RS_FPS=N (not in the original; a test switch): the render thread starts a frame every 1/N s on
-// its own clock instead of at each display-link tick, and the swap interval is 0, so the game can
-// be run at another rate than the display's (e.g. 120 on a 60 Hz screen). 0 or unset: the display.
-static int rsp_fps(void) {
-  static int v = -1;
-  if (v < 0) {
-    const char *e = getenv("RS_FPS");
-    v = e && *e ? atoi(e) : 0;
-    if (v < 0 || v > 1000) v = 0;
-  }
-  return v;
-}
-
-static void rsp_fps_wait(void) {
-  static uint64_t next, period;
-  if (!period) {
-    mach_timebase_info_data_t tb;
-    mach_timebase_info(&tb);
-    period = (uint64_t)(1e9 / rsp_fps()) * tb.denom / tb.numer;
-    next = mach_absolute_time();
-  }
-  next += period;
-  uint64_t now = mach_absolute_time();
-  if (next < now) next = now;  // behind: start at once, don't queue up missed frames
-  else mach_wait_until(next);
+// RS_FPS=N (not in the original; a test switch; rsp_fps.h, Learn & Play's too): the render thread starts a
+// frame every 1/N s on its own clock instead of at each display-link tick, and the swap interval is 0, so
+// the game can be run at another rate than the display's (e.g. 120 on a 60 Hz screen). 0 or unset: the display.
+static void rsp_fps_frame(void) {
+  static uint64_t next;
+  rsp_fps_wait(&next, rsp_fps_ticks(1000000000ull / (uint64_t)rsp_fps()));
 }
 
 static void *rsp_render_thread(void *ctx) {
   pthread_set_qos_class_self_np(QOS_CLASS_USER_INTERACTIVE, 0);
   for (;;) {
-    if (rsp_fps()) rsp_fps_wait();
+    if (rsp_fps()) rsp_fps_frame();
     else dispatch_semaphore_wait(rsp_rt_sem, DISPATCH_TIME_FOREVER);
     while (dispatch_semaphore_wait(rsp_rt_sem, DISPATCH_TIME_NOW) == 0) {
     }

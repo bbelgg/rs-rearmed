@@ -18,6 +18,10 @@ notes and empties this file. -->
   these run as at 60 Hz whatever the display's rate; at 60 Hz nothing changes. `RS_MODS_FRAME_RATE=0` is the game's own
   behaviour. Not yet played with a guitar on a 120 Hz display: if calibration or the tuner still misbehaves there,
   please open an issue with `logs/last-run.log`.
+- **Learn & Play: `RS_FPS=N` fixes the frame rate, as in the Mac edition.** The game then starts a frame every
+  1/N s with vsync off, whatever the display's rate: `RS_FPS=120` runs it at 120 frames a second on a 60 Hz screen.
+  Before, this edition only followed the display, so what depends on the frame rate could be tried there only on a
+  faster display. It is a test switch, with the Mac's rule and clock; unset, nothing changes.
 - **Learn & Play: a mod finds the input names of two players.** `input_mode`, `input_profile_string`,
   `input_manager`, `input_by_name` and `input_binding` are in Learn & Play's table with their calls, and so are
   the two profile keys, `input_key_direct` and `input_key_mic`, pointers to the keys' text as on the Mac; before,

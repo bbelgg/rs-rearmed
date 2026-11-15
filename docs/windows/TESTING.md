@@ -289,9 +289,13 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   feature" comes after "Loading profile…" and clears itself about 4 s later, so take snapshots every 2 s.
   `RC_HOOK_TRACE=autosave_warning` shows the handler either way. Not checked: a Real Tone cable or Microphone
   profile, and the tuner with the switch off.
-- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): this app has no switch for the frame rate, so on a 60 Hz screen
-  the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar. Not
-  done yet.
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): the log has `[rs-mods] frame rate: on, 8 of 8 points`, and
+  `[rs-mods] frame rate: off` with `RS_MODS_FRAME_RATE=0`. `RS_FPS=120` makes the frames short enough for the
+  hooks to act on a 60 Hz screen: the log then has `lp: RS_FPS=120: a frame every 8.33 ms, vsync off`, and with
+  `LP_FRAME_LOG=100` the rate every 10 s (one run, on a 75 Hz display: 119-120 fps in the menus, and 90-107 in
+  the song's first seconds, which had first-use stalls in them). A route to the highway goes through the tuner
+  with them. What they do takes a guitar, by hand, as in the [Mac edition](../mac/TESTING.md#unattended-runs).
+  Not done yet.
 - **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP`): the Mac edition's check and its keys; the log's
   screens were the same here, to `menu: Guitarcade_Game`. Not run: the switch off, leaving the game, and a game
   played after a skip.
@@ -369,6 +373,8 @@ mods, song and window, and one report with a column for each. It is described on
 - The frame times have no game-frame events here, so that row of the report is empty; the threads have their
   names (`w32 game`, `w32 thread <start address>`).
 - Cherub Rock needs no DLC of the test account in this edition.
+- `"RS_FPS"` in the edition's `env` fixes its frame rate as it does the Mac's. A route ran with it; the free
+  frame rate has not been measured in this edition.
 
 A build's first play of the song on a screen has a stall or two in the window: the warm-up run is there for it.
 Results are in [PERFORMANCE.md](PERFORMANCE.md).
@@ -472,6 +478,7 @@ edition's table, in its order ([Mac testing](../mac/TESTING.md#diagnostics)).
 | `RS_FULLSCREEN=1\|0` | full screen or a window, whatever the game's setting |
 | `RS_WINDOW_ANY_SHAPE=0` | 16:9 with the game's bars, and a resized window keeps the resolution ([DESIGN.md](DESIGN.md#screen-and-window)) |
 | `RS_METAL_RETINA=1` | render in backing pixels |
+| `RS_FPS=N` | a fixed frame rate, with vsync off, as in the Mac edition; the log says `lp: RS_FPS=N: a frame every M ms, vsync off` |
 | `RS_AUDIO_RS_NAMES=0` | keep CoreAudio's device names |
 | `RS_AUDIO_FRAMES`, `RS_AUDIO_RT`, `RS_AUDIO_INPUT_TRIM`, `RS_AUDIO_SET_RATE` | the audio policy ([INSTALL.md](INSTALL.md#settings-and-switches)) |
 | `RS_REARMED=0` | the game's own title logo ([INSTALL.md](INSTALL.md#the-title-logo)) |

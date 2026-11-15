@@ -17,7 +17,7 @@ out=${1:-$cm/d3d9-test}
 gl=$cm/shims/opengl
 mkdir -p "$out"
 CC="clang -arch arm64 -O1 -g -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializers -DRC_GUEST32"
-INC="-I$root/tools/ws7/recomp/runtime -I$root/win-x86/shims -I$root/win-x86/shims/d3d9 -I$root/shims/opengl/src"
+INC="-I$root/tools/ws7/recomp/runtime -I$root/win-x86/shims -I$root/win-x86/shims/d3d9 -I$root/shims/opengl/src -I$root/shims/platform/include"
 $CC $INC -o "$out/d3d9_test" \
     "$here/d3d9_test.c" \
     "$root"/win-x86/shims/d3d9/*.c \

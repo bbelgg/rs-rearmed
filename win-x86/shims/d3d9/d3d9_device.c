@@ -15,6 +15,7 @@
 #include "d3d9_ffp_gen.h"
 #include "d3d9_internal.h"
 #include "rs_gfx.h"
+#include "rsp_fps.h"
 #include "win32_shims.h"
 
 static const uint8_t IID_IUnknown[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0xC0, 0, 0, 0, 0, 0, 0, 0x46};
@@ -928,26 +929,26 @@ static d3d9_ft_mark_t d3d9_ft_mark(void) {
     return fn;
 }
 
-// A hidden window's layer stops pacing: nextDrawable answers at once and the game runs free, at about
-// 120 fps on a 75 Hz display. While the window can't be seen Present keeps to the display's rate itself,
-// as the Mac edition's display link does, outside the device lock so other threads aren't held up.
+// The frames Present paces itself, on the Mac edition's clock (rsp_fps.h), outside the device lock so other
+// threads aren't held up:
+// - A hidden window's layer stops pacing: nextDrawable answers at once and the game runs free, at about 120 fps
+//   on a 75 Hz display. While the window can't be seen Present keeps to the display's rate, as the Mac edition's
+//   display link does.
+// - With RS_FPS=N (the Mac edition's switch) the layer never paces, shown or hidden: the window seam takes its
+//   vsync off (lp_window.m), and Present keeps to 1/N s.
 static _Atomic uint64_t d3d9_hidden_period;  // ns between frames while hidden; 0 while the window shows
+static _Atomic uint64_t d3d9_fixed_period;   // ns between frames with RS_FPS, whatever the window; 0 without
 void d3d9_set_hidden_period(uint64_t ns) { atomic_store(&d3d9_hidden_period, ns); }
-static void d3d9_hidden_wait(void) {
+void d3d9_set_fixed_period(uint64_t ns) { atomic_store(&d3d9_fixed_period, ns); }
+static void d3d9_present_wait(void) {
     static uint64_t next;  // only the presenting thread comes here
-    uint64_t period = atomic_load(&d3d9_hidden_period);
+    uint64_t period = atomic_load(&d3d9_fixed_period);
+    if (!period) period = atomic_load(&d3d9_hidden_period);
     if (!period) {
         next = 0;
         return;
     }
-    uint64_t now = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
-    if (now < next) {
-        uint64_t left = next - now;
-        nanosleep(&(struct timespec){.tv_sec = (time_t)(left / 1000000000u), .tv_nsec = (long)(left % 1000000000u)}, NULL);
-        next += period;
-    } else {
-        next = now + period;  // the first hidden frame, or one that took longer than the period
-    }
+    rsp_fps_wait(&next, rsp_fps_ticks(period));
 }
 
 // The app's strong definitions replace these (a test of this layer has neither): the mods' held input
@@ -976,7 +977,7 @@ uint32_t d3d9_dev_present(d3d9_device *d) {
     d3d9_dev_unlock(d);
     if (t0) lp_frame_event(LPF_PRESENT, lp_frame_now() - t0, 0);
     if (ft) ft('F', ft0, mach_absolute_time(), 0, 0);
-    d3d9_hidden_wait();
+    d3d9_present_wait();
     return D3D_OK;
 }
 

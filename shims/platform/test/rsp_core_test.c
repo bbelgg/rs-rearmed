@@ -15,6 +15,7 @@
 #include <mach-o/dyld.h>
 #include <signal.h>
 
+#include "rsp_fps.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
 
@@ -695,6 +696,32 @@ static void test_renderer_startup(void) {
   CHECK(strstr(out, "gen 1 backend metal") != NULL, "setting metal again: metal (%s)", out);
 }
 
+// --- RS_FPS (rsp_fps.h: both editions') ----------------------------------------
+static void test_fps(void) {
+  CHECK(rsp_fps_value(NULL) == 0 && rsp_fps_value("") == 0 && rsp_fps_value("0") == 0, "unset or 0: the display");
+  CHECK(rsp_fps_value("120") == 120 && rsp_fps_value("1") == 1 && rsp_fps_value("1000") == 1000, "a rate");
+  CHECK(rsp_fps_value("1001") == 0 && rsp_fps_value("-60") == 0 && rsp_fps_value("fast") == 0, "out of range");
+
+  // the clock: a period after the frame before, and from now on after a late one
+  uint64_t next = 0;
+  CHECK(rsp_fps_step(&next, 100, 1000) == 1100, "the first frame: a period from now (%llu)", (unsigned long long)next);
+  CHECK(rsp_fps_step(&next, 100, 1105) == 1200, "on time: the period, not the frame's own start");
+  CHECK(rsp_fps_step(&next, 100, 1200) == 1300, "at the moment itself");
+  CHECK(rsp_fps_step(&next, 100, 1450) == 0 && next == 1450, "late: at once, from now (%llu)", (unsigned long long)next);
+  CHECK(rsp_fps_step(&next, 100, 1460) == 1550, "no missed frame queued");
+  CHECK(rsp_fps_step(&next, 100, 1400) == 1650, "the clock never goes back");
+
+  // the wait itself, on the machine's clock: 5 frames of 4 ms take 5 periods
+  mach_timebase_info_data_t tb;
+  mach_timebase_info(&tb);
+  uint64_t period = rsp_fps_ticks(4000000), t0 = mach_absolute_time();
+  CHECK(period == 4000000ull * tb.denom / tb.numer, "4 ms in ticks");
+  next = 0;
+  for (int k = 0; k < 5; k++) rsp_fps_wait(&next, period);
+  uint64_t ns = (mach_absolute_time() - t0) * tb.numer / tb.denom;
+  CHECK(ns >= 20000000 && ns < 200000000, "5 frames of 4 ms: %.1f ms", ns / 1e6);
+}
+
 int main(int argc, char **argv) {
   if (argc > 1 && !strcmp(argv[1], "--renderer-child")) return renderer_child(argc, argv);
   uint32_t sn = sizeof g_self;
@@ -716,6 +743,7 @@ int main(int argc, char **argv) {
   test_renderer_decide();
   test_renderer_files();
   test_renderer_startup();
+  test_fps();
   printf("rsp_core_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)
          "arm64",

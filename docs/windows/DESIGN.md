@@ -167,7 +167,13 @@ full screen) has the layer fit that back buffer.
 The screen saver and display sleep stay off while the game is open: `lp_window.m` holds a display-sleep
 assertion from the window's making to the process' end, as the Mac game's view does (not in an offscreen run,
 `LP_OFFSCREEN=1`). A hidden window (covered, minimised) has no layer pacing its presents, so `lp_window.m`
-gives the D3D9 layer the display's period, and Present keeps to it (`d3d9_hidden_wait`).
+gives the D3D9 layer the display's period, and Present keeps to it (`d3d9_present_wait`).
+
+The frames follow the display's refresh rate: the layer holds each present for a refresh. `RS_FPS=N` fixes a
+rate, as in the Mac edition, and with the Mac's rule and clock (`shims/platform/include/rsp_fps.h`):
+`lp_window.m` takes the layer's vsync off and gives the D3D9 layer a period of 1/N s, which Present keeps to
+whether the window shows or not. The Mac's render thread waits before a frame; here the game's own thread makes
+the frames, so the wait is at the end of Present.
 
 ## Renderer
 

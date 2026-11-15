@@ -313,6 +313,27 @@ int main(int argc, char **argv) {
         check(t2 - t1 < 60000000, "Present: shown again, no wait (%llu ms)", (unsigned long long)((t2 - t1) / 1000000));
     }
 
+    // 2c. RS_FPS: Present keeps the fixed period, shown or hidden, and no period again without it
+    {
+        uint64_t t0 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        d3d9_set_fixed_period(10000000);
+        for (int i = 0; i < 5; i++) com(dev, DEV_Present, 4, 0, 0, 0, 0);
+        uint64_t t1 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        d3d9_set_hidden_period(50000000);
+        for (int i = 0; i < 5; i++) com(dev, DEV_Present, 4, 0, 0, 0, 0);
+        uint64_t t2 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        d3d9_set_fixed_period(0);
+        d3d9_set_hidden_period(0);
+        for (int i = 0; i < 5; i++) com(dev, DEV_Present, 4, 0, 0, 0, 0);
+        uint64_t t3 = clock_gettime_nsec_np(CLOCK_UPTIME_RAW);
+        check(t1 - t0 >= 50000000 && t1 - t0 < 120000000, "Present: a fixed rate, 5 frames take 5 periods (%llu ms)",
+              (unsigned long long)((t1 - t0) / 1000000));
+        // (from the end of a wait, so the first of these periods is short by the time it took to wake up)
+        check(t2 - t1 >= 40000000 && t2 - t1 < 120000000, "Present: a fixed rate while hidden is still that rate (%llu ms)",
+              (unsigned long long)((t2 - t1) / 1000000));
+        check(t3 - t2 < 40000000, "Present: no fixed rate, no wait (%llu ms)", (unsigned long long)((t3 - t2) / 1000000));
+    }
+
     // 3. vs_3_0 / ps_3_0 with constants, DrawIndexedPrimitive with a base vertex, into a
     // render-target texture, half of it through the viewport
     check(com(dev, DEV_CreateTexture, 8, W, H, 1, USAGE_RENDERTARGET, FMT_A8R8G8B8, POOL_DEFAULT, out, 0) == D3D_OK, "render target texture");

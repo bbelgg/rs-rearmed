@@ -26,7 +26,7 @@ echo "=== Win32 shims ==="
 rm -f "$obj/shims"/*.o
 for f in "$shims"/win32_*.c "$shims"/d3d9/*.c "$shims"/audio/wa_*.c "$root/shims/coreaudio"/rs_audio_*.c \
          "$root"/win-x86/online/online32.c; do
-  $CC -I"$root/shims/coreaudio" -c "$f" -o "$obj/shims/$(basename "$f" .c).o"
+  $CC -I"$root/shims/coreaudio" -I"$root/shims/platform/include" -c "$f" -o "$obj/shims/$(basename "$f" .c).o"
 done
 # the built-in fixes' part that is the Mac's source (overrides/mods: mods_shared.c, the switches, the log and the start;
 # framerate.c, the frame rate fixes): built as a mod is, by the game's names at run time

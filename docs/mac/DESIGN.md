@@ -73,7 +73,8 @@ are there.
 
 ### Screen and window
 
-The shell follows the display's refresh rate (`RS_FPS` fixes a rate). On a Retina screen the game renders in
+The shell follows the display's refresh rate (`RS_FPS` fixes a rate; its rule and clock are
+`shims/platform/include/rsp_fps.h`, which Learn & Play uses too). On a Retina screen the game renders in
 points and each frame is scaled up to the screen's pixels with MetalFX (`rs_gfx_set_output_size`,
 [METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)); `RS_METAL_RETINA=1` renders at backing-pixel size instead.
 A window takes any shape, where the original kept it at 16:9 (`RS_WINDOW_ANY_SHAPE=0` does too): the game sets

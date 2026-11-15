@@ -34,7 +34,12 @@
 // The window's keys and pointer go to the game (win32_input.c): DirectInput, the virtual-key state
 // and the window messages; the pointer in back-buffer pixels. LP_INPUT_SCRIPT plays keys.
 //
+// The frames are the display's: the layer holds each for a refresh. RS_FPS=N (the Mac edition's switch,
+// shims/platform/include/rsp_fps.h) takes the layer's vsync off and has Present start a frame every 1/N s
+// (d3d9_set_fixed_period), so the game can be run at another rate than the display's.
+//
 // env: LP_OFFSCREEN=1     no window: the device renders offscreen
+//      RS_FPS=N           a fixed frame rate, with vsync off (1-1000; unset or 0: the display's rate)
 //      RS_METAL_RETINA=1  the desktop, and so the game's resolution, in backing pixels
 //      RS_FULLSCREEN=1|0  always full screen / always a window, whatever the game's setting
 //      RS_WINDOW_ANY_SHAPE=0  16:9 with the game's bars, and a resized window keeps the resolution
@@ -51,6 +56,7 @@
 
 #include "lp_screen.h"
 #include "rs_gfx.h"
+#include "rsp_fps.h"
 
 #ifndef LP_VERSION
 #define LP_VERSION "dev"  // build.sh passes the repository's VERSION
@@ -250,6 +256,7 @@ static void window_script(void);
 #define LP_QUIT_WAIT 8
 void wa_default_changed(void);  // the system's default output changed (wa_com.c)
 void d3d9_set_hidden_period(uint64_t ns);  // d3d9_device.c
+void d3d9_set_fixed_period(uint64_t ns);   // d3d9_device.c
 void w32_input_release_all(void);
 void w32_input_focus(int active);
 void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp);
@@ -451,8 +458,18 @@ static void input_monitor(void) {
   }];
 }
 
+// RS_FPS: Present keeps the rate (with no window too), and the layer made below holds no frame for the display.
+static void fixed_rate(void) {
+  static int said;
+  int fps = rsp_fps();
+  d3d9_set_fixed_period(fps ? 1000000000ull / (uint64_t)fps : 0);
+  if (fps && !said) fprintf(stderr, "lp: RS_FPS=%d: a frame every %.2f ms, vsync off\n", fps, 1000.0 / fps);
+  said = 1;
+}
+
 rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
   if (any_shape()) lp_game_shape(w, h);  // the game's thread, before its first frame
+  fixed_rate();
   const char *off = getenv("LP_OFFSCREEN");
   if (off && *off && *off != '0') return rs_gfx_create_offscreen(w, h);
   int dw, dh;
@@ -490,6 +507,12 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
     layer.contentsGravity = kCAGravityResizeAspect;  // a back buffer of another shape: letterboxed
     layer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
     layer.drawableSize = CGSizeMake(w, h);
+    if (rsp_fps()) {
+      // as the Mac edition's swap interval 0 (rsp_present_metal.m): presents are not held for the display, so a
+      // third drawable would only add latency
+      layer.displaySyncEnabled = NO;
+      layer.maximumDrawableCount = 2;
+    }
     v.wantsLayer = YES;
     v.layer = layer;
     g_view = v;

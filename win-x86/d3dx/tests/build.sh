@@ -55,7 +55,7 @@ $CC -w -c "$root/win-x86/shims/d3d9/d3d9_shader.c" -o "$out/obj/d3d9_d3d9_shader
 libs="-Wl,-all_load $out/msvcr100/obj/libgame_rc.a $out/d3dx9_42/obj/libgame_rc.a $out/d3dcompiler_42/obj/libgame_rc.a"
 if [ -n "$cm" ]; then
     gl=$cm/shims/opengl
-    INC="-I$root/shims/opengl/src"
+    INC="-I$root/shims/opengl/src -I$root/shims/platform/include"
     mkdir -p "$out/obj-d3d9"
     for f in "$root"/win-x86/shims/d3d9/*.c; do
         [ "$(basename "$f")" = d3d9_shader.c ] && continue

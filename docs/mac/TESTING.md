@@ -359,9 +359,10 @@ this edition's game frame, a command buffer's time on the GPU (`U`), the CPU of 
 (`ioreg`, the whole system's).
 
 At a fixed frame rate the GPU's utilisation and start-to-end time are not its work: it slows its clock to fill
-the refresh. For what it can do, run with `"RS_FPS": "300"` in `CONFIG`'s `env` (the Mac edition), one run at a
-time on a cool Mac. A `--trace` run records a Time Profiler trace (`xcrun xctrace`) from the settle on, which
-`profile.py` adds up by thread and function; it gives no numbers, as the sampler slows the game.
+the refresh. For what it can do, run with `"RS_FPS": "300"` in `CONFIG`'s `env` (measured in the Mac edition so
+far; Learn & Play reads the switch too), one run at a time on a cool Mac. A `--trace` run records a Time Profiler
+trace (`xcrun xctrace`) from the settle on, which `profile.py` adds up by thread and function; it gives no
+numbers, as the sampler slows the game.
 
 Results are in [PERFORMANCE.md](PERFORMANCE.md). Not looked at yet: that the venue shows with no guitar played,
 and a run on an external display.

@@ -80,6 +80,70 @@ either edition's docs. What a release needs (the notes' entries, the known issue
   with `TZ=UTC`.
 - **Ask before any push, tag, release or other remote change.**
 
+## Projects that build on this one
+
+Three projects of their own run inside the game as mods. Players have them installed, each is released on its own,
+and no test of this repository builds or runs them: a change here can break one with nothing here failing.
+
+| Project | What it is | What it takes from here |
+|---|---|---|
+| [rearmed-mods](https://github.com/glebb/rearmed-mods) | RSMods' features: `rearmed-mods.dylib`, one file for both editions, with its settings app, the ToneHost add-on and the Song Stems helper | its own copy of the mod headers (its `include/rs-rearmed`); the runtime the executables export; by name, the hook points, offsets, symbols, edits and mid points of `tools/targets`; the overlay and render APIs |
+| [RS Companion](https://github.com/glebb/rs-mac-companion) | `librscompanion.dylib`, which follows the song and its tone changes for its app | no header of ours: it declares `rc_mod_abi`, `rc_target`, `rc_slide`, `rc_hook_add_name` and the first 16 registers of `rc_ctx` itself, hooks `frontend_open_file` and `ak_post_event_name`, and reads the game's memory from `rc_slide` (the Mac image at the original game's addresses, Learn & Play's 4 GB guest window) |
+| rearmed-songbridge | `songbridge.dylib`: each edition reads the other platform's song archives | builds against a checkout of this repository (its `RS_REARMED`): `rc_mod.h`, `rc_file.h`; its tests compile `runtime/rc_file.c` and read archives with `tools/psarc_extract.py` |
+
+### What they hold us to
+
+- **The mod interface.** The headers a mod includes (`rc.h`, `rc_rt.h`, `rc_call.h`, `rc_hook.h`, `rc_abi.h`, `rc_cc.h`,
+  `rc_mod.h`, `rc_mid.h`, `rc_file.h` in `tools/ws7/recomp/runtime`, `tools/ws7/recomp/overrides/rc_ov.h`,
+  `shims/include/rs_overlay.h`, `rs_render.h`) and everything the executables export to mods. Adding is safe.
+  Removing or renaming something, changing a prototype or a struct's layout (`rc_ctx`, the mid point frame,
+  `rc_file_info`), or which libraries the loader takes (`rc_mod_abi`) is a break. The mods players have are binaries
+  built with an earlier copy of the headers: what those call has to keep working, not only what compiles today.
+- **Names** (`tools/targets/names` and each target's maps). A hook point, offset, symbol, edit or mid point keeps its
+  name, its meaning and, for a hook point, its arguments, in both targets. The groups marked as a mod's ("the mods
+  library", "a mod's: rearmed-mods") are used by a released library, and so may every hook point be.
+- **What a mod sees happen.** A hook sees the Mac's call on either target, the game's files go through `rc_file_*`,
+  mods load from `mods/` at startup. A change of route breaks a mod with every header and name intact: when 1.15
+  bound the Mac game's file imports to the runtime, RS Companion before 1.9.0 stopped seeing songs.
+- **The install.** What their installers and libraries use under `~/Library/Application Support/RS Re-ARMed/`
+  (`mods/`, `learn-play/mods/`, `game/`, `game-dir`, `libnetguard.dylib`), the process names `Rocksmith2014` and
+  `rs2014_lp`, and `RS_NATIVE_HOME`, `RS_MODS_PATH`, `RS_LOAD_MODS`.
+
+### When a change touches any of that
+
+1. **Prefer not to break.** Keep the old name, call or file working beside the new one.
+2. **Check each project that has a checkout** (usually beside this one: `../rearmed-mods`, `../rearmed-songbridge`;
+   RS Companion's is `rs-mac-companion`). With `RS` set to this checkout:
+   - rearmed-mods, from its folder, its sources against this tree's headers (its own build uses its copies, so it
+     passes whatever changed here), and `grep -rn NAME src` for a name that changes:
+
+     ```sh
+     for c in src/*.c; do clang -arch arm64 -fsyntax-only -Wall -Wno-unused-function -Isrc \
+       -I$RS/tools/ws7/recomp/runtime -I$RS/tools/ws7/recomp/overrides -I$RS/shims/include \
+       -DREARMED_MODS_VERSION='"check"' "$c"; done
+     ```
+   - rearmed-songbridge, from its folder: `RS_REARMED=$RS ./build.sh` and `RS_REARMED=$RS ./build.sh --test`.
+   - RS Companion: nothing of it builds against this repository, and its tests run against a stand-in for this one.
+     Read the change against "RS Re-ARMed's mod interface" in its `native/rscompanion.c` and its
+     `docs/when-the-game-updates.md`.
+
+   These only read the other repository (build output aside). Change nothing there unless that is the task.
+3. **A compile shows that the source still fits, not that the installed libraries still work.** When the change gets
+   a game run, make it with the three libraries in the mods folders and read the log for them: `[rc] mod loaded:`
+   for each, no `mod not loaded`, and no missing hook point or name in their own lines (`[rsmods]`, `[songbridge]`,
+   the companion's log). Without a game run, say that the installed libraries were not run.
+
+### Tell the maintainer
+
+Whenever one of the three breaks, may break, or could not be checked (no checkout, no game run), say so to the
+maintainer at the top of the report of the work: which project, what stops working for a player who has it, which
+change does it, and what each side would need. Do this when the break is intended too; the commit message alone is
+not telling. A break that isn't the point of the task waits, uncommitted, for the maintainer's word on how to go on.
+
+What follows is the maintainer's call: the entry in `docs/release/next.md` names the version of the other project
+the release needs, a released version of it that stops working is also a known issue, and the fix on the other side
+is that repository's own work, with its own commit and release.
+
 ## Code and commits
 
 - Follow the style of the surrounding code: comment density, naming, idiom. C for the runtime and shims,
@@ -104,6 +168,8 @@ One release covers both editions; the steps and their scripts (`tools/release`) 
   that isn't out yet says `(not released)`.
 - A release checks what its changes call for (`tools/release/scope.py`), and says what it left unrun. A new
   directory or test suite gets its rule there.
+- A release that changed anything of [what the mods of other projects use](#what-they-hold-us-to) is checked against
+  them before it is published, and the maintainer hears the result with the rest of what the release checked.
 - Publishing (`tools/release/publish.sh … --yes`) is the remote change to ask about, every time.
 
 ## Building
@@ -125,6 +191,8 @@ One release covers both editions; the steps and their scripts (`tools/release`) 
 - Shared: `python3 tools/targets/check.py`, `tools/play-native/test_gamefiles.py`, the `opengl.*` tests.
 - Either: `tools/release/check.py` runs the suites a change calls for (`tools/release/scope.py` says which,
   `--all` runs every one). It builds, so not during a game run.
+- Other projects' mods: none of the suites above builds or runs them. A change to what they use gets the checks of
+  [Projects that build on this one](#projects-that-build-on-this-one).
 - Tests that need game files skip when the files aren't there; say so when reporting results.
 - Before treating something as a port bug, check that the original game doesn't do the same (under
   Rosetta for Mac, on Windows for Learn & Play).

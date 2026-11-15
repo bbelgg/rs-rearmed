@@ -224,7 +224,8 @@ it starts. Nothing is downloaded by the game, and Steam's folders are read only 
    lists that AppID as a DLC of the game and says it is installed. The app's offline Steam layer answers that
    from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC your account's license
    lists, and the AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever
-   AppID it carries, with the Steam client closed. `RS_STEAM_DLC=all` counts every AppID as owned
+   AppID it carries, with the Steam client closed. `RS_STEAM_DLC=all` counts every AppID as owned, so every
+   song the copy has shows, those of the first Rocksmith (4) too
    ([Settings and switches](#settings-and-switches)).
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
    off in Built-in Mods…, and they must be the PC version, `_p.psarc`.

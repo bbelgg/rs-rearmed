@@ -51,7 +51,8 @@ make test     # vtable-slot check, ABI tests (arm64, and x86_64 under Rosetta), 
     in whichever Steam library that is (e.g. one on an external drive).
     `RS_STEAM_DLC` / `dlc`: `installed` (default), `all`
     (opt-in: every app id is owned, so every archive shows up whatever its
-    AppID), `none`, or a comma-separated list of app ids (only those). The
+    AppID, and `BIsSubscribedApp` says yes for every app too: the songs
+    `RS_STEAM_OWNED` gates all show), `none`, or a comma-separated list of app ids (only those). The
     install passes such a list (`game/.rearmed/steam.env`, written by
     `tools/play-native/gamefiles.py`): the installed DLC, 248750 and every
     AppID the copy's `dlc/` archives carry, so custom songs show up whatever

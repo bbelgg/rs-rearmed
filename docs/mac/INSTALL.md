@@ -290,7 +290,7 @@ Nothing is downloaded by the game, and Steam's folders are read only when you pr
    game from Steam's download, the DLC your account's license lists), and the
    AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever AppID it
    carries, with the Steam client closed. `RS_STEAM_DLC=all` (with `launchctl setenv`) counts every AppID as
-   owned.
+   owned, so every song the copy has shows, those of the first Rocksmith (4) too.
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
    off in Built-in Mods….
 4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game

@@ -416,6 +416,13 @@ runtime. `RS_MODS_LOG=1` logs them.
 - **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original): the same two changes as `mods.c`.
   `F_11f08d0` is the Mac's three inlined checks in one function, which sets Player 2 to Real Tone, and
   `F_1344640` is `input_bind`.
+- **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original): the Mac's source,
+  `tools/ws7/recomp/overrides/mods/framerate.c`, built as a mod is built, with this game's eight mid points in
+  `tools/targets/win-x86/mids.map` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). The Windows code
+  has the same counts and the same buffers, and its frame time is whole milliseconds too, from
+  `QueryPerformanceCounter`. It keeps these values in memory or on the x87 stack: the level's step is a frame
+  local handed to a helper both phases call, and the tuner compares its stored count of misses, which is why the
+  hook reads the count and goes on at the function's return instead of changing it.
 - **Loading-screen fix.** Not needed here ([Shader corpus](#shader-corpus)).
 - **Direct Connect choice** (`RS_MODS_OVERLAY=0` as on the Mac). The same overlay, made by the same
   `tools/play-native/cache_overlay.py`. The archives' key comes from the unpacked code image, which the build
@@ -461,7 +468,8 @@ runtime. `RS_MODS_LOG=1` logs them.
   - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`), for a change inside a function.
     The tables have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar after rs7string
     (735 edits and 127 mid points: the game's arrays for six strings grown to eight), and `plain_packages`, its
-    Plain Packages (2 edits and a mid point on the song file's decrypt). The Mac's tables have the same two
+    Plain Packages (2 edits and a mid point on the song file's decrypt). Eight more mid points, `fps_*`, are the built-in
+    frame rate fixes'. The Mac's tables have the same two
     groups; the 29 points only the Mac needs are `none` here.
   - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The Win32 seam's opens for
     reading, reads, seeks, sizes, attributes, finds and mapped views (`win32_kfile.c`, `win32_ksync.c`) go

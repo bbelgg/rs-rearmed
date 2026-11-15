@@ -373,3 +373,5 @@ sng_note_sustain             0x3c  # SNG note: float sustain (the same reads, +0
 headstock_seg_values         0x8  # a segment's params: its nine value pointers start at +0x8 (Rnd_SetStringShaderParams 0x1001af5e0: g_flickerPhase +0x8 ... g_diffuseColor +0x20, v_positionString +0x28, the last +0x48); Learn & Play 0x0
 guitar_string_size           0x168  # string object size (efd_alloc in the ctor 0x1001b00e7; LP 0x110)
 # --- Seven-String Guitar: end
+# --- Frame rate (built in: overrides/mods/framerate.c)
+service_holder_frame_dt      0x16c  # the frame tick 0x1000e0330 stores min((ms now - ms before) / 1000, 1/15) here (movss at 0x1000e0520); its getter is 0x1000dd0c0

@@ -20,6 +20,8 @@
 //   RS_MODS_NO_THREAD=1  do not start the End-key poller thread (tests)
 //   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only, without the
 //                      menu entries the installer's overlay adds (Direct Connect) (default on)
+//   RS_MODS_FRAME_RATE=0 what the game counts in frames (calibration, the tuner) is left to the frame rate, as in
+//                      the original (default: as at 60 Hz at any rate; framerate.h)
 //   RS_MODS_LOG=1      log what is applied to stderr
 typedef struct {
   int bypass;

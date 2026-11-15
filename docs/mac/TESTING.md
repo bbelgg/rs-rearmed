@@ -27,7 +27,7 @@ game is in the repository.
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with the Windows port: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with the Windows port: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names |
-| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; the files a mod serves (`test_files`: `rc_file.h` as descriptors, as a `FILE` and in a folder's listing). It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
+| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; the files a mod serves (`test_files`: `rc_file.h` as descriptors, as a `FILE` and in a folder's listing); the arithmetic of the frame rate fixes (`test_framerate`: `overrides/mods/framerate.h`, with the game's whole-millisecond frame times from 30 to 360 Hz). It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
 | Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | [The recompiler](#the-recompiler) |
 | Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with the Windows port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
@@ -230,6 +230,11 @@ runs: look at a snapshot, or wait for the `menu:` line, rather than count on the
   skip must keep the game's input mode step: a DIRECT CONNECT profile with an interface connected must reach the
   tuner, not "It sounds like your cable is unplugged". Not checked: a Real Tone cable or Microphone profile, and
   a cached mode to restore.
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `frame rate: on, 8 of 8 points`, and `frame
+  rate: off` with `RS_MODS_FRAME_RATE=0`; `--init-only` is enough to see it. `RS_FPS=120` makes the frames short
+  enough for the hooks to act on a 60 Hz screen, and a route to the highway then goes through the tuner with them.
+  What they do takes a guitar, by hand: at `RS_FPS=120` or `240`, Return on a tuner opens calibration, which should
+  settle as at 60 Hz, and a Guitarcade game's tuner should complete. Not done yet.
 - **Direct Connect overlay**: with `game/Update/patcharchives.psarc` made by `cache_overlay.py`, INPUT offers
   DIRECT CONNECT as a fourth value, and the log has `cache overlay: cache7.7z from Update/patcharchives.psarc`.
   Without screen control, change the title's `pressstart` label in the overlay's copy of

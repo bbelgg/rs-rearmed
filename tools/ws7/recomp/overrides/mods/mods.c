@@ -21,6 +21,7 @@
 #include <time.h>
 #include <unistd.h>
 
+#include "framerate.h"
 #include "mods.h"
 #include "rc_hook.h"
 #include "rc_nofile.h"
@@ -151,6 +152,9 @@ __attribute__((constructor)) static void mods_init(void) {
   logf_("fixes %s, bypass %s, overlay %s, intro skip %s, autosave %s, budget %.0f ms",
         g_cfg.fixes ? "on" : "off", g_cfg.bypass ? "on" : "off", g_cfg.overlay ? "on" : "off",
         g_cfg.intro ? "on" : "off", g_cfg.autosave ? "on" : "off", g_cfg.budget_s * 1000);
+  int fr = rs_framerate_init();  // framerate.c: its own switch, RS_MODS_FRAME_RATE
+  if (fr < 0) logf_("frame rate: off");
+  else logf_("frame rate: on, %d of %d points", fr, RS_FR_POINTS);
 }
 
 // ------------------------------------------------------------------------------------------------

@@ -27,6 +27,13 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   a game run from such a copy ([TESTING.md](TESTING.md#installer-tests)). The language of such an install is
   English (no appmanifest), and DLC a family member shares is not fetched: the ownership ticket lists only the
   account's own, as for Learn & Play.
+- **Calibration and the tuner at any frame rate** (not released): what the game counts in frames is put right by the
+  frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before
+  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). It came from a player's report of the Guitarcade's games going
+  round between the tuner and calibration on a 120 Hz MacBook Pro; whether this was the cause of that is not known.
+  Checked by the unit tests of the arithmetic, by the translator's checks of the eight points against the image, and
+  by a run to the note highway at `RS_FPS=120`, which goes through the tuner. Not yet done: calibration and the tuner
+  played with a guitar above 60 Hz, alone and with two players.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs-for-1130)); 74.9 fps on 75 Hz.

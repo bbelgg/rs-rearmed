@@ -127,6 +127,8 @@ Mac-only, not needed, or not proved). The Windows build uses it for the hook poi
     after the hooks every register and xmm register is put back as the point found it, but those a hook set
     with `rc_mid_set` or `rc_mid_set_f`. A bad name, index or hook is refused with a log line. A point a
     target's table marks `none` takes a hook and never calls it, and answers `rc_mid_is_none` with 1.
+    The apps' own code may hook them as well: the built-in frame rate fixes (`overrides/mods/framerate.c`) are one
+    source built into both apps as a mod is built, with hooks at eight points.
 
   The tables are checked where the function is translated: the old bytes must be the image's, a range must start
   and end on an instruction with no jump into it, the new bytes must decode to whole instructions, a continuation
@@ -313,7 +315,8 @@ How to run them: [Windows testing](../windows/TESTING.md#the-recompiler), [Mac t
   game code first. The same mod switches edit groups on and hooks a mid point in its constructor; the test
   checks the refusals (no such group, none on this game, too late), the hook's values, flags and
   continuation, a point that is `none`, and that registers the hook changed without setting them are put
-  back. `test_files` checks the file provider.
+  back. `test_files` checks the file provider, and `test_framerate` the arithmetic of the built-in frame rate
+  fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times.
 - **Edits and mid points in translated code, 32-bit**: `test/x86/innercases.py` builds a small PE and
   translates it with edits and mid points of its own (`gen_image_pe.py --inner`). It runs the edited
   snippets against Unicorn twice: switches off against the image, on against a copy with the new bytes.

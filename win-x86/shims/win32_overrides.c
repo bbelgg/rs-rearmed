@@ -176,10 +176,18 @@ static void cfg_load(void) {
   }
   g_cfg.init = 1;
 }
+// The frame rate fixes, the Mac's (tools/ws7/recomp/overrides/mods/framerate.c, which says what they are): the same
+// source and the same switch, RS_MODS_FRAME_RATE=0. The number of points hooked, of eight, or -1 when off.
+int rs_framerate_init(void);
 // The open-file limit, as on the Mac (rc_nofile.h): each CreateFile holds a host descriptor. At the start of
 // lp_main.c, after the log is set up; RS_MODS_FIXES=0 leaves it.
 void lp_mods_init(void) {
   cfg_load();
+  int fr = rs_framerate_init();
+  if (g_cfg.log) {
+    if (fr < 0) fprintf(stderr, "mods: frame rate: off\n");
+    else fprintf(stderr, "mods: frame rate: on, %d of 8 points\n", fr);
+  }
   if (!g_cfg.fixes) return;
   uint64_t old;
   int failed;

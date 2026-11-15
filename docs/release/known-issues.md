@@ -18,6 +18,8 @@ into the notes as it stands. -->
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
   in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
+- **Not played yet:** the frame rate fixes, which make calibration and the tuner run above 60 Hz as they do at 60 Hz, have not
+  been played with a guitar on a display faster than 60 Hz, in either game. `RS_MODS_FRAME_RATE=0` turns them off.
 - Not tested yet with this release: the Mac game downloaded by Steam when it isn't installed there (checked with a
   stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
   the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game

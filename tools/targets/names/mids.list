@@ -160,3 +160,12 @@ seven_pd2_chord
 seven_pd4_sustain
 seven_pd5_eval
 # --- Seven-String Guitar: end
+# --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
+fps_calib_window      # calibration's start: its averaging window, before it is stored
+fps_calib_step_play   # calibration, strings played: the level's step of this frame, before it is added
+fps_calib_step_mute   # calibration, strings muted: the same
+fps_panel_hold        # a menu panel's hold: what this frame takes off its timer
+fps_tuner_miss        # the tuner's string hold: the misses in a row, where they are compared with three, and where fewer go on
+fps_tuner_volume      # the tuner's volume warnings: the check's start, and its return
+fps_tuner_instrument  # the tuner's wrong instrument warning: the same
+fps_tuner_hint        # the tuner's first-time hint: the same

@@ -379,3 +379,5 @@ sng_note_sustain             0x3c  # SNG note: float sustain (0x13217b0)
 headstock_seg_values         0x0  # a segment's params: its value pointers from the start (not read: 4-byte guests)
 guitar_string_size           0x110  # string object: bytes (its allocation in the GuitarStrings ctor)
 # --- Seven-String Guitar: end
+# --- Frame rate (built in: overrides/mods/framerate.c)
+service_holder_frame_dt           0xc0    # ServiceManager holder (*0x1ee0bfc): float frame time, whole milliseconds / 1000, at most 1/15 (the frame tick 0x133e880 writes it at 0x133ea36)

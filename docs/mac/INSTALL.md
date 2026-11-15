@@ -474,6 +474,7 @@ too ([its switches](../windows/INSTALL.md#settings-and-switches)). `RS_MODS_LOG=
 | Song ownership: the base game, your DLC, the AppID of every archive in the copy's `dlc/`, and the Rocksmith 1 songs you own (a copy or refresh asks Steam, with your account logged in) | yes | `RS_STEAM_DLC=all`, or a list of AppIDs |
 | Title logo, from your own `static.psarc` | yes | Built-in Mods…, `RS_REARMED=0`, or delete `static.psarc.rearmed` |
 | Frame rate follows the display; a fixed rate turns vsync off | | `RS_FPS=N` |
+| Calibration and the tuner are the same at any frame rate (the game counts them in frames, which goes wrong above 60 Hz) | yes | `RS_MODS_FRAME_RATE=0` |
 | Lower guitar latency: a smaller output buffer, a real-time audio thread, stale guitar audio dropped | | `RS_AUDIO_FRAMES=N` (0 leaves the system's), `RS_LATENCY_BUFFER=N` (1-16), `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_LOG=1` |
 | [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
 | [Two players](#two-players) on any input | yes | Built-in Mods…, `RS_MODS_MULTIPLAYER=0` |

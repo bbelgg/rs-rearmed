@@ -181,3 +181,13 @@ seven_pd5_eval    0x10011314f  (void *eval@rsi, int extreme@rax)  # PD5 Mac: 0x1
 
 # plain
 plain_pp_sngd  0x1001eb84a  (const uint8_t *src@rdi, uint32_t len@rsi, uint8_t *out@r8, uint32_t out_len@r9, uint8_t ok@rax) -> done=0x1001eb84f  # PP_SNGD the song file loader 0x1001eb6a0's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, SysV: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
+
+# Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
+fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840
+fps_calib_step_play   0x100662ca0  (float step@xmm3)  # the played phase 0x100662b90: +-0.001 x (min(|-22.5 - average|, 30) x 9.5 / 30 + 0.5), before it is added to the level at +0x8ac
+fps_calib_step_mute   0x100662b2c  (float step@xmm0)  # the muted phase 0x100662930: +-0.01, 0.02 or 0.04 toward an average of -70, before it is added to the level at +0x8ac
+fps_panel_hold        0x10089cf03  (float step@xmm0)  # the panel 0x10089cdc0 (PlayThinking_External, PlayJustCompleted_External), state 2: max(frame time, 1/15) after its maxss, before it is taken off the timer at +0xbc
+fps_tuner_miss        0x10052e021  (uint32_t misses@rax, void *tuner@rbx) -> grace=0x10052e079  # the string hold 0x10052dee0: the misses in a row (+0xc8, stored), at their compare with 3; grace is its return of 0, where fewer than 3 go
+fps_tuner_volume      0x100526a50  (void *tuner@rdi) -> skip=0x100526bf8  # the average of the last 20 levels (+0x224, count +0x274), one a call, behind "Your volume is really low / high"
+fps_tuner_instrument  0x1005268f0  (void *tuner@rdi) -> skip=0x100526a45  # CheckWrongInstrument: the average of the last 10 notes (+0x27c, count +0x2a4), one a call
+fps_tuner_hint        0x10054cf10  (void *menu@rdi) -> skip=0x10054d0b3  # the tuner menu's first-time hint: frames of several strings ringing, counted at +0x2e0

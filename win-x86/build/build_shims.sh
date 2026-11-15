@@ -22,6 +22,9 @@ for f in "$shims"/win32_*.c "$shims"/d3d9/*.c "$shims"/audio/wa_*.c "$root/shims
          "$root"/win-x86/online/online32.c; do
   $CC -I"$root/shims/coreaudio" -c "$f" -o "$obj/shims/$(basename "$f" .c).o"
 done
+# the frame rate fixes, the Mac's source (overrides/mods/framerate.c): built as a mod is, by the game's names at run time
+clang -arch arm64 -O2 -g -Wall -I"$runtime" -I"$root/tools/ws7/recomp/overrides" \
+  -c "$root/tools/ws7/recomp/overrides/mods/framerate.c" -o "$obj/shims/framerate.o"
 # the overlay API for mods, the Mac's (shims/include/rs_overlay.h): linked as an object, as only mods call it
 $CC -I"$root/shims/platform/include" -c "$root/shims/platform/src/rsp_overlay.c" -o "$obj/rsp_overlay.o"
 rm -f "$obj/win32_shims.a"

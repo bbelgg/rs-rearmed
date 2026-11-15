@@ -244,6 +244,21 @@ same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-f
   free slot; here `input_bind` finds Player 2's saved input first. It has to be that early: moving the input of
   a running stream crashes the I/O thread. The menu overlay rewords the notice MULTIPLAYER INPUT SUPPORT, which
   said Player 2 must use the cable.
+- **The same at any frame rate** (`framerate.c`, hooks at eight mid points, `fps_*`; `RS_MODS_FRAME_RATE=0` is
+  the original). The game's frame time is whole milliseconds with no lower bound, and some of its code counts
+  frames, which goes wrong above 60 a second. Calibration sizes its averaging window as the frames of one second,
+  by the time of the one frame in which its screen opens and with no upper bound, over buffers of 100 samples a
+  player that the meter's own counters follow: above 100 frames a second player 1's samples run into player 2's,
+  and a frame of 4 ms or less puts them over the meter's own state. It moves the input level one step a frame
+  toward its target in both phases (strings muted, then played) while its average lags half a second, so the
+  loop runs faster with the frame rate. The tuner gives a string that drifts two frames before its hold loses
+  ground, and averages the last 20 levels and the last 10 notes, one a frame, for its volume and wrong
+  instrument warnings. A menu panel's hold takes at least 1/15 s off its timer each frame. The hooks put each
+  right by the frame's own time, and only for a frame shorter than a 60 Hz one (under 14.5 ms): the window stays
+  within the buffer, a step is the part of itself that the frame is of 1/60 s, the two averages and the
+  first-time hint take the calls a 60 Hz game would make, and the hold's three misses are counted in sixtieths
+  of a second. At 60 Hz and below the game runs as it always has. One source for both editions, with each game's
+  places in its `mids.map`.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the
@@ -290,7 +305,7 @@ same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-f
   - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables
     (`tools/targets/mac-x64/edits.map` and `mids.map`) have two groups, both for rearmed-mods: `seven_string`,
     its Seven-String Guitar (618 edits and 122 mid points), and `plain_packages`, its Plain Packages (2 edits and
-    a mid point). Fewer edits than Learn & Play's 735: many of this game's six-string loops are unrolled, so
+    a mid point). Eight more mid points, `fps_*`, are the built-in frame rate fixes'. Fewer edits than Learn & Play's 735: many of this game's six-string loops are unrolled, so
     where Learn & Play's edits lengthen a loop, mid points of this edition's own (29, `none` in Learn & Play) do
     the extra strings. 34 of the shared points are `none` here.
   - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The game's file imports

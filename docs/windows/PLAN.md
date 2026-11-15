@@ -13,6 +13,11 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   microphone and other interfaces through Direct Connect; every channel in the input list, input channel and gain,
   calibration that can boost; the output following the system's default; window, full screen and Retina; Command-Q and
   the close button, in 0.3-0.5 s; the built-in fixes, no intro screens or Auto Save warning; the GUI installer.
+- **Calibration and the tuner at any frame rate** (not released): as in the [Mac plan](../mac/PLAN.md#status), from
+  the same source with this game's eight points ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). Checked by the same
+  unit tests, by the translator's checks of the points against the image, and by a run to the note highway on a
+  60 Hz screen, where the hooks leave the game as it is. Not yet run above 60 Hz: this edition has no switch for the
+  frame rate, so that takes a faster display.
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 - **Performance**: a song holds the display's rate, 60 fps on a 60 Hz display and 74.9 on 75 Hz, at 52-54% of a core
   and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB

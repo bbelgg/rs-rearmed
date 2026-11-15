@@ -183,3 +183,14 @@ seven_pd4_update    none  the Mac inlines the all-strings-tremolo test into the 
 seven_pd2_chord     none  the Mac inlines the all-strings-slide test into the chord update; Learn & Play's is the function seven_pd2
 seven_pd4_sustain   none  the Mac inlines the all-strings-tremolo test into the sustain update; Learn & Play's is the function seven_pd4
 seven_pd5_eval      none  the Mac's unrolled slide-distance function; Learn & Play's is seven_pd5
+
+# Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
+# Windows code keeps these values in memory or on the x87 stack, and its objects in esi.
+fps_calib_window      0x0116adf5  (uint32_t window@edx)  # the calibration meter's start 0x116a9d0 (virtual, vtable cell 0x1d3180c; the Mac's 0x10065ce30): max(30, (int)(1 / frame time)) in edx, before it is stored at +0x788; the samples are 100 floats a player at +0x3d4 and +0x564, the meter's own state from +0x6f4
+fps_calib_step_play   0x0116e295  (float step@[ebp-0x24])  # the played phase 0x116e150 (the Mac's 0x100662b90): +-0.001 x (min(|-22.5 - average|, 30) x 9.5 / 30 + 0.5), before it goes to the add-and-clamp helper 0x116f170 (the level, +0x754)
+fps_calib_step_mute   0x0116e119  (float step@[ebp-0x4])  # the muted phase 0x116dfe0 (the Mac's 0x100662930): +-0.01, 0.02 or 0.04 toward an average of -70, before the same helper
+fps_panel_hold        0x0114190d  (float step@st0)  # the panel 0x11417d0 (PlayThinking_External, PlayJustCompleted_External; the Mac's 0x10089cdc0), state 2: max(frame time, 1/15) back from 0xf8aea0, before it is taken from the timer at +0x84
+fps_tuner_miss        0x011322f4  (uint32_t misses@[esi+0xb8], void *tuner@esi) -> grace=0x0113234a  # the string hold 0x1132140 (the Mac's 0x10052dee0): the misses in a row, at their compare (cmp [esi+0xb8], 2; jbe): the value is the stored counter itself, so the hook reads it and goes on at the return of 0 when it is too soon
+fps_tuner_volume      0x01134480  (void *tuner@esi) -> skip=0x01134640  # the average of the last 20 levels (+0x1a8, count +0x1f8), behind "volume is really low/high" (the Mac's 0x100526a50)
+fps_tuner_instrument  0x01134110  (void *tuner@esi) -> skip=0x01134323  # CheckWrongInstrument: the average of the last 10 notes (+0x200, count +0x228) (the Mac's 0x1005268f0); skip is its last `ret 4`
+fps_tuner_hint        0x012c2660  (void *menu@esi) -> skip=0x012c283e  # the tuner menu's first-time hint (the Mac's 0x10054cf10 without its first test, which is in the caller 0x12c25f0 here)

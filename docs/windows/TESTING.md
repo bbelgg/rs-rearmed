@@ -29,7 +29,7 @@ where you point them and never copied into the repository. `OUT=DIR` is a build 
 | Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac port: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port: what a change calls for, and a release's edits and notes |
 | Tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
-| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention; the files a mod serves (`test_files`); `probe_mod.dylib` and `files_mod.dylib` for the game runs ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
+| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention; the files a mod serves (`test_files`); the arithmetic of the frame rate fixes (`test_framerate`); `probe_mod.dylib` and `files_mod.dylib` for the game runs ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
 
 ### The recompiler
 
@@ -291,6 +291,10 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   feature" comes after "Loading profile…" and clears itself about 4 s later, so take snapshots every 2 s.
   `RC_HOOK_TRACE=autosave_warning` shows the handler either way. Not checked: a Real Tone cable or Microphone
   profile, and the tuner with the switch off.
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `mods: frame rate: on, 8 of 8 points`, and
+  `mods: frame rate: off` with `RS_MODS_FRAME_RATE=0`. This app has no switch for the frame rate, so on a 60 Hz
+  screen the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar
+  ([Mac testing](../mac/TESTING.md#unattended-runs)). Not done yet.
 - **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
   REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
   shows which one the app linked.

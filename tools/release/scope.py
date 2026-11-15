@@ -109,13 +109,15 @@ RULES = {
     "tools/play-native/install.sh": rule([MAC], run=[MAC], installer=True),
     "tools/play-native/launch.sh": rule([MAC], run=[MAC], suites=["settings"]),
     "tools/play-native/launch-stub.c": rule([MAC], run=[MAC]),
-    "tools/play-native/warm-shaders.sh": rule([MAC], run=[MAC]),
+    # (both installs run it on the app they made: install.sh, learn-play.sh and the installer app)
+    "tools/play-native/warm-shaders.sh": rule(BOTH, run=BOTH, installer=True),
     "tools/play-native/learn-play.sh": rule([LP], run=[LP], installer=True),
     "tools/play-native/cache_overlay.py": rule(BOTH, run=BOTH, suites=["cache_overlay"]),
     "tools/psarc_extract.py": rule(BOTH, suites=["cache_overlay", "gamefiles"]),
     "tools/psarc_pack.py": rule(BOTH, suites=["cache_overlay", "gamefiles"]),
     "tools/steamless/": rule([MAC], suites=["decrypt"], installer=True),
-    "tools/rs-env.sh": rule([MAC], suites=["netguard"]),
+    # (install.sh, learn-play.sh and the guard's build source it)
+    "tools/rs-env.sh": rule(BOTH, suites=["netguard"], installer=True),
     "tools/check-shim.sh": rule([MAC], suites=["ct.shims"]),
 
     # Shared: the recompiler, the tables, the renderer, audio, the guard.
@@ -132,6 +134,8 @@ RULES = {
     "shims/platform/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.platform", "lp.screen"]),
     "shims/include/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.shims", "ct.opengl", "ct.platform"]),
     "tools/ws8/netguard/": rule(BOTH, build=[LP], run=[MAC], suites=["netguard"]),
+    # (Learn & Play's Steam face compiles the Mac layer's state and answers: win-x86/shims/steam/Makefile)
+    "shims/steam/src/": rule(BOTH, build=BOTH, run=BOTH, suites=["steam", "lp.steam"]),
 
     # The Mac edition alone.
     "shims/": rule([MAC], build=[MAC], run=[MAC], suites=["ct.shims"]),
@@ -155,7 +159,8 @@ RULES = {
     "win-x86/shims/win32_d3d9.c": rule([LP], build=[LP], run=[LP], suites=["lp.d3d9"]),
     "win-x86/shims/tests/": rule(suites=["lp.shims"]),
     "win-x86/online/": rule([LP], build=[LP], run=[LP], suites=["lp.online"]),
-    "win-x86/app/": rule([LP], build=[LP], run=[LP], suites=["lp.screen"]),
+    # (settings: the test compiles lp_settings.c beside the Mac launcher's reader)
+    "win-x86/app/": rule([LP], build=[LP], run=[LP], suites=["lp.screen", "settings"]),
     "win-x86/test/": rule(suites=["lp.screen", "lp.d3d9"]),
     "win-x86/README.md": NOTHING,
 }

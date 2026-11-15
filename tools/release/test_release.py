@@ -38,6 +38,17 @@ class Scope(unittest.TestCase):
             s = scope.scope([path])
             self.assertEqual((s["build"], s["run"]), (["mac", "lp"], ["mac", "lp"]), path)
 
+    def test_what_one_edition_borrows_from_the_other_reaches_both(self):
+        s = scope.scope(["shims/steam/src/interfaces.cpp"])
+        self.assertEqual((s["editions"], s["build"], s["run"]), (["mac", "lp"], ["mac", "lp"], ["mac", "lp"]))
+        self.assertEqual(s["suites"], ["steam", "lp.steam"])
+        for path in ("tools/play-native/warm-shaders.sh", "tools/rs-env.sh"):
+            s = scope.scope([path])
+            self.assertEqual(s["editions"], ["mac", "lp"], path)
+            self.assertTrue(s["installer"], path)
+        self.assertEqual(scope.scope(["tools/play-native/warm-shaders.sh"])["run"], ["mac", "lp"])
+        self.assertEqual(scope.scope(["win-x86/app/lp_settings.c"])["suites"], ["settings", "lp.screen"])
+
     def test_the_longest_prefix_decides(self):
         self.assertEqual(scope.scope(["tools/targets/win-x86/edits.map"])["run"], ["lp"])
         self.assertEqual(scope.scope(["tools/ws7/recomp/app/build.sh"])["build"], ["mac"])

@@ -364,25 +364,49 @@ static int before_dlc_owned(rc_ctx *c, void *user) {
   return 1;
 }
 
+// RS_MODS_LOG=1 says what a mounting did once its list is empty, in Learn & Play's words: the archives its steps
+// took, the frames and the time. Learn & Play's steps dropped archives when several ran in a frame, until its loop
+// waited for each mount to be finished (win-x86/shims/win32_overrides.c). This game's do not: it lists the same
+// songs after a mounting with the budget as after one at RS_MODS_BUDGET_MS=0, a step a frame as in the original
+// (docs/mac/TESTING.md has the check).
+static struct {
+  unsigned steps, frames;
+  double t0;
+} g_mount;  // the game thread's, when logging
+
+// One install step. 1 when it took an archive: the step that finds the list empty clears the flag and installs
+// nothing.
+static int mount_step(uint8_t *self, uint64_t o) {
+  OV_GUEST(dlc_install_step, o);
+  if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) return 0;
+  if (g_log) g_mount.steps++;
+  return 1;
+}
+
 void RC_FN(dlc_update)(rc_ctx *c) {
   OV_ARGS_OF(dlc_update, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
+  if (g_log && !g_mount.steps) g_mount.t0 = elapsed_s();
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
   g_mounting = 1;
+  unsigned steps = g_mount.steps;
   if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-    OV_GUEST(dlc_install_step, o);
+    mount_step(self, o);
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
     do {
-      OV_GUEST(dlc_install_step, o);
-      // the step that finds the list empty clears the flag and installs nothing
-      if (*(volatile uint8_t *)(self + INSTALLING_FLAG)) COUNT(g_installed);
+      if (mount_step(self, o)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < g_cfg.budget_s);
   }
   g_mounting = 0;
+  if (g_mount.steps != steps) g_mount.frames++;
+  if (g_mount.steps && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+    logf_("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames, elapsed_s() - g_mount.t0);
+    memset(&g_mount, 0, sizeof g_mount);
+  }
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;
   if (self[RC_OFF(dlc_check_on)] && self[RC_OFF(dlc_pending)]) {
     if ((uint8_t)OV_GUEST(dlc_enum_check, o)) {

@@ -226,6 +226,11 @@ same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-f
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours (keys, the End key in
   menus, faster loading with large libraries, the song path cache, the number-table hash, worker-thread priority,
   the open-file limit, in `rc_nofile.h`, which the Windows build shares) and the RSBypass CDLC signature skip.
+  The faster loading is the batched DLC mounting: the DLC coordinator's update runs its install step for
+  `RS_MODS_BUDGET_MS` (default 50) a frame instead of once. Learn & Play's loop has to wait for each mount to be
+  finished, or archives are dropped ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)); this
+  game's needs no wait, as its song list is the same with the budget as with a step a frame
+  ([TESTING.md](TESTING.md#unattended-runs)).
 - **No intro screens** (`before_intro_update`, a pre-hook on `boot_intro_update`; `RS_MODS_INTRO=0` plays the
   intro): the boot service ticks the intro movie (logos, legal screens, intro video) in its boot phases 2 and 3
   and shows the title only once the intro has ended. The movie's model is loaded as usual, but the movie is

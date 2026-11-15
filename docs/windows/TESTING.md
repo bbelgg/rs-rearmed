@@ -295,6 +295,10 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   `mods: frame rate: off` with `RS_MODS_FRAME_RATE=0`. This app has no switch for the frame rate, so on a 60 Hz
   screen the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar
   ([Mac testing](../mac/TESTING.md#unattended-runs)). Not done yet.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here. With `RS_MODS_LOG=1`, `mods: DLC: N
+  archives were not mounted` comes before the `archives mounted` line when a step dropped its archive (the seam
+  counts each open of a song archive). The count of songs in the search box, as in
+  [Mac testing](../mac/TESTING.md#unattended-runs), has not been read in this edition.
 - **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
   REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
   shows which one the app linked.

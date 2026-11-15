@@ -18,6 +18,9 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   unit tests, by the translator's checks of the points against the image, and by a run to the note highway on a
   60 Hz screen, where the hooks leave the game as it is. Not yet run above 60 Hz: this edition has no switch for the
   frame rate, so that takes a faster display.
+- **Batched DLC mounting**: since 1.14.1 the loop waits for each mount to be finished, so every archive of a
+  large library is mounted ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The Mac edition was checked for the
+  same fault and does not have it ([Mac plan](../mac/PLAN.md#status)).
 - **Checked on**: one Mac (M2) with a 75 Hz external display and the built-in Retina screen.
 - **Performance**: a song holds the display's rate, 60 fps on a 60 Hz display and 74.9 on 75 Hz, at 52-54% of a core
   and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB

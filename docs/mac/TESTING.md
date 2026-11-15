@@ -183,7 +183,7 @@ runs: look at a snapshot, or wait for the `menu:` line, rather than count on the
 | Title (TitleScreen) | Return | up about 8 s after the start with the intro skip, about 31 s without. Give it 6-8 s after it appears: a Return in the fade-in is lost, and Esc there opens EXIT GAME |
 | Profile list (ProfileSelect) | Return | `fwddelete` here deletes the profile. With no profile, Return starts the first-time screens (Down to New profile, Return, a name, Return, then "Have you played Rocksmith before?"). With rearmed-mods' `ForceProfileLoad` the game goes to the main menu by itself |
 | Main menu (MainMenu) | Return on LEARN A SONG | up about 25 s after the profile with a few DLC archives, about 85 s with 2,400; no key is taken while the DLC is enumerated, and a Return sooner is lost. The list: LEARN A SONG, ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, UPLAY |
-| Song list (LearnASong_Songs) | `/`, the letters, Down, Return | `/` opens the search (the Mac binding; Shift is the Windows one), Tab opens SORT BY. Letters 1.5 s apart; a key down and up in one frame is lost for text. Return with no match leaves the box open |
+| Song list (LearnASong_Songs) | `/`, the letters, Down, Return | `/` opens the search (the Mac binding; Shift is the Windows one), Tab opens SORT BY. The open box says how many songs match: with nothing typed, how many the list has (`263 Matches`). Letters 1.5 s apart; a key down and up in one frame is lost for text. Return with no match leaves the box open |
 | Song page (LearnASong_SongOptions) | Return on Play Song | |
 | Tuner (LearnASong_PreSongTuner) | `fwddelete`, then Return | up 15-30 s after Play Song. `fwddelete` is Skip Tuner, Return answers "Yes, continue without tuning" about 5 s later. Return on the tuner itself starts Calibration, which waits for a guitar (Esc cancels) |
 | "TUNE UP!" (SelectionListDialog) | Return | instead of the tuner on a profile with no input (DISCONNECTED) |
@@ -235,6 +235,13 @@ runs: look at a snapshot, or wait for the `menu:` line, rather than count on the
   enough for the hooks to act on a 60 Hz screen, and a route to the highway then goes through the tuner with them.
   What they do takes a guitar, by hand: at `RS_FPS=120` or `240`, Return on a tuner opens calibration, which should
   settle as at 60 Hz, and a Guitarcade game's tuner should complete. Not done yet.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): `RS_MODS_LOG=1` logs `DLC: N archives mounted in F frames, T s`
+  once the profile has loaded, which is the end of the mounting. A step that took an archive and mounted nothing
+  would lose its songs, as Learn & Play's did before 1.14.1
+  ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)), so compare the song list of a start with the
+  budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original: the search box of the song list
+  says how many songs there are. With 147 archives in `dlc/`: 263 both ways, mounted in 5 to 8 frames with the
+  budget and in 147 without. Not run that way with a library of thousands.
 - **Direct Connect overlay**: with `game/Update/patcharchives.psarc` made by `cache_overlay.py`, INPUT offers
   DIRECT CONNECT as a fourth value, and the log has `cache overlay: cache7.7z from Update/patcharchives.psarc`.
   Without screen control, change the title's `pressstart` label in the overlay's copy of
@@ -404,7 +411,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 
 | Switch | What |
 |---|---|
-| `RS_MODS_LOG=1` | what the built-in fixes apply |
+| `RS_MODS_LOG=1` | what the built-in fixes apply, and the DLC mounting's end (archives, frames, time) |
 | `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each level set, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
 | `RS_FILE_LOG=1` | each open a mod's file provider served, and each folder listing it added names to (`[rc] file:`) |

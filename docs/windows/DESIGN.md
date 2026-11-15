@@ -417,6 +417,8 @@ What differs, fix by fix:
   `tools/targets/win-x86/mids.map`. The Windows code has the same counts and the same buffers, and its frame time is
   whole milliseconds too, from `QueryPerformanceCounter`. It keeps the tuner's count of misses in memory, which is why
   the hook reads the count and picks where the function goes on instead of changing it.
+- **Skip Tuner in the Guitarcade**: the shared hook, with this game's mid point. The game makes the same test and
+  keeps its answer in a local, where the Mac's is in a register.
 - **Loading-screen fix.** Not needed here ([Shader corpus](#shader-corpus)).
 - **Direct Connect choice**: the same overlay, made by the same `tools/play-native/cache_overlay.py`. The archives' key
   comes from the unpacked code image, which the build step hands to the copy (`gamefiles.key_from_image`).

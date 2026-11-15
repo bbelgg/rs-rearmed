@@ -191,3 +191,6 @@ fps_tuner_miss        0x10052e021  (uint32_t misses@rax, void *tuner@rbx) -> gra
 fps_tuner_volume      0x100526a50  (void *tuner@rdi) -> skip=0x100526bf8  # the average of the last 20 levels (+0x224, count +0x274), one a call, behind "Your volume is really low / high"
 fps_tuner_instrument  0x1005268f0  (void *tuner@rdi) -> skip=0x100526a45  # CheckWrongInstrument: the average of the last 10 notes (+0x27c, count +0x2a4), one a call
 fps_tuner_hint        0x10054cf10  (void *menu@rdi) -> skip=0x10054d0b3  # the tuner menu's first-time hint: frames of several strings ringing, counted at +0x2e0
+
+# Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+tuner_skip_offer      0x100544c7f  (uint8_t offer@r14)  # the tuner menu's Skip Tuner button 0x100544a30 (button 0xac; not for the menus "tuner" and "getuner" or a first encounter): whether the stage its OnComplete names is another than "Guitarcade_Game", in r14b at its test before the button is added

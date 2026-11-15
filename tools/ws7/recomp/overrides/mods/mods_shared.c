@@ -16,8 +16,8 @@
 // ------------------------------------------------------------------------------------------------
 // Configuration
 // ------------------------------------------------------------------------------------------------
-rs_mods_config rs_mods_cfg = {
-    .bypass = 1, .fixes = 1, .autosave = 1, .multiplayer = 1, .budget_s = 0.050, .intro = 1, .overlay = 1};
+rs_mods_config rs_mods_cfg = {.bypass = 1, .fixes = 1, .autosave = 1, .multiplayer = 1, .budget_s = 0.050,
+                              .intro = 1, .overlay = 1, .guitarcade_skip = 1};
 
 int rs_mods_env_on(const char *name, int dflt) {
   const char *v = getenv(name);
@@ -33,6 +33,7 @@ void rs_mods_reload_config(void) {
   rs_mods_cfg.overlay = rs_mods_env_on("RS_MODS_OVERLAY", 1);
   rs_mods_cfg.autosave = rs_mods_env_on("RS_MODS_AUTOSAVE", 1);
   rs_mods_cfg.multiplayer = rs_mods_env_on("RS_MODS_MULTIPLAYER", 1);
+  rs_mods_cfg.guitarcade_skip = rs_mods_env_on("RS_MODS_GUITARCADE_SKIP", 1);
   rs_mods_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -214,6 +215,26 @@ static int before_input_bind(rc_ctx *c, void *user) {
   return 0;
 }
 
+// ------------------------------------------------------------------------------------------------
+// Skip Tuner in a Guitarcade game's tuner. Where the tuner menu sets its buttons up, it offers Skip Tuner (button
+// 0xac) unless it is the Tuner of the tools or a lesson's, a first encounter, or a tuner that goes on to a
+// Guitarcade game: it reads the stage its OnComplete names and leaves the button out for "Guitarcade_Game". That
+// one test is all that keeps it from those tuners. The skip itself is the menu's own whatever the stage: the same
+// warning (RS2SkipTuner, unless the profile says not to show it), then the step on to OnComplete that a finished
+// tuning takes. So a player whose tuner does not finish (an input the tuner can't follow, a guitar kept in another
+// tuning) could play no game but the one that has no tuner; a song has always left that to the player.
+//
+// Both games make the test the same way and keep its answer until they act on it, the Mac in a register and
+// Learn & Play in a local: a mid point there (tuner_skip_offer), whose answer the hook sets.
+// RS_MODS_GUITARCADE_SKIP=0 is the original.
+// ------------------------------------------------------------------------------------------------
+static int g_skip_offer = -1;  // the answer's index at the point; -1: this game has no such point
+
+static void on_skip_offer(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (rs_mods_cfg.guitarcade_skip && g_skip_offer >= 0) rc_mid_set(f, g_skip_offer, 1);
+}
+
 void rs_mods_start(void) {
   rs_mods_reload_config();
   if (rc_hook_add_name("boot_intro_update", before_intro_update, NULL, NULL)) rs_mods_logf("no intro hook point");
@@ -227,4 +248,8 @@ void rs_mods_start(void) {
   int fr = rs_framerate_init();  // framerate.c: its own switch, RS_MODS_FRAME_RATE
   if (fr < 0) rs_mods_logf("frame rate: off");
   else rs_mods_logf("frame rate: on, %d of %d points", fr, RS_FR_POINTS);
+  int p = rc_mid_add_name("tuner_skip_offer", on_skip_offer, NULL);  // a game without the point: a log line of its own
+  if (p >= 0 && !rc_mid_is_none(p)) g_skip_offer = rc_mid_value(p, "offer");
+  rs_mods_logf("Guitarcade Skip Tuner: %s",
+               g_skip_offer < 0 ? "no point for it" : rs_mods_cfg.guitarcade_skip ? "on" : "off");
 }

@@ -266,8 +266,9 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   Return ends it. NONSTOP PLAY: Return on START, the tuner, the song; Esc pauses with SKIP on top. LESSONS: Down
   to a lesson, Return twice; Esc, Down, Return leaves. A lesson with practice (Bass 101, the third Down from the
   first video one): Return twice, Skip Tuner, Return; Esc there gives RESUME LESSON, EXIT LESSON, RESTART
-  LESSON, TUNER, TECHNIQUE GUIDE, MIXER. GUITARCADE: TECHNIQUE GAMES, Return on a game, then Calibration "Make
-  some noise!" waits for a guitar (Esc goes back); SCORE ATTACK works without one: Return on the song, Return on
+  LESSON, TUNER, TECHNIQUE GUIDE, MIXER. GUITARCADE: as the Mac edition's route, to the game's tuner, Skip Tuner
+  (forward delete) and Return on its warning; the game's "MAKE SOME NOISE!" then waits for a guitar (Esc goes
+  back). A Return on the tuner is Calibrate. SCORE ATTACK works without a guitar: Return on the song, Return on
   EASY, Skip Tuner, Return; three strikes end it about 30 s in, and Return goes back to the list. MULTIPLAYER:
   Return on the notice MULTIPLAYER INPUT SUPPORT, on the second profile, on CONTINUE, on the mode and the first
   song, on Play Song, Skip Tuner, Return: a split-screen song; Player 2's profile needs an input, or it stops at
@@ -291,6 +292,9 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
 - **Frame rate fixes** (`RS_MODS_FRAME_RATE`): this app has no switch for the frame rate, so on a 60 Hz screen
   the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar. Not
   done yet.
+- **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP`): the Mac edition's check and its keys; the log's
+  screens were the same here, to `menu: Guitarcade_Game`. Not run: the switch off, leaving the game, and a game
+  played after a skip.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here: `[rs-mods] DLC: N archives were not
   mounted` comes before the `archives mounted` line when a step dropped its archive (the seam counts each open
   of a song archive). The count of songs in the search box has not been read in this edition.

@@ -46,6 +46,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   ([TESTING.md](TESTING.md#unattended-runs)).
 - **Calibration and the tuner at any frame rate** (not released): what the game counts in frames is put right by the
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
+- **Skip Tuner in the Guitarcade** (not released): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
+  with the same warning. The game left it out there, so only a finished tuning got a player into a game.
 - **Shared with Learn & Play** (not released): the switches, the log and the start of the built-in fixes, the intro
   skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are one source for both
   editions (`overrides/mods/mods_shared.c`, `framerate.c`), and Learn & Play's own fixes name the game through the

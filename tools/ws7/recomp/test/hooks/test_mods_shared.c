@@ -67,6 +67,16 @@ const rc_target_value rc_target_symbols[] = {
     {"input_profile_string", ADDR(PROFILE), CC(CDECL)}, {0, 0, 0}};
 const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), 0};
 const int rc_hook_npoints = NPOINTS;
+// The one mid point the fixes here hook, with its value where each game has it: the low byte of a register, a
+// local below the frame pointer.
+#define SKIP_LOCAL (-0x1d)
+#ifdef RC_GUEST32
+const rc_mid_name rc_target_mids[] = {
+    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', RC_MID_MEM | 5, SKIP_LOCAL}}, 0, {0}, 0}, {0}};
+#else
+const rc_mid_name rc_target_mids[] = {
+    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', 14, 0}}, 0, {0}, 0}, {0}};
+#endif
 #define OFF(name) ((uint32_t)rc_off(name))
 
 // What is logged for a while: between log_start and log_stop into `logged`; logged_lines counts the lines that are
@@ -260,7 +270,7 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
 
 static const char *const SWITCHES[] = {"RS_MODS_LOG", "RS_MODS_BYPASS", "RS_MODS_FIXES", "RS_MODS_INTRO",
                                        "RS_MODS_OVERLAY", "RS_MODS_AUTOSAVE", "RS_MODS_MULTIPLAYER",
-                                       "RS_MODS_BUDGET_MS", "RS_MODS_FRAME_RATE"};
+                                       "RS_MODS_BUDGET_MS", "RS_MODS_FRAME_RATE", "RS_MODS_GUITARCADE_SKIP"};
 static void no_switches(void) {
   for (size_t k = 0; k < sizeof SWITCHES / sizeof *SWITCHES; k++) unsetenv(SWITCHES[k]);
 }
@@ -272,6 +282,7 @@ static void switches(void) {
   const rs_mods_config *c = rs_mods_config_get();
   CHECK(c == &rs_mods_cfg);
   CHECK(c->bypass && c->fixes && c->intro && c->overlay && c->autosave && c->multiplayer && !c->log);
+  CHECK(c->guitarcade_skip);
   CHECK(c->budget_s == 0.050);
   static const char *const off[] = {"0", "no", "No", "false", "False"}, *const on[] = {"1", "yes", "on", "2", ""};
   for (int k = 0; k < 5; k++) {
@@ -287,8 +298,10 @@ static void switches(void) {
   setenv("RS_MODS_BYPASS", "n", 1);
   setenv("RS_MODS_LOG", "1", 1);
   setenv("RS_MODS_BUDGET_MS", "8", 1);
+  setenv("RS_MODS_GUITARCADE_SKIP", "0", 1);
   rs_mods_reload_config();
   CHECK(!c->intro && !c->bypass && c->log && c->fixes && c->overlay && c->autosave && c->multiplayer);
+  CHECK(!c->guitarcade_skip);
   CHECK(c->budget_s == 0.008);
   setenv("RS_MODS_BUDGET_MS", "0", 1);  // a step a frame, as the original
   rs_mods_reload_config();
@@ -318,7 +331,7 @@ static void log_lines(void) {
 }
 
 // The start: it reads the switches itself, adds the hooks of the fixes that are here and says what is on. The
-// frame rate fixes find none of their points in this test's tables.
+// frame rate fixes find none of their points in this test's tables; Skip Tuner finds its one.
 static void start(void) {
   no_switches();
   setenv("RS_MODS_LOG", "1", 1);
@@ -329,6 +342,7 @@ static void start(void) {
   log_stop();
   CHECK_EQ(logged_lines("[rs-mods] fixes on, bypass on, overlay on, intro skip on, autosave off, budget 20 ms"), 1);
   CHECK_EQ(logged_lines("[rs-mods] frame rate: on, 0 of 8 points"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] Guitarcade Skip Tuner: on"), 1);
   CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point") +
            logged_lines("[rs-mods] no hook point for Player 2's saved input"), 0);
   CHECK(!rs_mods_cfg.autosave && rs_mods_cfg.log);
@@ -466,6 +480,46 @@ static void call_bind(uint32_t input) {
 }
 #define OBJ_AS_GIVEN ((uint32_t)(uintptr_t)obj)
 #endif
+
+// Skip Tuner in a Guitarcade game's tuner: at the point the game has its answer, 0 for a tuner that goes on to a
+// Guitarcade game. The hook makes it 1 and lets the game's own test run; switched off, the answer is the game's.
+static void skip_tuner(void) {
+  uint32_t fl = 0x40;
+#ifdef RC_GUEST32
+  ctx->r[5] = esp0 - 64;  // the frame pointer: the answer is a byte below it, with the game's other locals around
+  uint8_t *local = (uint8_t *)RC32_H((uint32_t)ctx->r[5] + (uint32_t)SKIP_LOCAL);
+  local[-1] = 0x5a;
+  local[1] = 0xa5;
+#define ANSWER (*local)
+#define SET_ANSWER(v) (*local = (v))
+#define AROUND_KEPT (local[-1] == 0x5a && local[1] == 0xa5)
+#else
+#define ANSWER ((uint8_t)ctx->r[14])
+#define SET_ANSWER(v) (ctx->r[14] = 0x1122334455667700ull | (uint8_t)(v))
+#define AROUND_KEPT ((ctx->r[14] >> 8) == 0x11223344556677ull)
+#endif
+  no_switches();
+  rs_mods_reload_config();
+  SET_ANSWER(0);
+  CHECK_EQ((uint32_t)rc_mid_call(0, ctx, &fl), 0);  // no continuation: the game's test, on the new answer
+  CHECK_EQ(ANSWER, 1);
+  CHECK(AROUND_KEPT);
+  CHECK_EQ(fl, 0x40);
+  SET_ANSWER(1);  // a song's tuner: offered already
+  rc_mid_call(0, ctx, &fl);
+  CHECK_EQ(ANSWER, 1);
+  setenv("RS_MODS_GUITARCADE_SKIP", "0", 1);
+  rs_mods_reload_config();
+  SET_ANSWER(0);
+  rc_mid_call(0, ctx, &fl);
+  CHECK_EQ(ANSWER, 0);  // the original
+  CHECK(AROUND_KEPT);
+  no_switches();
+  rs_mods_reload_config();
+#undef ANSWER
+#undef SET_ANSWER
+#undef AROUND_KEPT
+}
 
 static uint32_t fld(const char *name) { uint32_t v; memcpy(&v, obj + OFF(name), 4); return v; }
 static void set(const char *name, uint32_t v) { memcpy(obj + OFF(name), &v, 4); }
@@ -744,6 +798,7 @@ int main(void) {
   intro();
   ownership();
   saved_input();
+  skip_tuner();
   printf("mods_shared: ok (%s)\n", rc_guest_ptr_size == 4 ? "32-bit guest" : "64-bit guest");
   return 0;
 }

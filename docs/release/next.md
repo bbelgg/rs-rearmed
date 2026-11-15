@@ -40,3 +40,8 @@ notes and empties this file. -->
   Connect or the microphone and a saved input whose name is longer than about 15 characters, each time the game
   looked for a slot for their guitar a copy of the name stayed in the game's memory, at every look while that
   input was unplugged. Both editions, since 1.8.0. Not yet played with two inputs since.
+- **The Guitarcade's games can be started without tuning.** A game's tuner now has Skip Tuner, the one a song's
+  tuner has, with the same warning. Before, the tuner there offered only Cancel and Calibrate, and Calibrate comes
+  back to the tuner: a player whose tuner would not finish could play no game but Gone Wailin', which has no tuner.
+  The games listen for pitch, so an instrument out of tune plays them badly; that is the player's choice, as in a
+  song. `RS_MODS_GUITARCADE_SKIP=0` is the game's own behaviour.

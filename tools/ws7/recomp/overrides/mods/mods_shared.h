@@ -21,6 +21,8 @@
 //                      menu entries the installer's overlay adds (Direct Connect) (default on)
 //   RS_MODS_FRAME_RATE=0 what the game counts in frames (calibration, the tuner) is left to the frame rate, as in
 //                      the original (default: as at 60 Hz at any rate; framerate.h)
+//   RS_MODS_GUITARCADE_SKIP=0 a Guitarcade game's tuner has no Skip Tuner, as in the original (default: it has
+//                      the one a song's tuner has)
 //   RS_MODS_LOG=1      log what is applied, to stderr (the edition's log)
 typedef struct {
   int bypass;
@@ -31,6 +33,7 @@ typedef struct {
   int intro;  // skip the intro screens
   int overlay;
   int log;
+  int guitarcade_skip;  // Skip Tuner in a Guitarcade game's tuner
 } rs_mods_config;
 // The switches as they were last read; the defaults until then.
 extern rs_mods_config rs_mods_cfg;
@@ -46,7 +49,8 @@ void rs_mods_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // from a constructor (the launcher has set it), Learn & Play's from lp_mods_init (after settings.env). Reads the
 // switches, raises the open-file limit, adds the hooks of the fixes that are here and of the frame rate fixes
 // (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), an archive
-// of dlc/ owned while it is mounted (RS_MODS_BYPASS), and Player 2's saved input (RS_MODS_MULTIPLAYER).
+// of dlc/ owned while it is mounted (RS_MODS_BYPASS), Player 2's saved input (RS_MODS_MULTIPLAYER), and Skip Tuner
+// in a Guitarcade game's tuner (RS_MODS_GUITARCADE_SKIP).
 void rs_mods_start(void);
 // The game thread's: the DLC coordinator's update is in its install steps (1) or out of them again (0). Each
 // edition's dlc_update says so around the steps; an archive counts as owned between the two.

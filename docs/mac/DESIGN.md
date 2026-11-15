@@ -276,6 +276,13 @@ What each does:
   volume and wrong instrument warnings. A menu panel's hold takes at least 1/15 s off its timer each frame. The hooks
   put each right by the frame's own time (`framerate.h` has the arithmetic), and only for a frame shorter than a 60 Hz
   one (under 14.5 ms): at 60 Hz and below the game runs as it always has.
+- **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP=0` is the original; shared: a hook at the mid point
+  `tuner_skip_offer`, with each game's place in its `mids.map`). Where the tuner menu sets its buttons up, it offers
+  Skip Tuner unless the stage its `OnComplete` names is `Guitarcade_Game`: that one test kept the button from a
+  Guitarcade game's tuner, which left Cancel and Calibrate, and Calibrate comes back to the tuner. The skip itself is
+  the menu's own whatever the stage: the same warning, then the step on that a finished tuning takes. So the hook only
+  makes the test's answer yes. A player whose tuner would not finish could play no game but Gone Wailin', which has no
+  tuner.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the

@@ -169,3 +169,5 @@ fps_tuner_miss        # the tuner's string hold: the misses in a row, where they
 fps_tuner_volume      # the tuner's volume warnings: the check's start, and its return
 fps_tuner_instrument  # the tuner's wrong instrument warning: the same
 fps_tuner_hint        # the tuner's first-time hint: the same
+# --- Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+tuner_skip_offer      # the tuner menu's buttons: whether Skip Tuner is offered, where the game acts on it

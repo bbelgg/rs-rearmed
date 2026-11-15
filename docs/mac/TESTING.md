@@ -206,8 +206,11 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   still in it (`/`, Delete ten times, then the new letters).
 - **The other modes**: LESSONS: Down to a lesson, Return, Return to start it; Esc gives RESUME, EXIT LESSON.
   SESSION MODE: Space on the band screen starts it, after the tuner. NONSTOP PLAY: Return on START NONSTOP PLAY,
-  the tuner, Delete, Return. GUITARCADE: Return on TECHNIQUE GAMES, a game, Return, Return; a game's tuner has no
-  Skip Tuner, so only a tuned instrument gets past it and the games are a check by hand. MULTIPLAYER:
+  the tuner, Delete, Return. GUITARCADE (the sixth entry: Down five times), Return on TECHNIQUE GAMES, Down to the
+  second game (the first, Gone Wailin', has no tuner), Return: the game's tuner (Guitarcade_Tuner). `fwddelete` is
+  Skip Tuner there too, Return answers its warning, and the game is up about 10 s later (Guitarcade_Game) on
+  "MAKE SOME NOISE!", which waits for a guitar; Esc goes back to the list. A Return on the tuner is Calibrate, which
+  comes back to the tuner. MULTIPLAYER:
   [By hand](#by-hand-and-with-computer-use).
 - **Tools** (Space on the main menu): OPTIONS is Down three times; [Measured runs](#measured-runs) has the way
   to Venue Mode.
@@ -234,6 +237,12 @@ with `RS_MODS_LOG=1`.
   the frames short enough for the hooks to act on a 60 Hz screen, and a route to the highway then goes through
   the tuner with them. What they do takes a guitar, by hand: at `RS_FPS=120` or `240`, Return on a tuner opens
   calibration, which should settle as at 60 Hz, and a Guitarcade game's tuner should complete. Not done yet.
+- **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP`): the log has `[rs-mods] Guitarcade Skip Tuner: on`
+  (`--init-only` is enough to see it), a Guitarcade game's tuner shows DELETE Skip Tuner beside Cancel and
+  Calibrate, and the route above ends in the game: `menu: Guitarcade_Tuner`, `SelectionListDialog`,
+  `Guitarcade_Tuner`, `Guitarcade_Game`. With `tools/perf/run.py`: `--profile-keys "space esc:4 down down down down
+  down return:8 return:8 down return:15 fwddelete:6 return:25"` (the first key has to change the screen, hence
+  Space and Esc). Not run: the switch off, and a game played after a skip.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log has `[rs-mods] DLC: N archives mounted in F frames,
   T s` once the profile has loaded, which is the end of the mounting. A step that took an archive and mounted
   nothing would lose its songs, so compare the song list of a start with the budget with one at

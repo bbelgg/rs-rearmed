@@ -194,3 +194,6 @@ fps_tuner_miss        0x011322f4  (uint32_t misses@[esi+0xb8], void *tuner@esi) 
 fps_tuner_volume      0x01134480  (void *tuner@esi) -> skip=0x01134640  # the average of the last 20 levels (+0x1a8, count +0x1f8), behind "volume is really low/high" (the Mac's 0x100526a50)
 fps_tuner_instrument  0x01134110  (void *tuner@esi) -> skip=0x01134323  # CheckWrongInstrument: the average of the last 10 notes (+0x200, count +0x228) (the Mac's 0x1005268f0); skip is its last `ret 4`
 fps_tuner_hint        0x012c2660  (void *menu@esi) -> skip=0x012c283e  # the tuner menu's first-time hint (the Mac's 0x10054cf10 without its first test, which is in the caller 0x12c25f0 here)
+
+# Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+tuner_skip_offer      0x012c2f37  (uint8_t offer@[ebp-0x1d])  # the tuner menu's Skip Tuner button 0x12c2df0 (the Mac's 0x100544a30; button 0xac): the same answer, a local here, at its compare with 0 before the button is added

@@ -48,6 +48,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   mounted. The Mac edition's loop needs no wait.
 - **Calibration and the tuner at any frame rate** (not released): as the Mac edition, from the same source with this
   game's eight points.
+- **Skip Tuner in the Guitarcade** (not released): as the Mac edition, from the same source with this game's point.
 - **Shared with the Mac edition** (not released): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
   and the start, the intro skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are
   the Mac's source (`overrides/mods/mods_shared.c`, `framerate.c`; DESIGN.md says what stays this port's own and why).

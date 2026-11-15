@@ -46,17 +46,17 @@ edition" is described there. What has not been tested is under [Open issues](#op
   anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does.
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
   mounted. The Mac edition's loop needs no wait.
-- **Calibration and the tuner at any frame rate** (not released): as the Mac edition, from the same source with this
+- **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
-- **Skip Tuner in the Guitarcade** (not released): as the Mac edition, from the same source with this game's point.
-- **A fixed frame rate** (not released): `RS_FPS=N`, the Mac edition's test switch, with its rule and clock
+- **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
+- **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the Mac edition's test switch, with its rule and clock
   (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
-- **Shared with the Mac edition** (not released): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
+- **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
   and the start, the intro skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are
   the Mac's source (`overrides/mods/mods_shared.c`, `framerate.c`; DESIGN.md says what stays this port's own and why).
   For Player 2's saved input this game's `input_bind` is a hook point, the Mac's call with its second argument folded
   away, and the shared hook frees the name's text, which this port's own version left behind as the Mac's did.
-- **By name** (not released): `win32_overrides.c` names every function, global and field of the game through
+- **By name** (new in 1.16.0): `win32_overrides.c` names every function, global and field of the game through
   `tools/targets/win-x86`, as the Mac's overrides do through `mac-x64` ([DESIGN.md](DESIGN.md#per-game-tables)). The
   list of functions it replaces is a table too (`names/overrides/win32.list`), and the translation's skip file is made
   of it.
@@ -74,7 +74,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 **Mods**
 
-- **Loading and hook points**: 19 of the 21 hook points, `input_bind` the latest (not released); `si_io`, the Mac
+- **Loading and hook points**: 19 of the 21 hook points, `input_bind` the latest (new in 1.16.0); `si_io`, the Mac
   game's CoreAudio input, has no counterpart, and `input_mode_is_cable` is inlined into a function
   `win32_overrides.c` replaces. The overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)): `rearmed-mods.dylib` runs as the same file. No mod code runs

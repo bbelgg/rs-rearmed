@@ -29,9 +29,11 @@ into the notes as it stands. -->
   archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10
   or ultrawide screen in the Mac edition, an ultrawide screen in Learn & Play, full screen on a second display in
   Learn & Play, the music category (Game Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone
-  profile with the Auto Save skip, unplugging an interface while the game runs, and in Multiplayer a cable with an
-  interface, two interfaces, or the swap in Learn & Play. The stuck tone that Prevent Buggy Tones fixes is rare and
-  hasn't been met in testing.
+  profile with the Auto Save skip, unplugging an interface while the game runs, a Guitarcade game played with a guitar
+  after Skip Tuner (the button and its warning were pressed in a run of each edition, and the game started), a whole
+  install that ends with the new lines about custom songs, and in Multiplayer a cable with an interface, two
+  interfaces, the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is
+  found. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**

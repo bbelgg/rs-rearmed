@@ -41,16 +41,16 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 - **Switched off in the installer**: **Built-in Mods…** writes `settings.env`, which the launcher reads at every
   start, so a change needs no reinstall ([INSTALL.md](INSTALL.md#settings-and-switches)).
-- **Batched DLC mounting** (not released): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
+- **Batched DLC mounting** (new in 1.16.0): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. This game's loop drops no archive: the fault Learn & Play's had was looked for here and not found
   ([TESTING.md](TESTING.md#unattended-runs)).
-- **Calibration and the tuner at any frame rate** (not released): what the game counts in frames is put right by the
+- **Calibration and the tuner at any frame rate** (new in 1.16.0): what the game counts in frames is put right by the
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
-- **Skip Tuner in the Guitarcade** (not released): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
+- **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
-- **A fixed frame rate** (not released): the rule and clock of `RS_FPS=N`, this edition's test switch, are one
+- **A fixed frame rate** (new in 1.16.0): the rule and clock of `RS_FPS=N`, this edition's test switch, are one
   source that Learn & Play uses too (`shims/platform/include/rsp_fps.h`); this edition runs as before.
-- **Shared with Learn & Play** (not released): the switches, the log and the start of the built-in fixes, the intro
+- **Shared with Learn & Play** (new in 1.16.0): the switches, the log and the start of the built-in fixes, the intro
   skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are one source for both
   editions (`overrides/mods/mods_shared.c`, `framerate.c`), and Learn & Play's own fixes name the game through the
   tables as these do. One thing changes for this edition's player: the shared hook for Player 2's saved input frees

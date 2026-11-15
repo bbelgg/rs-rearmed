@@ -77,7 +77,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ✅ a chart needs a Mac archive (`_m.psarc`) | ✅ |
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
-| Calibration and the tuner the same at any frame rate (not released) | ⚠️ not yet played with a guitar above 60 Hz | ⚠️ the same |
+| Calibration and the tuner the same at any frame rate | ⚠️ not yet played with a guitar above 60 Hz | ⚠️ the same |
 | Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |

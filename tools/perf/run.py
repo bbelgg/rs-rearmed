@@ -250,12 +250,14 @@ class Game:
             raise Stop("the game ended")
         try:
             fd = os.open(self.fifo, os.O_WRONLY | os.O_NONBLOCK)
+            with os.fdopen(fd, "w") as f:
+                f.write("".join(c + "\n" for c in ("front",) + cmds))
         except OSError as err:
             if err.errno == errno.ENXIO:
                 raise Stop("keyfifo is not reading: is it in the game? (no `keyfifo:` line in the log)")
-            raise
-        with os.fdopen(fd, "w") as f:
-            f.write("".join(c + "\n" for c in ("front",) + cmds))
+            # the run's folder gone (its drive unmounted, say) or the game's end of the pipe closed: a run that
+            # can't be driven is over, and quit() ends the game by a signal
+            raise Stop("the keys can't be sent (%s): is the run's folder still there?" % err)
         print("  %6.1f s  %s" % (time.time() - self.t_start, ", ".join(cmds)), flush=True)
 
     def screens(self):

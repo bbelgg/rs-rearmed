@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Tests of the measuring tools' arithmetic: frame times, the settings file, the report. No game."""
+"""Tests of the measuring tools: frame times, the settings file, the report, the key channel. No game."""
+import contextlib
+import io
 import os
 import sys
 import unittest
@@ -8,6 +10,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import profile as hot  # noqa: E402
 import report  # noqa: E402
+import run     # noqa: E402
 import stats   # noqa: E402
 
 
@@ -109,6 +112,72 @@ class Profile(unittest.TestCase):
         self.assertEqual(t["roots"].most_common(1)[0][0], ("frame", "game"))  # not the system's thread start
         self.assertEqual(hot.under(t, "frame")[1], 3000000)
         self.assertEqual(hot.under(t, "leaf")[0][("leaf", "game")], 2000000)
+
+
+class FakeGame:
+    """A process for run.Game: running until told to stop, and what it was sent."""
+    def __init__(self, heeds_term=True):
+        self.signals, self.killed, self.heeds_term, self.ended = [], False, heeds_term, False
+
+    def poll(self):
+        return 0 if self.ended else None
+
+    def wait(self, timeout=None):
+        if not self.ended:
+            raise run.subprocess.TimeoutExpired("game", timeout)
+        return 0
+
+    def send_signal(self, sig):
+        self.signals.append(sig)
+        self.ended = self.heeds_term
+
+    def kill(self):
+        self.killed = self.ended = True
+
+
+class Keys(unittest.TestCase):
+    """The key channel: what can't be sent stops the run, and the game is ended all the same."""
+    def game(self, fifo, p):
+        g = run.Game.__new__(run.Game)
+        g.fifo, g.p, g.t_start = fifo, p, 0.0
+        return g
+
+    def test_keys_reach_a_reader(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            fifo = os.path.join(d, "keys")
+            os.mkfifo(fifo)
+            rd = os.open(fifo, os.O_RDONLY | os.O_NONBLOCK)
+            try:
+                with contextlib.redirect_stdout(io.StringIO()):
+                    self.game(fifo, FakeGame()).say("key return")
+                self.assertEqual(os.read(rd, 100), b"front\nkey return\n")
+            finally:
+                os.close(rd)
+
+    def test_no_reader_and_no_folder_stop_the_run(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            fifo = os.path.join(d, "keys")
+            os.mkfifo(fifo)
+            with self.assertRaisesRegex(run.Stop, "keyfifo is not reading"):
+                self.game(fifo, FakeGame()).say("key return")
+            gone = os.path.join(d, "unmounted", "keys")  # the run's folder went away under the game
+            with self.assertRaisesRegex(run.Stop, "can't be sent"):
+                self.game(gone, FakeGame()).say("key return")
+        ended = FakeGame()
+        ended.ended = True
+        with self.assertRaisesRegex(run.Stop, "the game ended"):
+            self.game(gone, ended).say("key return")
+
+    def test_quit_ends_a_game_it_can_not_tell(self):
+        import signal
+        p = FakeGame()
+        self.game("/nonexistent/keys", p).quit()  # no key channel: the signal, not an error
+        self.assertEqual((p.signals, p.killed), ([signal.SIGTERM], False))
+        p = FakeGame(heeds_term=False)
+        self.game("/nonexistent/keys", p).quit()
+        self.assertEqual((p.signals, p.killed), ([signal.SIGTERM], True))
 
 
 def result(edition, cpu, fps=60.0, **manifest):

@@ -5,6 +5,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "rc_mod.h"
 #include "rc_nofile.h"
@@ -131,10 +132,89 @@ static int before_dlc_owned(rc_ctx *c, void *user) {
   return 1;
 }
 
+// ------------------------------------------------------------------------------------------------
+// Two players on any input: Player 2's saved input. A player's input mode and input live in their profile, but
+// the game restores a saved input for Player 1 alone, after the profile screen; Player 2 takes the first slot
+// free. So before the game looks for a slot for Player 2's guitar (input_bind), this finds the input their profile
+// names, when the profile is on Direct Connect or the microphone, and gives it the slot. It has to be there that
+// early: moving the input of a running stream crashes the I/O thread, in the callback that feeds the player.
+// RS_MODS_MULTIPLAYER=0 is the original. The fix's other half is each edition's own (mods_shared.h).
+//
+// Both games have the function: the Mac's takes (input, force), Learn & Play's the input in a register, with
+// `force` folded away, 0 in every call of either game (each one's symbols.map has the reading), and the hook sees
+// the Mac's call. What it reads is the same in both: the ten slots (input_binding: 0-3 an input, 5 nothing), the
+// profile's keys (pointers to their text), a string of the profile, the input of a name and its slot.
+// ------------------------------------------------------------------------------------------------
+#define INPUT_P1_MIC 1
+#define INPUT_P2_GUITAR 2
+#define INPUT_P2_MIC 3
+#define INPUT_NONE 5
+#define INPUT_SLOTS 10
+#define P2_STRING 64  // room for the game's small string in either game
+#define P2_NAME 256
+
+// A pointer for the game, at its own width
+static void put_ptr(uint8_t *at, const void *p) {
+  uint64_t g = RC_GUEST(p);
+  memcpy(at, &g, (size_t)rc_guest_ptr_size);
+}
+
+// The string of Player 2's profile under `key`, as text in `name` (P2_NAME bytes of the game's memory, as is `s`):
+// empty when the profile has none. The game writes it into a small string of its own: the text in place or behind
+// a pointer at its start, its end at efd_str_size, and efd_str_inline holds the address of that word while the
+// text is in place. A text behind the pointer is the game's allocation, and is left to it, as each edition's own
+// version left it: a name too long for the string costs the game a block a call (efd_str_destroy would free it).
+static void profile_string(const void *key, uint8_t *s, char *name) {
+  uint8_t *end = s + RC_OFF(efd_str_size), *in_place = s + RC_OFF(efd_str_inline);
+  memset(s, 0, P2_STRING);
+  put_ptr(end, s);
+  put_ptr(in_place, end);
+  OV_GUEST(input_profile_string, RS_MODS_PLAYER_2, (uint64_t)(uintptr_t)key, (uint64_t)(uintptr_t)s);
+  const char *from = rc_mod_ptr(in_place) == (void *)end ? (const char *)s : rc_mod_ptr(s);
+  const char *to = rc_mod_ptr(end);
+  size_t len = from && to > from ? (size_t)(to - from) : 0;
+  if (len >= P2_NAME) len = P2_NAME - 1;
+  if (len) memcpy(name, from, len);
+  name[len] = 0;
+}
+
+static int before_input_bind(rc_ctx *c, void *user) {
+  (void)user;
+  OV_ARGS(a, c);
+  if (!rs_mods_cfg.multiplayer || OV_U32(a) != INPUT_P2_GUITAR) return 0;
+  uint8_t mode = (uint8_t)OV_GUEST(input_mode, RS_MODS_PLAYER_2);
+  if (!rs_mods_any_input(mode)) return 0;
+  int32_t *binding = (int32_t *)(uintptr_t)RC_GA(input_binding);
+  for (int i = 0; i < INPUT_SLOTS; i++)
+    if (binding[i] == INPUT_P2_GUITAR) return 0;
+  // what the game is handed has to be memory it can reach (rc_mod.h): one block a thread, kept
+  static _Thread_local uint8_t *mem;
+  if (!mem && !(mem = rc_guest_alloc(P2_STRING + P2_NAME))) return 0;
+  char *name = (char *)mem + P2_STRING;
+  const void *key = rc_mod_ptr((const void *)(uintptr_t)(mode == RS_MODS_MODE_DIRECT ? RC_GA(input_key_direct)
+                                                                                   : RC_GA(input_key_mic)));
+  if (!key) return 0;
+  profile_string(key, mem, name);
+  if (!name[0]) return 0;
+  uint64_t manager = OV_GUESTV(input_manager, NULL, 0);
+  const uint8_t *in = RC_HOST(OV_GUEST(input_by_name, manager, (uint64_t)(uintptr_t)name));
+  if (!in) return 0;
+  uint32_t slot = RC_LD(uint32_t, in + RC_OFF(input_slot));
+  if (slot >= INPUT_SLOTS) return 0;
+  int32_t held = binding[slot];  // a microphone input takes any slot, and finds another
+  if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
+    binding[slot] = INPUT_P2_GUITAR;
+    rs_mods_logf("player 2 on \"%s\"", name);
+  }
+  return 0;
+}
+
 void rs_mods_start(void) {
   rs_mods_reload_config();
   if (rc_hook_add_name("boot_intro_update", before_intro_update, NULL, NULL)) rs_mods_logf("no intro hook point");
   if (rc_hook_add_name("steam_dlc_owned", before_dlc_owned, NULL, NULL)) rs_mods_logf("no DLC ownership hook point");
+  if (rc_hook_add_name("input_bind", before_input_bind, NULL, NULL))
+    rs_mods_logf("no hook point for Player 2's saved input");
   if (rs_mods_cfg.fixes) rs_mods_raise_nofile();
   rs_mods_logf("fixes %s, bypass %s, overlay %s, intro skip %s, autosave %s, budget %.0f ms",
                rs_mods_cfg.fixes ? "on" : "off", rs_mods_cfg.bypass ? "on" : "off", rs_mods_cfg.overlay ? "on" : "off",

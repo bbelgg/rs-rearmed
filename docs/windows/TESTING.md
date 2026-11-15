@@ -410,6 +410,11 @@ full screen to a window of the screen's shape and back, with `lp: window macOS:`
 - **Two players**: load the second profile on its own, `lpctrl`, Down to INPUT, DIRECT CONNECT, Down and Return
   lists the inputs, Return takes `HX Stomp channel 6`, say; leave by the menus, or it isn't saved. Load the
   first profile the same way on another channel, then MULTIPLAYER: a song with each player on their channel.
+  With `RS_MODS_LOG=1` the log has `[rs-mods] player 2 on "NAME"` when the fix gives Player 2's saved input its
+  slot, and `RC_HOOK_TRACE=input_bind` shows the game's searches for a slot (the input is in `eax`, which the
+  trace doesn't print; `esi` points at it in the caller's list of four). A single player's way to the note
+  highway makes no such call (the trace logs none), so only two players check that fix in the game. Not played
+  since the fix became the Mac's source ([PLAN.md](PLAN.md#status)).
 - **Full screen on a second display**: not run on Learn & Play. The Mac edition's way of moving the window,
   sending the keys and reading the frame applies; here the game's own full screen comes from its Windowed Mode
   setting.

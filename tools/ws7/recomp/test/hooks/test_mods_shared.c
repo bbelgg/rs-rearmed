@@ -11,43 +11,60 @@
 #include "rc32.h"
 #include "rc32_hook.h"
 #endif
+#include "rc_cc.h"
 #include "rc_hook.h"
 #include "rc_mid.h"
 
 #include "mods_shared.h"
 
-#define CHECK(x) do { if (!(x)) { fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); exit(1); } } while (0)
-#define CHECK_EQ(a, b) do { uint64_t a_ = (a), b_ = (b); if (a_ != b_) { \
+static void log_end(void);  // a failure while the log is captured is said on the real stderr
+#define CHECK(x) do { if (!(x)) { log_end(); \
+    fprintf(stderr, "FAIL %s:%d: %s\n", __FILE__, __LINE__, #x); exit(1); } } while (0)
+#define CHECK_EQ(a, b) do { uint64_t a_ = (a), b_ = (b); if (a_ != b_) { log_end(); \
     fprintf(stderr, "FAIL %s:%d: %s = 0x%llx, not 0x%llx\n", __FILE__, __LINE__, #a, (unsigned long long)a_, \
             (unsigned long long)b_); exit(1); } } while (0)
 
 const char rc_target_id[] = "test";
 
-// --- the target's tables: the hook points of the fixes, each game's own convention and field offsets
-enum { INTRO, OWNED, NPOINTS };
+// --- the target's tables: the hook points of the fixes, each game's own convention and field offsets, and what
+// the fixes call and read in the game by name: its functions at ADDR, its data at DATA
+enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME };
 #define ADDR(k) (0x401000u + 0x100u * (k))
+#define DATA 0x402000u
+enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0, D_SIZE = 0x100 };
 #ifdef RC_GUEST32
 const rc_target_value rc_target_offsets[] = {{"boot_intro_playing", 0x2d}, {"boot_intro_state", 0x60},
                                              {"boot_phase", 0x48}, {"boot_phase3_steps", 10}, {"boot_step", 0x28},
+                                             {"efd_str_inline", 0x14}, {"efd_str_size", 0x10}, {"input_slot", 0xc},
                                              {0, 0}};
-// stdcall bool(void *boot), and thiscall bool(void *steam, int app)
+// stdcall bool(void *boot), thiscall bool(void *steam, int app), and custom void(int input@eax, int force=0)
 const rc_hook_name rc_target_hooks[] = {
     {"boot_intro_update", ADDR(INTRO), 1, 0, RC_CC_STDCALL, 'b', 4, 1, {{'p', 0}}},
     {"steam_dlc_owned", ADDR(OWNED), 2, 0, RC_CC_THISCALL, 'b', 4, 2, {{'p', ~1}, {'i', 0}}},
+    {"input_bind", ADDR(BIND), 3, 0, RC_CC_CUSTOM, 'v', -1, 2, {{'i', ~0}, {'c', 0, 0}}},
     {0, 0, 0},
 };
 int rc_hook_code_pops(int index) {
-  static const short pops[NPOINTS] = {4, 4};
+  static const short pops[NPOINTS] = {4, 4, 0};
   return pops[index];
 }
+#define CC(cc) RC_CC_##cc
 #else
 const rc_target_value rc_target_offsets[] = {{"boot_intro_playing", 0x39}, {"boot_intro_state", 0x78},
                                              {"boot_phase", 0x58}, {"boot_phase3_steps", 12}, {"boot_step", 0x34},
+                                             {"efd_str_inline", 0x18}, {"efd_str_size", 0x10}, {"input_slot", 0x14},
                                              {0, 0}};
 const rc_hook_name rc_target_hooks[] = {{"boot_intro_update", ADDR(INTRO), ADDR(INTRO)},
-                                        {"steam_dlc_owned", ADDR(OWNED), ADDR(OWNED)}, {0, 0, 0}};
+                                        {"steam_dlc_owned", ADDR(OWNED), ADDR(OWNED)},
+                                        {"input_bind", ADDR(BIND), ADDR(BIND)}, {0, 0, 0}};
+#define CC(cc) RC_CC_SYSV
 #endif
-const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), 0};
+const rc_target_value rc_target_symbols[] = {
+    {"input_binding", DATA + D_BINDING, -1},     {"input_by_name", ADDR(BYNAME), CC(STDCALL)},
+    {"input_key_direct", DATA + D_KEY_DIRECT, -1}, {"input_key_mic", DATA + D_KEY_MIC, -1},
+    {"input_manager", ADDR(MANAGER), CC(CDECL)}, {"input_mode", ADDR(MODE), CC(CDECL)},
+    {"input_profile_string", ADDR(PROFILE), CC(CDECL)}, {0, 0, 0}};
+const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), 0};
 const int rc_hook_npoints = NPOINTS;
 #define OFF(name) ((uint32_t)rc_off(name))
 
@@ -63,13 +80,18 @@ static void log_start(void) {
   log_stderr = dup(2);
   dup2(fileno(log_file), 2);
 }
-static void log_stop(void) {
+static void log_end(void) {
+  if (!log_file) return;
   fflush(stderr);
   dup2(log_stderr, 2);
   close(log_stderr);
+}
+static void log_stop(void) {
+  log_end();
   rewind(log_file);
   logged[fread(logged, 1, sizeof logged - 1, log_file)] = 0;
   fclose(log_file);
+  log_file = 0;
 }
 static int logged_lines(const char *line) {
   size_t len = strlen(line);
@@ -79,27 +101,136 @@ static int logged_lines(const char *line) {
   return n;
 }
 
-// --- what the runtimes need of an image
+_Noreturn void rc_fail(const char *what, uint64_t a) {
+  fprintf(stderr, "rc_fail %s 0x%llx\n", what, (unsigned long long)a);
+  exit(1);
+}
+
+// --- the game's side of Player 2's saved input: what the fix calls and reads, as each game has it. A pointer
+// the game holds is its own width, and what it is handed has to be its own memory.
+static uint8_t *data;  // DATA as the host sees it
 #ifdef RC_GUEST32
+static uint64_t as_game(const void *h) { return h ? RC32_G(h) : 0; }
+static void *as_host(uint64_t g) { return g ? RC32_H((uint32_t)g) : 0; }
+static void *game_alloc(uint32_t size) { return RC32_H(rc32_alloc(size)); }
+#else
+uint64_t rc_slide;
+static uint64_t as_game(const void *h) { return (uint64_t)(uintptr_t)h; }
+static void *as_host(uint64_t g) { return (void *)(uintptr_t)g; }
+static void *game_alloc(uint32_t size) { return calloc(1, size); }
+#endif
+static void put_ptr(uint8_t *at, const void *h) {
+  uint64_t g = as_game(h);
+  memcpy(at, &g, (size_t)rc_guest_ptr_size);
+}
+static void *get_ptr(const uint8_t *at) {
+  uint64_t g = 0;
+  memcpy(&g, at, (size_t)rc_guest_ptr_size);
+  return as_host(g);
+}
+
+static int game_mode_is, mode_calls, profile_calls, manager_calls, by_name_calls;
+static uint32_t mode_player, profile_player;
+static const char *profile_key;   // the key the profile was asked for
+static const char *profile_text;  // what the profile has under it; null: a string with no text at all
+static char by_name_seen[600];
+#define TEXT_HEAP 512
+static const char *input_name;    // the one input the manager has, and the object it is
+static uint8_t *input_obj, *manager_obj, *text_heap;
+
+// input_mode(player) -> al, the rest of eax whatever it was
+static uint32_t game_mode(uint32_t player) {
+  mode_calls++;
+  mode_player = player;
+  return 0xffffff00u | (uint32_t)game_mode_is;
+}
+// input_profile_string(player, key, string *out): the game's small string, given empty; a text that fits before
+// its size word goes in place, a longer one behind a pointer at its start
+static void game_profile_string(uint32_t player, const char *key, uint8_t *out) {
+  uint8_t *end = out + rc_off("efd_str_size"), *in_place = out + rc_off("efd_str_inline");
+  size_t n = profile_text ? strlen(profile_text) : 0;
+  profile_calls++;
+  profile_player = player;
+  profile_key = key;
+  CHECK(key && out);  // null: the runtime could not hand the game what it was given
+  CHECK(get_ptr(end) == out && get_ptr(in_place) == end);
+  CHECK(n < TEXT_HEAP);
+  if (!profile_text) {
+    put_ptr(out, 0);
+    put_ptr(end, 0);
+    put_ptr(in_place, 0);
+  } else if (n < (size_t)rc_off("efd_str_size")) {
+    memcpy(out, profile_text, n);
+    put_ptr(end, out + n);
+  } else {
+    memcpy(text_heap, profile_text, n);
+    put_ptr(out, text_heap);
+    put_ptr(end, text_heap + n);
+    put_ptr(in_place, 0);
+  }
+}
+// input_by_name(manager, name) -> the input, or null
+static void *game_by_name(void *manager, const char *name) {
+  by_name_calls++;
+  CHECK(manager == manager_obj && name);
+  snprintf(by_name_seen, sizeof by_name_seen, "%s", name);
+  return input_name && !strcmp(name, input_name) ? input_obj : 0;
+}
+
+// --- what the runtimes need of an image: the game's functions above, by each one's convention
+#ifdef RC_GUEST32
+static uint32_t rd(uint32_t g) { uint32_t v; memcpy(&v, RC32_H(g), 4); return v; }
+static void wr(uint32_t g, uint32_t v) { memcpy(RC32_H(g), &v, 4); }
+// a guest `ret N` with eax; ecx and edx are the callee's to spoil
+static void ret32(rc_ctx *c, uint32_t eax, uint32_t pops) {
+  uint32_t sp = (uint32_t)c->r[4];
+  c->r[0] = eax;
+  c->r[1] = c->r[2] = 0xdeadbeefu;
+  c->ret_to = rd(sp);
+  c->r[4] = sp + 4 + pops;
+}
+static uint32_t arg32(rc_ctx *c, int k) { return rd((uint32_t)c->r[4] + 4 + 4 * (uint32_t)k); }
+static void f_mode(rc_ctx *c) { ret32(c, game_mode(arg32(c, 0)), 0); }
+static void f_profile(rc_ctx *c) {
+  game_profile_string(arg32(c, 0), as_host(arg32(c, 1)), as_host(arg32(c, 2)));
+  ret32(c, 1, 0);
+}
+static void f_manager(rc_ctx *c) {
+  manager_calls++;
+  ret32(c, (uint32_t)as_game(manager_obj), 0);
+}
+static void f_by_name(rc_ctx *c) {  // stdcall
+  ret32(c, (uint32_t)as_game(game_by_name(as_host(arg32(c, 0)), as_host(arg32(c, 1)))), 8);
+}
 rc_fn rc32_lookup(uint32_t g) {
-  (void)g;
-  return 0;
+  return g == ADDR(MODE) ? f_mode : g == ADDR(PROFILE) ? f_profile : g == ADDR(MANAGER) ? f_manager
+       : g == ADDR(BYNAME) ? f_by_name : 0;
 }
 int rc32_tls_images(const rc32_tls_image **out) {
   *out = 0;
   return 0;
 }
 #else
-uint64_t rc_slide;
 uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64_t *dbls, int ndbl, uint64_t *xmm0) {
-  (void)fn; (void)ints; (void)nint; (void)dbls; (void)ndbl; (void)xmm0;
+  (void)dbls; (void)ndbl; (void)xmm0;
+  switch (fn - rc_slide) {
+    case ADDR(MODE):
+      CHECK_EQ(nint, 1);
+      return game_mode((uint32_t)ints[0]);
+    case ADDR(PROFILE):
+      CHECK_EQ(nint, 3);
+      game_profile_string((uint32_t)ints[0], as_host(ints[1]), as_host(ints[2]));
+      return 1;
+    case ADDR(MANAGER):
+      manager_calls++;
+      return as_game(manager_obj);
+    case ADDR(BYNAME):
+      CHECK_EQ(nint, 2);
+      return as_game(game_by_name(as_host(ints[0]), as_host(ints[1])));
+  }
   return 0;
 }
 #endif
-_Noreturn void rc_fail(const char *what, uint64_t a) {
-  fprintf(stderr, "rc_fail %s 0x%llx\n", what, (unsigned long long)a);
-  exit(1);
-}
 
 static const char *const SWITCHES[] = {"RS_MODS_LOG", "RS_MODS_BYPASS", "RS_MODS_FIXES", "RS_MODS_INTRO",
                                        "RS_MODS_OVERLAY", "RS_MODS_AUTOSAVE", "RS_MODS_MULTIPLAYER",
@@ -172,7 +303,8 @@ static void start(void) {
   log_stop();
   CHECK_EQ(logged_lines("[rs-mods] fixes on, bypass on, overlay on, intro skip on, autosave off, budget 20 ms"), 1);
   CHECK_EQ(logged_lines("[rs-mods] frame rate: on, 0 of 8 points"), 1);
-  CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point"), 0);
+  CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point") +
+           logged_lines("[rs-mods] no hook point for Player 2's saved input"), 0);
   CHECK(!rs_mods_cfg.autosave && rs_mods_cfg.log);
 }
 
@@ -184,8 +316,6 @@ static int orig_ran;
 static uint32_t orig_arg;  // what the original was given, where its convention has it (the low word)
 #ifdef RC_GUEST32
 static uint32_t esp0, obj_guest;
-static uint32_t rd(uint32_t g) { uint32_t v; memcpy(&v, RC32_H(g), 4); return v; }
-static void wr(uint32_t g, uint32_t v) { memcpy(RC32_H(g), &v, 4); }
 // stdcall (boot): the argument on the stack, `ret 4`; al = busy
 static void o_intro(rc_ctx *c) {
   uint32_t sp = (uint32_t)c->r[4];
@@ -232,6 +362,29 @@ static uint64_t call_owned(uint32_t app) {
   CHECK_EQ((uint32_t)ctx->r[4], sp + 8);
   return ctx->r[0] & 0xff;
 }
+// custom (input): the input in eax and nothing else, `ret`; al = it looked for a slot. esi is not the call's.
+#define ESI 0x5a5a5a5au
+static void o_bind(rc_ctx *c) {
+  uint32_t sp = (uint32_t)c->r[4];
+  orig_ran++;
+  orig_arg = (uint32_t)c->r[0];
+  c->r[0] = 0xffffff01u;
+  c->ret_to = rd(sp);
+  c->r[4] = sp + 4;
+}
+static void call_bind(uint32_t input) {
+  uint32_t sp = esp0 - 256;
+  ctx->r[4] = sp;
+  ctx->ret_to = 0;
+  ctx->r[0] = input;
+  ctx->r[6] = ESI;
+  wr(sp, RET);
+  orig_ran = 0;
+  rc_hook_call(BIND, ctx, o_bind);
+  CHECK_EQ(ctx->ret_to, RET);
+  CHECK_EQ((uint32_t)ctx->r[4], sp + 4);
+  CHECK_EQ(ctx->r[6], ESI);
+}
 #define OBJ_AS_GIVEN obj_guest
 #else
 static uint64_t stack_[16];
@@ -268,6 +421,22 @@ static uint64_t call_owned(uint32_t app) {
   rc_hook_call(OWNED, ctx, o_owned);
   CHECK_EQ(ctx->r[4], (uint64_t)(uintptr_t)&stack_[9]);
   return ctx->r[0] & 0xff;
+}
+// (input, force): force 0, as in every call of the game's
+static void o_bind(rc_ctx *c) {
+  orig_ran++;
+  orig_arg = (uint32_t)c->r[7];
+  c->r[0] = 1;
+  c->r[4] += 8;
+}
+static void call_bind(uint32_t input) {
+  ctx->r[4] = (uint64_t)(uintptr_t)&stack_[8];
+  stack_[8] = RET;
+  ctx->r[7] = input;
+  ctx->r[6] = 0;
+  orig_ran = 0;
+  rc_hook_call(BIND, ctx, o_bind);
+  CHECK_EQ(ctx->r[4], (uint64_t)(uintptr_t)&stack_[9]);
 }
 #define OBJ_AS_GIVEN ((uint32_t)(uintptr_t)obj)
 #endif
@@ -351,6 +520,166 @@ static void ownership(void) {
   CHECK_EQ(orig_ran, 1);
 }
 
+// Player 2's saved input (the hook start() added on input_bind). The call a hook sees there is the Mac's on both
+// runtimes: the input, and a force of 0, which Learn & Play's function has folded away.
+static uint32_t seen_input, seen_force;
+static int seen;
+static int see_bind(rc_ctx *c, void *user) {
+  (void)user;
+  seen++;
+  seen_input = (uint32_t)c->r[7];
+  seen_force = (uint32_t)c->r[6];
+  return 0;
+}
+
+enum { P1_GUITAR, P1_MIC, P2_GUITAR, P2_MIC, NONE = 5, SLOTS = 10 };
+static int32_t *binding;
+// The game before a call: Player 2's mode, what their profile names, the input the manager has and its slot, and
+// every slot free but slot 0, Player 1's guitar. The words on either side of the ten slots read as free ones too:
+// a write past the table would show.
+static void bind_at(int mode, const char *in_profile, const char *name, uint32_t slot) {
+  game_mode_is = mode;
+  profile_text = in_profile;
+  input_name = name;
+  memcpy(input_obj + rc_off("input_slot"), &slot, 4);
+  for (int k = -1; k <= SLOTS; k++) binding[k] = k ? NONE : P1_GUITAR;
+  mode_calls = profile_calls = manager_calls = by_name_calls = seen = 0;
+  profile_key = 0;
+  by_name_seen[0] = 0;
+}
+// A call for `input`: the game's own search runs after the fix whatever it did, with the input it was called with
+static void bind(uint32_t input) {
+  call_bind(input);
+  CHECK_EQ(orig_ran, 1);
+  CHECK_EQ(orig_arg, input);
+  CHECK_EQ(seen, 1);
+  CHECK_EQ(seen_input, input);
+  CHECK_EQ(seen_force, 0);
+}
+static int slots_as_set(void) {
+  for (int k = -1; k <= SLOTS; k++)
+    if (binding[k] != (k ? NONE : P1_GUITAR)) return 0;
+  return 1;
+}
+
+static void saved_input(void) {
+  static const char SHORT[] = "USB Codec", LONG[] = "Interface with a long name: Input 2";  // in place, and not
+  CHECK(rs_mods_cfg.multiplayer);
+  CHECK(sizeof SHORT - 1 < (size_t)rc_off("efd_str_size") && sizeof LONG - 1 > (size_t)rc_off("efd_str_size"));
+  CHECK(!rc_hook_add_name("input_bind", see_bind, NULL, NULL));
+  // another input than Player 2's guitar: nothing asked of the game
+  static const uint32_t others[] = {P1_GUITAR, P1_MIC, P2_MIC, NONE};
+  for (size_t k = 0; k < sizeof others / sizeof *others; k++) {
+    bind_at(3, SHORT, SHORT, 4);
+    bind(others[k]);
+    CHECK_EQ(mode_calls + profile_calls + by_name_calls, 0);
+    CHECK(slots_as_set());
+  }
+  // Player 2 on a cable, disconnected or not set: the game's own rule
+  static const int cable[] = {0, 2, 4};
+  for (size_t k = 0; k < sizeof cable / sizeof *cable; k++) {
+    bind_at(cable[k], SHORT, SHORT, 4);
+    bind(P2_GUITAR);
+    CHECK_EQ(mode_calls, 1);
+    CHECK_EQ(mode_player, 1);
+    CHECK_EQ(profile_calls + by_name_calls, 0);
+    CHECK(slots_as_set());
+  }
+  // Direct Connect, the name in place: the profile's Direct Connect key, the input of that name, its slot
+  bind_at(3, SHORT, SHORT, 4);
+  log_start();
+  bind(P2_GUITAR);
+  log_stop();
+  CHECK_EQ(profile_calls, 1);
+  CHECK_EQ(profile_player, 1);
+  CHECK(profile_key == (const char *)data + D_TEXT_DIRECT);
+  CHECK_EQ(manager_calls, 1);
+  CHECK_EQ(by_name_calls, 1);
+  CHECK(!strcmp(by_name_seen, SHORT));
+  CHECK_EQ(binding[4], P2_GUITAR);
+  binding[4] = NONE;
+  CHECK(slots_as_set());
+  CHECK_EQ(logged_lines("[rs-mods] player 2 on \"USB Codec\""), 1);
+  // the microphone, the name behind a pointer: the other key, and a slot a microphone input holds is taken
+  static const int32_t taken[] = {P1_MIC, P2_MIC};
+  for (size_t k = 0; k < sizeof taken / sizeof *taken; k++) {
+    bind_at(1, LONG, LONG, 9);
+    binding[9] = taken[k];
+    log_start();
+    bind(P2_GUITAR);
+    log_stop();
+    CHECK_EQ(logged_lines("[rs-mods] player 2 on \"Interface with a long name: Input 2\""), 1);
+    CHECK(profile_key == (const char *)data + D_TEXT_MIC);
+    CHECK(!strcmp(by_name_seen, LONG));
+    CHECK_EQ(binding[9], P2_GUITAR);
+  }
+  // a slot a guitar holds stays that guitar's, and nothing is said
+  bind_at(3, SHORT, SHORT, 0);
+  log_start();
+  bind(P2_GUITAR);
+  log_stop();
+  CHECK_EQ(by_name_calls, 1);
+  CHECK(slots_as_set());
+  CHECK(!strstr(logged, "player 2 on"));
+  // Player 2's guitar has a slot already, any of the ten: nothing read of the profile
+  static const int has[] = {1, 7, SLOTS - 1};
+  for (size_t k = 0; k < sizeof has / sizeof *has; k++) {
+    bind_at(3, SHORT, SHORT, 4);
+    binding[has[k]] = P2_GUITAR;
+    bind(P2_GUITAR);
+    CHECK_EQ(mode_calls, 1);
+    CHECK_EQ(profile_calls + by_name_calls, 0);
+    CHECK_EQ(binding[4], NONE);
+  }
+  // no saved input in the profile, as an empty text and as a string with no text; one the manager doesn't have
+  static const char *const none[] = {"", 0};
+  for (int k = 0; k < 2; k++) {
+    bind_at(3, none[k], SHORT, 4);
+    bind(P2_GUITAR);
+    CHECK_EQ(profile_calls, 1);
+    CHECK_EQ(by_name_calls, 0);
+    CHECK(slots_as_set());
+  }
+  bind_at(3, LONG, SHORT, 4);
+  bind(P2_GUITAR);
+  CHECK_EQ(by_name_calls, 1);
+  CHECK(slots_as_set());
+  // a slot out of the table, by one, by a byte's worth and by all of its word: no slot is written, in it or past it
+  static const uint32_t out_of_table[] = {SLOTS, 0x104, 0xffffffffu};
+  for (size_t k = 0; k < sizeof out_of_table / sizeof *out_of_table; k++) {
+    bind_at(3, SHORT, SHORT, out_of_table[k]);
+    bind(P2_GUITAR);
+    CHECK_EQ(by_name_calls, 1);
+    CHECK(slots_as_set());
+  }
+  // a name longer than the fix keeps: the input is asked for by its first 255 bytes, and nothing past them is written
+  static char longest[300];
+  memset(longest, 'n', sizeof longest - 1);
+  bind_at(3, longest, SHORT, 4);
+  bind(P2_GUITAR);
+  CHECK_EQ(by_name_calls, 1);
+  CHECK_EQ(strlen(by_name_seen), 255);
+  CHECK(!memcmp(by_name_seen, longest, 255));
+  CHECK(slots_as_set());
+  // the image without the key's pointer: nothing asked of the profile
+  uint8_t kept[8];
+  memcpy(kept, data + D_KEY_DIRECT, sizeof kept);
+  memset(data + D_KEY_DIRECT, 0, sizeof kept);
+  bind_at(3, SHORT, SHORT, 4);
+  bind(P2_GUITAR);
+  CHECK_EQ(mode_calls, 1);
+  CHECK_EQ(profile_calls + by_name_calls, 0);
+  CHECK(slots_as_set());
+  memcpy(data + D_KEY_DIRECT, kept, sizeof kept);
+  // RS_MODS_MULTIPLAYER=0: the original
+  rs_mods_cfg.multiplayer = 0;
+  bind_at(3, SHORT, SHORT, 4);
+  bind(P2_GUITAR);
+  CHECK_EQ(mode_calls + profile_calls + by_name_calls, 0);
+  CHECK(slots_as_set());
+  rs_mods_cfg.multiplayer = 1;
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -358,16 +687,31 @@ int main(void) {
   esp0 = (uint32_t)ctx->r[4];
   obj_guest = rc32_alloc(256);
   obj = RC32_H(obj_guest);
+  CHECK(!rc32_mem_commit(DATA, D_SIZE));
+  data = RC32_H(DATA);
 #else
   static rc_ctx c64;
+  static uint8_t image[D_SIZE];
   ctx = &c64;
   obj = calloc(1, 256);
+  data = image;
+  rc_slide = (uint64_t)(uintptr_t)image - DATA;
 #endif
+  // the image's data: the ten slots, and the two pointers to the profile keys' text
+  binding = (int32_t *)(data + D_BINDING);
+  strcpy((char *)data + D_TEXT_DIRECT, "DirectKey");
+  strcpy((char *)data + D_TEXT_MIC, "MicKey");
+  put_ptr(data + D_KEY_DIRECT, data + D_TEXT_DIRECT);
+  put_ptr(data + D_KEY_MIC, data + D_TEXT_MIC);
+  input_obj = game_alloc(64);
+  manager_obj = game_alloc(16);
+  text_heap = game_alloc(TEXT_HEAP);
   switches();
   log_lines();
   start();
   intro();
   ownership();
+  saved_input();
   printf("mods_shared: ok (%s)\n", rc_guest_ptr_size == 4 ? "32-bit guest" : "64-bit guest");
   return 0;
 }

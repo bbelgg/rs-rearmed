@@ -50,7 +50,7 @@ Everything tied to one binary (function addresses, calling conventions, struct o
   that does not mark it `unsupported`, when native code uses a name no list has, or when code built for Learn &
   Play alone (`win-x86/shims`, `app`, `online`) uses one that `win-x86` marks `unsupported`.
 
-`mac-x64` is a full target. `win-x86` has an entry for every name: 1,063 of the 1,264 symbols and 359 of the
+`mac-x64` is a full target. `win-x86` has an entry for every name: 1,063 of the 1,263 symbols and 359 of the
 383 offsets are read from the Windows code, and an `unsupported` line says why for the rest (inlined by LTCG,
 Mac-only, not needed, or not proved). The Windows build uses it for the hook points, edits and mid points
 (`gen_image_pe.py --target`), for what a mod asks for by name, and for its built-in fixes
@@ -74,7 +74,8 @@ has it, since a mod built once reads both (Learn & Play's path table lock is `pa
   point is translated as `W_<addr>`, and its `F_<addr>` is one load and a branch more than the function
   until a hook is registered (`rc_hook_on`). The generators refuse more than 256. The apps' own code hooks them
   as well: the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`: the intro
-  skip, the song ownership during a mount) are pre hooks by name, built into both apps as a mod is built.
+  skip, the song ownership during a mount, Player 2's saved input) are pre hooks by name, built into both apps as
+  a mod is built.
 - **What a hook sees.** The same on every target: the Mac's SysV call. On the Mac the hook gets the guest's
   context. On the 32-bit guest its `rc_ctx *` is a view of the call (`runtime/rc32_hook.c`): the arguments
   in `rdi rsi rdx rcx r8 r9` and `xmm0-7` whatever the convention, a guest pointer as a host pointer (null

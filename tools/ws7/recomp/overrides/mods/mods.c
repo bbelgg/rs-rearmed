@@ -80,7 +80,6 @@ static void *keys_thread(void *arg) {
 static int before_open_file(rc_ctx *c, void *user);
 static int before_autosave_warning(rc_ctx *c, void *user);
 static int before_is_cable(rc_ctx *c, void *user);
-static int before_input_bind(rc_ctx *c, void *user);
 
 // The launcher has set the environment by now, so the switches are read here (Learn & Play reads its
 // settings.env in main, and starts from there: lp_mods_init).
@@ -90,9 +89,8 @@ __attribute__((constructor)) static void mods_init(void) {
     rs_mods_logf("no FrontEnd_OpenFile hook point");
   if (rc_hook_add_name("autosave_warning", before_autosave_warning, NULL, NULL))
     rs_mods_logf("no Auto Save warning hook point");
-  if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL) ||
-      rc_hook_add_name("input_bind", before_input_bind, NULL, NULL))
-    rs_mods_logf("no two-player input hook points");
+  if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL))
+    rs_mods_logf("no hook point for Player 2's input mode");
   if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
@@ -681,67 +679,17 @@ static int is_cache_7z(const char *p) {
 // ask whether Player 2 is in Real Tone mode (input_mode_is_cable: its only callers) and, when not, set them to it, so
 // the game's rule is two cables. And a player's saved input is restored for Player 1 alone, after the profile screen;
 // Player 2 takes the first slot free. So here a profile on Direct Connect or the microphone is taken to be in the
-// right mode, and input_bind finds Player 2's saved input before the game looks for a free slot. It has to be there
-// that early: moving the input of a running stream crashes the I/O thread, in the callback that feeds the player.
-// RS_MODS_MULTIPLAYER=0 is the original (Learn & Play: win32_overrides.c).
-#define PLAYER_2 1
-#define INPUT_P1_MIC 1
-#define INPUT_P2_GUITAR 2
-#define INPUT_P2_MIC 3
-#define INPUT_NONE 5
-#define MODE_MIC 1
-#define MODE_DIRECT 3
-#define INPUT_SLOTS 10
-
-static int any_input(uint8_t mode) { return mode == MODE_MIC || mode == MODE_DIRECT; }
-
+// right mode. The other half, Player 2's saved input found before the game looks for a free slot, is one source
+// with Learn & Play (before_input_bind, mods_shared.c); this half is not, as Learn & Play has the check inlined
+// into a function of its own (win32_overrides.c). RS_MODS_MULTIPLAYER=0 is the original.
 static int before_is_cable(rc_ctx *c, void *user) {
   (void)user;
   OV_ARGS(a, c);
-  if (!rs_mods_cfg.multiplayer || OV_U32(a) != PLAYER_2 || !any_input((uint8_t)OV_GUEST(input_mode, PLAYER_2)))
+  if (!rs_mods_cfg.multiplayer || OV_U32(a) != RS_MODS_PLAYER_2 ||
+      !rs_mods_any_input((uint8_t)OV_GUEST(input_mode, RS_MODS_PLAYER_2)))
     return 0;
   ov_ret_u32(c, 1);
   return 1;
-}
-
-// The game's small string: its text in place or behind a pointer at +0, the end at +0x10, and +0x18 says which.
-static void profile_string(const void *key, char *out, size_t n) {
-  uint8_t s[0x20] = {0};
-  *(uint8_t **)(s + 0x10) = s;
-  *(uint8_t **)(s + 0x18) = s + 0x10;
-  OV_GUEST(input_profile_string, PLAYER_2, (uint64_t)(uintptr_t)key, (uint64_t)(uintptr_t)s);
-  const char *from = *(uint8_t **)(s + 0x18) == s + 0x10 ? (const char *)s : *(const char **)s;
-  const char *to = *(const char **)(s + 0x10);
-  size_t len = to > from ? (size_t)(to - from) : 0;
-  if (len >= n) len = n - 1;
-  memcpy(out, from, len);
-  out[len] = 0;
-}
-
-static int before_input_bind(rc_ctx *c, void *user) {
-  (void)user;
-  OV_ARGS(a, c);
-  if (!rs_mods_cfg.multiplayer || OV_U32(a) != INPUT_P2_GUITAR) return 0;
-  uint8_t mode = (uint8_t)OV_GUEST(input_mode, PLAYER_2);
-  if (!any_input(mode)) return 0;
-  int32_t *binding = (int32_t *)RC_GA(input_binding);
-  for (int i = 0; i < INPUT_SLOTS; i++)
-    if (binding[i] == INPUT_P2_GUITAR) return 0;
-  char name[256];
-  const void *key = mode == MODE_DIRECT ? *(const void **)RC_GA(input_key_direct) : *(const void **)RC_GA(input_key_mic);
-  profile_string(key, name, sizeof name);
-  if (!name[0]) return 0;
-  uint64_t manager = OV_GUESTV(input_manager, NULL, 0);
-  uint8_t *in = (uint8_t *)(uintptr_t)OV_GUEST(input_by_name, manager, (uint64_t)(uintptr_t)name);
-  if (!in) return 0;
-  uint32_t slot = RC_LD(uint32_t, in + RC_OFF(input_slot));
-  if (slot >= INPUT_SLOTS) return 0;
-  int32_t held = binding[slot];  // a microphone input takes any slot, and finds another
-  if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
-    binding[slot] = INPUT_P2_GUITAR;
-    rs_mods_logf("player 2 on \"%s\"", name);
-  }
-  return 0;
 }
 
 static int before_open_file(rc_ctx *c, void *user) {

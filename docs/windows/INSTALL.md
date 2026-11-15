@@ -419,7 +419,7 @@ opens for reading, their size and date, and names in a folder's listing (`rc_fil
   most, and a calibration stopped partway still counts as run.
 - It has had far less testing than the Mac port. Not tested yet: the Workshop beyond the tone designer, the DLC
   preview ([PLAN.md](PLAN.md#status)).
-- Mods: 18 of the 21 hook points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the
+- Mods: 19 of the 21 hook points, the overlay API and `OV_VCALL` are there. A mod can't yet: use what else the
   Mac app exports beyond `rc_mod.h`, such as `ov_fn` (the mod then fails to load, with the reason in the log);
   change an event's arguments in `input_sink` (it can keep the event from the game); pass floating point
   arguments to `rc_call_guest` (`rc_call_name_f` can); call a function that takes its own registers by name; give

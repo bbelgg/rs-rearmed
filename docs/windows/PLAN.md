@@ -23,11 +23,15 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   itself before ([DESIGN.md](DESIGN.md#per-game-tables)). The renaming changed nothing it does: the compiled code
   was the same to the byte before and after it. The list of functions it replaces is a table too
   (`names/overrides/win32.list`), and the translation's skip file is made of it, where `skip.txt` was kept by hand.
-- **Built-in fixes shared with the Mac edition** (not released): the switches, the log and the start, the intro skip
-  and the song ownership during a mount are the Mac's source now, as the frame rate fixes were
-  (`overrides/mods/mods_shared.c`; [DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what stays this port's own
-  and why). The log's lines start `[rs-mods] ` as the Mac's. Checked by unit tests of the shared object on both
-  runtimes and a run to the note highway.
+- **Built-in fixes shared with the Mac edition** (not released): the switches, the log and the start, the intro skip,
+  the song ownership during a mount and Player 2's saved input are the Mac's source now, as the frame rate fixes
+  were (`overrides/mods/mods_shared.c`; [DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what stays this port's
+  own and why). The log's lines start `[rs-mods] ` as the Mac's. Checked by unit tests of the shared object on both
+  runtimes and a run to the note highway. Player 2's saved input came over last: this game's `input_bind` is the
+  Mac's call with its second argument folded away, so it is a hook point here now, and the fix is the Mac's pre
+  hook on it. Not yet done: two players played on two inputs with it. A single player's way to the note
+  highway never calls `input_bind` (`RC_HOOK_TRACE=input_bind` logs no call), so in the game only the hook's place
+  in the table is checked, and the unit tests stand for what it does.
 - **Batched DLC mounting**: since 1.14.1 the loop waits for each mount to be finished, so every archive of a
   large library is mounted ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The Mac edition was checked for the
   same fault and does not have it ([Mac plan](../mac/PLAN.md#status)).
@@ -36,8 +40,9 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB
   ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The title is up in about 7 s. Guest memory doesn't grow
   over songs in a row.
-- **Mods**: 18 of the 21 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and the two of two
-  players are in `win32_overrides.c`), the overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
+- **Mods**: 19 of the 21 hook points (`si_io`, the Mac game's CoreAudio input, has no counterpart, and
+  `input_mode_is_cable` is inlined into a function `win32_overrides.c` replaces; `input_bind` is the 19th, not
+  released), the overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). `rearmed-mods.dylib` runs as the same file: 0.6.0 played here, and
   0.8.0, which the Mac has loaded, not run here yet. No mod code runs without the network guard.
 - **Files a mod serves** (new in 1.14.0): as in the [Mac plan](../mac/PLAN.md#status), through the Win32 seam's file

@@ -59,12 +59,16 @@ class Repo(unittest.TestCase):
             self.assertIn("1449310", skip)        # dlc_update: replaced
             self.assertIn("141c130 wrap", skip)   # path_intern: kept as W_ beside the native one
             self.assertIn("120adf0 wrap", skip)   # autosave_warning: a hook point too, so the native one is N_
-            self.assertNotIn("1126950 wrap", skip)   # boot_intro_update: the shared pre hook, nothing native
+            # boot_intro_update and input_bind: the shared pre hooks, nothing native, kept or not
+            self.assertFalse([x for x in skip if x.split()[:1] in (["1126950"], ["1344640"])])
             self.assertEqual(len([x for x in skip if x and not x.startswith("#")]),
                              len(targets.name_lists()["overrides/win32"]))   # every name is a function here
             c = open(os.path.join(d, "rc_target.c")).read()
             self.assertIn("""{"steam_dlc_owned", 0x1448b10ull, 0x100a07800ull, 0, 3, 'b', 4, 2, {{'p', -2, 0}, {'i', 0, 0}}, 0, 0},""", c)
             self.assertIn("""{"frontend_open_file", 0x101ba80ull, 0x1003c7810ull, 0, 5, 'p', -1, 2, {{'p', 0, 0}, {'p', -2, 0}}, 0, 0},""", c)
+            # the input in a register, and the Mac's second argument folded away: its one value
+            self.assertIn("""{"input_bind", 0x1344640ull, 0x10044aaf0ull, 0, 5, 'v', -1, 2, {{'i', -1, 0}, {'c', 0, 0}}, 0, 0},""", c)
+            self.assertIn('{"input_key_direct", 0x1e69558, -1},', c)   # a pointer to the key's text, as the Mac's
             self.assertIn('{"boot_phase", 72},', c)
             # a name in common with the Mac is the Mac's call, adapted or refused
             self.assertIn("""{"game_frame", 0x1479df0ull, 0x10017a020ull, 0, 3, 'e', 0, 1, {{'x', -2, 0}}, 32, 7},""", c)

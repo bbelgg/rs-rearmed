@@ -14,7 +14,7 @@ tools/targets/
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
     edits.map        GROUP  ADDRESS  LEN:CHECK  EDIT        instructions a mod can switch to others (below)
     mids.map         NAME  ADDRESS  (VALUES) [-> CONTS]      mid points: a mod's hook before one instruction (below)
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,063 of 1,264 symbols read, the rest
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,063 of 1,263 symbols read, the rest
                      `unsupported` with the reason; target.toml also has the install pins (the depot, the exe, Microsoft's DLLs)
     relaxed.map      ADDRESS [+calls] WHY                   relaxed functions relaxed.list doesn't name (xlat/relaxed.py)
   names/             shared by every target
@@ -87,7 +87,7 @@ A map line `unsupported` on a point can still run: the platform layer takes it w
 
 A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose stack
 arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments, so no check
-stands behind those prototypes: 9 of the 16 points `win-x86` has.
+stands behind those prototypes: 10 of the 17 points `win-x86` has.
 
 ## Edits and mid points
 

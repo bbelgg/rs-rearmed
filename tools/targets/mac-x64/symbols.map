@@ -205,7 +205,7 @@ GCAccumulatedActor_QueryInterface                                0x1003c00d0  sy
 GCAccumulatedActor_QueryInterface_const                          0x1003c0130  sysv  -
 frontend_open_file                                               0x1003c7810  sysv  void **(void **out, const char *path)
 input_mode_is_cable                                              0x1001c3af0  sysv  bool(int player)
-input_bind                                                       0x10044aaf0  sysv  void(int input, int force)
+input_bind                                                       0x10044aaf0  sysv  void(int input, int force)  # force is 0 in each of its four calls (0x10044aaae, 0x10044aabb, 0x10044aac8, the tail jump 0x10044aad6); with it the input would take another's slot when none is free (0x10044ad66). Learn & Play's has it folded away
 input_mode                                                       0x1001c2530  sysv  uint8_t(int player)
 input_profile_string                                             0x1001c15f0  sysv  bool(int player, const char *key, void *out)
 input_manager                                                    0x10133ddc0  sysv  void *(void)
@@ -1262,7 +1262,6 @@ path_table_cs                unsupported  a pthread mutex here: path_table_lock
 ui_navigate                  0x100306ac0 sysv -  # the Auto Save handler's call at 0x1005e7f92 (mods.c leaves the call out with its branch, and calls nothing here)
 autosave_navigate_ret        0x1005e7f97 code -  # the return of that call: the handler then reads the dialog at autosave_menu
 input_p2_force_cable         unsupported  inlined: each of the three callers of input_mode_is_cable sets the mode itself
-input_find_slot              unsupported  Learn & Play's form of input_bind, which is the function here
 crt_memset                   unsupported  an import here (the system's memset)
 efd_no_free                  unsupported  not located: nothing native frees one of the game's blocks by hand here
 sng_check                    unsupported  inlined into the SNG loader 0x1001eb6a0, which calls the verifier itself (sng_load_verify_ret)

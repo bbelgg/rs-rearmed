@@ -24,3 +24,8 @@ notes and empties this file. -->
   before it; they are now the same pre hooks as on the Mac, added before any mod's, and a mod's hook there runs after
   them and not at all on the calls they answer. The player sees no difference, and `RS_MODS_LOG=1` now logs
   `intro: skipped` here too.
+- **Learn & Play: `input_bind` is a hook point, 19 of the 21 now.** A mod's hook on it was refused there, because
+  the game's function takes one argument where the Mac's takes two. The second is 0 in every call of either game,
+  so a hook now sees the Mac's call with that 0; a hook that changes it changes nothing there, the game's code
+  having no place for it. The fix that finds Player 2's saved input is the Mac's pre hook on it, added before any
+  mod's. The player sees no difference. Not yet played with two inputs since.

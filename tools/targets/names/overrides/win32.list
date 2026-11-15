@@ -19,10 +19,9 @@ song_key_known wrap
 # the native one mounts several within a frame budget, as the Mac's. RS_MODS_BUDGET_MS / RS_MODS_FIXES.
 dlc_update
 # Two players on any input: what forces Player 2 to Real Tone (inlined at the Mac's three callers of
-# input_mode_is_cable), and the search for an input's slot (the Mac input_bind). The native ones run first, off with
-# RS_MODS_MULTIPLAYER=0.
+# input_mode_is_cable). The native one runs first, off with RS_MODS_MULTIPLAYER=0. The other half, Player 2's saved
+# input, is the Mac's pre hook on input_bind (overrides/mods/mods_shared.c), and nothing here.
 input_p2_force_cable wrap
-input_find_slot wrap
 # No Auto Save warning: the UI event handler, and the navigate call that makes a dialog, which the handler calls for
 # RS2AutosaveWarning. The native navigate leaves that one call out, as the Mac mods.c does, off with
 # RS_MODS_AUTOSAVE=0; every other caller gets the original, and so does the handler's rest.

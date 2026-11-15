@@ -35,10 +35,12 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   by a run to the note highway at `RS_FPS=120`, which goes through the tuner. Not yet done: calibration and the tuner
   played with a guitar above 60 Hz, alone and with two players.
 - **Built-in fixes shared with Learn & Play** (not released): the switches, the log and the start of the built-in
-  fixes, the intro skip and the song ownership during a mount are one source for both editions
-  (`overrides/mods/mods_shared.c`, beside `framerate.c`), and Learn & Play's own fixes name the game through the
-  tables as these do ([Windows plan](../windows/PLAN.md#status)). Nothing changes for this edition's player.
-  Checked by unit tests of the shared object on both runtimes and a run to the note highway.
+  fixes, the intro skip, the song ownership during a mount and Player 2's saved input are one source for both
+  editions (`overrides/mods/mods_shared.c`, beside `framerate.c`), and Learn & Play's own fixes name the game
+  through the tables as these do ([Windows plan](../windows/PLAN.md#status)). Nothing changes for this edition's
+  player. Checked by unit tests of the shared object on both runtimes and a run to the note highway. Not yet
+  done: two players played on two inputs since Player 2's saved input moved; what the hook hands the game is now
+  memory kept for it, where it was the hook's own stack.
 - **Batched DLC mounting** (not released): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. The fault Learn & Play's had until 1.14.1, archives dropped when several steps ran in a frame, was looked
   for here and not found: with 147 archives in `dlc/` the game lists the same 263 songs with the budget as with a

@@ -224,9 +224,9 @@ Each is a native override or a hook in `tools/ws7/recomp/overrides/mods/mods.c`,
 same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). What needs
 nothing of one game alone is one source, built into both apps: `mods_shared.c` beside it has the switches, the
 log (`[rs-mods] ` lines), the start (`rs_mods_start`, from a constructor here, since the launcher has set the
-environment by then), the intro skip and the song ownership during a mount, and `framerate.c` the frame rate
-fixes. They are written as a mod is (`rc_mod.h`): the game's functions and fields by name, looked up when they
-run. What is still written twice, and why, is in the [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
+environment by then), the intro skip, the song ownership during a mount and Player 2's saved input, and
+`framerate.c` the frame rate fixes. They are written as a mod is (`rc_mod.h`): the game's functions and fields by
+name, looked up when they run. What is still written twice, and why, is in the [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours (keys, the End key in
   menus, faster loading with large libraries, the song path cache, the number-table hash, worker-thread priority,
@@ -248,13 +248,15 @@ run. What is still written twice, and why, is in the [Windows design](../windows
   player's input mode, shows `RS2AutosaveWarning` and starts a 4 s timer. The hook does the first and leaves out
   the rest: it stores a token in the handler's dialog slot and a zero in the timer, so the next tick goes on, as
   it does when the dialog's time is up. A NULL slot would stop the flow on the profile screen.
-- **Two players on any input** (pre hooks on `input_mode_is_cable` and `input_bind`; `RS_MODS_MULTIPLAYER=0` is
-  the original). Two rules of the game's made two players need two cables. The Multiplayer screens ask whether
-  Player 2 is in Real Tone mode and set them to it when not; here a profile on Direct Connect or the microphone
-  counts as in the right mode. And a saved input is restored for Player 1 alone, while Player 2 takes the first
-  free slot; here `input_bind` finds Player 2's saved input first. It has to be that early: moving the input of
-  a running stream crashes the I/O thread. The menu overlay rewords the notice MULTIPLAYER INPUT SUPPORT, which
-  said Player 2 must use the cable.
+- **Two players on any input** (pre hooks on `input_mode_is_cable`, in `mods.c`, and `input_bind`, in
+  `mods_shared.c` and the same one in Learn & Play; `RS_MODS_MULTIPLAYER=0` is the original). Two rules of the
+  game's made two players need two cables. The Multiplayer screens ask whether Player 2 is in Real Tone mode and
+  set them to it when not; here a profile on Direct Connect or the microphone counts as in the right mode. And a
+  saved input is restored for Player 1 alone, while Player 2 takes the first free slot; here `input_bind` finds
+  Player 2's saved input first. It has to be that early: moving the input of a running stream crashes the I/O
+  thread. `input_bind` has a second argument, `force`, with which an input takes another's slot when none is
+  free; the game passes 0 in each of its four calls. The menu overlay rewords the notice MULTIPLAYER INPUT
+  SUPPORT, which said Player 2 must use the cable.
 - **The same at any frame rate** (`framerate.c`, hooks at eight mid points, `fps_*`; `RS_MODS_FRAME_RATE=0` is
   the original). The game's frame time is whole milliseconds with no lower bound, and some of its code counts
   frames, which goes wrong above 60 a second. Calibration sizes its averaging window as the frames of one second,
@@ -312,7 +314,7 @@ run. What is still written twice, and why, is in the [Windows design](../windows
   has:
   - **Hook points.** `rc_hook_add_name("game_frame", pre, post, user)` hooks a game function by name. The 21
     hook points are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has
-    18 of them). A name the game doesn't have gives -1 and a log line. `rc_hook_add` with a game address keeps
+    19 of them). A name the game doesn't have gives -1 and a log line. `rc_hook_add` with a game address keeps
     working; `rc_target()` returns `mac-x64`.
   - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables
     (`tools/targets/mac-x64/edits.map` and `mids.map`) have two groups, both for rearmed-mods: `seven_string`,

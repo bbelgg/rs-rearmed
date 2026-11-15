@@ -45,12 +45,22 @@ void rs_mods_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // The start of the built-in fixes, once the edition's environment is final and before the game runs: the Mac's
 // from a constructor (the launcher has set it), Learn & Play's from lp_mods_init (after settings.env). Reads the
 // switches, raises the open-file limit, adds the hooks of the fixes that are here and of the frame rate fixes
-// (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), and an archive
-// of dlc/ owned while it is mounted (RS_MODS_BYPASS).
+// (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), an archive
+// of dlc/ owned while it is mounted (RS_MODS_BYPASS), and Player 2's saved input (RS_MODS_MULTIPLAYER).
 void rs_mods_start(void);
 // The game thread's: the DLC coordinator's update is in its install steps (1) or out of them again (0). Each
 // edition's dlc_update says so around the steps; an archive counts as owned between the two.
 void rs_mods_mounting(int on);
+
+// Two players on any input (RS_MODS_MULTIPLAYER), the game's numbers: players count from 0, and a player's input
+// mode (input_mode) is 0 Real Tone cable, 1 microphone, 2 disconnected, 3 Direct Connect, 4 not set. The fix takes a
+// profile on the microphone or Direct Connect as it is. Its first half, the Multiplayer screens' rule that Player 2
+// is on a cable, is each edition's own (the games have it in different functions: mods.c, win32_overrides.c); the
+// second, Player 2's saved input, is here.
+#define RS_MODS_PLAYER_2 1
+#define RS_MODS_MODE_MIC 1
+#define RS_MODS_MODE_DIRECT 3
+static inline int rs_mods_any_input(uint8_t mode) { return mode == RS_MODS_MODE_MIC || mode == RS_MODS_MODE_DIRECT; }
 
 // Raises RLIMIT_NOFILE (rsmacfixes' fix 4, rc_nofile.h); returns the new soft limit.
 uint64_t rs_mods_raise_nofile(void);

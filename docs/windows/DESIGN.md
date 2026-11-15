@@ -80,7 +80,7 @@ the stack check: [recompiler](../recompiler/README.md#the-32-bit-front-end-windo
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,063 of the 1,264 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,063 of the 1,263 symbols read, an
 `unsupported` line with the reason for the rest: inlined, folded or specialised by LTCG, or no counterpart),
 `offsets.map`, `edits.map`, `mids.map` and `relaxed.map`, and in its `target.toml` the pins (the depot,
 manifest, exe and DLL hashes, build figures). The build uses them for the hook points, what a mod asks for by
@@ -387,12 +387,12 @@ name (`RC_FN(dlc_update)`; the names below are those). `RS_MODS_LOG=1` logs them
 What needs nothing of one game alone is the Mac's source, built into this app as a mod is built
 (`tools/ws7/recomp/overrides/mods`): `mods_shared.c` has the switches, the log (`[rs-mods] ` lines), the start
 (`lp_mods_init()` calls its `rs_mods_start` once `settings.env` is in the environment, where the Mac's runs from
-a constructor), the intro skip and the song ownership during a mount; `framerate.c` has the frame rate fixes.
-The rest is written for this game, because its code differs where the fix has to go: the batched mounting has
-to wait for each mount here, the Auto Save handler has a release the Mac's lacks, `FrontEnd_OpenFile` is native
-because the original's lower-casing is behind a packer stub, the Mac's two hook points for two players are one
-inlined function and a register call here, the path cache and the number hash sit in other functions, and the
-song-key table is this image's alone.
+a constructor), the intro skip, the song ownership during a mount and Player 2's saved input; `framerate.c` has
+the frame rate fixes. The rest is written for this game, because its code differs where the fix has to go: the
+batched mounting has to wait for each mount here, the Auto Save handler has a release the Mac's lacks,
+`FrontEnd_OpenFile` is native because the original's lower-casing is behind a packer stub, the check of Player
+2's input mode is inlined into a function of this game's own, the path cache and the number hash sit in other
+functions, and the song-key table is this image's alone.
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`):
   - batched DLC mounting: the DLC coordinator's per-frame update (`dlc_update`) runs its install step in a loop
@@ -428,9 +428,16 @@ song-key table is this image's alone.
   and every other caller gets the original. So the rest of the branch, which has a release the Mac's lacks, stays
   the game's own. The native function around the handler clears the timer once it has returned, and the menu's
   tick goes on as when the dialog's time is up.
-- **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original): the same two changes as `mods.c`.
-  `input_p2_force_cable` is the Mac's three inlined checks in one function, which sets Player 2 to Real Tone, and
-  `input_find_slot` is `input_bind` in this game's shape (the input in a register, no `force`).
+- **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original): the Mac's two changes
+  ([what they do](../mac/DESIGN.md#built-in-fixes-and-mods)). The first is this port's own:
+  `input_p2_force_cable` is the Mac's three inlined checks of `input_mode_is_cable` in one function, which sets
+  Player 2 to Real Tone, and the native function in front of it leaves a profile on Direct Connect or the
+  microphone as it is. The second, Player 2's saved input, is the Mac's source, the pre hook on `input_bind` in
+  `mods_shared.c`. This game's `input_bind` takes the input in `eax` and nothing else: the Mac's second argument,
+  `force`, is 0 in each of the Mac game's four calls, and the compiler folded it away here with the code under
+  it, so `symbols.map` gives the hook the Mac's call with that 0 (`void(int input@eax, int force=0)`; the entry
+  has the reading of both images). The profile keys the hook reads are pointers in this image's data as on the
+  Mac, though this game's code has their values as literals.
 - **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original): the Mac's source,
   `tools/ws7/recomp/overrides/mods/framerate.c`, built as a mod is built, with this game's eight mid points in
   `tools/targets/win-x86/mids.map` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). The Windows code
@@ -464,24 +471,27 @@ song-key table is this image's alone.
   mods the installed app goes to `LP_GAME_DIR`, the Mac's working directory, before it loads them, so a mod
   finds its settings there. What a mod has:
   - **Hook points.** `rc_hook_add_name` as on the Mac; the hooks run on a view of the call, the Mac's SysV
-    one, made from `tools/targets/win-x86`. Of the 21 hook points (`tools/targets/names/hooks.list`) 18 work
-    here. Sixteen are functions of this game, eight of them in this game's own shape, adapted in
+    one, made from `tools/targets/win-x86`. Of the 21 hook points (`tools/targets/names/hooks.list`) 19 work
+    here. Seventeen are functions of this game, nine of them in this game's own shape, adapted in
     `symbols.map` (`game_frame`, `ui_event`, `rr_speed_ratio`, `too_many_inputs`, `frontend_open_file`,
-    `tone_change`, `song_list_name`, `si_open`). Two, `input_sink` and `set_app_focus`, have no function here
-    (the game has window messages and an inlined tick), and `win32_input.c` runs them instead
+    `tone_change`, `song_list_name`, `si_open`, `input_bind`). Two, `input_sink` and `set_app_focus`, have no
+    function here (the game has window messages and an inlined tick), and `win32_input.c` runs them instead
     (`rc_hook_add_seam`), with the Mac's values: macOS key codes, the character, the pointer from the bottom
-    left. Three are `unsupported`, and a hook on them gives -1 and a log line: `si_io` is the Mac game's
-    CoreAudio input ([Audio](#audio)), `input_mode_is_cable` is inlined into its caller, and `input_bind` takes
-    its input in a register and nothing else; the built-in fix has both.
+    left. Two are `unsupported`, and a hook on them gives -1 and a log line: `si_io` is the Mac game's
+    CoreAudio input ([Audio](#audio)), and `input_mode_is_cable` is inlined into its caller, which the built-in
+    fix replaces.
 
     What differs with the call the same: a hook point that is also a built-in fix of this port's own
     (`autosave_warning`, `frontend_open_file`) is `N_<addr>` in `win32_overrides.c` and a mod's hooks run around the
-    fix, where on the Mac the fix is a pre hook that can answer first (the fixes of `boot_intro_update` and
-    `steam_dlc_owned` are the Mac's pre hooks here too, so a mod's hook on those comes after the fix in both);
+    fix, where on the Mac the fix is a pre hook that can answer first (the fixes of `boot_intro_update`,
+    `steam_dlc_owned` and `input_bind` are the Mac's pre hooks here too, so a mod's hook on those comes after the
+    fix in both);
     `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames are presented; while a
     mod hooks a seam point, events wait for the game thread (`w32_input_frame`, at the start of each Present) and
     reach the game a frame later, and `input_sink`'s arguments, changed by a pre hook, are not taken
-    (`set_app_focus`'s is); a modifier key is a down and an up here, where the Mac sends a down for both.
+    (`set_app_focus`'s is); an argument this game's code has folded away is not taken either (`input_bind`'s
+    `force`, `ui_event`'s last two): a hook reads its one value, and a change to it goes nowhere; a modifier key
+    is a down and an up here, where the Mac sends a down for both.
   - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`), for a change inside a function.
     The tables have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar after rs7string
     (735 edits and 127 mid points: the game's arrays for six strings grown to eight), and `plain_packages`, its

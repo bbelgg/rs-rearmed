@@ -180,74 +180,19 @@ void RC_NFN(autosave_warning)(rc_ctx *c) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Two players on any input: the counterpart of the Mac's (tools/ws7/recomp/overrides/mods/mods.c, before_is_cable
-// and before_input_bind, which say why), off with the same RS_MODS_MULTIPLAYER=0. 0x11f08d0 is the Mac's three
-// inlined checks in one function (input_p2_force_cable): it sets Player 2 to Real Tone unless they are, and returns
-// al = it did. 0x1344640 is input_bind, with the input in eax (input_find_slot). The profile's string is the Mac's
-// with 32-bit pointers: the end at +0x10, and +0x14 says whether the text is in place or behind the pointer at +0.
+// Two players on any input: the counterpart of the Mac's before_is_cable (tools/ws7/recomp/overrides/mods/mods.c,
+// which says why), off with the same RS_MODS_MULTIPLAYER=0. 0x11f08d0 is the Mac's three inlined checks in one
+// function (input_p2_force_cable): it sets Player 2 to Real Tone unless they are, and returns al = it did. The
+// fix's other half, Player 2's saved input, is the Mac's source: a pre hook on input_bind (mods_shared.c).
 // ------------------------------------------------------------------------------------------------
-// The game's own: input_mode, cdecl (player) -> al; input_profile_string, cdecl (player, key, string);
-// input_manager, -> the manager; input_by_name, stdcall (manager, name) -> the input, or 0; input_binding, int[10]:
-// what each slot serves, 0-3 an input, 5 nothing; input_key_direct and input_key_mic, pointers to the profile keys'
-// text (the game's own code has the texts' addresses as literals; the pointers are in its data as on the Mac).
-#define PLAYER_2 1u
-#define INPUT_P1_MIC 1u
-#define INPUT_P2_GUITAR 2u
-#define INPUT_P2_MIC 3u
-#define INPUT_NONE 5u
-#define MODE_MIC 1
-#define MODE_DIRECT 3
-#define INPUT_SLOTS 10
+// The game's own: input_mode, cdecl (player) -> al.
 void RC_WFN(input_p2_force_cable)(rc_ctx *c);
-void RC_WFN(input_find_slot)(rc_ctx *c);
-
-static uint8_t p2_mode(rc_ctx *c) {
-  uint32_t player = PLAYER_2;
-  return (uint8_t)rc32_call(c, RC_ADDR(input_mode), &player, 1, 0, 0, 0);
-}
 
 void RC_FN(input_p2_force_cable)(rc_ctx *c) {
-  uint8_t mode = rs_mods_cfg.multiplayer ? p2_mode(c) : 0;
-  if (mode == MODE_MIC || mode == MODE_DIRECT) ov_ret32(c, 0);
+  uint32_t player = RS_MODS_PLAYER_2;
+  uint8_t mode = rs_mods_cfg.multiplayer ? (uint8_t)rc32_call(c, RC_ADDR(input_mode), &player, 1, 0, 0, 0) : 0;
+  if (rs_mods_any_input(mode)) ov_ret32(c, 0);
   else RC_WFN(input_p2_force_cable)(c);
-}
-
-static void p2_saved_input(rc_ctx *c) {
-  static uint32_t s, name;  // guest memory, kept for the life of the process
-  uint8_t mode = p2_mode(c);
-  if (mode != MODE_MIC && mode != MODE_DIRECT) return;
-  for (uint32_t i = 0; i < INPUT_SLOTS; i++)
-    if (ld32(RC_ADDR(input_binding) + 4 * i) == INPUT_P2_GUITAR) return;
-  if ((!s && !(s = rc32_alloc(32))) || (!name && !(name = rc32_alloc(256)))) return;
-  const uint32_t end = RC_OFF(efd_str_size), in_place = RC_OFF(efd_str_inline);
-  st32(s + end, s);
-  st32(s + in_place, s + end);
-  *g8(s) = 0;
-  uint32_t args[3] = {PLAYER_2, ld32(mode == MODE_DIRECT ? RC_ADDR(input_key_direct) : RC_ADDR(input_key_mic)), s};
-  rc32_call(c, RC_ADDR(input_profile_string), args, 3, 0, 0, 0);
-  uint32_t from = ld32(s + in_place) == s + end ? s : ld32(s), to = ld32(s + end), len = to > from ? to - from : 0;
-  if (!len) return;
-  if (len > 255) len = 255;
-  memcpy(g8(name), g8(from), len);
-  *g8(name + len) = 0;
-  uint32_t manager = rc32_call(c, RC_ADDR(input_manager), 0, 0, 0, 0, 0);
-  uint32_t find[2] = {manager, name};
-  uint32_t in = rc32_call(c, RC_ADDR(input_by_name), find, 2, 0, 0, 0);
-  if (!in) return;
-  uint32_t slot = ld32(in + RC_OFF(input_slot));
-  if (slot >= INPUT_SLOTS) return;
-  uint32_t held = ld32(RC_ADDR(input_binding) + 4 * slot);  // a microphone input takes any slot, and finds another
-  if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
-    st32(RC_ADDR(input_binding) + 4 * slot, INPUT_P2_GUITAR);
-    rs_mods_logf("player 2 on \"%s\"", (const char *)g8(name));
-  }
-}
-
-void RC_FN(input_find_slot)(rc_ctx *c) {
-  uint32_t input = (uint32_t)c->r[0];
-  if (rs_mods_cfg.multiplayer && input == INPUT_P2_GUITAR) p2_saved_input(c);
-  c->r[0] = input;
-  RC_WFN(input_find_slot)(c);
 }
 
 // ------------------------------------------------------------------------------------------------

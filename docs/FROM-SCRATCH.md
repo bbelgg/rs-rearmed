@@ -46,18 +46,12 @@ your machine.
   the sections *before and independently of* its anti-debug check, and that decompression is a deterministic
   function of a small amount of its runtime state — identical output every run. So you capture that state
   once and replay it on the Mac. The captured state holds the unpacker's scratch and registers, not game
-  code; it is tied to one exe build.
-  1. Run 32-bit Windows in QEMU with a GDB stub (`-cpu max,hypervisor=off`, or Windows hangs at the boot
-     manager). Install the VC++ 2010 runtime. Place the exe beside `steam_api.dll`, `bink2w32.dll`,
-     `d3dx9_42.dll`.
-  2. Launch the game; it halts at "Please make sure Steam is running". Leave it and read its image base. The
-     base is randomised once per boot, but a second launch lands at the same base as the first.
-  3. From the stub, set a hardware write watchpoint on `.text` (invisible to the guest) and launch again. It
-     stops at the first write to `.text` — the moment before decompression.
-  4. Save the unpacker's registers, GDT and scratch pages at that point. In Unicorn on the Mac, lay the exe
-     out at its section addresses, apply the saved state, and map benign kernel32 stubs (the packer only
-     checks one anti-hook byte per target; a `8b ff 55 8b ec` prologue satisfies it — no real DLL bytes). Run
-     the decompression and dump the sections. Confirm two runs agree byte for byte.
+  code; it is tied to one exe build. In outline: run 32-bit Windows in QEMU with a GDB stub, stop the game at
+  its first write to `.text` with a hardware watchpoint (invisible to the guest), and save the unpacker's
+  registers, GDT and scratch pages. In Unicorn on the Mac, lay the exe out at its section addresses, apply the
+  saved state, map benign stubs where the packer looks at its call targets, run the decompression and dump the
+  sections. Two runs must agree byte for byte. The steps, with what stops each one the first time:
+  [win-x86/unpack](../win-x86/unpack/README.md#making-a-seed-the-qemu-capture).
 
 Either route gives you the decompressed sections. Then rebuild a normal PE from them: the true section table,
 `.data` as captured with the `.bss` tail zeroed, an import directory laid over the real IAT, entry point

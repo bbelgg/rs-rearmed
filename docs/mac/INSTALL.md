@@ -7,14 +7,14 @@ recompiles the game to C and compiles that into an arm64 app. Nothing it produce
 
 - A Mac with Apple Silicon (M1 or later), macOS 12 Monterey or later.
 - The Steam macOS version of **Rocksmith 2014 (Remastered)**, on your Steam account. It doesn't have to be
-  installed in Steam: the installer finds it in any Steam library, and when it isn't installed it has Steam
-  download it, as it does for [Learn & Play](../windows/INSTALL.md#the-steps); then you need **Steam** itself
-  on the Mac, signed in with that account. By hand, set `RS_GAME_DIR` when the game is somewhere else
-  ([The game image](#3-the-game-image)).
+  installed in Steam: the installer finds it in any Steam library, and otherwise has Steam download it, as it does
+  for [Learn & Play](../windows/INSTALL.md#the-steps). Then **Steam** must be on the Mac, signed in with that
+  account, with about 7 GB free for the download, plus your DLC (16 MB each on average); the installer checks
+  first, and offers a folder on another disk.
 - A Real Tone cable, or another audio input the game accepts. macOS asks for microphone access the first
   time the game listens for your guitar ([What macOS will ask](#what-macos-will-ask)).
 - Apple's command line tools, with their `python3`. The installer starts their installation when they are
-  missing, and you click Install in Apple's window. Nothing from Homebrew, no Rosetta. The game is never
+  missing, and you click Install in Apple's window. Nothing else: no Homebrew, no Rosetta. The game is never
   started: the build reads it from disk.
 - An internet connection while building: the source of the release, the FFmpeg 7.1.2 source for the Bink shim
   (from ffmpeg.org, checksum verified) and the build's Python packages (pip; CMake and Ninja among them).
@@ -23,8 +23,6 @@ recompiles the game to C and compiles that into an arm64 app. Nothing it produce
 - Room for RS Re-ARMed's own copy of the game files ([Game files](#game-files)): none extra when the game
   is on an APFS volume (the startup disk, or an external drive: the copy then goes onto that drive), else
   about 6.5 GB plus the DLC on the startup disk.
-- For a game that isn't installed in Steam: about 7 GB for Steam's download of it, plus your DLC (16 MB each on
-  average). The installer checks first, and offers a folder on another disk.
 
 ### What macOS will ask
 
@@ -59,24 +57,17 @@ ends the run; what is done is kept, and Build & Install goes on from there.
 
 ### The steps
 
-1. **Checking Apple's tools.** If Apple's command line tools are missing, macOS's own window for them opens (it
-   may be behind the installer): click Install, then Agree. It takes a few minutes. If you have Xcode and it
-   isn't set up, it opens: click Agree and Install, with your Mac's password.
+1. **Checking Apple's tools.** If Apple's command line tools are missing, or you have Xcode and it isn't set up,
+   macOS asks ([What macOS will ask](#what-macos-will-ask)). Installing the tools takes a few minutes.
 2. **Downloading source** and **Checking prerequisites**, then **Finding the Mac game**: in any Steam library,
    where nothing more happens. If the game isn't installed in Steam, the installer has Steam download it, with
-   your own account, into Steam's download folder, without installing it, as for
-   [Learn & Play](../windows/INSTALL.md#the-steps): it opens Steam if it isn't open and tells it what to
-   download. Steam's window doesn't show this download; the progress is in the installer. The boxes that can
-   come up are the same ones (Install Steam, Sign in to Steam, the download stopped), with one of its own:
-   **This Steam account doesn't have the Mac game**. If that account has the Windows edition, click Stop and
-   choose Learn & Play under Game; otherwise change to the account that owns the game. If there isn't room on
-   the startup disk, it asks for a folder on another disk. A game Steam is installing or updating just then is
-   waited for instead.
+   your own account, without installing it, as it does the Windows game for
+   [Learn & Play](../windows/INSTALL.md#the-steps): step 2 there has Steam's part, the boxes that can come up and
+   the folder on another disk. One box is this edition's own, **This Steam account doesn't have the Mac game**: if
+   that account has Learn & Play, click Stop and choose Learn & Play under Game; otherwise change to the
+   account that owns the game. A game Steam is installing or updating just then is waited for instead.
 3. **Downloading your DLC**: nothing for a game installed in Steam, which installs your DLC with the game. For
-   a game from Steam's download, each DLC is a Steam download of its own: the installer reads which DLC your
-   Steam account owns and has Steam fetch them one after another ("12 of 73"). If it is stopped, the next run
-   continues. One that fails doesn't stop the install: the box at the end names it, and Refresh Game Files tries
-   again.
+   a game from Steam's download, Steam fetches each DLC your account owns, as in step 3 for Learn & Play.
 4. **Setting up Python environment**, then **Decrypting the game**, a few seconds: the game's code is read from
    the Steam copy on disk, which doesn't change. The game isn't started. If it isn't the build RS Re-ARMed is
    made for, it says so; Verify integrity in Steam usually mends that for an installed game.
@@ -93,8 +84,9 @@ ends the run; what is done is kept, and Build & Install goes on from there.
   macOS asks once whether the installer may use it.
 - **Mac game folder** stays empty for the game in Steam (installed in a library, else Steam's download);
   choose a folder only for a game that is somewhere else, and it shows the folder you chose for the install
-  you have. **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy with the game
-  folder: after new DLC or custom songs, or a Steam update ([Game files](#game-files)).
+  you have.
+- **Refresh Game Files** (shown once the game is installed) syncs RS Re-ARMed's copy with the game folder: after
+  new DLC or custom songs, or a Steam update ([Game files](#game-files)).
 - **Game files** matters only when the game is on another drive than your home folder: **On the game's drive**
   keeps RS Re-ARMed's copy there, with no extra space, and the game needs that drive connected; **On this Mac**
   makes a full copy in your home folder, and the game plays without the drive. It shows where the copy is now.
@@ -212,9 +204,10 @@ tools/play-native/install.sh
 
 It makes the [copy of the game files](#game-files), puts the app (`$RS_BUILD_DIR/m4/app/Rocksmith2014.app`, or
 the path you pass) and the network guard in `~/Library/Application Support/RS Re-ARMed/`, creates the launcher
-`~/Applications/RS Re-ARMed.app`, and prepares the Metal shaders (4.5 to 6.5 minutes the first time on an M2, a second on
-later installs; `RS_WARM_SHADERS=0` skips it, `tools/play-native/warm-shaders.sh` does it later). Quit the game
-first. Always start the game through the launcher: opening `Rocksmith2014.app` directly doesn't work.
+`~/Applications/RS Re-ARMed.app`, and prepares the Metal shaders (a few minutes the first time, a second on later
+installs; `RS_WARM_SHADERS=0` skips it, `tools/play-native/warm-shaders.sh` does it later). Quit the game first.
+Always start the game through the launcher, which sets it up to run offline: `Rocksmith2014.app` is not made to be
+opened directly.
 
 With a game from Steam's download (`RS_GAME_DIR` is its folder, or unset with the game not installed in Steam),
 it first has Steam download the DLC your signed-in account owns, as the installer does (`gamefiles.py dlc-fetch`;
@@ -223,7 +216,7 @@ it first has Steam download the DLC your signed-in account owns, as the installe
 `RS_RENDERER=metal` or `opengl` chooses the renderer (default: the one the install has, else Metal).
 `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` change the two install locations.
 
-### Game files
+## Game files
 
 The game reads only its own copy, `~/Library/Application Support/RS Re-ARMed/game/`, so a Steam update or
 uninstall can't break it. `install.sh` makes the copy (`tools/play-native/gamefiles.py`): the game's archives and
@@ -240,7 +233,6 @@ have brought coming from elsewhere:
 | DLC | the game's `dlc` folder, where Steam installs it | the DLC downloads in Steam's download folder (each has the Mac and the PC archive), fetched by the install and by each refresh |
 | Custom songs | the game's `dlc` folder | the `dlc` folder of `steamapps/common/Rocksmith2014` in a Steam library (make it if it isn't there) |
 | The DLC you own | Steam's appmanifest | your account's ownership ticket in Steam's folder, and the AppIDs the archives carry |
-| The account | the license with the Mac game | the same |
 | The language | Steam's appmanifest | English, as for Learn & Play, unless `RS_STEAM_LANGUAGE` says otherwise (`launchctl setenv RS_STEAM_LANGUAGE german`) |
 | Saves | copied in once from `Steam/userdata/<number>/221680/remote` | the same, when the game has run through Steam on this Mac before; otherwise the game starts with a new profile |
 
@@ -260,13 +252,12 @@ nothing for it is in RS Re-ARMed). The game's program in the game folder shows i
 - **A Steam library on another drive.** On APFS the copy goes onto that drive as clones, in `RS Re-ARMed/game` at
   its top, and `…/RS Re-ARMed/game` is a link to it, so the game needs that drive connected. On a drive that can't
   clone (exFAT, HFS+, a network volume) it is a real copy in your home folder, about 6.5 GB without DLC, after a
-  check for room. The installer's **Game files** choice picks the place, and moves a copy that is in the other
-  one: to your home folder as a real copy (about 6.5 GB without DLC, after a check for room; the game then starts
-  without the drive and macOS doesn't ask about it), or to the game's drive as clones. Everything in the copy
-  moves, and the old one is removed only when the new one is whole. By hand that is `RS_GAME_COPY_DIR=home` or
-  `RS_GAME_COPY_DIR=drive` for an install or a refresh. `RS_GAME_COPY_DIR=DIR` puts a new copy in `DIR/game`
-  (for the installer, `launchctl setenv`; its choice is then switched off). Without any of them a refresh keeps
-  the copy where it is.
+  check for room. The installer's **Game files** choice ([the steps](#the-steps)) picks the place, and moves a
+  copy that is in the other one; with the copy in your home folder macOS doesn't ask about the drive either.
+  Everything in the copy moves, and the old one is removed only when the new one is whole. By hand that is
+  `RS_GAME_COPY_DIR=home` or `RS_GAME_COPY_DIR=drive` for an install or a refresh. `RS_GAME_COPY_DIR=DIR` puts a
+  new copy in `DIR/game` (for the installer, `launchctl setenv`; its choice is then switched off). Without any of
+  them a refresh keeps the copy where it is.
 - **Refresh** after new DLC or custom songs, or a Steam update: **Refresh Game Files**, or
   `tools/play-native/install.sh --refresh-game`. It copies new and changed files, removes what the game folder no
   longer has, and touches nothing else. If the game folder is gone it changes nothing and says so. For a game
@@ -282,16 +273,16 @@ Nothing is downloaded by the game, and Steam's folders are read only when you pr
 
 1. **What gets into `game/dlc`.** Steam installs your DLC into the Mac game's `dlc` folder; for a game that
    isn't installed in Steam, the installer has Steam download each DLC your account owns as a download of its own
-   ([the steps](#the-steps)). A copy or a refresh takes every `*_m.psarc` there, in subfolders too (a `dlc/cdlc/` of custom songs keeps its place), and nothing
-   else: the PC archives, `*_p.psarc`, stay behind. A file the game folder no longer has is removed from the
-   copy at the next refresh.
+   ([the steps](#the-steps)). A copy or a refresh takes every `*_m.psarc` there, in subfolders too (a `dlc/cdlc/`
+   of custom songs keeps its place), and nothing else: the PC archives, `*_p.psarc`, stay behind. A file the game
+   folder no longer has is removed from the copy at the next refresh.
 2. **Which archives the game shows.** Each archive carries an AppID, and the game mounts it only when Steam
    lists that AppID as a DLC of the game and says it is installed. RS Re-ARMed's offline Steam layer answers
    that from `game/.rearmed/steam.env` (`RS_STEAM_DLC`), which the copy writes: the DLC Steam installed (for a
-   game from Steam's download, the DLC your account's license lists), and the
-   AppID of every archive in `game/dlc`, read from the archive itself. So a song shows whatever AppID it
-   carries, with the Steam client closed. `RS_STEAM_DLC=all` (with `launchctl setenv`) counts every AppID as
-   owned, so every song the copy has shows, those of the first Rocksmith (4) too.
+   game from Steam's download, the DLC your account's license lists), and the AppID of every archive in
+   `game/dlc`, read from the archive itself. So a song shows whatever AppID it carries, with the Steam client
+   closed. `RS_STEAM_DLC=all` counts every AppID as owned, so every song the copy has shows, those of the first
+   Rocksmith (4) too ([Settings and switches](#settings-and-switches)).
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
    off in Built-in Mods…. Put them straight into `game/dlc`, as the Mac version, `_m.psarc`: every install ends
    by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
@@ -317,32 +308,36 @@ makes it again.
 
 ## Where things are
 
+In the table, `…` is `~/Library/Application Support/RS Re-ARMed`.
+
 | Where | What |
 |---|---|
 | `~/Applications/RS Re-ARMed.app` | the launcher |
 | `~/Library/Application Support/RS Re-ARMed/game/` | the game folder the game reads: RS Re-ARMed's own copy of the game files ([Game files](#game-files)), the installed `Rocksmith2014.app` and an offline `Rocksmith.ini`; for a game on another APFS drive a link to `<drive>/RS Re-ARMed/game`, where all of that is |
 | `…/game/dlc/` | the songs the game has: your DLC, and the place for custom songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `…/game/.rearmed/` | the copy's manifest (written last), where it comes from (`source.json`), the Steam facts (`steam.env`: the installed DLC, the language, the account) and the install's `Rocksmith.ini` |
-| `…/game-dir`, `…/game-source`, `…/gamefiles.py` | the folder the game reads, the folder the copy comes from, and the tool that refreshes it |
+| `…/game/static.psarc` | a link the launcher sets at each start: to `static.psarc.original`, the game's own, or `static.psarc.rearmed`, the [title logo](#the-title-logo) |
+| `…/game-dir`, `…/game-source` | the folder the game reads, and the folder the copy comes from (one line each) |
+| `…/gamefiles.py` | the tool that refreshes the copy |
 | `…/libnetguard.dylib` | the network guard, loaded into the game at every start |
-| `…/steam/<account>/221680/remote/` | your profiles and progress for the native build |
+| `…/steam/<account>/221680/remote/` | your profiles and progress |
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
 | `…/mods/` | mods loaded at startup |
 | `…/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
 | `…/renderer`, `…/renderer-fallback.txt` | `metal` or `opengl`, and why a fallback changed it ([Renderer](#renderer)) |
-| `…/guitar-input.ini` | if you made one: the guitar input's channel and gain ([Guitar input](#guitar-input)) |
+| `…/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 | `…/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
-On the first launch your Steam saves are copied once into `steam/`, without `crd` (stored Ubisoft
-credentials). The native build never writes your Steam saves.
+On the first start your Steam saves are copied once into `steam/`, without `crd` (stored Ubisoft credentials).
+RS Re-ARMed never writes your Steam saves.
 
 ## Playing
 
-Start **RS Re-ARMed** from `~/Applications`. The Steam client is not needed. Enter on the title screen goes
-straight to the profile list. Custom songs (CDLC) load as they are, in their Mac version, `*_m.psarc`: put them
-in `game/dlc` ([How the game finds DLC](#how-the-game-finds-dlc)). To add a song while you play, put it there (or
-in Steam's `dlc` folder) and press **ENUMERATE** in the main menu: it is in the list a moment later, with no
-restart. Changed or removed songs and new DLC need a [refresh](#game-files).
+Start **RS Re-ARMed** from `~/Applications`. It runs offline: no Steam client, no Ubisoft login, no network. Enter
+on the title screen goes straight to the profile list. Custom songs (CDLC) load as they are, in their Mac version,
+`*_m.psarc`: put them in `game/dlc` ([How the game finds DLC](#how-the-game-finds-dlc)). To add a song while you
+play, put it there (or in Steam's `dlc` folder) and press **ENUMERATE** in the main menu: it is in the list a
+moment later, with no restart. Changed or removed songs and new DLC need a [refresh](#game-files).
 
 ### Keys
 
@@ -361,13 +356,13 @@ From the title to a song: Return (title), Return (profile, or New profile), Retu
 
 ### Window modes
 
-Shift-Command-F or Control-Command-F switches between full screen and a window. Full screen covers the display the window is on, so
-with a second display, move the window there first. In a window, drag the edges to resize: the new size becomes
-the game's resolution, and the window takes any shape (the original kept it at 16:9; `RS_WINDOW_ANY_SHAPE=0` does
-too). The game follows the shape itself, in a window and in full screen alike: its cameras keep their height and
-take the resolution's width, and its menus are laid out to the width, so nothing is stretched. A 16:10 window shows
-a little less at the sides than 16:9, an ultrawide one more. Full screen hasn't been run on a 16:10 or ultrawide
-screen yet.
+Shift-Command-F or Control-Command-F switches between full screen and a window. Full screen covers the display the
+window is on, so with a second display, move the window there first. In a window, drag the edges to resize: the
+new size becomes the game's resolution, and the window takes any shape (the original kept it at 16:9;
+`RS_WINDOW_ANY_SHAPE=0` does too). The game follows the shape itself, in a window and in full screen alike: its
+cameras keep their height and take the resolution's width, and its menus are laid out to the width, so nothing is
+stretched. A 16:10 window shows a little less at the sides than 16:9, an ultrawide one more. Full screen hasn't
+been run on a 16:10 or ultrawide screen yet.
 
 ### Renderer
 
@@ -380,7 +375,7 @@ other one:
 echo opengl > ~/Library/Application\ Support/RS\ Re-ARMed/renderer   # or: echo metal > ...
 ```
 
-For a single start, `RS_GL_BACKEND=gl` or `RS_GL_BACKEND=metal` wins over the file. `logs/last-run.log`
+While it is set, `RS_GL_BACKEND=gl` or `RS_GL_BACKEND=metal` wins over the file. `logs/last-run.log`
 says which one ran and why (`[rsp] renderer: metal (default)`).
 `Rocksmith2014.app/Contents/MacOS/Rocksmith2014 --renderer-check` prints what a start would use.
 
@@ -397,105 +392,120 @@ start uses OpenGL, writes `opengl` into `renderer`, shows a notification and exp
    processing).
 
 The setting is `LatencyBuffer` in `Rocksmith.ini`: the game's output buffer in steps of 256 frames
-(5.3 ms). The launcher keeps it across launches. The output device's buffer is `RS_AUDIO_FRAMES`
-(default 256; 128 at `LatencyBuffer=1` and on an interface that also has inputs).
+(5.3 ms). The launcher keeps it across launches, and sets it to `RS_LATENCY_BUFFER` when that is set. The output
+device's buffer is `RS_AUDIO_FRAMES` (default 256; 128 at `LatencyBuffer=1` and on an interface that also has
+inputs).
 
 ### Guitar input
 
-The game's list of inputs under Direct Connect (Path/Input, DIRECT CONNECT, then Available Inputs) shows each channel of
-an audio interface: `HX Stomp channel 1` to `channel 8`, say. The bar beside each moves with its signal, so play and
-pick the one that moves. The game stops at 10 inputs and the list doesn't scroll, so they go in order: the Real Tone
-cable, interfaces, the built-in microphone, others such as a webcam, then virtual devices. Every interface keeps at
-least one entry, and with too many channels they share the room.
+The game's list of inputs under Direct Connect (Path/Input, DIRECT CONNECT, then Available Inputs) shows each
+channel of an audio interface: `HX Stomp channel 1` to `channel 8`, say. The bar beside each moves with its
+signal, so play and pick the one that moves. The game stops at 10 inputs and the list doesn't scroll, so they go
+in order: the Real Tone cable, interfaces, the built-in microphone, others such as a webcam, then virtual devices.
+Every interface keeps at least one entry, and with too many channels they share the room.
 
-The game's calibration sets the input's level, and can boost it by up to 24 dB, so a quiet interface reaches the top of
-its meter. It doesn't change the volume of your interface in the system. Run calibration once: until then the level
-saved in your profile is left out and the input stays as it is. The Real Tone cable works as in the original.
+The game's calibration sets the input's level, and can boost it by up to 24 dB, so a quiet interface reaches the
+top of its meter. It doesn't change the volume of your interface in the system. Run calibration once: until then
+the level saved in your profile is left out and the input stays as it is. The Real Tone cable works as in the
+original.
 
-Both can also be set per device, in `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (Learn & Play reads the same
-file):
+Both can also be set per device, in `~/Library/Application Support/RS Re-ARMed/guitar-input.ini` (Learn & Play
+reads the same file):
 
 ```ini
 [HX Stomp]
 Channel=5
 ```
 
-The section is the device's name in Audio MIDI Setup. `Channel` counts from 1, and such a device has one entry in the
-list. `GainDb=6` adds a fixed gain to the level: -24 to 36, default 0 (an HX Stomp needs none); above full scale the
-signal clips, as in an interface. The file is read when an input opens, so restart the game after a change and calibrate
-again.
+The section is the device's name in Audio MIDI Setup. `Channel` counts from 1, and such a device has one entry in
+the list. `GainDb=6` adds a fixed gain to the level: -24 to 36, default 0 (an HX Stomp needs none); above full
+scale the signal clips, as in an interface. The file is read when an input opens, so restart the game after a
+change and calibrate again.
 
 Switches: `RS_AUDIO_INPUT_CHANNEL=N` and `RS_AUDIO_INPUT_GAIN_DB=N` (for every device), `RS_AUDIO_INPUT_FILE=PATH`
-(another file), `RS_AUDIO_CHANNEL_ENTRIES=N` (the list's length, default 10; 0: one entry per device, in the system's
-order), `RS_AUDIO_INPUT_LEVEL=0` (the level stays the device's own volume, with no boost) and `RS_AUDIO_INPUT=0` (none
-of this). With `RS_AUDIO_LOG=1` the log has the channel, each level set, and every few seconds the peak and the samples
-clipped.
+(another file), `RS_AUDIO_CHANNEL_ENTRIES=N` (the list's length, default 10; 0: one entry per device, in the
+system's order), `RS_AUDIO_INPUT_LEVEL=0` (the level stays the device's own volume, with no boost) and
+`RS_AUDIO_INPUT=0` (none of this). With `RS_AUDIO_LOG=1` the log has the channel, each level set, and every few
+seconds the peak and the samples clipped.
 
 ### Two players
 
-Each player's input is in their own profile. Load the profile on its own, set Path/Input to DIRECT CONNECT or MICROPHONE, pick the
-input, and leave through the menus so it saves. In MULTIPLAYER each player then has their own: `HX Stomp channel 5` for Player 1 and
-`HX Stomp channel 6` for Player 2, say. Two interfaces, or a cable and an interface, go the same way but haven't been played yet. A
-profile on REAL TONE CABLE needs a cable, as in the original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them.
+Each player's input is in their own profile. Load the profile on its own, set Path/Input to DIRECT CONNECT or
+MICROPHONE, pick the input, and leave through the menus so it saves. In MULTIPLAYER each player then has their own:
+`HX Stomp channel 5` for Player 1 and `HX Stomp channel 6` for Player 2, say. Two interfaces, or a cable and an
+interface, go the same way but haven't been played yet. A profile on REAL TONE CABLE needs a cable, as in the
+original. With both players in the same mode, SWAP CABLE ASSIGNMENT swaps their inputs and saves them.
 
 For two channels of one interface, leave `Channel` out of `guitar-input.ini` for it, so its channels are listed.
 `RS_MODS_MULTIPLAYER=0` is the original rule: Player 2 takes a Real Tone cable only.
 
 ## Settings and switches
 
-The rows below that say **Built-in Mods…** can be switched off in the installer. It writes them to `settings.env`
-in `~/Library/Application Support/RS Re-ARMed/`, which the launcher reads at every start; without the file every
-one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches: other lines are ignored, and the top
-of `logs/last-run.log` says what was used. Learn & Play has its own file, read the same way.
+The switches below that say **Built-in Mods…** can be switched off in the installer. It writes them to
+`settings.env` in `~/Library/Application Support/RS Re-ARMed/`, which the launcher reads at every start; without
+the file every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches: other lines are
+ignored, and the top of `logs/last-run.log` says what was used. Learn & Play has its own file, read the same way.
 
 ```
 RS_MODS_INTRO=0
 RS_REARMED=0
 ```
 
-The other switches are environment variables. The launcher starts the game through macOS, so variables set in a
-Terminal do not reach it. Set them for the login session; they win over `settings.env` too:
+Every switch is an environment variable. The launcher starts the game through macOS, so the game has the login
+session's variables and what the launcher passes on (the `settings.env` switches, the renderer, the Steam facts of
+the copy): a variable set in a Terminal does not reach it. Set a switch for the login session, which wins over
+`settings.env` too and holds until you log out:
 
 ```bash
 launchctl setenv RS_MODS_BYPASS 0     # takes effect on the next launch
 launchctl unsetenv RS_MODS_BYPASS     # back to the default
 ```
 
-Everything below is compiled into the app and on by default unless it says otherwise. LP: Learn & Play has it
-too ([its switches](../windows/INSTALL.md#settings-and-switches)). `RS_MODS_LOG=1` writes what the mods apply to
-`logs/last-run.log`.
+Learn & Play sees a variable set this way too ([its switches](../windows/INSTALL.md#settings-and-switches)).
 
-| What | LP | Switch |
+Each row is a switch set away from its default, and what that does. Everything is compiled into the app; the
+`RS_METAL_` switches are for the Metal renderer.
+
+| Switch | Default | What |
 |---|---|---|
-| [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit | loading, open files | Built-in Mods…, `RS_MODS_FIXES=0`; `RS_MODS_BUDGET_MS=N`: time per frame for mounting DLC archives (default 50; 0 mounts one per frame, as the game does) |
-| CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass) | yes | Built-in Mods…, `RS_MODS_BYPASS=0` |
-| No intro screens; no game file changed | yes | Built-in Mods…, `RS_MODS_INTRO=0` |
-| DIRECT CONNECT in the INPUT setting and on the cable screen, from an overlay of your own `cache.psarc` | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
-| ENUMERATE in place of SHOP: adds new songs, with no restart. Changed and removed songs need **Refresh Game Files** | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
-| EXIT GAME in place of UPLAY | yes | Built-in Mods…, `RS_MODS_OVERLAY=0` |
-| Uplay sign-in prompt skipped | yes | none |
-| Auto Save warning skipped | yes | Built-in Mods…, `RS_MODS_AUTOSAVE=0` |
-| Offline Steam layer: `libsteam_api` with no client, cloud saves in a local folder | yes | none |
-| Song ownership: the base game, your DLC, the AppID of every archive in the copy's `dlc/`, and the Rocksmith 1 songs you own (a copy or refresh asks Steam, with your account logged in) | yes | `RS_STEAM_DLC=all`, or a list of AppIDs |
-| Title logo, from your own `static.psarc` | yes | Built-in Mods…, `RS_REARMED=0`, or delete `static.psarc.rearmed` |
-| Frame rate follows the display; a fixed rate turns vsync off | | `RS_FPS=N` |
-| Calibration and the tuner are the same at any frame rate (the game counts them in frames, which goes wrong above 60 Hz) | yes | `RS_MODS_FRAME_RATE=0` |
-| Lower guitar latency: a smaller output buffer, a real-time audio thread, stale guitar audio dropped | | `RS_AUDIO_FRAMES=N` (0 leaves the system's), `RS_LATENCY_BUFFER=N` (1-16), `RS_AUDIO_RT=0`, `RS_AUDIO_INPUT_TRIM=0`, `RS_AUDIO_LOG=1` |
-| [Guitar input](#guitar-input): channel, gain, every channel listed, calibration that can boost | yes | see there |
-| [Two players](#two-players) on any input | yes | Built-in Mods…, `RS_MODS_MULTIPLAYER=0` |
-| An interface isn't lost when another device, such as a webcam, fails to open | | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` |
-| A device whose identifier can't be read is skipped (the original crashes at the title) | not needed | always on |
-| [Renderer](#renderer) | Metal only | the `renderer` file, the installer, `RS_GL_BACKEND=gl` |
-| Retina, Metal only: on a Retina screen the game renders in points and each frame is scaled up to the screen's own pixels with MetalFX (macOS 13+; bilinear on macOS 12) | yes | `RS_METAL_UPSCALE=0` (a plain bilinear scale); `RS_METAL_RETINA=1` renders every pixel instead (about 4x the GPU work) |
-| Colours as the game made them (sRGB): the picture is colour-matched to the screen, so a wide-colour (P3) screen, such as a Mac's own, doesn't show it oversaturated | yes | `RS_METAL_COLORS=vivid` (untagged, more saturated on such a screen) |
-| Sharper textures, Metal only: the game's own mipmap bias, and 16x anisotropic filtering where the game asks for 1x to 4x | yes | `RS_METAL_ANISO=N` (1-16; 1 keeps the game's) |
-| Anti-aliasing, Metal only: 4x MSAA on the game's 3D picture (its screen-sized targets with depth) | yes | `RS_METAL_MSAA=N` (1 off, 2, 4, 8) |
-| A window of any shape ([Window modes](#window-modes)) | yes | `RS_WINDOW_ANY_SHAPE=0` keeps it at 16:9 |
-| Multithreaded GL engine, OpenGL only (off by default) | | `RS_GL_MTENGINE=1` |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed (Built-in Mods…) |
+| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit (Built-in Mods…) |
+| `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame, as the game does |
+| `RS_MODS_INTRO=0` | on | the intro screens play (Built-in Mods…) |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Built-in Mods…) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Built-in Mods…) |
+| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Built-in Mods…) |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Built-in Mods…); set for the install, no logo is made |
+| `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
+| `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
+| `RS_STEAM_DLC=all`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_ID=N` | the account whose license has the game | the Steam account the game plays as ([Game files](#game-files)) |
+| `RS_STEAM_LANGUAGE=NAME` | Steam's, else English | the game's language, as Steam names it (`german`; [Game files](#game-files)) |
+| `RS_GL_BACKEND=gl`, or `metal` | the `renderer` file | the [renderer](#renderer), whatever the file says |
+| `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
+| `RS_METAL_RETINA=1` | off | render every pixel of a Retina screen, about 4x the GPU work (otherwise the game renders in points and each frame is scaled up to the screen's pixels) |
+| `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
+| `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
+| `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
+| `RS_WINDOW_ANY_SHAPE=0` | on | a window keeps 16:9, as in the original ([Window modes](#window-modes)) |
+| `RS_FPS=N` | the display's rate | a fixed frame rate, with vsync off |
+| `RS_GL_MTENGINE=1` | off | Apple's multithreaded GL engine (OpenGL only) |
+| `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames; 0 leaves the device's ([Audio latency](#audio-latency)) |
+| `RS_LATENCY_BUFFER=N` | the game's setting | the game's `LatencyBuffer`, 1-16, which the launcher then writes ([Audio latency](#audio-latency)) |
+| `RS_AUDIO_RT=0` | on | the audio thread is not a real-time thread |
+| `RS_AUDIO_INPUT_TRIM=0` | on | stale guitar audio is not dropped |
+| `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` | on | the game's own device scan, which loses an interface when another device, such as a webcam, fails to open |
+| `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](#guitar-input) |
+| `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
+| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library |
+| `RS_NATIVE_HOME=DIR` | `~/Library/Application Support/RS Re-ARMed` | another folder for the game files, settings, saves and logs, as at the install ([6. Install](#6-install)) |
 
-Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup and survives a reinstall
-(`RS_LOAD_MODS=0` starts without them, `RS_MODS_PATH` loads another folder or one library). Include
-`tools/ws7/recomp/runtime/rc_mod.h` and one dylib serves both editions:
+Without a switch: the offline Steam layer (`libsteam_api` with no client, cloud saves in a local folder), the
+network guard, the Uplay sign-in prompt skipped, and a device whose identifier can't be read left out of the
+device scan (the original crashes at the title). Diagnostics switches: [TESTING.md](TESTING.md#diagnostics).
+
+Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup and survives a
+reinstall. Include `tools/ws7/recomp/runtime/rc_mod.h` and one dylib serves both editions:
 
 ```bash
 clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runtime -Itools/ws7/recomp/overrides \
@@ -503,10 +513,9 @@ clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runti
 ```
 
 `tools/ws7/recomp/test/hooks/probe_mod.c` is a small one; how mods hook the game:
-[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game (new in 1.14.0): ones it
-opens for reading, their size and date, and names in a folder's listing (`rc_file.h`, which `rc_mod.h` includes).
-Mods made for the original game that change its files may work as before: a modified `cache.psarc` is used as it
-is.
+[DESIGN.md](DESIGN.md#built-in-fixes-and-mods). A mod can also serve files to the game: ones it opens for
+reading, their size and date, and names in a folder's listing (`rc_file.h`, which `rc_mod.h` includes). Mods made
+for the original game that change its files may work as before: a modified `cache.psarc` is used as it is.
 
 ## Update and uninstall
 
@@ -518,18 +527,21 @@ is.
   have it). That removes the copy of the game files too, unless the game is on another drive: then
   `…/RS Re-ARMed/game` is only a link, and the copy is on that drive, in `RS Re-ARMed/game` at its top (or
   in the folder `ls -l ~/Library/Application\ Support/RS\ Re-ARMed/game` shows): delete that `RS Re-ARMed`
-  folder too (it also holds Learn & Play's `learn-play/game`, if you have it there). `static.psarc.rearmed` in
-  your Steam game folder, if an early version left one, can be deleted.
+  folder too (it also holds Learn & Play's `learn-play/game`, if you have it there). A game Steam downloaded
+  without installing it stays in Steam's download folder, as
+  [Learn & Play's](../windows/INSTALL.md#update-and-uninstall) does. `static.psarc.rearmed` in your Steam game
+  folder, if an early version left one, can be deleted.
 
 ## Known issues
 
-- The game lists 10 inputs at most. Two interfaces can fill that, as an 8-channel and a 2-channel one do, and then the built-in
-  microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which leaves room
-  ([Guitar input](#guitar-input)).
-- Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - No online features: Ubisoft services are not available.
-- Progress made in the native build is not copied back to your Steam saves.
+- Progress made in RS Re-ARMed is not copied back to your Steam saves.
 - Only the one Steam macOS build of Rocksmith 2014 is supported.
+- The game lists 10 inputs at most. Two interfaces can fill that, as an 8-channel and a 2-channel one do, and then
+  the built-in microphone isn't listed. A `Channel` in `guitar-input.ini` makes such an interface one entry, which
+  leaves room ([Guitar input](#guitar-input)).
+- Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to
+  the end.
 - With Metal, the first time a song, venue or mode is played, a few short stutters (up to about half a
   second) can show in its first half-minute while Metal compiles what it draws for the first time. Later
   plays are smooth.
@@ -550,6 +562,7 @@ connected, the game already running, macOS not letting it read the files) and th
 
 | Message | What to do |
 |---|---|
+| The installer: "Apple's command line tools are there but don't run" | You have Xcode and its license isn't accepted yet: open Xcode once and accept it. |
 | `missing .../build/shims/game/librs_game.a` | Run step 4 with `build` as the build directory. |
 | `warning: no arm64 libsteam_api.dylib` (or `libBink2Macx64.dylib`, `Cg`) | That shim was not built: run step 4. |
 | `UnicodeDecodeError` from Python's `site.py` in step 2 | The repository is on a drive such as exFAT, where macOS writes `._` files. Run `find build/venv -name '._*' -delete`, step 2 again, then the `find` once more. |

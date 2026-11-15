@@ -5,97 +5,80 @@ Retina screen or a 75 Hz 2560x1440 external display. The Mac port's: [Mac perfor
 
 ## Summary
 
-The current figures are the [measured runs](#measured-runs-for-1130) of 2026-11-10 on 1.13.0's code: a song, full screen on
-the Mac's own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods loaded.
+The current figures are the [measured runs](#measured-runs) on 1.13.0's code: a song, full screen on the Mac's
+own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods loaded.
 
 | Song | Learn & Play | |
 |---|---|---|
-| Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Toward the Mac edition](#toward-the-mac-edition)) |
+| Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Start-up and first play](#start-up-and-first-play)) |
 | CPU | 52.0-53.6% of a core, 8.66-8.93 ms a frame | game thread 32.6-33.3, Wwise 7.2-7.5, note detection 5.8-6.3 |
-| Memory footprint | 1.51-1.52 GB | 1.28-1.36 GB on 2026-11-04, on a 1x display before MSAA and upscaling, without mods |
+| Memory footprint | 1.51-1.52 GB | 1.28-1.36 GB on a 1x display without MSAA, upscaling and mods |
 
-- **Since 1.13.0** (new in 1.14.0): the note detection's spectrum loop is relaxed, one run at 50.4% of a core with that
-  thread at 4.4 points ([Where the CPU goes](#where-the-cpu-goes-in-1130)).
-- **Against the Mac edition**: 10 points of a core more, 1.7 ms a frame, and 0.29 GB more. On an earlier, lighter route
-  the difference was 1.1 ms a frame, 17% ([Toward the Mac edition](#toward-the-mac-edition)).
+- **Since those runs** the note detection's spectrum loop is relaxed: one run at 50.4% of a core with that thread at
+  4.4 points ([Where the CPU goes](#where-the-cpu-goes)).
+- **Against the Mac edition**: 10 points of a core more, 1.7 ms a frame, and 0.29 GB more
+  ([Toward the Mac edition](#toward-the-mac-edition)).
 - **Against the original Mac game under Rosetta**: about the same CPU (the original 51.0% of a core), with a better
   picture and half the audio buffer ([Mac](../mac/PERFORMANCE.md#against-rosetta)).
 - The memory order (a fence with each guest access) costs about 1 ms a frame ([Memory order](#memory-order)).
-- The title is up in about 7 s, and the shaders are prepared at install in 16.5 s ([Shader preparation](#shader-preparation)).
+- **The start**: the title is up in about 7 s, and the shaders are prepared at install in 16.5 s
+  ([Shader preparation](#shader-preparation)).
 
 ## Method
 
-- **Measured runs**: `tools/perf/run.py` ([Reproducing](#reproducing), [TESTING.md](TESTING.md#measured-runs)), from
-  2026-11-10, as the [Mac edition's](../mac/PERFORMANCE.md#method): one script for both editions with the settings,
-  profile, mods and song pinned.
-- **Earlier tables** were made by hand, each on the setup its text gives: `out/rs2014_lp` started directly in a test home
-  with the input script of [TESTING.md](TESTING.md#unattended-runs), frame times from `RS_GL_FRAMETIMES` (one event per
-  Present), CPU from `ps` and per thread from `LP_THREAD_CPU=10` (the guest's threads named by their start address),
-  memory from `footprint`, GPU from `ioreg`. They compare within a table and not with each other.
+- **Measured runs**: `tools/perf/run.py` ([Reproducing](#reproducing), [TESTING.md](TESTING.md#measured-runs)), as the
+  [Mac edition's](../mac/PERFORMANCE.md#method): one script for both editions with the settings, profile, mods and song
+  pinned.
+- **Figures from before that script** were taken by hand, each on the setup its text gives: `out/rs2014_lp` started
+  directly in a test home with the input script of [TESTING.md](TESTING.md#unattended-runs), frame times from
+  `RS_GL_FRAMETIMES` (one event per Present), CPU from `ps` and per thread from `LP_THREAD_CPU=10` (the guest's threads
+  named by their start address), memory from `footprint`, GPU from `ioreg`. They compare within their section and not
+  with the measured runs.
 - **Hot spots**: a Time Profiler trace (`tools/perf/run.py --trace`, `tools/perf/profile.py`). Not `sample`: it stops the
-  threads for about 6 ms a sample, so the frame rate falls to about 47 fps, and it shows the audio threads idle (the Wwise
-  thread at 2 of 1,093 samples when it uses 10% of a core).
-- **Noise**: about +-1 point of a core between runs of one build (69.0, 69.0, 69.5, 70.1% for one configuration).
-  Differences under 2 points are not results.
+  threads for about 6 ms a sample, so the frame rate falls to about 47 fps, and it shows the audio threads idle.
+- **Noise**: about +-1 point of a core between runs of one build. Differences under 2 points are not results.
 
-## Measured runs for 1.13.0
+## Measured runs
 
-2026-11-10, three runs of each edition in turn after a warm-up of each: the setup and the table of both are in the
-[Mac edition's](../mac/PERFORMANCE.md#measured-runs-for-1130). This edition's column:
-
-| Song | Learn & Play |
-|---|---|
-| Frame rate | 59.9-60.0 |
-| Frame interval, median / p95 / p99 | 16.66-16.67 / 17.3-17.4 / 17.7-17.8 ms |
-| Frames over 20 ms / over 50 ms | 10, 12, 13 / 0-1 |
-| CPU (% of a core) | 52.0, 52.8, 53.6 |
-| CPU per frame | 8.66-8.93 ms |
-| game thread (`w32 game`) | 32.6-33.3 |
-| Wwise thread (`w32 thread 1a823c0`) | 7.2-7.5 |
-| note detection (`w32 thread 149ab10`) | 5.8-6.3 |
-| GPU | 90% |
-| Footprint | 1.51-1.52 GB |
-
-That is 10 points of a core and 0.29 GB over the Mac edition, with the steadier frames (p99 17.7 ms against 19.4-19.7, a
-third as many over 20 ms). The original Mac game under Rosetta on the same song and screen took 51.0% of a core, with a
-plainer picture and twice the audio buffer ([what differed](../mac/PERFORMANCE.md#against-rosetta)).
+The setup and the table of both editions are in the [Mac edition's](../mac/PERFORMANCE.md#measured-runs); this
+edition's figures are in the [Summary](#summary). Its frames are the steadier: p99 17.7-17.8 ms against the Mac
+edition's 19.4-19.7, and a third as many over 20 ms (10 to 13 in a run). In `LP_THREAD_CPU`'s log the game thread is
+`w32 game`, the Wwise thread `w32 thread 1a823c0` and the note detection `w32 thread 149ab10`.
 
 With the renderer's own times in the log, one more run: all 9,001 frames went on the screen one refresh apart. The GPU's
-90% is its clock slowed to fill the refresh, not its limit, and the one frame of 0.37 s is a pipeline's first use. The
-free frame rate and the GPU's time by pass were run in the Mac edition only; Learn & Play draws through the same renderer.
+90% is its clock slowed to fill the refresh, not its limit. The free frame rate and the GPU's time by pass were run in
+the Mac edition only; Learn & Play draws through the same renderer.
 
-## Where the CPU goes in 1.13.0
+## Where the CPU goes
 
-One trace of each edition, 2026-11-10: the table and the Mac edition's side are in
-[its file](../mac/PERFORMANCE.md#where-the-cpu-goes-in-1130). This edition's:
+One trace of each edition: the table and the Mac edition's side are in
+[its file](../mac/PERFORMANCE.md#where-the-cpu-goes). This edition's:
 
-- **Note detection**, 6.0 points of a core against the Mac edition's 2.6: `0x13f3690` was 34% of the thread, 2.0 points;
-  the FFT (`0x13f23e0`, `0x13f2d50`, relaxed) 0.9; `pow` through the translated CRT (`ci_pow`, the import thunk) 0.7.
-- **Wwise**: `0x1a08300` (`expander_gain`) 22% of the thread, Vorbis' Huffman decode 8%.
+- **Note detection**, 6.0 points of a core against the Mac edition's 2.6: the spectrum loop `0x13f3690` was 34% of the
+  thread, 2.0 points; the FFT (`0x13f23e0`, `0x13f2d50`, relaxed) 0.9; `pow` through the translated CRT 0.7.
+- **Wwise**: `expander_gain` (`0x1a08300`, fenced here) 22% of the thread, Vorbis' Huffman decode 8%.
 - **The game thread**, 33.9 points: flat, 76% in translated code. The frame's vertex data is copied twice, by the game
-  through `memcpy_s` from `0x176b550` (2.8% of the thread, about a point of a core) and by `glBufferSubData` (1.2%): the
-  zero-copy buffers of [Opportunities](#opportunities-by-expected-payoff).
+  through `memcpy_s` (2.8% of the thread, about a point of a core) and by `glBufferSubData` (1.2%): the zero-copy buffers
+  of [Opportunities](#opportunities-by-expected-payoff).
 - Seven of Metal's own threads that submit the frame's command buffer take about 3.3 points between them, in both editions.
 
-**Changed since, the same day** (new in 1.14.0):
+**Changed since that trace**:
 
-- **`0x13f3690` is relaxed.** It copies its input with the CRT's `memcpy` and calls its `_CIpow`, which a relaxed function
-  could not do in this front end. An entry of `relaxed.map` marked `+calls` now may, with the function's exit fence before
-  each such call and its entry fence after it ([the recompiler](../recompiler/README.md)): 61 loads and 14 stores lost
-  their fences, 7 calls got a pair. One measured run, the same setup: the thread at 4.4 points where four runs before had
-  5.8 to 6.3, the game at 50.4% of a core where they had 52.0 to 53.9, the other threads as they were. No guitar was
-  played in it: that the game still hears the notes right is for a person to check.
+- **The spectrum loop is relaxed.** It copies its input with the CRT's `memcpy` and calls its `_CIpow`, which a relaxed
+  function could not do in this front end. An entry of `relaxed.map` marked `+calls` now may, with the function's exit
+  fence before each such call and its entry fence after it ([the recompiler](../recompiler/README.md)). One measured
+  run, the same setup: the thread at 4.4 points where four runs before had 5.8 to 6.3, the game at 50.4% of a core where
+  they had 52.0 to 53.9. Played with a guitar since, four songs in Learn a Song.
 - **The stack check is done in place.** MSVC's `/GS` ends a function that has a buffer with a call of
-  `__security_check_cookie` (`0x1adb478`): 11,054 call sites in the game and 697 in its DLLs, each a full call that
-  spilled and filled every register. The translator now emits the compare where the call was and makes the call only when
-  the cookie is wrong. In the profile the function was 0.46 points of a core on the game thread and is gone. The measured
-  runs do not show it: five runs of that build gave 49.3 to 53.1% of a core where three before gave 49.8 to 51.0, with
-  another job running on the Mac between them.
+  `__security_check_cookie`, a full call that spilled and filled every register. The translator now emits the compare
+  where the call was and makes the call only when the cookie is wrong. In the profile the function was 0.46 points of a
+  core on the game thread and is gone; the measured runs do not show a difference that small.
 
-**Tried, no gain**: eight more functions relaxed and taken out again (`0x1a08300`, `0x1a35ba0`, `0x1a35660`, `0x1a1ff00`
-and `0x1aab890` on the Wwise thread; `0xff80f0`, `0x1560ac0` and `0x1666110`, small matrix functions of the game thread).
-Two runs: 49.8 and 51.0% of a core and both threads where they were. A fence costs about half a nanosecond, so it counts
-in a loop of little else over thousands of samples, as `0x13f3690` was, and not beside x87 arithmetic for each sample.
+**Tried, no gain**: eight more functions relaxed and taken out again (`expander_gain`, `peak_limiter_follower`,
+`0x1a35ba0`, `0x1a1ff00` and `0x1aab890` on the Wwise thread; `0xff80f0`, `0x1560ac0` and `0x1666110`, small matrix
+functions of the game thread): two runs, with both threads where they were. A fence costs about half a nanosecond, so
+it counts in a loop of little else over thousands of samples, as the spectrum loop was, and not beside x87 arithmetic
+for each sample.
 
 **Not to be relaxed**, though nothing in the instructions says so: `0x106b590` and `0x106b6d0`, the write and read of the
 ring that carries the guitar's samples from the audio thread to the note detection, and `0x105f420`, the note detection's
@@ -115,8 +98,9 @@ libRSOpenGL's Metal disk cache also warms what earlier runs used at the next sta
 `~/Library/Caches/rs-rearmed/metal`: with one shared cache each edition compiled the other's shaders at every start. A
 build run from `out/` has no disk cache, as a Mac build outside an app has none.
 
-2026-11-05, the setup of the [Final pass](#final-pass-for-140), one run of each, the app started directly with a bundle
-identifier of its own ([TESTING.md](TESTING.md#shaders-of-a-run)). Frames over 33 ms and the time they took:
+The first play after an install, with and without the warm-up, against the second: the setup of the
+[Start-up and first play](#start-up-and-first-play), one run of each, the app started directly with a bundle identifier of its own
+([TESTING.md](TESTING.md#shaders-of-a-run)). Frames over 33 ms and the time they took:
 
 | | First, no warm-up | First, after the warm-up | Second |
 |---|---|---|---|
@@ -125,8 +109,8 @@ identifier of its own ([TESTING.md](TESTING.md#shaders-of-a-run)). Frames over 3
 | Play Song to the highway | 15, 8.7 s, worst 3.5 s | 10, 0.6 s, worst 0.15 s | 3, 0.2 s |
 | 150 s of the song | 4, 1.2 s, each about 0.3 s | none | none |
 | First frame | 4.4 s | 0.5 s | 0.4 s |
-| Title up | 16.5 s ([Final pass](#final-pass-for-140)) | 7.8 s | 6.9, 7.3 s ([Final pass](#final-pass-for-140)) |
-| Title takes keys | by 20.5 s (the same) | by 10.9 s | by 10.0-10.4 s (the same) |
+| Title up | 16.5 s | 7.8 s | 6.9, 7.3 s |
+| Title takes keys | by 20.5 s | by 10.9 s | by 10.0-10.4 s |
 | `lib_ms`: compiling libraries | 25,480 ms | 7.8 ms | 1.4 ms |
 | `pipe_ms`: building pipelines | 1,040 ms | 1,064 ms | 0 |
 
@@ -146,11 +130,10 @@ constant). Without it a thread would hang for good at any of the spins on memory
 stores the game publishes to other threads could reach them out of order. Of the guest loads the translator emits, 834,000
 are fenced, 563,000 are on the stack and 23,000 read constants (`RC_LDC`).
 
-What it costs at the display's rate (2026-11-06, the game's generated C compiled without `RC_MO_TSO`, the DLLs as they
-were, the route of [Toward the Mac edition](#toward-the-mac-edition), 60 s of the song, one run): 46.5% of a core and
-6.21 ms a frame against 53.8% and 7.19 ms, so about 1 ms a frame. The game thread 29.7 against 31.8, the Wwise thread 6.7
-against 8.1, the note detection 3.6 against 6.0. Frames the same. That build is only a measurement. Earlier (2026-11-04, at
-120 fps): 10 to 15 points of a core.
+What it costs at the display's rate (the game's generated C compiled without `RC_MO_TSO`, the DLLs as they were, the
+route of [Toward the Mac edition](#toward-the-mac-edition), 60 s of the song, one run): 46.5% of a core and 6.21 ms a
+frame against 53.8% and 7.19 ms, so about 1 ms a frame. The game thread 29.7 against 31.8, the Wwise thread 6.7 against
+8.1, the note detection 3.6 against 6.0. Frames the same. That build is only a measurement.
 
 Tried, no gain: `ldapr` and `stlr` instead of the fences (0.53 ns an access against 0.48 on a microbenchmark, and they
 fault on an access across 16 bytes); native `memcpy`, `memmove` and `memset` fenced once a call while `memcpy_s` stayed
@@ -159,47 +142,53 @@ translated (with it they are kept, [Toward the Mac edition](#toward-the-mac-edit
 ## What the seam cost
 
 The first build took 69% of a core in a song at 60 fps, 48% after two fixes in the Win32 / D3D9 seam, both found by
-profile (2026-11-01/02):
+profile:
 
 - **Wake only the threads waiting for an object**: every `SetEvent` woke every waiting guest thread, a fifth of a core of
   system time.
 - **Dynamic vertex buffers upload at the draw**: the game's whole-buffer locks were each uploaded whole, 2.7 GB/s of
   copying.
 
-## Final pass for 1.4.0
+## Start-up and first play
 
-2026-11-04, the apps the installer built from 1.4.0's code, on the 75 Hz display at 2560x1440, before the memory order's
-later savings and the renderer's MSAA and upscaling: the setup, the start times of both editions (the title up in 6.9 and
-7.3 s, taking keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s) and the Mac edition's first play are
-in the [Mac edition's](../mac/PERFORMANCE.md#final-pass-for-140).
-
-This edition in the song, three runs: 74.9 fps, median 13.35-13.39 ms, p99 17.5-17.7 ms, worst 24.2 ms, 62.6-63.2% of a
-core, 8.4 ms a frame, GPU 56-57%, footprint 1.28-1.36 GB (RSS 1.10-1.17 GB), where the Mac edition took 44.1-44.4% and
-0.80-0.81 GB. In the 1280x720 window (`RS_FULLSCREEN=0`, one run): 63.4% of a core, GPU 35%, so its CPU does not follow
-the size of the picture. The CPU has come down since ([Toward the Mac edition](#toward-the-mac-edition)); the first play
-without shaders prepared, measured here first, is in [Shader preparation](#shader-preparation).
+The apps the installer built from 1.4.0's code, on the 75 Hz display at 2560x1440: the setup and the table of both
+editions' starts are in the [Mac edition's](../mac/PERFORMANCE.md#start-up-and-first-play). The
+[measured runs](#measured-runs) have replaced its song figures but for the frame rate on that display: 74.9 fps,
+median 13.35-13.39 ms, p99 17.5-17.7 ms, worst 24.2 ms. This edition's start: the title up in 6.9 and 7.3 s and taking
+keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s. In the 1280x720 window (`RS_FULLSCREEN=0`, one
+run) the CPU was what it was full screen, 63.4% of a core against 62.6-63.2 then, with the GPU at 35% against 56-57: the
+CPU does not follow the size of the picture. The first play without shaders prepared is in
+[Shader preparation](#shader-preparation).
 
 ## Toward the Mac edition
 
-2026-11-06, the 75 Hz 2560x1440 display. One run each, `out/rs2014_lp` started directly in a test home, `RS_FULLSCREEN=0`,
-a warm Metal cache, no mods, the window in front, the route of [TESTING.md](TESTING.md#unattended-runs): Cherub Rock, Lead,
-a DIRECT CONNECT profile on a UR22mkII, no guitar, measured from 45 s after the tuner's skip, at nice 5. This is a heavier
-route than the [Final pass](#final-pass-for-140)'s (the bass arrangement, Disconnected): 9.4 ms a frame here against 8.4
-there for the same code. It predates the renderer's MSAA and upscaling; on today's settings the figures are the
-[measured runs](#measured-runs-for-1130)'.
+On the same song, screen and settings this edition takes 52.0-53.6% of a core where the Mac edition takes 41.7-43.1%, and
+1.5 GB where it takes 1.2 GB ([measured runs](../mac/PERFORMANCE.md#measured-runs)): 10 points of a core,
+1.7 ms a frame, and 0.29 GB. By thread: the game thread about 6 points more, the note detection 3.5 (under 2 since its
+spectrum loop was relaxed), the Wwise thread 1.5, the others about the same. Where it is, by what the profiles show
+(the shares are the earlier route's, below):
+
+- the Wwise and note detection threads. Fences take a good part: 0.5 ms a frame of these two threads went without them.
+  The note detection is x87 here and SSE on the Mac.
+- the D3D9 layer, 23% of the game thread, of which the Metal work the Mac does too is about half: the state and object
+  lookups, the device lock.
+- the memory order itself is the same on both editions, so it isn't part of the gap, but it is the largest single cost
+  left in this one.
+
+How it came down, on an earlier route (2026-11-06, the 75 Hz display, before the renderer's MSAA and upscaling). One run
+each, `out/rs2014_lp` started directly in a test home, `RS_FULLSCREEN=0`, a warm Metal cache, no mods, the window in
+front, the route of [TESTING.md](TESTING.md#unattended-runs): Cherub Rock, Lead, a DIRECT CONNECT profile on a UR22mkII,
+no guitar, measured from 45 s after the tuner's skip, at nice 5. The frames were the same in every column: 74.9 fps,
+median 13.3 ms, p99 14.4-14.6 ms, none over 20 ms.
 
 | | Before | Batch 1 | Batch 2 | Final | Without fences |
 |---|---|---|---|---|---|
 | CPU (% of a core) | 70.2 | 57.7 | 55.6 | 53.8 | 46.5 |
 | CPU per frame | 9.38 ms | 7.70 ms | 7.42 ms | 7.19 ms | 6.21 ms |
 | game thread | 44.8 | 32.7 | 32.0 | 31.8 | 29.7 |
-| Wwise thread (`1a823c0`) | 10.2 | 9.7 | 9.0 | 8.1 | 6.7 |
-| note detection (`149ab10`) | 7.9 | 7.2 | 6.3 | 6.0 | 3.6 |
-| Frame rate | 74.93 | 74.92 | 74.92 | 74.93 | 74.92 |
-| median / p99 / worst (ms) | 13.35 / 14.53 / 18.9 | 13.34 / 14.54 / 18.1 | 13.34 / 14.36 / 18.5 | 13.34 / 14.44 / 18.8 | 13.34 / 14.59 / 16.5 |
-| Frames over 20 ms | 0 | 0 | 0 | 0 | 0 |
+| Wwise thread | 10.2 | 9.7 | 9.0 | 8.1 | 6.7 |
+| note detection | 7.9 | 7.2 | 6.3 | 6.0 | 3.6 |
 | Footprint | 1.30 GB | 1.33 GB | 1.33 GB | 1.33 GB | 1.33 GB |
-| Seconds measured | 150 | 90 | 90 | 90 | 60 |
 
 - **Batch 1**: x87 runs in C locals, `-mno-outline`, the shared lookup cache, native `memcpy`, `memmove`, `memset`,
   `memcpy_s`. Nearly all on the game thread, a quarter of it. The outlined fragments, which were 15% of that thread, are
@@ -209,60 +198,39 @@ there for the same code. It predates the renderer's MSAA and upscaling; on today
   dropped by a factor of five in the profile, but the Wwise thread by 0.7 points: most of what they took now sits in
   functions they are inlined into, or wasn't fences.
 - **Final**: 6 more relaxed.
-- **Since** (2026-11-08, not measured on this route): the Mac's relaxed kernels proved here by name (`symbols.map`), with
-  the helpers they call where the Mac has them inline, so 16 more relaxed, 33 in all: the Vorbis decoder's Huffman and bit
-  reader, the stereo mixer, the FFT, the room reverb's second network, FutzBox's filters and the note detection's analysis
-  window.
-- **1.10.0, a short check** (2026-11-08, the built-in screen with upscaling and 4x MSAA, DISCONNECTED, a 1280x720 window,
-  60 s, one run each): 6.33 ms a frame and 1.54 GB, the Mac build 5.83 ms and 1.24 GB. The
-  [measured runs](#measured-runs-for-1130) have replaced it.
+- **Without fences**: only a measurement ([Memory order](#memory-order)).
+- **Since, not measured on this route**: the Mac's relaxed kernels are relaxed here by name (`symbols.map`), with the
+  helpers they call where the Mac has them inline, the Vorbis decoder's Huffman and bit reader, the stereo mixer, the
+  FFT, the room reverb's second network, FutzBox's filters and the note detection's analysis window among them: 34
+  functions in all with the spectrum loop.
 
-The binary is 122 MB, from 107: the inline lookups and `-mno-outline`.
-
-Against the Mac: the same route on the Mac build, [run later the same day](../mac/PERFORMANCE.md#learn--plays-route), is
-6.1 ms a frame, so 7.2 ms is about 1.1 ms from it, 17% more. The game thread is 4.2 ms a frame here against the Mac's 4.0,
-the Wwise and note detection threads 1.9 ms against 1.1. What is left, by what the profiles show:
-
-- the Wwise and note detection threads. Fences take a good part: 0.5 ms a frame of these two threads went without them.
-  The note detection is x87 here and SSE on the Mac.
-- the D3D9 layer, 23% of the game thread, of which the Metal work the Mac does too is about half: the state and object
-  lookups, the device lock.
-- the memory order itself is the same on both editions, so it isn't part of the gap, but it is the largest single cost
-  left in this one.
+The binary is 122 MB, from 107: the inline lookups and `-mno-outline`. The Mac edition on this route took 6.1 ms a
+frame where the final column has 7.2 ([Learn & Play's route](../mac/PERFORMANCE.md#learn--plays-route)).
 
 ## Hook points
 
-What the hook table costs the game thread with no mod loaded: nothing that shows (2026-11-04, the 75 Hz display, 120 s
-of frames from the tuner into the song, three runs of each in turn). "Without" is the same sources translated without
-`--target`, so the nine hook points that are not built-in fixes are plain functions; both have the same 1,198,690 memory
-fences.
-
-| | with hook points | without |
-|---|---|---|
-| Mean frame | 13.362, 13.359, 13.359 ms | 13.359, 13.359, 13.359 ms |
-| p99 | 14.64, 14.64, 15.40 ms | 14.60, 15.21, 14.92 ms |
-| `w32 game`, the song | 38.1% of a core (37.2-38.7) | 38.0% (37.3-38.5) |
-| Process, the song | 63.3% | 63.1% |
-
-In the unit test a point without hooks is 0.01 ns a call more than the function, with a mod's pre and post hook 36 ns; a
-song calls `ak_set_rtpc_name` 9 times a frame and `camera_set_frustum` 6.4 times. One run with the probe mod on every point
-has the same figures: mean 13.362 ms, `w32 game` 37.8%.
+The hook table costs the game thread nothing that shows with no mod loaded. Three runs in turn of the build and of the
+same sources translated without `--target`, where the nine hook points that were not built-in fixes are plain functions:
+a mean frame of 13.36 ms in both and the game thread at 38.1% of a core against 38.0%, 120 s of frames from the tuner
+into the song. One run with a probe mod on every point has the same figures. In the unit test a point without hooks is
+0.01 ns a call more than the function, and a mod's pre and post hook 36 ns; a song calls `ak_set_rtpc_name` 9 times a
+frame and `camera_set_frustum` 6.4 times.
 
 ## The build: memory and time
 
-2026-11-04, the M2 (16 GB), 8 jobs, nothing else building. Through the app, with the seed and nothing placed first:
-25 minutes in all, the build 24 of them and the game 19. The installer's build run by itself: 19.5 minutes (68 minutes of
-CPU), the game 15 of them.
+On the M2 (16 GB), 8 jobs, nothing else building. Through the app, with the seed and nothing placed first: 25 minutes in
+all, the build 24 of them and the game 19. The installer's build run by itself: 19.5 minutes (68 minutes of CPU), the
+game 15 of them.
 
 | Step | What runs | Memory |
 |---|---|---|
-| Finding the game's functions | one process, about 8 minutes then, under 3 now | 1.4 GB |
+| Finding the game's functions | one process, under 3 minutes (about 8 when the times above were taken) | 1.4 GB |
 | Translating | a worker per job | 0.37 GB each (flat after the first functions; 3 GB with 8) |
 | Compiling the generated C | a compiler per job | at most 0.8 GB each, 2.9 GB with 8 |
 
 `lp_build.py` runs one job per core, as many as fit in half the memory at 600 MB a job (`default_jobs`): 6 on an 8 GB Mac,
 every core from 10 GB up; `--jobs N` overrides it. So an 8 GB Mac should peak at about 3 GB: worked out from the numbers
-above, not run on one. Earlier the translator kept every function's decoded instructions and took 23 GB on the game.
+above, not run on one.
 
 ## Build options
 
@@ -276,15 +244,17 @@ above, not run on one. Earlier the translator kept every function's decoded inst
   `RC_RELAXED=0` at the build fences them too.
 - **`LP_NATIVE_MATH=0`** (at run time): the CRT's math runs translated. Native math saves 30% of the note detection
   thread.
+- **`LP_NATIVE_MEM=0`** (at run time): the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` run translated.
 - **`LP_QOS=0`** (at run time): the default QoS for the game's threads. User-interactive QoS on the game thread keeps the
   frames on a loaded machine: with eight busy loops 45% of a core and no frame over 33 ms, against 72% and 5 without.
 
 ## Opportunities, by expected payoff
 
-1. **The note detection and the Wwise thread**: 1.9 ms a frame against the Mac's 1.1 on
-   [one route](#toward-the-mac-edition). Relaxing more functions gave nothing
-   ([Where the CPU goes](#where-the-cpu-goes-in-1130)). What is left there: the FFT pass and bit reversal, 1.7 points of a
-   core together and relaxed already, and `pow`, which reaches the system's through the CRT's error rules at 0.5.
+1. **The note detection and the Wwise thread**: 5 points of a core over the Mac's in the measured runs, about 3.5 since
+   the spectrum loop was relaxed. Relaxing more functions gave nothing
+   ([Where the CPU goes](#where-the-cpu-goes)). What is left there, in a trace after those changes: the FFT pass
+   and bit reversal, 1.7 points of a core together and relaxed already, and `pow`, which reaches the system's through
+   the CRT's error rules at 0.5.
 2. **The D3D9 layer's bookkeeping**: `d3d9_obj_get`, `d3d9_dev_lock`, the buffer sync, about a tenth of the game thread
    besides Metal's own work. The layer has one lock and a table lookup per call, on a device only the game thread uses.
 3. **Zero-copy dynamic buffers**: back each dynamic D3D9 buffer's guest memory with the Metal buffer itself
@@ -304,16 +274,9 @@ performance cores), `ldapr`/`stlr`, relaxing more of the audio functions.
 
 ## Reproducing
 
-```sh
-tools/perf/run.py CONFIG OUT              # a warm-up and three measured runs of each edition, in turn
-tools/perf/report.py OUT [--against BASE] # the table, and the change from another set of runs
-tools/perf/run.py CONFIG OUT --trace 30   # a Time Profiler trace of each edition
-tools/perf/profile.py OUT/lp-trace/game.trace [--under NAME]
-```
-
-`CONFIG` names test installs of your own (`tools/perf/example.json`); what a run pins and checks is in
-[Mac testing](../mac/TESTING.md#measured-runs), and what differs here in [TESTING.md](TESTING.md#measured-runs). By hand,
-a run of the scripted song with frame times and the per-thread CPU log:
+The commands are the [Mac edition's](../mac/PERFORMANCE.md#reproducing), with `OUT/lp-trace/game.trace` for the profile;
+what differs in a measured run here is in [TESTING.md](TESTING.md#measured-runs). By hand, a run of the scripted song
+with frame times and the per-thread CPU log:
 
 ```sh
 LP_GAME_DIR=<game folder> LP_USER_DIR=<test user folder> RS_STEAM_DATA_DIR=<test steam folder> \

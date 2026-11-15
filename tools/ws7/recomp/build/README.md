@@ -7,10 +7,11 @@ import thunks, and checks zlib `adler32`/`crc32` against the system libz. `app/b
 with the override skip lists.
 
 Run alone: generated C in `analysis/ws7/recomp/gen` (large; may be a symlink to another disk), objects and
-`libgame_rc.a` in `analysis/ws7/recomp/obj`. Override with `RC_GEN_DIR`, `RC_OBJ_DIR`; `app/build-m4.sh` sets them to
-`gen` and `obj` in its build folder.
-Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC_TSO`, `RC_IMAGE`, `RC_PY`, `RS_NINJA`,
-`RC_SMOKE` (`0` skips the smoke test), `RC_TARGET` (default `mac-x64`).
+`libgame_rc.a` in `analysis/ws7/recomp/obj`, both ignored by git. Override with `RC_GEN_DIR`, `RC_OBJ_DIR`;
+`app/build-m4.sh` sets them to `gen` and `obj` in its build folder.
+Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC_TSO`, `RC_IMAGE`, `RC_PY`,
+`RS_NINJA`, `RC_SMOKE` (`0` skips the smoke test), `RC_TARGET` (default `mac-x64`); the script's header says what
+each is.
 
 - `optflags.sh` -- the optimisation switches every build script sources: `RC_LTO=thin` (TUs, runtime,
   thunks and overrides as bitcode; ThinLTO at the app link with `-Wl,-cache_path_lto` (`RC_LTO_CACHE`), `RC_LTO_JOBS`
@@ -32,7 +33,8 @@ Other env vars: `RC_CFLAGS` (default `-w -DRC_ABI_TRUST`), `RC_OPT` (`-O2`), `RC
   Two kinds of access stay unfenced inside them: RIP-relative loads from sections nothing writes after
   the image is loaded (`RC_LDC`), and the functions listed in `tools/targets/names/relaxed.list`, which fence only at
   entry and exit (`xlat/relaxed.py`; `RC_RELAXED=0` turns the list off when the C is generated; runtime/rc_int.h).
-- `gen_image_pe.py` -- the same for a 32-bit PE image, run by `win-x86/install/lp_build.py`
+- `gen_image_pe.py` -- the same for a 32-bit PE image, run by `win-x86/install/lp_build.py` and, by hand,
+  `win-x86/build/translate.sh` and `build_modules.sh`
   ([docs/recompiler](../../../../docs/recompiler/README.md#the-32-bit-front-end-windows)).
 - Undefined symbols at smoke link time are listed in `obj/undefined.txt` and stubbed with aborting
   functions so the test can still run.

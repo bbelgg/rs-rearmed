@@ -28,27 +28,21 @@ The output is deterministic: the same exe and seed give the same SHA-256 on ever
 
 ## Current status
 
-**It works for the depot build (SHA-256 `bb056959...`, 24.5 MB), through to playing a song.** The seed is
-about 190 KB, nearly all of it relocation sites. A run takes about half a minute on an M2. The installer
-and `learn-play.sh` use this route whenever a seed is there (`lp_install.py game-image`).
+**It works for the depot build (SHA-256 `bb056959...`, 24.5 MB), through to playing a song.** A run takes about
+half a minute on an M2. The installer and `learn-play.sh` use this route whenever a seed is there
+(`lp_install.py game-image`).
 
 The output is the game as loaded at `0xf80000`, the base the port's tables are for, with its `.data` as at
 load. `OUT.relocs` beside it holds the exact relocation sites; without them the recompiler misses
-functions reached only through a pointer. Against the image of a capture on Windows
-([harvest](../harvest/README.md)):
+functions reached only through a pointer. They come from comparing the output with a copy of the game loaded
+elsewhere (`make_seed.py --loaded`), since VMProtect's own table stays packed. For this build that copy was a
+capture.
 
-| In the game image | Against a capture's |
-|---|---|
-| `.text`, `.rdata`, `.rsrc`, the import tables | identical |
-| `.data` | identical where the unpacked image stores it; past that the capture has 3,889 non-zero bytes of runtime state, and the game runs without them |
-| the wrapper table | identical |
-| `.UBX0/1/2` | a few thousand bytes differ; VMProtect's own sections, not translated |
-| translated functions | the same but for one, leaving out the overrides (`tools/targets/names/overrides/win32.list`) |
-
-The relocation sites come from comparing the output with a copy of the game loaded elsewhere
-(`make_seed.py --loaded`); VMProtect's own table stays packed. For this build that copy was a capture.
-
-`make_seed.py` still reads a Qiling snapshot of an older build; that route never worked on the depot build.
+Against the image of a capture on Windows ([harvest](../harvest/README.md)): `.text`, `.rdata`, `.rsrc`, the
+import tables and the wrapper table are identical, and `.data` is identical where the unpacked image stores it
+(past that the capture has runtime state, which the game runs without). VMProtect's own sections (`.UBX0/1/2`)
+differ and are not translated. The translated functions are the same but for one, leaving out the overrides
+(`tools/targets/names/overrides/win32.list`).
 
 ## Making a seed: the QEMU capture
 
@@ -86,14 +80,14 @@ refuses any other exe. A new Steam build needs a fresh capture and seed.
 
 ## What ships, and what does not
 
-- **Shipped (in the release bundle, not this repo)**: `seed.bin` (~190 KB gzip) — VMProtect VM
+- **Shipped (in the release's installer, not this repo)**: `seed.bin` (~190 KB gzip) — VMProtect VM
   scratch + register state: nine pages, a delta of 285 bytes against the exe, of which one is
-  `.text`'s first decompressed byte, and the relocation sites, which are offsets only. **No
-  third-party code.** It is read with an unpickler that
-  accepts plain data only, so a tampered file cannot run code.
+  `.text`'s first decompressed byte, and the relocation sites, which are offsets only and most of its size.
+  **No third-party code.** It is read with an unpickler that accepts plain data only, so a tampered file
+  cannot run code.
 - **From the user**: their own `Rocksmith2014.exe` (depot 221683, pinned build). We ship none of it.
 
-`seed.bin` is kept out of this (public) source repo (`.gitignore` enforces this): it is a VM-state blob
+`seed.bin` is kept out of this source repo (`.gitignore` enforces this): it is a VM-state blob
 keyed to a specific commercial game build. `lp_install.py` looks for `$LP_SEED`, then for it next to this
 module; the installer app passes its own copy as `LP_SEED`. Absent, the image comes from a capture.
 
@@ -123,7 +117,7 @@ The source archive of the tag has no seed, and needs none: the app keeps it in i
 | File | Purpose |
 |---|---|
 | `lp_unpack.py` | Shippable unpacker. `unpack(exe, seed) -> bytes`, or run as a CLI. Deps: `unicorn` + `pefile`. |
-| `make_seed.py` | Build-time seed generator (developer only). `--from-gdb` for QEMU captures, plain arg for Qiling snapshots. |
+| `make_seed.py` | Build-time seed generator (developer only): `--from-gdb capture.bin` for a QEMU capture. Without the option it reads a Qiling snapshot, which exists for an older build only. |
 | `qemu_capture.py` | Captures VMProtect state from a QEMU guest through its GDB stub. Standard library only, no gdb. |
 | `qemu_vm.sh` | QEMU VM launcher: `create`, `setup`, `run` (with GDB stub). |
 | `test_lp_unpack.py` | Unit tests. Fast tests always; integration test opt-in via env vars. |

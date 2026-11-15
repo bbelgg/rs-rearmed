@@ -18,9 +18,11 @@ RS Re-ARMed builds a native arm64 Mac app from either of two games:
 Shared by both: the recompiler (`tools/ws7/recomp`, 64-bit and 32-bit PE front ends,
 [docs/recompiler](docs/recompiler/README.md)), the renderer (`shims/opengl`, libRSOpenGL with its Metal
 backend; Learn & Play's D3D9 layer draws through it), the shader corpus tools (`tools/metal`), CoreAudio
-(`shims/coreaudio`), the offline Steam behaviour, the mod loader and its ABI
-(`tools/ws7/recomp/runtime/rc_mods.c`, `rc_mod.h`), the installer app (`tools/installer`), the game-file copy
-(`tools/play-native/gamefiles.py`) and the per-game tables (`tools/targets`).
+(`shims/coreaudio`), the offline Steam behaviour (`shims/steam/src`, which Learn & Play's Steam face compiles),
+the mod loader and its ABI (`tools/ws7/recomp/runtime/rc_mods.c`, `rc_mod.h`), the built-in fixes both games do
+the same way (`tools/ws7/recomp/overrides/mods/mods_shared.c`, `framerate.c`), the installer app
+(`tools/installer`), the game-file copy (`tools/play-native/gamefiles.py`) and the per-game tables
+(`tools/targets`).
 
 The network guard is the same rule in two forms: the Mac edition loads `tools/ws8/netguard` into the game on
 every launch; Learn & Play has no host socket to guard (no `socket`, `connect` or name lookup is linked into
@@ -121,6 +123,8 @@ One release covers both editions; the steps and their scripts (`tools/release`) 
   (`python3 -m unittest discover -s win-x86/install -p 'test_*.py'`), the shim `make … test` targets,
   the D3D9 host test, and the recompiler's 32-bit difftest.
 - Shared: `python3 tools/targets/check.py`, `tools/play-native/test_gamefiles.py`, the `opengl.*` tests.
+- Either: `tools/release/check.py` runs the suites a change calls for (`tools/release/scope.py` says which,
+  `--all` runs every one). It builds, so not during a game run.
 - Tests that need game files skip when the files aren't there; say so when reporting results.
 - Before treating something as a port bug, check that the original game doesn't do the same (under
   Rosetta for Mac, on Windows for Learn & Play).

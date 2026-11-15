@@ -29,10 +29,11 @@ it better. The priorities:
   menus, every channel listed, calibration that can boost a quiet input, lower guitar latency, and multiplayer with
   each player on their own input.
 - **Quality of life.** Custom songs out of the box, with no CDLC patch. **ENUMERATE** in the main menu adds new songs
-  without a restart. No intro screens, and mods load from a `mods/` folder, such as [rearmed-mods](https://github.com/glebb/rearmed-mods), RSMods' features and more with an app to set them up.
+  without a restart. No intro screens. Mods load from a `mods/` folder:
+  [rearmed-mods](https://github.com/glebb/rearmed-mods) has RSMods' features and more, with an app to set them up.
 
-Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can be
-switched off, and the built-in mods with a checkbox in the installer (**Built-in Mods…**):
+Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can
+be switched off, the built-in mods with a checkbox in the installer (**Built-in Mods…**):
 [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
 
 ## Requirements
@@ -40,16 +41,18 @@ switched off, and the built-in mods with a checkbox in the installer (**Built-in
 - A Mac with Apple Silicon (M1 or later), macOS 12 or later.
 - **Rocksmith 2014 (Remastered)** for Mac or **Learn & Play** on your Steam account
   ([Mac](docs/mac/INSTALL.md#requirements), [Learn & Play](docs/windows/INSTALL.md#requirements)). Neither has to
-  be installed in Steam: the installer has Steam download it. No Rosetta and no Windows PC needed.
+  be installed in Steam: the installer has Steam download it, and uses a Mac game that is installed as it is. No
+  Rosetta and no Windows PC needed.
 - A Real Tone cable or another audio input.
 
 ## Install
 
 Download `RS.Re-ARMed.Installer.app.zip` from [Releases](https://github.com/bbelgg/rs-rearmed/releases), unzip it
 and open it. macOS refuses the first time, as it isn't notarized: click **Open Anyway** in **System Settings**,
-**Privacy & Security**. Choose your game and click **Build & Install**; it tells you when it needs you. The installer holds no game
-code: it builds the app on your Mac from your own copy, so never download a built app from anywhere. The first
-Learn & Play build takes about 25 minutes on an M2.
+**Privacy & Security**. Choose your game and click **Build & Install**; it tells you when it needs you. The installer
+holds no game code: it builds the app on your Mac from your own copy. A built app contains the game's code, so it
+can't be shared: never download one from anywhere. A first build takes about 15 minutes for the Mac game and about
+25 for Learn & Play, on an M2.
 
 Then start **RS Re-ARMed** or **RS Re-ARMed Learn & Play** from `~/Applications`.
 
@@ -57,23 +60,24 @@ To build by hand: [Mac](docs/mac/INSTALL.md#build-by-hand), [Learn & Play](docs/
 
 ## Mac and Windows compared
 
-The Windows (Learn & Play) port plays, but has had far less testing than the Mac port.
+Both editions play. Learn & Play has had far less testing than the Mac edition.
 
 ✅ works (tested) · ⚠️ present, not tested · ❌ not implemented
 
 | Feature | Mac | Windows (Learn & Play) |
 |---|---|---|
 | Songs, Score Attack, Guitarcade, Session Mode, Nonstop Play, lessons with video | ✅ | ✅ |
-| Rocksmith Workshop, tone designer | ⚠️ | ✅ the tone designer opens |
+| Rocksmith Workshop, tone designer | ⚠️ | ✅ the tone designer; ⚠️ the Workshop's other screens |
 | Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
-| Mods (`mods/` folder) and hook points | ✅ | ✅ one dylib serves both, with `rc_mod.h`; 19 of the 21 hook points, the overlay API and the render API |
-| Files a mod serves to the game (`rc_file.h`) | ✅ | ✅ the same interface |
+| Mods (`mods/` folder), hook points, the overlay API and the render API | ✅ all 21 hook points | ✅ the same dylib, built with `rc_mod.h`; 19 of the 21 hook points |
+| Files a mod serves to the game (`rc_file.h`) | ✅ | ✅ |
 | [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
 | Edits and mid points: a mod changes a function from the inside | ✅ | ✅ |
-| 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ✅ played with a guitar; a chart needs a Mac archive (`_m.psarc`) | ✅ played with a guitar |
+| 7-string charts (rearmed-mods' Seven-String Guitar, after [rs7string](https://github.com/SomeeName/rs7string)) | ✅ a chart needs a Mac archive (`_m.psarc`) | ✅ |
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
+| Calibration and the tuner the same at any frame rate (not released) | ⚠️ not yet played with a guitar above 60 Hz | ⚠️ the same |
 | Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
@@ -81,76 +85,76 @@ The Windows (Learn & Play) port plays, but has had far less testing than the Mac
 | ENUMERATE: new songs without a restart | ✅ | ✅ |
 | EXIT GAME in the main menu | ✅ | ✅ |
 | Lower guitar latency | ✅ | ⚠️ |
-| Your own plug-in in place of the game's tones (rearmed-mods' ToneHost add-on) | ✅ played with Helix Native | ✅ the same |
+| Your own plug-in in place of the game's tones (rearmed-mods' ToneHost add-on) | ✅ | ✅ |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |
-| Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ✅ the same renderer, run once |
-| A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; full screen not yet run on such a screen | ✅ full screen on a MacBook's screen, a window of any shape; not on Windows, where it keeps 16:9 with bars |
-| Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer, run once |
-| Frame rate follows the display | ✅ 75/120 Hz | ✅ 75 Hz |
+| Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ✅ the same renderer; the upscaled picture not checked |
+| A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; ⚠️ full screen on such a screen | ✅ a window of any shape, full screen on a MacBook's screen; ⚠️ an ultrawide screen |
+| Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer; not compared with them off |
+| Frame rate follows the display | ✅ 60 and 75 Hz; ⚠️ 120 Hz | ✅ 60 and 75 Hz; ⚠️ 120 Hz |
 | Metal renderer, shaders prepared at install | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |
 | Installer app and install script | ✅ | ✅ |
-| The game and your DLC downloaded by Steam, with nothing installed in Steam | ✅ when the game isn't installed in Steam; an installed game is used as it is | ✅ |
-| Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs-for-1130)) | ✅ the display's frame rate, about Rosetta's CPU: 10 points of a core and 0.3 GB more than the Mac port ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
+| The game and your DLC downloaded by Steam, with nothing installed in Steam | ⚠️ when the game isn't installed in Steam; ✅ an installed game is used as it is | ✅ |
+| Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs)) | ✅ the display's frame rate, about the CPU of the original under Rosetta: 10 points of a core and 0.3 GB more than the Mac edition ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 
-¹ Learn & Play reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC has both, and
-the installer has Steam fetch what your account owns; custom songs often exist for one platform only.
+¹ Learn & Play reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC has
+both, and the installer has Steam fetch what your account owns; custom songs often exist for one platform only.
 ² Tested with a virtual device named like the cable.
 
-Status in detail: [Mac](docs/mac/PLAN.md#status), [Windows](docs/windows/PLAN.md#status). If you own both games: [which to build from](docs/EDITIONS.md).
+Status in detail: [Mac](docs/mac/PLAN.md#status), [Learn & Play](docs/windows/PLAN.md#status). If you own both games:
+[which to build from](docs/EDITIONS.md).
 
 ## Known issues
 
 - No online features.
 - Progress is kept separately and isn't copied back to your Steam saves.
-- Only the one Steam macOS build of the game is supported.
+- Each edition supports one Steam build of its game.
 - With Metal, the first play of a song, venue or mode can stutter briefly in its first half-minute.
 - Mods that draw with OpenGL themselves show nothing on Metal: use the overlay API or the OpenGL renderer.
 
-More: [Mac](docs/mac/INSTALL.md#known-issues), [Learn & Play](docs/windows/INSTALL.md#known-issues). Plans, with no promise of when:
-[Mac](docs/mac/PLAN.md#next-work), [Windows](docs/windows/PLAN.md#next-work).
+More: [Mac](docs/mac/INSTALL.md#known-issues), [Learn & Play](docs/windows/INSTALL.md#known-issues). Plans, with no
+promise of when: [Mac](docs/mac/PLAN.md#next-work), [Learn & Play](docs/windows/PLAN.md#next-work).
 
 ## FAQ
 
 **Is this an emulator?**
 No. The game's x86 code is translated to C once, at build time, and compiled into an arm64 app.
 
-**Does it change my Steam install?**
-No. Your Steam folder is only read.
-
-**Do I need Steam running?**
-Only to install. The Steam client isn't used while you play.
+**Does it need Steam, or change my Steam install?**
+Steam is needed only to install, and isn't used while you play. Your installed game and your Steam saves are
+only read. The one thing the installer changes in Steam's folder: when you have Steam download the game to another
+disk, it links Steam's download folder there.
 
 **Where are my saves and logs?**
-In `~/Library/Application Support/RS Re-ARMed/`: saves in `steam/<account>/221680/remote/`, logs in `logs/`. Learn & Play's are
-in the same places under `learn-play/`.
+In `~/Library/Application Support/RS Re-ARMed/`: saves in `steam/<account>/221680/remote/`, logs in `logs/`. Learn &
+Play's are in the same places under `learn-play/`.
 
 **How do I add songs?**
-Put them in your game's `dlc` folder and press **ENUMERATE** in the main menu. After changing or removing songs, click
-**Refresh Game Files** in the installer.
+Put custom songs in the app's own `dlc` folder, `~/Library/Application Support/RS Re-ARMed/game/dlc`
+(`…/RS Re-ARMed/learn-play/game/dlc` for Learn & Play): Mac archives (`*_m.psarc`) for the Mac game, PC archives
+(`*_p.psarc`) for Learn & Play. The game has them at its next start, or at once with **ENUMERATE** in the main menu.
+For DLC bought since the install, click **Refresh Game Files** in the installer.
 
 **How do I update or uninstall?**
-To update, run the new installer; your saves are kept. To uninstall, delete the app and the folder above, after backing up
-`steam/` if you want your progress: [details](docs/mac/INSTALL.md#update-and-uninstall).
-
-**Can I get a prebuilt app?**
-No. A built app contains the game's code, so it can't be shared.
+To update, run the new installer; your saves are kept. To uninstall, delete the app and the folder above, after
+backing up `steam/` if you want your progress: [Mac](docs/mac/INSTALL.md#update-and-uninstall),
+[Learn & Play](docs/windows/INSTALL.md#update-and-uninstall).
 
 **How do I get the lowest guitar delay?**
-Set the game's audio engine setting to 1 and restart it (2 if the sound crackles), and listen through headphones or a USB
-interface, not the built-in speakers: [details](docs/mac/INSTALL.md#audio-latency).
+Set the game's audio engine setting to 1 and restart it (2 if the sound crackles), and listen through headphones or
+a USB interface, not the built-in speakers: [details](docs/mac/INSTALL.md#audio-latency).
 
 **My interface has several inputs, or the guitar is too quiet.**
-Set INPUT to DIRECT CONNECT in Path/Input and open Available Inputs. Play, pick the channel whose bar moves, then run the
-game's calibration: [details](docs/mac/INSTALL.md#guitar-input).
+Set INPUT to DIRECT CONNECT in Path/Input and open Available Inputs. Play, pick the channel whose bar moves, then run
+the game's calibration: [details](docs/mac/INSTALL.md#guitar-input).
 
 **Where do I report bugs?**
-In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check that the original game doesn't do the same (under
-Rosetta, or on Windows for Learn & Play).
+In [GitHub Issues](https://github.com/bbelgg/rs-rearmed/issues). First check that the original game doesn't do the
+same (under Rosetta, or on Windows for Learn & Play).
 
 ## Documentation
 
-| | Mac port | Windows port (Learn & Play) |
+| | Mac edition | Learn & Play |
 |---|---|---|
 | Index | [docs/mac](docs/mac/README.md) | [docs/windows](docs/windows/README.md) |
 | Install, build, play | [INSTALL.md](docs/mac/INSTALL.md) | [INSTALL.md](docs/windows/INSTALL.md) |
@@ -160,8 +164,9 @@ Rosetta, or on Windows for Learn & Play).
 | Status and plan | [PLAN.md](docs/mac/PLAN.md) | [PLAN.md](docs/windows/PLAN.md) |
 | Testing | [TESTING.md](docs/mac/TESTING.md) | [TESTING.md](docs/windows/TESTING.md) |
 
-The recompiler both use: [docs/recompiler](docs/recompiler/README.md). How the two games differ: [EDITIONS.md](docs/EDITIONS.md).
-How such a port is made, step by step: [FROM-SCRATCH.md](docs/FROM-SCRATCH.md).
+The recompiler both use: [docs/recompiler](docs/recompiler/README.md). How the two games differ:
+[EDITIONS.md](docs/EDITIONS.md). How such a port is made, step by step: [FROM-SCRATCH.md](docs/FROM-SCRATCH.md).
+Making a release: [docs/release](docs/release/README.md). Contributing: [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Credits
 

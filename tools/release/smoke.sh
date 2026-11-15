@@ -11,8 +11,8 @@
 #                       user folder holds a profile that goes straight from the title to the main menu
 #   RS_SMOKE_LP_SCRIPT  another LP_INPUT_SCRIPT than the documented one (optional)
 #   RS_SMOKE_HOLD       seconds to stay on the highway before the look (default 30)
-# The Mac edition has no input script of its own: its unattended routes use an injector that is not in this
-# repository (docs/mac/TESTING.md, Game runs). So:
+# The Mac edition has no input script of its own: its route is played from outside, by tools/perf/run.py with
+# --route-only on a test install (docs/mac/TESTING.md, Measured runs), or by a rig of your own. So:
 #   RS_SMOKE_MAC_CMD    a command that runs the route and exits 0 when the game reached the highway. It gets
 #                       RS_SMOKE_OUT, the folder for its log and snapshots.
 set -euo pipefail
@@ -22,7 +22,7 @@ edition=${1:-}
 out="$rel_out/smoke-${edition#--}"
 case $edition in
 --mac)
-    [[ -n ${RS_SMOKE_MAC_CMD:-} ]] || rel_die "RS_SMOKE_MAC_CMD is not set: the Mac route is not in the repository (see the top of this file)"
+    [[ -n ${RS_SMOKE_MAC_CMD:-} ]] || rel_die "RS_SMOKE_MAC_CMD is not set: the Mac route is a command of yours (see the top of this file)"
     rel_no_game_run
     rm -rf "$out"; mkdir -p "$out"
     if RS_SMOKE_OUT=$out /bin/bash -c "$RS_SMOKE_MAC_CMD" > "$out/route.log" 2>&1; then

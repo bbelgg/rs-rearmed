@@ -13,17 +13,13 @@ make check    # exports vs. the game's imports, both slices
 make test     # vtable-slot check, ABI tests (arm64, and x86_64 under Rosetta), Enumerate, mode auto
 ```
 
+The native app bundles the arm64 slice (`tools/ws7/recomp/app/build.sh`), and the launcher
+(`tools/play-native/launch.sh`) always runs it in stub mode. Learn & Play compiles the same sources into its
+32-bit Steam face: [win-x86/shims/steam](../../win-x86/shims/steam/README.md).
+
 ## Backends
 
-- **real**: forwards to Valve's library, which talks to the Steam client. The Steam client ships a
-  universal `libsteam_api.dylib` inside
-  `Steam.AppBundle/.../Frameworks/Steam Helper.app/Contents/MacOS/`, and the shim
-  finds it. That library is from a modern SDK and **no longer exports `SteamAPI_Init`**, so it can't
-  be dropped in directly: the shim maps `SteamAPI_Init` onto
-  `SteamAPI_InitSafe`, or onto `SteamInternal_SteamAPI_Init` if `InitSafe` is
-  missing. The old interface version strings (`SteamUser020`, ...) are passed
-  through unchanged, and the Steam client still serves them.
-- **stub**: works fully offline:
+- **stub**: works fully offline, and is what an installed game runs:
   - Mock `ISteamClient/User/Friends/Utils/Apps/UserStats/RemoteStorage`
     objects. Every other interface (including `ISteamHTTP`) gets a
     160-slot object that returns 0 from every slot, so the game never gets a
@@ -38,7 +34,7 @@ make test     # vtable-slot check, ABI tests (arm64, and x86_64 under Rosetta), 
     (`*_PRFLDB` profiles, `LocalProfiles.json`). The real Steam folder
     is never written. `crd`, the game's stored Uplay credentials, is left out
     (and removed from an existing copy) unless `RS_STEAM_KEEP_CREDENTIALS=1`:
-    with it the game signs in to Ubisoft by itself.
+    with it the game signs in to Ubisoft by itself, so no install sets it.
   - The identity (SteamID, persona) comes from `config/loginusers.vdf`, and
     the language from the game's appmanifest.
   - Owned: the base app (221680), the DLC that Steam installed, read from
@@ -49,32 +45,42 @@ make test     # vtable-slot check, ABI tests (arm64, and x86_64 under Rosetta), 
     game folder is a folder of symlinks, the appmanifest is found next to
     the real install through its `steam_appid.txt` or `static.psarc` link,
     in whichever Steam library that is (e.g. one on an external drive).
-    `RS_STEAM_DLC` / `dlc`: `installed` (default), `all`
-    (opt-in: every app id is owned, so every archive shows up whatever its
-    AppID, and `BIsSubscribedApp` says yes for every app too: the songs
-    `RS_STEAM_OWNED` gates all show), `none`, or a comma-separated list of app ids (only those). The
-    install passes such a list (`game/.rearmed/steam.env`, written by
-    `tools/play-native/gamefiles.py`): the installed DLC, 248750 and every
-    AppID the copy's `dlc/` archives carry, so custom songs show up whatever
-    AppID they carry.
-    `RS_STEAM_OWNED` / `owned`: a comma-separated list of apps the account
-    owns outside this game's DLC, reported by `BIsSubscribedApp` only (not
-    `BIsDlcInstalled`, not `GetDLCCount`). The install fills it with the first
-    Rocksmith's DLC the account owns, which the game asks about for each song
-    of the RS1 compatibility pack ([DESIGN.md](../../docs/mac/DESIGN.md#steam)).
+  - The Enumerate entry of the main menu (`src/enumerate.h`): the game's `IsOverlayEnabled`
+    question counts as the press, new archives are copied into the install's `dlc/`, and a
+    `DlcInstalled_t` for 248750 makes the game scan them
+    ([DESIGN.md](../../docs/mac/DESIGN.md#built-in-fixes-and-mods)).
+- **real**: forwards to Valve's library, which talks to the Steam client. The Steam client ships a
+  universal `libsteam_api.dylib` inside
+  `Steam.AppBundle/.../Frameworks/Steam Helper.app/Contents/MacOS/`, and the shim
+  finds it. That library is from a modern SDK and **no longer exports `SteamAPI_Init`**, so it can't
+  be dropped in directly: the shim maps `SteamAPI_Init` onto
+  `SteamAPI_InitSafe`, or onto `SteamInternal_SteamAPI_Init` if `InitSafe` is
+  missing. The old interface version strings (`SteamUser020`, ...) are passed
+  through unchanged, and the Steam client still serves them.
+- **auto** (the default without a setting): real when Valve's library loads and
+  `SteamAPI_Init` succeeds through it, and stub otherwise; listeners the game
+  registered before a failed `SteamAPI_Init` are the stub's from then on.
 
-The stub also answers the Enumerate entry of the main menu (`src/enumerate.h`, shared with Learn & Play): the game's
-`IsOverlayEnabled` question counts as the press, new archives are copied into the install's `dlc/`, and a
-`DlcInstalled_t` for 248750 makes the game scan them ([DESIGN.md](../../docs/mac/DESIGN.md#built-in-fixes-and-mods)).
+## Settings
 
-`auto` (the default) uses real when Valve's library loads and
-`SteamAPI_Init` succeeds through it, and stub otherwise; listeners the game
-registered before a failed `SteamAPI_Init` are the stub's from then on. Settings go in
-`steam_shim.ini` (in `.rearmed/` next to the app bundle, or inside the bundle
-next to `libsteam_api.dylib`), or in `RS_STEAM_*` environment variables (see
-[steam_shim.ini.example](steam_shim.ini.example)).
+Each setting is an `RS_STEAM_*` environment variable or a key of `steam_shim.ini`
+([steam_shim.ini.example](steam_shim.ini.example) lists them); the variable wins. The file is looked for in two
+places (`load_config` in `src/shim.cpp`): `.rearmed/steam_shim.ini` in the folder that holds the app bundle,
+then `steam_shim.ini` beside the library. For an installed Mac game the first is the copy of the game files,
+`…/RS Re-ARMed/game/.rearmed/`, which a reinstall keeps.
 
-The native app bundles the arm64 slice (`tools/ws7/recomp/app/build.sh`); the launcher
-(`tools/play-native`) runs it in stub mode.
+An install needs no file. The launcher passes `RS_STEAM_MODE=stub` and `RS_STEAM_DATA_DIR` (`…/RS Re-ARMed/steam`),
+and from `game/.rearmed/steam.env`, which `tools/play-native/gamefiles.py` writes with the copy, these four,
+each unless it is set already (`launchctl setenv`):
 
-The 32-bit counterpart for the Windows port, built on the same code: [win-x86/shims/steam](../../win-x86/shims/steam/README.md).
+- `RS_STEAM_DLC` / `dlc`: `installed` (the default: the appmanifest's DLC and 248750), `all` (every app id is
+  owned, so every archive shows up whatever its AppID, and `BIsSubscribedApp` says yes for every app too: the
+  songs `RS_STEAM_OWNED` gates all show), `none`, or a comma-separated list of app ids (only those). The install
+  passes such a list: the installed DLC, 248750 and every AppID the copy's `dlc/` archives carry, so custom
+  songs show up whatever AppID they carry.
+- `RS_STEAM_OWNED` / `owned`: a comma-separated list of apps the account owns outside this game's DLC, reported
+  by `BIsSubscribedApp` only (not `BIsDlcInstalled`, not `GetDLCCount`). The install fills it with the first
+  Rocksmith's DLC the account owns, which the game asks about for each song of the RS1 compatibility pack
+  ([DESIGN.md](../../docs/mac/DESIGN.md#steam)).
+- `RS_STEAM_LANGUAGE` / `language`, and `RS_STEAM_ID` / `steam_id`: the account whose license has the game,
+  whichever is logged in to Steam later.

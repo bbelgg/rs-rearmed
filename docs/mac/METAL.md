@@ -50,8 +50,9 @@ together with every user. How to choose the renderer as a user: [INSTALL.md](INS
 - Wrappers cost a flag test and a tail call; counting (`rs_gl_stats`) only with `RS_GL_LOG`,
   `RS_GL_CHECK`, `RS_GL_TRACE_DIR` or `RS_GL_STATS` set. `rs_gl_current_program()` answers the program
   `glUseProgram` last bound without a GL query; the Cg shim uses it to re-take GL after Scaleform's
-  `glUseProgram(0)`. The Cg shim also records the program pairs the game linked (`cg-pairs.txt` in `~/Library/Caches/rs-rearmed`, `RS_CG_PAIR_CACHE`) and links
-  them at load on later runs, so no link (and on Metal no compile) lands in the middle of a song.
+  `glUseProgram(0)`. The Cg shim also records the program pairs the game linked (`cg-pairs.txt` in
+  `~/Library/Caches/rs-rearmed`, `RS_CG_PAIR_CACHE`) and links them at load on later runs, so no link (and on
+  Metal no compile) lands in the middle of a song.
 - `CGL*` (game imports `CGLLockContext`/`CGLUnlockContext`) and `NSOpenGLContext` are only used on GL. On
   Metal the shell uses `rs_gfx_*` and `CGLLockContext` takes the context's mutex.
 
@@ -68,8 +69,8 @@ differs from what `libRSOpenGL` loaded with it `execv`s its own executable with 
    presentation (`rsp_mtl_usable`; `RS_RENDERER_TEST_NO_METAL=1` simulates it) -> OpenGL, this start only.
 3. Crash count: the last two Metal sessions ended without a clean exit -> OpenGL; the setting becomes
    `opengl` (so the next starts need no count), the marker goes, `renderer-fallback.txt` explains it and
-   a notification says so (`RS_RENDERER_NOTIFY=0` turns it off). Writing `metal` into the setting tries Metal again with a fresh count; `install.sh`
-   also resets the count (a new build).
+   a notification says so (`RS_RENDERER_NOTIFY=0` turns it off). Writing `metal` into the setting tries Metal
+   again with a fresh count; `install.sh` also resets the count (a new build).
 4. `<home>/renderer`: `metal` or `opengl` (`install.sh`'s `RS_RENDERER`, the installer's Renderer
    popup). The launcher passes `opengl` on as `RS_GL_BACKEND=gl` (no restart) and `metal` not at all (so
    the crash fallback still applies), plus `RS_NATIVE_HOME`.
@@ -178,14 +179,12 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
     samplers at the sampler's texture unit.
 - **Errors and queries**: `glGet*` answered from tracked state; `glGetError` returns the first recorded
   error. `RS_GL_CHECK` works the same on both backends.
-- **Diagnostics** (off unless set, [the switches](TESTING.md#diagnostics)). The texture log (`mtl_texlog.m`)
-  hashes level 0 at upload (in Learn & Play a `glTexSubImage2D` of the whole level, as its D3D9 layer defines the
-  level empty first) and records what each draw binds: it is how to find a texture a mod should act on, and
-  `RS_GL_TEX_MARK` makes a [render API](#render-api-shimsincluders_renderh) rule that draws one in magenta. With
-  `RS_GL_FRAMETIMES` the frame log gets what only Metal knows: when a drawable went on the screen and each
-  command buffer's time on the GPU. `RS_METAL_PASS_TIMES=FILE` samples the GPU's timestamp around each render
-  pass of every eighth frame and writes the sums by the pass' place in the frame, with the present and the
-  upscaler.
+- **Diagnostics** (off unless set, [the switches](TESTING.md#diagnostics)). The texture log (`mtl_texlog.m`,
+  `RS_GL_TEX_LOG`) hashes level 0 at upload (in Learn & Play a `glTexSubImage2D` of the whole level, as its D3D9
+  layer defines the level empty first) and records what each draw binds: it is how to find a texture a mod
+  should act on, and `RS_GL_TEX_MARK` makes a [render API](#render-api-shimsincluders_renderh) rule that draws
+  one in magenta. The frame log (`RS_GL_FRAMETIMES`) gets what only Metal knows, when a drawable went on the
+  screen and each command buffer's time on the GPU, and `RS_METAL_PASS_TIMES` the GPU's time by render pass.
 - **Built-in attributes**: GLSL `gl_Vertex`, `gl_Normal`, `gl_Color`, `gl_MultiTexCoordN` use NVIDIA's
   aliasing (0, 2, 3, 8+N), so `glVertexAttribPointer` indices drive them.
 
@@ -210,8 +209,8 @@ compiles what it lacks. `RS_METAL_CORPUS_WARM=0|1` turns it off or forces it.
 `tools/play-native/warm-shaders.sh`; the loop is `rs_gfx_warm_only` in libRSOpenGL, which Learn & Play runs
 too): the installed app's executable, before it loads anything of the game, makes an offscreen context and runs
 `rs_gfx_prepare` with the same corpus rule, printing `progress F Preparing shaders… N of M`
-(`RS_METAL_WARM_MAX_SECONDS`, default 3600); exit 0 ready, 1 timed out, 2 no Metal. On an M2, cold: 3880
-libraries in 270 s; again 0.2 s.
+(`RS_METAL_WARM_MAX_SECONDS`, default 3600); exit 0 ready, 1 timed out, 2 no Metal. The Mac game's 3880
+libraries take 4.5 to 6.5 minutes the first time on an M2, and a second or so when they are compiled already.
 
 It has to be the installed app at its resolved path: Metal's system shader cache is keyed by the bundle
 identifier and, as measured on macOS 26, the length of the bundle's path. So a separate tool can't do it, the
@@ -271,22 +270,22 @@ palette textures, so this is enough for those. What it can't do: tell two object
 
 ## Status
 
-The default since 1.3.0, and the only renderer Learn & Play shows in a window. GL and Metal match in frame
-diffs; the fallback was checked with two forced kills in a row. CPU and frame times:
+The default in the Mac edition, and the only renderer Learn & Play has. GL and Metal match in frame diffs; the
+fallback was checked with two forced kills in a row. CPU and frame times:
 [PERFORMANCE.md](PERFORMANCE.md#renderer).
 
 Not checked: a second Mac or GPU, sleep and wake, unplugging a display, the Retina mouse in songs.
 
 ## Open points
 
-- The first play of a song after an install has a few 0.3-0.8 s stalls in its first half-minute:
-  pipelines are compiled on first use (the corpus warms libraries, not pipelines, which need draw state).
-  The second play has none.
-- Mods that draw with OpenGL themselves show nothing on Metal; they need the overlay API.
+What a player can meet is in the plan's [open issues](PLAN.md#open-issues): the first play of a song after an
+install has a few 0.3-0.8 s stalls in its first half-minute, as pipelines are compiled on first use (the corpus
+warms libraries, not pipelines, which need draw state), and mods that draw with OpenGL themselves show nothing
+on Metal. The Metal core's own limits:
+
 - `RS_GL_CHECK` keeps one pending error per thread, not per context.
-- `GL_TEXTURE_BASE_LEVEL` is ignored on Metal.
-- Shared CGL contexts are not supported on Metal (the game uses one context).
-- Cube maps always filter across faces in Metal; legacy GL does not unless `GL_TEXTURE_CUBE_MAP_SEAMLESS`.
+- `GL_TEXTURE_BASE_LEVEL` is ignored.
+- Shared CGL contexts are not supported (the game uses one context).
+- Cube maps always filter across faces; legacy GL does not unless `GL_TEXTURE_CUBE_MAP_SEAMLESS`.
 - Only the first Metal device gets a disk cache.
-- A shader the game would build at run time from sources the corpus does not know is translated when first
-  used (none seen in game runs).
+- A shader the corpus does not know is translated when first used ([Shader translation](#shader-translation)).

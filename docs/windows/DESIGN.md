@@ -1,11 +1,11 @@
 # How the Windows port works
 
-The Windows port takes the 32-bit Windows build of Rocksmith 2014 that the Learn & Play edition grants
-(Steam depot 221683) and makes a native arm64 Mac app of it. The game's code and the Microsoft DLLs it
+The Windows port takes the 32-bit Windows build of Rocksmith 2014 that the Learn & Play edition grants (Steam depot
+221683) and makes a native arm64 Mac app of it, RS Re-ARMed Learn & Play. The game's code and the Microsoft DLLs it
 loads are translated to C at build time by the shared recompiler's 32-bit front end
-([recompiler](../recompiler/README.md#the-32-bit-front-end-windows)); a Win32 seam on macOS stands in for
-Windows underneath. It reuses the Mac port's renderer, Steam layer and audio policy. User side:
-[INSTALL.md](INSTALL.md). Status: [PLAN.md](PLAN.md).
+([recompiler](../recompiler/README.md#the-32-bit-front-end-windows)); a Win32 seam on macOS stands in for Windows
+underneath. It reuses the Mac edition's renderer, Steam layer and audio policy. User side: [INSTALL.md](INSTALL.md).
+Status: [PLAN.md](PLAN.md).
 
 ## Overview
 
@@ -21,7 +21,7 @@ libgame_rc.a                                                     v
    rs2014_lp in ~/Applications/RS Re-ARMed Learn & Play.app (with libRSOpenGL, the game and DLL images)
 ```
 
-| | Mac port | Windows port |
+| | Mac edition | Learn & Play |
 |---|---|---|
 | Game binary | x86-64 Mach-O, SysV | 32-bit x86 PE, MSVC conventions |
 | Protection | Steam DRM, a repeating XOR | VMProtect, decrypts in memory only |
@@ -31,8 +31,8 @@ libgame_rc.a                                                     v
 | Shell | `shims/platform` (Cocoa) | `win-x86/app/lp_window.m` under a Win32 seam |
 | Libraries | native replacements (overrides) | Microsoft's DLLs, translated |
 
-Gameplay is the same C++ source compiled twice, so once translated it behaves the same. The Windows build
-looks like the PC game, drawn through the same Metal renderer.
+Gameplay is the same C++ source compiled twice, so once translated it behaves the same. Learn & Play looks like the PC
+game, drawn through the same Metal renderer.
 
 ## Getting the game image
 
@@ -82,13 +82,12 @@ the stack check: [recompiler](../recompiler/README.md#the-32-bit-front-end-windo
 
 `tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,063 of the 1,263 symbols read, an
 `unsupported` line with the reason for the rest: inlined, folded or specialised by LTCG, or no counterpart),
-`offsets.map`, `edits.map`, `mids.map` and `relaxed.map`, and in its `target.toml` the pins (the depot,
-manifest, exe and DLL hashes, build figures). The build uses them for the hook points, what a mod asks for by
-name, and the built-in fixes: `win32_overrides.c` is compiled against the generated `rc_target_names.h` and names
-every function, global and field of the game it touches (`RC_FN`, `RC_WFN`, `RC_NFN`, `RC_ADDR`, `RC_OFF`,
-`RC_SLOT` of `runtime/rc_abi.h`), as the Mac's overrides do. The other addresses the build needs are in
-`win-x86/imports/*.tsv` (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with
-their Mac counterparts). The Mac overrides are not built here.
+`offsets.map`, `edits.map`, `mids.map` and `relaxed.map`, and in its `target.toml` the pins (the depot, manifest, exe
+and DLL hashes, build figures). The build uses them for the hook points, what a mod asks for by name, and the built-in
+fixes, which name every function, global and field of the game they touch, as the Mac edition's overrides do
+([tools/targets/README.md](../../tools/targets/README.md)). The other addresses the build needs are in
+`win-x86/imports/*.tsv` (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with their
+Mac counterparts). The Mac edition's overrides are not built here.
 
 ## Runtime
 
@@ -152,11 +151,11 @@ Changing it in the game resets the device and restyles the window at once (`lp_w
 The Metal layer's drawable is always the back buffer, shown aspect-fit in the window; the pointer goes back
 through the same fit. The rules are plain C in `win-x86/app/lp_screen.c`.
 
-**Any shape.** The game draws at its back buffer's shape, as the Mac game does (`RS_WINDOW_ANY_SHAPE`, on unless
-`0`, the Mac's switch). The original draws 16:9 whatever its resolution: its camera setup and its
-`GRDisplayRatioAdjuster`, which squeezes the picture into a 16:9 band with bars, both go by one 16/9 constant.
-Nothing else reads it, so `lp_game_shape` (`win-x86/shims/win32_overrides.c`) sets it to the back buffer's
-width / height at each `CreateDevice` and `Reset`, on the game's thread before its next frame.
+**Any shape.** The game draws at its back buffer's shape, as the Mac game does (`RS_WINDOW_ANY_SHAPE`, on unless `0`,
+the Mac edition's switch). The original draws 16:9 whatever its resolution: its camera setup and its
+`GRDisplayRatioAdjuster`, which squeezes the picture into a 16:9 band with bars, both go by one 16/9 constant. Nothing
+else reads it, so `lp_game_shape` (`win-x86/shims/win32_overrides.c`) sets it to the back buffer's width / height at
+each `CreateDevice` and `Reset`, on the game's thread before its next frame.
 
 **Resizing.** A window the user resizes, or takes in or out of macOS full screen, becomes the game's resolution,
 as on the Mac. The game has no path for that (its window procedure takes no `WM_SIZE`), so `lp_window.m` asks
@@ -174,11 +173,10 @@ gives the D3D9 layer the display's period, and Present keeps to it (`d3d9_hidden
 
 ### Direct3D 9
 
-The game renders with Gamebryo's `NiDX9Renderer` and Scaleform's D3D9 HAL. `win-x86/shims/d3d9` implements
-the `IDirect3DDevice9` subset they use on the same `gl*` entry points the Mac game calls, so the Metal
-core and its caches are shared with the Mac port
-([Mac renderer](../mac/METAL.md)). Only Metal presents to the window: `rs_gfx_create_layer` has no
-OpenGL path, so `RS_GL_BACKEND=gl` runs offscreen (the D3D9 tests use it on both backends).
+The game renders with Gamebryo's `NiDX9Renderer` and Scaleform's D3D9 HAL. `win-x86/shims/d3d9` implements the
+`IDirect3DDevice9` subset they use on the same `gl*` entry points the Mac game calls, so the Metal core and its caches
+are shared with the Mac edition ([Mac renderer](../mac/METAL.md)). Only Metal presents to the window:
+`rs_gfx_create_layer` has no OpenGL path, so `RS_GL_BACKEND=gl` runs offscreen (the D3D9 tests use it on both backends).
 
 - **States and draws**: vertex declarations and FVFs, render and sampler states, state blocks,
   `DrawPrimitive`/`DrawIndexedPrimitive` (and the `UP` forms), `Lock`/`Unlock`, render targets, `Clear`,
@@ -261,7 +259,7 @@ between it and the guest in `wa_engine.c`. Every CoreAudio device is a render an
 inputs first, with stable ids. In exclusive event mode the ring holds two periods and the device's I/O
 thread signals the guest's event; it takes any format the HAL unit can convert.
 
-The policy is the Mac port's, from the same code (`shims/coreaudio/rs_audio_host.c`, `rs_audio_input.c`; the
+The policy is the Mac edition's, from the same code (`shims/coreaudio/rs_audio_host.c`, `rs_audio_input.c`; the
 [Mac design](../mac/DESIGN.md#audio) says why):
 
 - **Output.** The device's I/O buffer is `RS_AUDIO_FRAMES` (default 256), at most 128 on a device with inputs;
@@ -270,7 +268,7 @@ The policy is the Mac port's, from the same code (`shims/coreaudio/rs_audio_host
   (`RS_AUDIO_SET_RATE`). A change of the system's default output reaches the game's `IMMNotificationClient`s
   (`wa_com.c`), and Wwise makes a new sink on the new default, which the Mac edition's override does by hand.
 - **Input buffers.** Stale input is trimmed (`RS_AUDIO_INPUT_TRIM`). The capture stream takes any buffer size
-  (`input_cb`), so it needs no collection like the Mac's `audio_chan.c`.
+  (`input_cb`), so it needs no collection like the Mac edition's `audio_chan.c`.
 - **The guitar input's channel and gain**: the capture stream reads the device's channels and gives the game the
   one `guitar-input.ini` sets, with the gain and a clip at full scale ([INSTALL.md](INSTALL.md#guitar-input)).
   The stream is ours, so it needs no hook point (`si_io` is `unsupported`).
@@ -296,63 +294,59 @@ point on this game. Nothing here changes for it ([Audio](#audio)).
 
 ## Video (Bink)
 
-The game plays Bink 2 videos (`video.psarc`: first-run tutorials and credits; `etudes.psarc`: the lesson
-videos). `bink2w32.dll` from the game folder is rebased to `0x12000000` and translated as a fifth module, where
-the Mac port replaces Bink with FFmpeg. The game reads the files through its own file system
-(`BINKIOPROCESSOR`) and copies each frame into a D3D9 texture it locks. The sound track is decoded by
-`BinkGetTrackData` into the player's buffer and fed to Wwise as an audio-input source, so it reaches the
-speakers through the game's own output, with nothing Bink-specific in the audio layer.
+The game plays Bink 2 videos (`video.psarc`: first-run tutorials and credits; `etudes.psarc`: the lesson videos).
+`bink2w32.dll` from the game folder is rebased to `0x12000000` and translated as a fifth module, where the Mac edition
+replaces Bink with FFmpeg. The game reads the files through its own file system (`BINKIOPROCESSOR`) and copies each
+frame into a D3D9 texture it locks. The sound track is decoded by `BinkGetTrackData` into the player's buffer and fed to
+Wwise as an audio-input source, so it reaches the speakers through the game's own output, with nothing Bink-specific in
+the audio layer.
 
 ## Steam
 
-`win-x86/shims/steam` is an offline `steam_api.dll` face: the flat API of the 2019 SDK, interfaces as guest
-objects with MSVC `thiscall` vtables (slot and argument sizes generated from the game's DLL,
-`steam32_slots.h`), and the behaviour of the Mac stub from the same code (`shims/steam/src/interfaces.cpp`):
-the identity from `loginusers.vdf`, the installed DLC and 248750 as owned, Steam Cloud in
-`<data_dir>/<account>/221680/remote` seeded on the first start from the real Steam folder for app 221680
-(which the Mac and Windows games share) without `crd`, local stats. It never loads Valve's library. The
-game does not use Uplay's loader; `steam32_dll_blocked()` names the Ubisoft and Valve libraries a
-`LoadLibrary` must refuse. See [win-x86/shims/steam/README.md](../../win-x86/shims/steam/README.md).
+`win-x86/shims/steam` is an offline `steam_api.dll` face: the flat API of the 2019 SDK, interfaces as guest objects with
+MSVC `thiscall` vtables (slot and argument sizes generated from the game's DLL, `steam32_slots.h`), and the behaviour of
+the Mac edition's stub from the same code (`shims/steam/src/interfaces.cpp`; [Mac design](../mac/DESIGN.md#steam)). Its
+Steam Cloud folder is seeded on the first start from the real Steam folder for app 221680, which the Mac and Windows
+games share, without `crd`. It never loads Valve's library. The game does not use Uplay's loader;
+`steam32_dll_blocked()` names the Ubisoft and Valve libraries a `LoadLibrary` must refuse. See
+[win-x86/shims/steam/README.md](../../win-x86/shims/steam/README.md).
 
-The game mounts a `dlc/` archive only when the AppID in its `appid.appid` is a DLC the face lists
-(`GetDLCCount` / `BGetDLCDataByIndex`) and answers `BIsDlcInstalled` for; an official song re-packed with an
-AppID the account does not own disappears from the list. As on the Mac ([DESIGN.md](../mac/DESIGN.md#steam)),
-the install's `gamefiles.py` adds the AppID of every archive in the copy's `dlc/` to `RS_STEAM_DLC` in
-`game/.rearmed/steam.env` at each copy and refresh, so songs show whatever AppID they carry and official
-DLC is reported as before. No game code is changed for it.
-
-The songs of `rs1compatibilitydlc` need the first Rocksmith's DLC as well, the same way as on the Mac
-([DESIGN.md](../mac/DESIGN.md#steam)): `dlc_update_tail` asks `BIsSubscribedApp` for the AppIDs in the
-game folder's `metadata` file. The same `rs1_owned` asks the Steam client at a copy or refresh when the edition's
-account is logged in, and the face answers `RS_STEAM_OWNED` from `steam.env` through `BIsSubscribedApp` only.
+Custom songs show whatever AppID they carry, and the songs of `rs1compatibilitydlc` show for the first Rocksmith's DLC
+the account owns, by the Mac edition's means: the install's `gamefiles.py` writes `RS_STEAM_DLC` and `RS_STEAM_OWNED` to
+`game/.rearmed/steam.env` at each copy and refresh, and the face answers from them (`GetDLCCount`, `BGetDLCDataByIndex`
+and `BIsDlcInstalled` for the first, `BIsSubscribedApp` alone for the second). This game also keeps a song out of its
+list when it doesn't know the song's key, which a built-in fix answers
+([Built-in fixes and mods](#built-in-fixes-and-mods)).
 
 ## Online services
 
-`win-x86/online` gives the Windows build the Mac port's offline behaviour: no login is started, Enter on
-the title screen goes straight to the profile list, and anything that asks the RSConnect extension for a
-session gets the answers the game gives when Ubisoft's servers are unreachable. `crd` is never read.
+The game never reaches the network, by the Mac edition's three layers in the form this game needs
+([Mac design](../mac/DESIGN.md#online-services)): the offline Steam layer ([Steam](#steam)), the online stub, and a
+Win32 seam that refuses the game's network calls where the Mac edition has its network guard.
 
-Every function it changes is a virtual method the game only calls through its vtable, so `on32_install`
-(called by `lp_main.c` once the images are bound) writes a host thunk cell into each slot it replaces; the
-wrapped originals stay callable. Before writing, it checks that every slot still holds the function it
-expects, else it leaves that group alone with a message (another build of the game). Replaced:
-`RSConnectExtension_RDV` (Init, Login, Tick, the session, leaderboard and Uplay queries),
-`RSConnectGameInterface_Impl::GetConfigBool` (`RendezVous.SkipLogin` defaults to true) and
-`RSProfileService_Win32::StartSignIn` (skips the "Already have a Uplay account?" dialog). The addresses
-and their Mac counterparts are in `win-x86/online/names.tsv`. The DLC preview's download jobs fail at once on the
-calling thread, as on the Mac: the manager's queue functions and its flush are native (`win32_overrides.c`).
+**The online stub.** `win-x86/online` gives this game the Mac edition's offline behaviour: no login, Enter on the title
+screen straight to the profile list, the answers of unreachable servers for anything that asks the RSConnect extension
+for a session. `crd` is never read. Every function it changes is a virtual method the game only calls through its
+vtable, so `on32_install` (called by `lp_main.c` once the images are bound) writes a host thunk cell into each slot it
+replaces; the wrapped originals stay callable. Before writing, it checks that every slot still holds the function it
+expects, else it leaves that group alone with a message (another build of the game). Replaced: `RSConnectExtension_RDV`
+(Init, Login, Tick, the session, leaderboard and Uplay queries), `RSConnectGameInterface_Impl::GetConfigBool`
+(`RendezVous.SkipLogin` defaults to true) and `RSProfileService_Win32::StartSignIn` (skips the "Already have a Uplay
+account?" dialog). The addresses and their Mac counterparts are in `win-x86/online/names.tsv`. The DLC preview's
+download jobs fail at once on the calling thread, as on the Mac: the manager's queue functions and its flush are native
+(`win32_overrides.c`).
 
-The Win32 seam is offline too: ws2_32, iphlpapi and wininet refuse every connection (`win32_net.c`; `select`
-with no timeout waits 100 ms and finds nothing ready, as with one), and `ShellExecuteA` opens nothing. No host
-socket call is linked into the binary (`nm -u` shows no `socket`, `connect` or `getaddrinfo`), so without mods
-the Mac port's network guard is not loaded, and has nothing to guard. A mod is native code and could make a
-socket, so before anything else the app looks whether it has mods to load and, if so, starts itself again with
-`libnetguard.dylib` inserted (`mods_guard` in `lp_main.c`; from its own `Contents/MacOS`, as dyld inserts only
-at a start): the same library with the same rules as the Mac edition always runs with
-([Mac design](../mac/DESIGN.md#online-services)). Without the guard no mods load.
+**The Win32 seam and the network guard.** ws2_32, iphlpapi and wininet refuse every connection and datagram, and every
+name lookup but a literal loopback address (`win-x86/shims/win32_net.c`; `select` with no timeout waits 100 ms and finds
+nothing ready, as with one), and `ShellExecuteA` opens nothing. No host socket call is linked into the binary (`nm -u`
+shows no `socket`, `connect` or `getaddrinfo`), so without mods the Mac edition's network guard is not loaded, and has
+nothing to guard. A mod is native code and could make a socket, so at its start, once `settings.env` is read, the app
+looks whether it has mods to load and, if so, starts itself again with `libnetguard.dylib` inserted (`mods_guard` in
+`lp_main.c`; from its own `Contents/MacOS`, as dyld inserts only at a start): the same library with the same rules as
+the Mac edition always runs with. Without the guard no mods load.
 
-`lp_main.c` takes four keys of `game/.rearmed/steam.env` as `RS_STEAM_*` defaults and no others (`RS_STEAM_DLC`,
-`RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`), as the Mac launcher does.
+**What the app passes.** `lp_main.c` takes four keys of `game/.rearmed/steam.env` as `RS_STEAM_*` defaults and no others
+(`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`), as the Mac launcher does.
 
 ## Input
 
@@ -377,198 +371,144 @@ TLS to those threads.
 
 ## Built-in fixes and mods
 
-The Mac port's built-in fixes and mods ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods), which says what
-each is for) are in, on this game's own functions and with the Mac's switches. The Mac's are hooks on named
-functions; here a function named in `tools/targets/names/overrides/win32.list` is left out of translation, or
-kept as `W_<addr>` with `wrap` (the build makes the translator's skip file of the list and `win-x86`'s
-addresses), and `win-x86/shims/win32_overrides.c` defines its `F_<addr>` against the 32-bit runtime, by the same
-name (`RC_FN(dlc_update)`; the names below are those). `RS_MODS_LOG=1` logs them.
+Learn & Play has the Mac edition's built-in fixes and mods, with the same switches and the same `[rs-mods] ` log lines.
+The [Mac design](../mac/DESIGN.md#built-in-fixes-and-mods) says what each is for and which are one source for both
+editions; this section says what differs here, and why.
 
-What needs nothing of one game alone is the Mac's source, built into this app as a mod is built
-(`tools/ws7/recomp/overrides/mods`): `mods_shared.c` has the switches, the log (`[rs-mods] ` lines), the start
-(`lp_mods_init()` calls its `rs_mods_start` once `settings.env` is in the environment, where the Mac's runs from
-a constructor), the intro skip, the song ownership during a mount and Player 2's saved input; `framerate.c` has
-the frame rate fixes. The rest is written for this game, because its code differs where the fix has to go: the
-batched mounting has to wait for each mount here, the Auto Save handler has a release the Mac's lacks,
-`FrontEnd_OpenFile` is native because the original's lower-casing is behind a packer stub, the check of Player
-2's input mode is inlined into a function of this game's own, the path cache and the number hash sit in other
-functions, and the song-key table is this image's alone.
+How a fix gets into this app:
+
+- **The shared ones** (`tools/ws7/recomp/overrides/mods`: `mods_shared.c`, `framerate.c`) are built into it as a mod is
+  built. `lp_mods_init()` starts them from `lp_main.c`, once `settings.env` is in the environment, where the Mac edition
+  starts them from a constructor.
+- **This edition's own** are in `win-x86/shims/win32_overrides.c`, written against the 32-bit runtime. A function named
+  in `tools/targets/names/overrides/win32.list` is left out of the translation and defined there; one marked `wrap`
+  stays translated beside the native one, which calls it for the original. The build makes the translator's skip file of
+  that list and `tools/targets/win-x86`'s addresses. One that is also a hook point stays one: a mod's hooks run around
+  the native function.
+
+What differs, fix by fix:
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`):
-  - batched DLC mounting: the DLC coordinator's per-frame update (`dlc_update`) runs its install step in a loop
-    within `RS_MODS_BUDGET_MS` (default 50) instead of once. A step starts mounting one archive and leaves its
-    file open; the update's head (`dlc_update_head`) finishes the mount and closes it, and a step taken before
-    that drops the next archive. So the loop calls the head until the file is closed (the seam counts the open
-    song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac game's steps need no such wait
-    ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods));
-  - the open-file limit, which the batched mounting needs (a large library has more archives open than the 256
-    descriptors of an app started from Finder): the shared start raises it, as on the Mac;
-  - the song path cache: the path intern (`path_intern`, as on the Mac) takes each path's MD5 under the
-    path table's lock on every file check; the override keeps 1024 recent paths' objects;
-  - the number-table hash: the game hashes a double by its integer part, so every value in [0, 1) lands in one
-    bucket. Here the hash is a function of its own (`num_hash`), where the Mac replaces the three functions it
-    is inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down
-    first;
-  - the RSBypass song-file signature skip: the SNG loader's check (`sng_check`) returns true. As on the Mac only
-    the song loader's check is skipped, not the DSA verifier itself;
-  - the song-key table skip (Windows only): the Learn a Song list keeps a song only when the CRC-32 of its
-    `SongKey` is in a table of known keys in the image, so a custom song is left out even with its archive
-    mounted. `song_key_known` answers true (`RS_MODS_BYPASS=0`: the table again). The Mac image has no such table.
-
-  Two Mac fixes are not needed here: the keyboard ones fill the Mac game's table of Cocoa keys, and this game
-  reads DirectInput ([Input](#input)); the thread priority one works around macOS refusing the game's values,
-  which `LP_QOS` covers.
-- **No intro screens** (`RS_MODS_INTRO=0` plays the intro): the Mac's source, the pre hook on `boot_intro_update`
-  in `mods_shared.c` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). This game's tick is a function
-  of its own with the same states, a stdcall one, and its fields are in `tools/targets/win-x86/offsets.map`; the
-  hook sees the Mac's call.
-- **Auto Save warning skipped** (`RS_MODS_AUTOSAVE=0` shows it). The Mac copies the handler's branch into a pre
-  hook; here the handler (`autosave_warning`) runs as it is and only the dialog's call is left out:
-  `ui_navigate`, the navigate call, answers for that one return address (`autosave_navigate_ret`) with a token,
-  and every other caller gets the original. So the rest of the branch, which has a release the Mac's lacks, stays
-  the game's own. The native function around the handler clears the timer once it has returned, and the menu's
-  tick goes on as when the dialog's time is up.
-- **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original): the Mac's two changes
-  ([what they do](../mac/DESIGN.md#built-in-fixes-and-mods)). The first is this port's own:
-  `input_p2_force_cable` is the Mac's three inlined checks of `input_mode_is_cable` in one function, which sets
-  Player 2 to Real Tone, and the native function in front of it leaves a profile on Direct Connect or the
-  microphone as it is. The second, Player 2's saved input, is the Mac's source, the pre hook on `input_bind` in
-  `mods_shared.c`. This game's `input_bind` takes the input in `eax` and nothing else: the Mac's second argument,
-  `force`, is 0 in each of the Mac game's four calls, and the compiler folded it away here with the code under
-  it, so `symbols.map` gives the hook the Mac's call with that 0 (`void(int input@eax, int force=0)`; the entry
-  has the reading of both images). The profile keys the hook reads are pointers in this image's data as on the
-  Mac, though this game's code has their values as literals. The string the game writes the saved name into is
-  destroyed with `efd_str_destroy`, which this game's own readers of the profile call; the native function that
-  was here left a long name's text behind at every call.
-- **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original): the Mac's source,
-  `tools/ws7/recomp/overrides/mods/framerate.c`, built as a mod is built, with this game's eight mid points in
-  `tools/targets/win-x86/mids.map` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). The Windows code
-  has the same counts and the same buffers, and its frame time is whole milliseconds too, from
-  `QueryPerformanceCounter`. It keeps these values in memory or on the x87 stack: the level's step is a frame
-  local handed to a helper both phases call, and the tuner compares its stored count of misses, which is why the
-  hook reads the count and goes on at the function's return instead of changing it.
+  - Batched DLC mounting: this game's loop has to wait for each mount. An install step starts mounting one archive and
+    leaves its file open; the update's head, which the game calls once a frame, finishes the mount and closes the file,
+    and a step taken before that drops the next archive. So the loop calls the head until the file is closed (the seam
+    counts the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac game's steps need no such
+    wait.
+  - The song path cache wraps the path intern itself, as this build has the Mac game's wrapper around it inlined.
+  - The number-table hash is a function of its own here, where the Mac edition replaces the three functions it is
+    inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down first.
+  - The signature skip: the song loader's check is a function of its own here, and it answers true. As in the Mac
+    edition only the song loader's check is skipped, not the DSA verifier itself.
+  - The song-key table skip (this game only): the Learn a Song list keeps a song only when the CRC-32 of its `SongKey`
+    is in a table of known keys in the image, so a custom song is left out even with its archive mounted. With the fix
+    every key counts as known (`RS_MODS_BYPASS=0`: the table again). The Mac image has no such table.
+  - Not needed here: the keyboard fixes fill the Mac game's table of Cocoa keys, and this game reads DirectInput
+    ([Input](#input)); the thread priority fix works around macOS refusing the Mac game's values, which `LP_QOS` covers.
+- **No intro screens**: the shared hook. This game's tick is a stdcall function with the same states, and its fields are
+  in `tools/targets/win-x86/offsets.map`.
+- **Auto Save warning skipped**: the handler runs as it is and only the dialog's call is left out, where the Mac
+  edition's hook does the handler's branch itself. This game's branch has a release the Mac's lacks, so the rest stays
+  the game's own: the navigate call (`ui_navigate`) answers that one caller with a token and every other caller gets the
+  original, and the native function around the handler (`autosave_warning`) clears the timer once it has returned.
+- **Two players on any input**: the check of Player 2's input mode is inlined here into one function,
+  `input_p2_force_cable`, which sets Player 2 to Real Tone; a native function in front of it leaves a profile on Direct
+  Connect or the microphone as it is. Player 2's saved input is the shared hook.
+- **The same at any frame rate**: the shared source, with this game's eight mid points in
+  `tools/targets/win-x86/mids.map`. The Windows code has the same counts and the same buffers, and its frame time is
+  whole milliseconds too, from `QueryPerformanceCounter`. It keeps the tuner's count of misses in memory, which is why
+  the hook reads the count and picks where the function goes on instead of changing it.
 - **Loading-screen fix.** Not needed here ([Shader corpus](#shader-corpus)).
-- **Direct Connect choice** (`RS_MODS_OVERLAY=0` as on the Mac). The same overlay, made by the same
-  `tools/play-native/cache_overlay.py`. The archives' key comes from the unpacked code image, which the build
-  step hands to the copy (`gamefiles.key_from_image`). `FrontEnd_OpenFile` (`frontend_open_file`) is a native function
-  here: for a `cacheN.7z` it opens `PatchUpdate/<name>` first, then does what the original does.
-- **Exit Game.** The same entry and the same edit as the Mac's: the game has the action.
-- **Enumerate.** The same entry and the same code as the Mac's: the overlay's two edits, and
-  `shims/steam/src/enumerate.h`, compiled in through `interfaces.cpp`. `steam32.c` answers `IsOverlayEnabled`
-  and posts the `DlcInstalled_t`, and the game folder is `LP_GAME_DIR`.
-- **Song ownership during a mount**: the Mac's source, the pre hook on `steam_dlc_owned` in `mods_shared.c`, which
-  answers yes while this port's `dlc_update` runs its install steps (it tells the hook with `rs_mods_mounting`, as
-  the Mac's does). `RS_MODS_BYPASS=0` asks the list again (and brings back the song-key table, which hides custom
-  songs here whatever their AppID).
-- **Title logo.** The same `tools/loadscreen` and layout as the Mac's. `lp_install.py build` makes
+- **Direct Connect choice**: the same overlay, made by the same `tools/play-native/cache_overlay.py`. The archives' key
+  comes from the unpacked code image, which the build step hands to the copy (`gamefiles.key_from_image`).
+  `frontend_open_file` is a native function here: the original's lower-casing of the path is behind a packer stub. For a
+  `cacheN.7z` it opens `PatchUpdate/<name>` first, then does what the original does.
+- **Exit Game.** The same entry and the same edit as the Mac edition's: the game has the action.
+- **Enumerate.** The same entry and the same code as the Mac edition's: the overlay's two edits, and
+  `shims/steam/src/enumerate.h`, compiled in through `interfaces.cpp`. `steam32.c` answers `IsOverlayEnabled` and posts
+  the `DlcInstalled_t`, and the game folder is `LP_GAME_DIR`.
+- **Song ownership during a mount**: the shared hook, which this edition's mounting loop tells when its steps run.
+  `RS_MODS_BYPASS=0` also brings back the song-key table, which hides custom songs here whatever their AppID.
+- **Title logo.** The same `tools/loadscreen` and layout as the Mac edition's. `lp_install.py build` makes
   `static.psarc.rearmed` in the copy, and `title_logo()` in `lp_main.c` links `static.psarc` at each start as
-  `launch.sh` does (`RS_REARMED=0` for the original). It isn't in the manifest, so a refresh leaves it, except
-  that a new `static.psarc` removes it.
-- **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared, called from `win-x86/app/lp_main.c`): every `.dylib`
-  in `<home>/mods/` is loaded at startup, before the game runs, with the Mac's switches and log lines. A mod is
-  a native arm64 dylib built with `tools/ws7/recomp/runtime/rc_mod.h`, the same file for both editions
-  ([recompiler](../recompiler/README.md#overrides-and-hook-points)); `rc_target()` returns `win-x86`. A library
-  without `rc_mod_abi` is left out, with a log line: built for the Mac alone, it would misread this game's
-  memory. The network guard is in the process whenever mods load ([Online services](#online-services)). With
-  mods the installed app goes to `LP_GAME_DIR`, the Mac's working directory, before it loads them, so a mod
-  finds its settings there. What a mod has:
-  - **Hook points.** `rc_hook_add_name` as on the Mac; the hooks run on a view of the call, the Mac's SysV
-    one, made from `tools/targets/win-x86`. Of the 21 hook points (`tools/targets/names/hooks.list`) 19 work
-    here. Seventeen are functions of this game, nine of them in this game's own shape, adapted in
-    `symbols.map` (`game_frame`, `ui_event`, `rr_speed_ratio`, `too_many_inputs`, `frontend_open_file`,
-    `tone_change`, `song_list_name`, `si_open`, `input_bind`). Two, `input_sink` and `set_app_focus`, have no
-    function here (the game has window messages and an inlined tick), and `win32_input.c` runs them instead
-    (`rc_hook_add_seam`), with the Mac's values: macOS key codes, the character, the pointer from the bottom
-    left. Two are `unsupported`, and a hook on them gives -1 and a log line: `si_io` is the Mac game's
-    CoreAudio input ([Audio](#audio)), and `input_mode_is_cable` is inlined into its caller, which the built-in
-    fix replaces.
+  `launch.sh` does (`RS_REARMED=0` for the original).
+- **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared, called from `win-x86/app/lp_main.c`): every `.dylib` in
+  `<home>/mods/` is loaded at startup, before the game runs, with the Mac edition's switches and log lines and the same
+  `rc_mod.h`; `rc_target()` returns `win-x86`. A library without `rc_mod_abi` is left out, with a log line: built for
+  the Mac edition alone, it would misread this game's memory. The network guard is in the process whenever mods load
+  ([Online services](#online-services)). With mods the installed app goes to `LP_GAME_DIR`, the Mac edition's working
+  directory, before it loads them, so a mod finds its settings there. What a mod has:
+  - **Hook points.** `rc_hook_add_name` as on the Mac; the hooks run on a view of the call, the Mac's SysV one, made
+    from `tools/targets/win-x86` ([recompiler](../recompiler/README.md#overrides-and-hook-points)). Of the 21 hook
+    points (`tools/targets/names/hooks.list`) 19 work here. Seventeen are functions of this game, nine of them in this
+    game's own shape, adapted in `symbols.map`. Two, `input_sink` and `set_app_focus`, have no function here (the game
+    has window messages and an inlined tick), and `win32_input.c` runs them instead, with the Mac's values: macOS key
+    codes, the character, the pointer from the bottom left. Two are `unsupported`, and a hook on them gives -1 and a log
+    line: `si_io` is the Mac game's CoreAudio input ([Audio](#audio)), and `input_mode_is_cable` is inlined into its
+    caller, which the built-in fix replaces.
 
-    What differs with the call the same: a hook point that is also a built-in fix of this port's own
-    (`autosave_warning`, `frontend_open_file`) is `N_<addr>` in `win32_overrides.c` and a mod's hooks run around the
-    fix, where on the Mac the fix is a pre hook that can answer first (the fixes of `boot_intro_update`,
-    `steam_dlc_owned` and `input_bind` are the Mac's pre hooks here too, so a mod's hook on those comes after the
-    fix in both);
-    `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames are presented; while a
-    mod hooks a seam point, events wait for the game thread (`w32_input_frame`, at the start of each Present) and
-    reach the game a frame later, and `input_sink`'s arguments, changed by a pre hook, are not taken
-    (`set_app_focus`'s is); an argument this game's code has folded away is not taken either (`input_bind`'s
-    `force`, `ui_event`'s last two): a hook reads its one value, and a change to it goes nowhere; a modifier key
-    is a down and an up here, where the Mac sends a down for both.
-  - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`), for a change inside a function.
-    The tables have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar after rs7string
-    (735 edits and 127 mid points: the game's arrays for six strings grown to eight), and `plain_packages`, its
-    Plain Packages (2 edits and a mid point on the song file's decrypt). Eight more mid points, `fps_*`, are the built-in
-    frame rate fixes'. The Mac's tables have the same two
-    groups; the 29 points only the Mac needs are `none` here.
-  - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The Win32 seam's opens for
-    reading, reads, seeks, sizes, attributes, finds and mapped views (`win32_kfile.c`, `win32_ksync.c`) go
-    through the runtime's `rc_file_*`, which ask the mod's provider first; the same interface as the Mac's. The
-    provider sees host paths, after the seam's mapping of `C:\Rocksmith2014` and its lookup without case.
-  - **Drawing.** The render API (`rs_render.h`, [METAL.md](../mac/METAL.md#render-api-shimsincluders_renderh))
-    is in libRSOpenGL, under the D3D9 layer. The overlay API is the Mac's `rsp_overlay.c`, run in
-    `d3d9_dev_present` on the back buffer before it is shown.
+    What differs with the call the same:
+    - `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames are presented.
+    - A hook point that is also a fix of this edition's own (`autosave_warning`, `frontend_open_file`) runs a mod's
+      hooks around the fix, where the Mac edition's fix is a pre hook that can answer first. The shared fixes
+      (`boot_intro_update`, `steam_dlc_owned`, `input_bind`) are pre hooks in both, so a mod's hook on those comes after
+      the fix in both.
+    - While a mod hooks `input_sink` or `set_app_focus`, events wait for the game thread (at the start of each Present)
+      and reach the game a frame later. `input_sink`'s arguments, changed by a pre hook, are not taken
+      (`set_app_focus`'s is). A modifier key is a down and an up here, where the Mac sends a down for both.
+    - An argument this game's code has folded away is not taken (`input_bind`'s `force`, `ui_event`'s last two): a hook
+      reads its one value, and a change to it goes nowhere.
+  - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`): the Mac edition's two groups,
+    `seven_string` (735 edits and 127 mid points: the game's arrays for six strings grown to eight) and `plain_packages`
+    (2 edits and a mid point on the song file's decrypt), and the eight `fps_*` mid points of the built-in frame rate
+    fixes. The 29 points only the Mac needs are `none` here.
+  - **Files** (`rc_file_provide`, `rc_file.h`): the same interface as the Mac edition's. The Win32 seam's opens for
+    reading, reads, seeks, sizes, attributes, finds and mapped views (`win32_kfile.c`, `win32_ksync.c`) go through the
+    runtime's `rc_file_*`, which ask the mod's provider first. The provider sees host paths, after the seam's mapping of
+    `C:\Rocksmith2014` and its lookup without case.
+  - **Drawing.** The render API (`rs_render.h`, [METAL.md](../mac/METAL.md#render-api-shimsincluders_renderh)) is in
+    libRSOpenGL, under the D3D9 layer. The overlay API is the Mac edition's `rsp_overlay.c`, run in `d3d9_dev_present`
+    on the back buffer before it is shown.
 
   The rearmed-mods library (`rearmed-mods.dylib`, from 0.3.0) runs here as the same file as on the Mac. What it
   needs of the game is in the tables ("the mods library" in `tools/targets/names`).
 
 ## Installer and build
 
-```
-choose the game ─┬─ Rocksmith 2014 for Mac → the game in Steam, else Steam downloads the depot and the DLC
-                 │                            → static decrypt → shims, app → install → warm shaders → launcher
-                 └─ Learn & Play → free space → Steam downloads the depot and the DLC → game-copy → Microsoft DLLs
-                                    → code image → lp_install.py build → app-install → build-clean → warm shaders
-```
+`win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships).
+`tools/play-native/learn-play.sh` runs all of them in a terminal, and `RS Re-ARMed Installer.app` runs the same commands
+with its own steps ([Mac design](../mac/DESIGN.md#installer-and-build), which has the installer app, the flow of both
+editions and the parts both share). Neither touches the Mac game install or its saves.
 
-`win-x86/install/lp_install.py` does the steps (standard-library Python, only tools macOS ships). Getting a game
-from Steam's console is `tools/play-native/gamefiles.py`'s (`Depot`, `DepotDownload`, `depot_wait`, `SteamLog`,
-`redirect`), shared with the Mac game, which is downloaded the same way when it isn't installed in Steam
-(`gamefiles.py mac-game`, [Mac design](../mac/DESIGN.md#installer-and-build)); `lp_install.py` has this game's
-figures and words, and the room its build needs.
-
-1. **The game** (`game-locate`, `game-space`, `game-redirect`, `game-download`). `steam_osx +download_depot`
-   with the app, depot and manifest of `target.toml` hands the running Steam the download; only if it ignores
-   that for 30 seconds does `steam://open/console` open with the command on the clipboard. A second command
-   during a download makes Steam fetch every chunk twice, so one goes out only when no download has started
-   since Steam did, or nothing was written for ten minutes. `gamefiles.SteamGate` reads Steam's state from
-   disk, and what's left for the user comes out as `guide` lines, the same words as the Mac edition's. The
-   installer never handles credentials. Steam makes every file at full size first, so the whole depot must be
-   free up front; when it isn't, `game-redirect` links Steam's `steamapps/content` to another disk. The exe's
-   SHA-256 is checked against `target.toml`. steamcmd is not used: it is an Intel binary.
-2. **The DLC** (`gamefiles.py dlc-fetch`): each DLC is a depot of its own, with the AppID as its id. The DLC
-   the account owns are read from the app ownership ticket in Steam's `localconfig.vdf`, and Steam fetches them
-   one after another with the same `+download_depot`. A state file remembers what is done, and one that fails is
-   named and doesn't stop the install.
-3. **The game files** (`game-copy`, `game-refresh`; `tools/play-native/gamefiles.py`, shared with the Mac
-   install, [Mac design](../mac/DESIGN.md#installer-and-build)): the app's own copy in `LP_HOME/game`, as Steam
-   may clear its depot folder. It is the depot folder plus the PC archives `*_p.psarc` of its `dlc/` and the Mac
-   game's `dlc/`. `lp_main.c` refuses to start without the copy's `.rearmed/manifest.json`.
+1. **The game** (`game-locate`, `game-space`, `game-redirect`, `game-download`): Steam's download of depot 221683, got
+   as the Mac edition gets a Mac game that is not installed
+   ([the game from Steam's console](../mac/DESIGN.md#installer-and-build)), with the same `guide` lines. `lp_install.py`
+   has this game's figures and words, and counts the room its build needs with the download's. The exe's SHA-256 is
+   checked against `target.toml`.
+2. **The DLC** (`gamefiles.py dlc-fetch`): from the DLC depots, as for a downloaded Mac game.
+3. **The game files** (`game-copy`, `game-refresh`; `tools/play-native/gamefiles.py`, shared with the Mac install): the
+   app's own copy in `LP_HOME/game`, as Steam may clear its depot folder. It is the depot folder plus the PC archives
+   `*_p.psarc` of its `dlc/` and the Mac game's `dlc/`. `lp_main.c` refuses to start without the copy's
+   `.rearmed/manifest.json`.
 4. **The Microsoft DLLs** (`redist`): from Steam's Common Redistributables on the Mac
    (`Steamworks Shared/_CommonRedist`), else Microsoft's two redistributables downloaded with `/usr/bin/curl`
    (SHA-256 pinned; the only network access besides Steam), or a folder given with `--from`. `/usr/bin/tar`
    unpacks the cabinets; every DLL's SHA-256 is checked. D3DCompiler_42 is written rebased.
-5. **The code image** (`game-image`): the image an earlier run made; else the copy's exe unpacked with the seed
-   (`LP_SEED`, `win-x86/unpack/seed.bin`, or the installer app's Resources); else `lp_image.py` from a capture
-   folder. Without any, `harvest-export` writes the harvester folder to take to the PC and the run stops
-   ([Getting the game image](#getting-the-game-image)).
+5. **The code image**: from a capture folder when one is given (`lp_image.py`); else the pinned image an earlier run
+   made; else the copy's exe unpacked with the seed (`game-image`; the seed is `LP_SEED`, `win-x86/unpack/seed.bin`, or
+   in the installer app's Resources). Without any, `harvest-export` writes the harvester folder to take to the PC and
+   the run stops ([Getting the game image](#getting-the-game-image)).
 6. **The build** (`build`, `lp_build.py`): each translation is keyed by the SHA-256 of its input, its options,
    the translator's sources, the Python and Capstone versions, and the compiler and runtime headers. A step
    whose key matches is skipped, a stopped run continues, and after an update only what changed is redone. A key
    is deleted before the step it vouches for is redone, so a stopped run never leaves stale output. About 25
    minutes the first time on an M2, with a peak of about 2 GB in the build folder.
 7. **The install** (`app-install`): one ad-hoc signed bundle, `~/Applications/RS Re-ARMed Learn & Play.app`:
-   `Contents/MacOS` has `rs2014_lp` and `libRSOpenGL.dylib`, `Contents/Resources` the game image
-   (`lp_game.exe`), the DLL images and the game's icon. It sets no environment; `lp_main.c` takes its
-   folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods
-   switched off from `settings.env` there (`lp_settings.c`, the Mac launcher's rules: only those seven switches,
-   and a value in the environment wins), read before `mods_guard`, so the start again with the network guard
-   keeps them.
+   `Contents/MacOS` has `rs2014_lp`, `libRSOpenGL.dylib` and `libnetguard.dylib`, `Contents/Resources` the game image
+   (`lp_game.exe`), the DLL images, the shader corpus and the game's icon. It sets no environment; `lp_main.c` takes its
+   folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods switched off
+   from `settings.env` there (`lp_settings.c`, the Mac launcher's rules: only those seven switches, and a value in the
+   environment wins), read before `mods_guard`, so the start again with the network guard keeps them.
 8. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link.
-9. **The shaders** (`tools/play-native/warm-shaders.sh`, the Mac's): the installed app's `--warm-shaders`
+9. **The shaders** (`tools/play-native/warm-shaders.sh`, the Mac edition's): the installed app's `--warm-shaders`
    ([Shader corpus](#shader-corpus)).
-
-`tools/play-native/learn-play.sh` runs all of it in a terminal; `RS Re-ARMed Installer.app` runs the same
-commands with its own steps and its Refresh Game Files button runs the installed `gamefiles.py refresh`. Its
-Built-in Mods… sheet, with Learn & Play chosen, writes `learn-play/settings.env`, as it writes the Mac edition's
-([Mac DESIGN](../mac/DESIGN.md#installer-and-build)). Neither touches the Mac game install or its saves.

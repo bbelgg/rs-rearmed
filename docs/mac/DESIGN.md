@@ -63,14 +63,13 @@ connects them to the translated `GameBootstrap` and `GameFrame`. The shell takes
 `.app` as the game root, so the game reads only RS Re-ARMed's own copy of the game files
 ([Installer and build](#installer-and-build)).
 
-The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-ARMed.app` bundle by
-`launch-stub.c`) checks the copy is complete (telling a dangling link, the drive not connected, from an
-incomplete copy), links `static.psarc` to the title logo or the original, writes an offline `Rocksmith.ini`
-from the copy of the install's (keeping the player's `LatencyBuffer`), passes the built-in mods switched off in
-`settings.env` (only its seven switches, and a value in the environment wins; it passes that on too, as `open`
-starts the game with launchd's environment), seeds the offline Steam saves once, loads the network guard and
-starts the game with `open -n -a`. Nothing of Steam's is read while the game runs, except `loginusers.vdf` for
-the account, and without it (Steam uninstalled) the account whose saves are there.
+The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-ARMed.app` bundle by `launch-stub.c`)
+checks the copy is complete (telling a drive that is not connected from an incomplete copy), links `static.psarc` to the
+title logo or the original, keeps the game's `Rocksmith.ini` offline ([Online services](#online-services)), passes the
+built-in mods switched off in `settings.env` (only its seven switches; a value in the environment wins), seeds the
+offline Steam saves once, and starts the game with the network guard inserted (`open -n -a`). Nothing of Steam's is read
+while the game runs, except `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves
+are there.
 
 ### Screen and window
 
@@ -122,28 +121,23 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
   `audio_chan.c`) gives it a mono buffer of the chosen channel with the gain instead, and the game's mono path
   does the rest. Settings: `guitar-input.ini` ([INSTALL.md](INSTALL.md#guitar-input)).
 - **The list of inputs.** Each channel of an interface is an input of its own (`shims/coreaudio/rs_audio_input.c`,
-  `audio_devs.c`). The game opens a device per slot, 10 at most, so a channel is a device to it: the list it
-  reads has ids that hold the real device and the channel, in priority order, and the import thunks of the calls
-  that take a device reach the real one. Only ids the list handed out are taken apart (`rs_audio_entry_id`), as
-  a device's own id can have the same bit set. Two habits of the game are met: it compares the device its I/O
-  function gets with its own id, so `audio_chan.c` gives it that id, and it starts and stops its I/O by the
-  function's address, which is the id only for a function's first registration on a device, so a channel's real
-  id is kept and used in its place.
+  `audio_devs.c`). The game opens a device per slot, 10 at most, so a channel is a device to it: the list it reads has
+  ids that hold the real device and the channel, in priority order, and the import thunks of the calls that take a
+  device reach the real one.
 - **An input's level.** Calibration raises the level in small steps until its meter reaches the top. It reaches
   a device through `volm`, which most interfaces lack (so it never finished) and which on the others is the
   player's own setting. So every input but the cable reports a volume of ours (`audio_devs.c`), and the level is
   a gain in the `si_io` hook: 0.375, where the game starts a device, is unity, and 1 is +24 dB. A level saved
   before counts for nothing until calibration has run once (`input-level-calibrated` in the folder keeps that).
   The cable keeps its hardware level and the game's own path.
-- **Device identifiers.** Devices get stable identifiers, so an interface is not dropped from Direct Connect
-  after another device fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`;
-  `RS_AUDIO_INPUTS_FIRST` applies with the list of inputs off, as the list has its own order). The game's device
-  scan releases an identifier even when the read failed, so a failed read hands back a constant empty string,
-  which a release leaves alone, and the device is skipped (`audio_devs.c`).
+- **Device identifiers.** Devices get stable identifiers, so an interface is not dropped from Direct Connect after
+  another device fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`; `RS_AUDIO_INPUTS_FIRST`
+  applies with the list of inputs off, as the list has its own order). A device whose identifier can't be read is
+  skipped (`audio_devs.c`).
 
-The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the
-input's settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which the Windows
-port shares. `RS_AUDIO_LOG=1` logs the setup.
+The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the input's
+settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which Learn & Play shares
+([Windows design](../windows/DESIGN.md#audio)). `RS_AUDIO_LOG=1` logs the setup.
 
 ### Your own plug-in
 
@@ -160,55 +154,56 @@ a minimal static FFmpeg 7.1.2 build (downloaded and checksum-verified at build t
 
 ## Steam
 
-`shims/steam` is a drop-in `libsteam_api.dylib`. The launcher runs it in stub mode: no Steam client, Steam
-Cloud as a local folder (`steam/<account>/221680/remote`, seeded once from your Steam saves without `crd`),
-the identity from `loginusers.vdf`, the base game, the installed DLC and 248750 (the DLC custom songs
-carry) as owned. See [shims/steam/README.md](../../shims/steam/README.md).
+`shims/steam` is a drop-in `libsteam_api.dylib`. It runs in stub mode, which the launcher sets and the app defaults to:
+no Steam client, Steam Cloud as a local folder (`steam/<account>/221680/remote`, seeded once from your Steam saves
+without `crd`), the identity from `loginusers.vdf`, the base game, the installed DLC and 248750 (the DLC custom songs
+carry) as owned. See [shims/steam/README.md](../../shims/steam/README.md). Learn & Play has the same behaviour from the
+same code ([Windows design](../windows/DESIGN.md#steam)).
 
-The game mounts a `dlc/` archive only when the AppID in its `appid.appid` is a DLC Steam lists and reports
-installed, so custom songs that carry another AppID (or 248750, for an account without it) would not show.
-`tools/play-native/gamefiles.py` reads the AppID of every archive in the copy's `dlc/` at each copy and
-refresh and adds them to `RS_STEAM_DLC` in `game/.rearmed/steam.env` (`.rearmed/dlc-appids.json` keeps them by
-size and time, so a refresh reads only new and changed archives). Done at install rather than in the Steam
-layer: no psarc reading in the game process, and one implementation for both editions (Windows:
-[DESIGN.md](../windows/DESIGN.md#steam)).
+The game mounts a `dlc/` archive only when the AppID in its `appid.appid` is a DLC Steam lists and reports installed, so
+custom songs that carry another AppID (or 248750, for an account without it) would not show.
+`tools/play-native/gamefiles.py` reads the AppID of every archive in the copy's `dlc/` at each copy and refresh and adds
+them to `RS_STEAM_DLC` in `game/.rearmed/steam.env`. Done at install rather than in the Steam layer: no psarc reading in
+the game process, and one implementation for both editions.
 
-The songs of `rs1compatibilitydlc` need more. The archive comes with the game and carries the base AppID, but
-each song names the DLC of the first Rocksmith it came from, and the game (`dlc_update_tail`) asks
-`BIsSubscribedApp` for each and hides the songs of those not owned. Steam installs nothing for these, so nothing
-on disk says who owns them: a copy or refresh asks the Steam client, when the edition's account is the one
-logged in (`rs1_owned` in `gamefiles.py`, a process of its own through Valve's library, gone before the game
-starts). The answer goes into `RS_STEAM_OWNED` in `steam.env`, which the Steam layer reports through
-`BIsSubscribedApp` only: as with real Steam, these are no DLC of this game. `.rearmed/rs1-owned.json` keeps it
-for a refresh with Steam closed or on another account.
+The songs of `rs1compatibilitydlc` need more. The archive comes with the game and carries the base AppID, but each song
+names the DLC of the first Rocksmith it came from, and the game asks `BIsSubscribedApp` for each and hides the songs of
+those not owned. Steam installs nothing for these, so nothing on disk says who owns them: a copy or refresh asks the
+Steam client, when the edition's account is the one logged in (`rs1_owned` in `gamefiles.py`, a process of its own
+through Valve's library, gone before the game starts). The answer goes into `RS_STEAM_OWNED` in `steam.env`, which the
+Steam layer reports through `BIsSubscribedApp` only: as with real Steam, these are no DLC of this game.
+`.rearmed/rs1-owned.json` keeps it for a refresh with Steam closed or on another account.
 
 ## Online services
 
-The game's Rendez-Vous/Uplay layer is replaced by an offline one (the `online` override module:
-`shims/game/src/online_stub.cpp`, `tools/ws7/recomp/overrides/src/online_glue.c`): no login is started,
-Enter on the title screen goes straight to the profile list, and requests get the answers the game gives
-when Ubisoft's servers are unreachable. `crd` is never read.
+The game never reaches the network. Three layers see to it: the offline Steam layer ([Steam](#steam)), the online stub
+and the network guard.
 
-`tools/ws8/netguard` is loaded into the game on every launch (the launcher refuses to start without it). It
-refuses every connection and datagram that is not local (`connect`, `connectx`, `sendto`, `sendmsg`; an address
-shorter than its family's counts as not local), every host-name lookup (`gethostbyname`, `gethostbyname2`,
-`getipnodebyname`, `getaddrinfo`; the reverse lookups `gethostbyaddr` and `getnameinfo` for an address that is
-not this machine's) and every attempt to open a web page (`system` and `popen` of a command with a URL of any
-scheme, a `www.` address or the `open` command), and logs each to `logs/netguard.log`. It does not cover the
-resolver library, dns_sd or CFHost, which nothing of the game or the port calls; an address from them would
-still be refused at the connection.
+**The online stub.** The game's Rendez-Vous/Uplay layer is replaced by an offline one (the `online` override module:
+`shims/game/src/online_stub.cpp`, `tools/ws7/recomp/overrides/src/online_glue.c`): no login is started, Enter on the
+title screen goes straight to the profile list, and requests get the answers the game gives when Ubisoft's servers are
+unreachable. `crd` is never read.
 
-A start that is not the launcher's (the game's app opened from the Finder or a debugger) has no guard inserted,
-as dyld inserts only at a start: the app then starts itself again with the install's `libnetguard.dylib`
-inserted (`rc_main.c`: `netguard_start`), as Learn & Play does before it loads mods, and does not run when the
-guard still isn't in the process. A build with no install's guard to find (a build folder's tests) says so in
-its log and runs with the other two layers.
+**The network guard.** `tools/ws8/netguard` is inserted into the game at every launch (the launcher refuses to start
+without it). It refuses every connection and datagram that is not local (`connect`, `connectx`, `sendto`, `sendmsg`; an
+address shorter than its family's counts as not local), every host-name lookup but `localhost`'s (`gethostbyname`,
+`gethostbyname2`, `getipnodebyname`, `getaddrinfo`; the reverse lookups `gethostbyaddr` and `getnameinfo` for an address
+that is not this machine's) and every attempt to open a web page (`system` and `popen` of a command with a URL of any
+scheme, a `www.` address or the `open` command), and logs each to `logs/netguard.log`. It does not cover the resolver
+library, dns_sd or CFHost, which nothing of the game or the port calls; an address from them would still be refused at
+the connection.
 
-The launcher gives the game four keys of `game/.rearmed/steam.env` and no others (`RS_STEAM_DLC`,
-`RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`): the file never chooses the Steam layer's mode, folder or
-library, or keeps the stored credentials. It forces `[Net] AutoLogin=0` and `[Renderer.MacOS] DisableBrowser=1`
-in the game's `Rocksmith.ini` at every launch, also in a file that lacks the key or its section, and with no
-file at all it writes one with just those.
+A start that is not the launcher's (the game's app opened from the Finder or a debugger) has no guard inserted, as dyld
+inserts only at a start: the app then starts itself again with the install's `libnetguard.dylib` inserted
+(`netguard_start` in `rc_main.c`), and does not run when the guard still isn't in the process. A build with no install's
+guard to find (a build folder's tests) says so in its log and runs with the other two layers. Learn & Play starts again
+with the same guard when it has mods to load ([Windows design](../windows/DESIGN.md#online-services)).
+
+**What the launcher passes.** The launcher gives the game four keys of `game/.rearmed/steam.env` and no others
+(`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`): the file never chooses the Steam layer's mode,
+folder or library, or keeps the stored credentials. The game's `Rocksmith.ini` is the one it saved itself (the first
+time, the copy of the install's), with `[Net] AutoLogin=0` and `[Renderer.MacOS] DisableBrowser=1` forced at every
+launch, also in a file that lacks the key or its section; with no file at all the launcher writes one with just those.
 
 ## Input
 
@@ -219,62 +214,68 @@ original lacked ([INSTALL.md](INSTALL.md#keys)). Learn & Play's input is a layer
 
 ## Built-in fixes and mods
 
-Each is a native override or a hook in `tools/ws7/recomp/overrides/mods/mods.c`, with a switch
-([INSTALL.md](INSTALL.md#settings-and-switches)); `RS_MODS_LOG=1` logs what they apply. Learn & Play has the
-same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). What needs
-nothing of one game alone is one source, built into both apps: `mods_shared.c` beside it has the switches, the
-log (`[rs-mods] ` lines), the start (`rs_mods_start`, from a constructor here, since the launcher has set the
-environment by then), the intro skip, the song ownership during a mount and Player 2's saved input, and
-`framerate.c` the frame rate fixes. They are written as a mod is (`rc_mod.h`): the game's functions and fields by
-name, looked up when they run. What is still written twice, and why, is in the [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
+Each fix is a native replacement of a game function or a hook on one, with a switch
+([INSTALL.md](INSTALL.md#settings-and-switches)). `RS_MODS_LOG=1` logs what they apply, as `[rs-mods] ` lines in the
+edition's log. The sources are in `tools/ws7/recomp/overrides/mods`:
 
-- **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours (keys, the End key in
-  menus, faster loading with large libraries, the song path cache, the number-table hash, worker-thread priority,
-  the open-file limit, which Learn & Play has from the same source) and the RSBypass CDLC signature skip.
-  The faster loading is the batched DLC mounting: the DLC coordinator's update runs its install step for
-  `RS_MODS_BUDGET_MS` (default 50) a frame instead of once. Learn & Play's loop has to wait for each mount to be
-  finished, or archives are dropped ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)); this
-  game's needs no wait, as its song list is the same with the budget as with a step a frame
-  ([TESTING.md](TESTING.md#unattended-runs)).
-- **No intro screens** (`before_intro_update` in `mods_shared.c`, a pre-hook on `boot_intro_update` and the same one
-  in Learn & Play; `RS_MODS_INTRO=0` plays the intro): the boot service ticks the intro movie (logos, legal screens,
-  intro video) in its boot phases 2 and 3 and shows the title only once the intro has ended. The movie's model is
-  loaded as usual, but the movie is never started: the tick reports "not busy" until phase 3 has done its steps
-  (archives mounted, venues), and then the intro takes the transition of the game's own skip key. Both parts matter:
-  without the model loaded, or with the intro ended before phase 3's steps, the title screen never gets its menu
-  movie.
-- **Auto Save warning skipped** (`before_autosave_warning`, a pre-hook on `autosave_warning`;
-  `RS_MODS_AUTOSAVE=0` shows the dialog): on `OnSignInFlowComplete` the game's UI event handler restores the
-  player's input mode, shows `RS2AutosaveWarning` and starts a 4 s timer. The hook does the first and leaves out
-  the rest: it stores a token in the handler's dialog slot and a zero in the timer, so the next tick goes on, as
-  it does when the dialog's time is up. A NULL slot would stop the flow on the profile screen.
-- **Two players on any input** (pre hooks on `input_mode_is_cable`, in `mods.c`, and `input_bind`, in
-  `mods_shared.c` and the same one in Learn & Play; `RS_MODS_MULTIPLAYER=0` is the original). Two rules of the
-  game's made two players need two cables. The Multiplayer screens ask whether Player 2 is in Real Tone mode and
-  set them to it when not; here a profile on Direct Connect or the microphone counts as in the right mode. And a
-  saved input is restored for Player 1 alone, while Player 2 takes the first free slot; here `input_bind` finds
-  Player 2's saved input first. It has to be that early: moving the input of a running stream crashes the I/O
-  thread. `input_bind` has a second argument, `force`, with which an input takes another's slot when none is
-  free; the game passes 0 in each of its four calls. The hook has the game write the saved name into one of its
-  small strings and destroys the string afterwards, as the game's own readers of the profile do: a name too long
-  to sit in the string is a block of the game's memory, which the hook left behind at every call until this was
-  one source. The menu overlay rewords the notice MULTIPLAYER INPUT
-  SUPPORT, which said Player 2 must use the cable.
-- **The same at any frame rate** (`framerate.c`, hooks at eight mid points, `fps_*`; `RS_MODS_FRAME_RATE=0` is
-  the original). The game's frame time is whole milliseconds with no lower bound, and some of its code counts
-  frames, which goes wrong above 60 a second. Calibration sizes its averaging window as the frames of one second,
-  by the time of the one frame in which its screen opens and with no upper bound, over buffers of 100 samples a
-  player that the meter's own counters follow: above 100 frames a second player 1's samples run into player 2's,
-  and a frame of 4 ms or less puts them over the meter's own state. It moves the input level one step a frame
-  toward its target in both phases (strings muted, then played) while its average lags half a second, so the
-  loop runs faster with the frame rate. The tuner gives a string that drifts two frames before its hold loses
-  ground, and averages the last 20 levels and the last 10 notes, one a frame, for its volume and wrong
-  instrument warnings. A menu panel's hold takes at least 1/15 s off its timer each frame. The hooks put each
-  right by the frame's own time, and only for a frame shorter than a 60 Hz one (under 14.5 ms): the window stays
-  within the buffer, a step is the part of itself that the frame is of 1/60 s, the two averages and the
-  first-time hint take the calls a 60 Hz game would make, and the hold's three misses are counted in sixtieths
-  of a second. At 60 Hz and below the game runs as it always has. One source for both editions, with each game's
-  places in its `mids.map`.
+- **One source for both editions.** A fix that needs nothing of one game alone is written as a mod is (`rc_mod.h`): it
+  names the game's functions and fields and looks them up when it runs, so the same file is built into both apps.
+  `mods_shared.c` has the switches, the log, the start (`rs_mods_start`: it reads the switches, raises the open-file
+  limit and adds the hooks), the intro skip, the song ownership during a mount and Player 2's saved input; `framerate.c`
+  has the frame rate fixes. This edition starts them from a constructor, as the launcher has set the environment by
+  then.
+- **Each edition's own.** The batched DLC mounting loop, the Auto Save skip, the Direct Connect overlay's file open, the
+  path cache, the number hash and the signature skip sit where the two games' code differs. This edition's are in
+  `mods.c`, with two only it needs (the keys and the thread priority): a function named in
+  `tools/targets/names/overrides/mods.list` is left out of the translation and defined there, and the rest are pre hooks
+  on hook points. Learn & Play's, and why each differs: [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
+
+What each does:
+
+- **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours and the RSBypass signature skip.
+  - Batched DLC mounting, the faster loading with a large library: the DLC coordinator's update runs its install step,
+    which mounts one archive, for `RS_MODS_BUDGET_MS` a frame (default 50) instead of once. This game's steps need no
+    wait between them: its song list is the same with the budget as with a step a frame
+    ([TESTING.md](TESTING.md#unattended-runs)). Learn & Play's loop has to wait for each mount to be finished, or
+    archives are dropped ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)).
+  - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
+    descriptors of an app started from Finder. The shared start raises it.
+  - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path
+    table's lock. The fix keeps the objects of 1,024 recent paths.
+  - The number-table hash: the game hashes a double by its integer part, so every value in [0, 1) lands in one bucket.
+    The fix hashes the value's bits.
+  - The RSBypass signature skip: the song loader's call of the DSA verifier answers true, so unsigned custom songs load.
+    The verifier's other caller keeps the real check.
+  - This edition only: the keyboard keys the game's character table lacks and the End key in menus; and worker-thread
+    priority, where macOS takes only the two of the game's values that put a thread at the bottom of the scheduler, so a
+    request below the default gets the default.
+- **No intro screens** (`RS_MODS_INTRO=0` plays the intro; shared, a pre hook on `boot_intro_update`): the boot service
+  ticks the intro movie (logos, legal screens, intro video) in its boot phases 2 and 3 and shows the title only once the
+  intro has ended. The movie's model is loaded as usual, but the movie is never started: the tick reports "not busy"
+  until phase 3 has done its steps (archives mounted, venues), and then the intro takes the transition of the game's own
+  skip key. Both parts matter: without the model loaded, or with the intro ended before phase 3's steps, the title
+  screen never gets its menu movie.
+- **Auto Save warning skipped** (`RS_MODS_AUTOSAVE=0` shows the dialog; a pre hook on `autosave_warning`): on
+  `OnSignInFlowComplete` the game's UI event handler restores the player's input mode, shows `RS2AutosaveWarning` and
+  starts a 4 s timer. The hook does the first and leaves out the rest: it stores a token in the handler's dialog slot
+  and a zero in the timer, so the next tick goes on, as it does when the dialog's time is up. A NULL slot would stop the
+  flow on the profile screen.
+- **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original). Two rules of the game's made two players need
+  two cables. The Multiplayer screens ask whether Player 2 is in Real Tone mode and set them to it when not; here a
+  profile on Direct Connect or the microphone counts as in the right mode (a pre hook on `input_mode_is_cable`, this
+  edition's own). And a saved input is restored for Player 1 alone, while Player 2 takes the first free slot; a shared
+  pre hook on `input_bind` finds Player 2's saved input first. It has to be that early: moving the input of a running
+  stream crashes the I/O thread. The menu overlay rewords the notice MULTIPLAYER INPUT SUPPORT, which said Player 2 must
+  use the cable.
+- **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original; shared: `framerate.c`, hooks at eight mid
+  points, `fps_*`, with each game's places in its `mids.map`). The game's frame time is whole milliseconds with no lower
+  bound, and some of its code counts frames, which goes wrong above 60 a second. Calibration sizes its averaging window
+  as the frames of one second over buffers of 100 samples a player, so above 100 frames a second player 1's samples run
+  into player 2's, and it moves the input level one step a frame, so its loop runs faster with the frame rate. The tuner
+  gives a string that drifts two frames before its hold loses ground, and averages levels and notes one a frame for its
+  volume and wrong instrument warnings. A menu panel's hold takes at least 1/15 s off its timer each frame. The hooks
+  put each right by the frame's own time (`framerate.h` has the arithmetic), and only for a frame shorter than a 60 Hz
+  one (under 14.5 ms): at 60 Hz and below the game runs as it always has.
 - **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
   on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
   not the original, the shell compiles the shaders before the game starts loading and then throttles the
@@ -292,43 +293,40 @@ name, looked up when they run. What is still written twice, and why, is in the [
 - **Exit Game.** The main menu's UPLAY, which can't work here, becomes EXIT GAME in the same overlay
   (`ui_menu_pillar_main`: the label, a row the game has in every language, and the `OnSelect`, `ExitGame`). The
   game asks with its own dialog, then quits as it does on Cmd+Q.
-- **Enumerate.** The main menu's SHOP becomes ENUMERATE in the same overlay (the label and sort orders only;
-  its `OnSelect` still opens the Shop). Before it opens the Shop the game asks
-  `ISteamUtils::IsOverlayEnabled`, and it asks nowhere else. The answer here is no, so the Shop never opens: the
-  game stays in the menu and shows a notice, which the overlay rewords. That question is the press. The Steam
-  layer (`shims/steam/src/enumerate.h`, shared with Learn & Play) copies new archives on a thread of its own
-  from the folders in `.rearmed/source.json` into the copy's `dlc/`, then posts `DlcInstalled_t` for 248750,
-  whose listener asks the DLC service to enumerate, and the game mounts what it finds. Only new names are
-  written, through a `.part` file and a rename, so nothing the game has open is touched; each is named in
-  `.rearmed/enumerated.txt`, so a refresh takes it into the manifest and `steam.env`, or removes it when the
-  source no longer has it.
-- **Song ownership during a mount.** The game checks an archive's AppID against the list it made once at start
-  from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later. While the install step runs, a hook
-  on `steam_dlc_owned` answers yes (`mods_shared.c`, the same hook in Learn & Play; each edition's `dlc_update`
-  says when its steps run): an archive in `dlc/` counts as owned, whatever AppID it carries.
-  `RS_MODS_BYPASS=0` asks the list again, and such a song then needs a refresh and a restart.
-- **Title logo.** `tools/loadscreen` builds `static.psarc.rearmed` in the copy (`install.sh`; never in Steam's
-  folder) from the copy's `static.psarc.original` with a "Re-ARMed" tag on the title logo; the launcher uses it
-  when it is there (`RS_REARMED=0` for the original).
+- **Enumerate.** The main menu's SHOP becomes ENUMERATE in the same overlay (the label and sort orders only; its
+  `OnSelect` still opens the Shop). Before it opens the Shop the game asks `ISteamUtils::IsOverlayEnabled`, and it asks
+  nowhere else. The answer here is no, so the Shop never opens: the game stays in the menu and shows a notice, which the
+  overlay rewords. That question is the press. The Steam layer (`shims/steam/src/enumerate.h`, shared with Learn & Play)
+  copies new archives on a thread of its own from the folders in `.rearmed/source.json` into the copy's `dlc/`, then
+  posts `DlcInstalled_t` for 248750, whose listener asks the DLC service to enumerate, and the game mounts what it
+  finds. Only new names are written, so nothing the game has open is touched; `.rearmed/enumerated.txt` names them, so a
+  refresh takes them into the manifest and `steam.env`, or removes one the source no longer has.
+- **Song ownership during a mount** (shared, a pre hook on `steam_dlc_owned`). The game checks an archive's AppID
+  against the list it made once at start from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later.
+  While the install steps run the hook answers yes (each edition's mounting loop says when they do): an archive in
+  `dlc/` counts as owned, whatever AppID it carries. `RS_MODS_BYPASS=0` asks the list again, and such a song then needs
+  a refresh and a restart.
+- **Title logo.** `tools/loadscreen` builds `static.psarc.rearmed` in the copy (`install.sh`; never in Steam's folder)
+  from the copy's `static.psarc.original` with a "Re-ARMed" tag on the title logo; the launcher uses it when it is there
+  (`RS_REARMED=0` for the original). It isn't in the copy's manifest, so a refresh leaves it, except that a new
+  `static.psarc` removes it.
 - **Mods** (`tools/ws7/recomp/runtime/rc_mods.c`, shared): every `.dylib` in `<home>/mods/` is loaded at startup
   (`RS_MODS_PATH` names another folder or one library, `RS_LOAD_MODS=0` loads none). The executable exports the
   runtime, and `tools/ws7/recomp/runtime/rc_mod.h` is what a mod includes: one source and one arm64 dylib for
   this edition and Learn & Play ([recompiler](../recompiler/README.md#overrides-and-hook-points)). What a mod
   has:
-  - **Hook points.** `rc_hook_add_name("game_frame", pre, post, user)` hooks a game function by name. The 21
-    hook points are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has
-    19 of them). A name the game doesn't have gives -1 and a log line. `rc_hook_add` with a game address keeps
-    working; `rc_target()` returns `mac-x64`.
-  - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables
-    (`tools/targets/mac-x64/edits.map` and `mids.map`) have two groups, both for rearmed-mods: `seven_string`,
-    its Seven-String Guitar (618 edits and 122 mid points), and `plain_packages`, its Plain Packages (2 edits and
-    a mid point). Eight more mid points, `fps_*`, are the built-in frame rate fixes'. Fewer edits than Learn & Play's 735: many of this game's six-string loops are unrolled, so
-    where Learn & Play's edits lengthen a loop, mid points of this edition's own (29, `none` in Learn & Play) do
-    the extra strings. 34 of the shared points are `none` here.
-  - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The game's file imports
-    (`open`, `close`, `read`, `pread`, `lseek`, `fstat`, `dup`, `stat`, `fopen`, `opendir`, `readdir`,
-    `closedir`) are bound to the runtime's `rc_file_*`, which ask the mod's provider first; the same interface as
-    Learn & Play's.
+  - **Hook points.** `rc_hook_add_name("game_frame", pre, post, user)` hooks a game function by name. The 21 hook points
+    are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has 19 of them).
+    `rc_hook_add` with a game address keeps working; `rc_target()` returns `mac-x64`.
+  - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables (`tools/targets/mac-x64/edits.map`
+    and `mids.map`) have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar (618 edits and 122
+    mid points), and `plain_packages`, its Plain Packages (2 edits and a mid point). Eight more mid points, `fps_*`, are
+    the built-in frame rate fixes'. Learn & Play has 735 edits: many of this game's six-string loops are unrolled, so
+    where Learn & Play's edits lengthen a loop, 29 mid points of this edition's own (`none` in Learn & Play) do the
+    extra strings. The 34 points only Learn & Play needs are `none` here.
+  - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The game's file imports (`open`,
+    `read`, `stat`, `fopen`, `opendir` and the rest) are bound to the runtime's `rc_file_*`, which ask the mod's
+    provider first; the same interface as Learn & Play's.
   - **Drawing.** The overlay API (`shims/include/rs_overlay.h`) works on both renderers; a mod that changes a
     game texture uses the render API (`shims/include/rs_render.h`, Metal alone). Both: [METAL.md](METAL.md).
 
@@ -338,32 +336,43 @@ name, looked up when they run. What is still written twice, and why, is in the [
 
 ## Installer and build
 
-- `tools/installer/RSReARMedInstaller.swift` (built by `tools/installer/build.sh`) is the GUI. For the Mac
-  game it runs the manual steps of [INSTALL.md](INSTALL.md) with a progress bar: prerequisites, the Python
-  environment, the game image (`decrypt.py`), the shims, the app, the install and the shader warm-up. What the
-  user has to do is shown in a box above the log, from the `guide` lines of `gamefiles.py mac-game`, which finds
-  the game in every Steam library and, when it is installed in none, has Steam download the Mac depot as
-  Learn & Play's is downloaded (below). Its Built-in Mods… sheet writes the chosen
-  edition's `settings.env` (`KEY=0` lines, no file when every mod is on), which that edition's launcher reads at
-  every start; `tools/play-native/test_settings.py` checks that the installer and both launchers have the same
-  keys. The standalone installer builds only a download that is, file for file, the source it was made from:
-  `build.sh` builds in a digest of the source, and the app works it out over what it unpacked before anything
-  runs.
-- **The game from Steam's console** (`gamefiles.py`: `Depot`, `DepotDownload`, `depot_wait`, `SteamLog`,
-  `redirect`; shared with Learn & Play, whose `lp_install.py` adds its own figures and the room for its build:
-  [Windows DESIGN](../windows/DESIGN.md#installer-and-build)). Neither edition needs its game installed in Steam.
-  `mac-game` takes, in this order, the folder the user names, the game installed in a Steam library (the
-  appmanifest says "installed"), and Steam's download of depot 221682 (`steamapps/content/app_221680/
-  depot_221682`), which it starts when the game is nowhere: `steam_osx +download_depot` with the app, depot and
-  manifest of `tools/targets/mac-x64/target.toml`, the same Steam steps and `guide` lines, the same check for
-  room (`mac-game-space`) and link to another disk (`mac-game-redirect`), and a SHA-256 check of the game's
-  program against `target.toml`. A game Steam is installing or updating right then is waited for instead. A
-  downloaded game has no appmanifest and no DLC with it, so what the copy takes from a Steam install comes from
-  elsewhere: the DLC from the DLC depots (`dlc-fetch`, each depot has the `_m` and the `_p` archive), the owned
-  DLC from the account's ownership ticket, the account from the license that has depot 221682
-  (`edition_depots`), custom songs from a Steam library's `common/Rocksmith2014/dlc`; the language is the Steam
-  layer's default, and the saves are there only when the game has run through Steam on this Mac. A refresh of
-  such a copy fetches new DLC first and goes on with Steam's download folder cleared (`depot_source`).
+```
+choose the game ─┬─ Rocksmith 2014 for Mac → the game in Steam, else Steam downloads the depot and the DLC
+                 │                            → static decrypt → shims, app → install → warm shaders → launcher
+                 └─ Learn & Play → free space → Steam downloads the depot and the DLC → game-copy → Microsoft DLLs
+                                    → code image → lp_install.py build → app-install → build-clean → warm shaders
+```
+
+- `tools/installer/RSReARMedInstaller.swift` (built by `tools/installer/build.sh`) is the GUI for both editions. For the
+  Mac game it runs the manual steps of [INSTALL.md](INSTALL.md) with a progress bar: prerequisites, the Python
+  environment, the game image (`decrypt.py`), the shims, the app, the install and the shader warm-up. For Learn & Play
+  it runs [that edition's steps](../windows/DESIGN.md#installer-and-build). What the user has to do is shown in a box
+  above the log, from the `guide` lines of the step that waits. Its Refresh Game Files button runs the installed
+  `gamefiles.py refresh`. Its Built-in Mods… sheet writes the chosen edition's `settings.env` (`KEY=0` lines, no file
+  when every mod is on), which that edition's launcher reads at every start; `tools/play-native/test_settings.py` checks
+  that the installer and both launchers have the same keys. The standalone installer builds only a download that is,
+  file for file, the source it was made from: `build.sh` builds in a digest of the source, and the app works it out over
+  what it unpacked before anything runs.
+- **The game from Steam's console** (`tools/play-native/gamefiles.py`, shared with Learn & Play). Neither edition needs
+  its game installed in Steam. `mac-game` takes, in this order, the folder the user names, the game installed in a Steam
+  library (the appmanifest says "installed"), and Steam's download of depot 221682, which it starts when the game is
+  nowhere; a game Steam is installing or updating right then is waited for instead.
+  - The download: `steam_osx +download_depot` with the app, depot and manifest of the edition's `target.toml` hands the
+    running Steam the command; only if Steam ignores it for 30 seconds does `steam://open/console` open with the command
+    on the clipboard. Steam's state is read from disk (`SteamGate`), and what is left for the user (install Steam, sign
+    in, the right account) comes out as `guide` lines. The installer never handles credentials. steamcmd is not used: it
+    is an Intel binary.
+  - Room: Steam makes every file at full size first, so the whole depot must be free up front (`mac-game-space`); when
+    it isn't, Steam's `steamapps/content` is linked to another disk (`mac-game-redirect`). The game's program is checked
+    against the SHA-256 in `target.toml`.
+  - The DLC (`dlc-fetch`): a downloaded game has none with it. Each DLC is a depot of its own, with the AppID as its id
+    and both the `_m` and the `_p` archive. The DLC the account owns are read from the app ownership ticket in Steam's
+    `localconfig.vdf`, and Steam fetches them one after another with the same command. A state file remembers what is
+    done, and one that fails is named and doesn't stop the install.
+  - A downloaded game has no appmanifest either: the account is the one whose license has depot 221682, custom songs
+    come from a Steam library's `common/Rocksmith2014/dlc`, the language is the Steam layer's default, and the saves are
+    there only when the game has run through Steam on this Mac. A refresh of such a copy fetches new DLC first, and
+    works with Steam's download folder cleared.
 - **The game files** (`tools/play-native/gamefiles.py`, shared with Learn & Play): the install is
   self-contained, with RS Re-ARMed's own copy of the game files next to the installed app: APFS clones, which
   share the data with Steam's files until one side changes, when both are on one volume, else a real copy.

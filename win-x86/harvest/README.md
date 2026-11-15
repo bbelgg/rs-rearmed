@@ -18,8 +18,8 @@ you. How it fits into the install: [docs/windows/INSTALL.md](../../docs/windows/
   with the recorder and zips the result to `Desktop\rs-harvest.zip`.
 - `build.sh`: rebuilds the exe from the source (on a Mac or anywhere with the .NET SDK).
 
-`lp_install.py harvest-export DIR` (run by `tools/play-native/learn-play.sh` and the installer) copies the
-exe, its config and the wrapper into a folder to take to the PC.
+`lp_install.py harvest-export DIR` (run by `tools/play-native/learn-play.sh` and the installer) copies all of
+these, with this file, into a folder to take to the PC.
 
 ## On the Windows PC
 
@@ -35,8 +35,8 @@ exe, its config and the wrapper into a folder to take to the PC.
 The wrapper expects the supported build of the game (SHA-256 `bb056959c0c6371d4ecf78f84c5d27e2fae93a9d0258830c2a36f33e6a2778eb`).
 Another build still captures, with a warning, but the Mac side is pinned to the supported one.
 
-**Not tested:** this net48 build of `rsharvest2.cs` has not been run on Windows yet. The capture the port
-was first built from was made with an earlier, self-contained build of the same harvester.
+**Not tested:** this .NET Framework 4.8 build of `rsharvest2.cs` has not been run on Windows yet; the capture
+the port was first built from was made with an earlier, self-contained build of the same harvester.
 
 ## Verify it yourself
 

@@ -8,7 +8,7 @@
 # rewrites gfxassets/views/logo_elk_final.dds and logo_graded_elk_final.dds (both
 # are used by titlescreen.gfx), and writes the result to <out.psarc>. The install
 # is not touched. Needs a python with Pillow, numpy and etcpak (DXT5 encoder;
-# Pillow's own smears the tag's outline): set RS_PY, or a venv is made in $TMPDIR.
+# Pillow's own smears the tag's outline): set RS_PY, or a venv is made in the build folder.
 set -euo pipefail
 here=$(cd "$(dirname "$0")" && pwd)
 tools=$(dirname "$here")

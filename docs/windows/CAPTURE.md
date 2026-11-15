@@ -1,8 +1,8 @@
 # Getting the Learn & Play game image on a Windows PC
 
-A player with the released installer needs neither path: it unpacks the game on the Mac. These are for a build
-from a clone of the repository, and for making a release. Each takes about 5 minutes on a Windows PC where you own the
-game on Steam.
+A player with the released installer needs neither path: it unpacks the game on the Mac. Path A is for a build
+from a clone of the repository, and takes about 5 minutes on a Windows PC where you own the game on Steam. Path B
+is for making a release, and is done on the Mac, in a Windows VM.
 
 ## Path A: harvest the image
 
@@ -43,9 +43,10 @@ Once per Steam build, by a maintainer. The seed lets `lp_unpack.py` unpack the e
 ships in the released installer app (about 190 KB, no game code), never in git, and with it the installer and
 `learn-play.sh` make the game image by themselves.
 
-The seed is VMProtect's state partway through unpacking. It is made in a QEMU VM running Windows with a GDB stub
-(`qemu_vm.sh`, `qemu_capture.py` and `make_seed.py --from-gdb` in `win-x86/unpack/`), which needs a 32-bit Windows
-ISO. The steps are in [win-x86/unpack/README.md](../../win-x86/unpack/README.md); to put a seed into a release, see
+The seed is VMProtect's state partway through unpacking. It is made on the Mac, in a QEMU VM running Windows with
+a GDB stub (`qemu_vm.sh`, `qemu_capture.py` and `make_seed.py --from-gdb` in `win-x86/unpack/`): about two hours,
+most of it the Windows install. It needs a 32-bit Windows ISO and a Path A capture of the same build. The steps are
+in [win-x86/unpack/README.md](../../win-x86/unpack/README.md); to put a seed into a release, see
 [Shipping the seed](../../win-x86/unpack/README.md#shipping-the-seed). To try one from a clone:
 
 ```bash

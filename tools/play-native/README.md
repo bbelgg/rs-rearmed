@@ -16,9 +16,9 @@ python3 tools/play-native/test_settings.py   # settings.env, read by both editio
 
 `APP` defaults to the build-m4.sh output under `$RS_BUILD_DIR` (default `build/` in the repo). Then start
 **RS Re-ARMed** from `~/Applications`. `RS_NATIVE_HOME` and `RS_NATIVE_LAUNCHER` move the install's folder and
-the launcher; `RS_RENDERER=metal|opengl` sets the renderer, `RS_WARM_SHADERS=0` skips
-the shader warm-up, `RS_GAME_COPY_DIR=DIR` puts the copy of the game files in `DIR/game` (`home` or `drive`: in the install's folder, or
-on the game's drive, moving a copy that is in the other place).
+the launcher; `RS_RENDERER=metal|opengl` sets the renderer, `RS_WARM_SHADERS=0` skips the shader warm-up, and
+`RS_GAME_COPY_DIR=DIR` puts the copy of the game files in `DIR/game` (`home` or `drive`: in the install's folder,
+or on the game's drive, moving a copy that is in the other place).
 
 | File | What |
 |---|---|
@@ -31,10 +31,12 @@ on the game's drive, moving a copy that is in the other place).
 | `warm-shaders.sh` | runs the installed app with `--warm-shaders`, either edition's |
 
 How the Mac launcher runs the game, every launch:
-- **Offline.** Steam shim in stub mode (no Steam client, no Steam Cloud), `[Net] AutoLogin=0` and
+- **Offline.** The Steam layer in stub mode (no Steam client, no Steam Cloud), `[Net] AutoLogin=0` and
   `[Renderer.MacOS] DisableBrowser=1` forced in the copy's `Rocksmith.ini`, and libnetguard refusing every
-  non-local connection. Enter on the title goes straight to the profile list: no Uplay login is shown
-  (`signin_start_no_uplay`).
+  non-local connection. Enter on the title goes straight to the profile list: no Uplay login is shown.
+- **The Steam facts.** The DLC, the language and the account the copy recorded (`game/.rearmed/steam.env`)
+  go to the Steam layer as `RS_STEAM_*` variables, each unless it is set already
+  ([shims/steam](../../shims/steam/README.md#settings)).
 - **Saves copied once.** The real Steam folder is only read, on the first launch, and never written; native
   progress stays in `…/steam`. `crd` (stored Ubisoft credentials) is not copied, and any `crd` in the copy is
   deleted before each launch.

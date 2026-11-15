@@ -19,11 +19,13 @@ If a change needs something from the game, read it from the user's install at bu
 - Keep each commit to one change, with a message that says what it does and why. A pull request is squashed
   into one commit when it's merged, so its title and description should sum up the whole of it.
 - Before reporting a bug in the port, check that it does not also happen in the original game: under
-  Rosetta for the Mac port, on Windows for the Learn & Play port.
-- How each port works and how it is tested: [docs/mac](docs/mac/README.md), [docs/windows](docs/windows/README.md),
-  [docs/recompiler](docs/recompiler/README.md).
-- A change to one port usually has a counterpart in the other: [AGENTS.md](AGENTS.md) says how to handle that, and
-  which tests to run.
+  Rosetta for the Mac edition, on Windows for Learn & Play.
+- How each edition works and how it is tested: [docs/mac](docs/mac/README.md),
+  [docs/windows](docs/windows/README.md), [docs/recompiler](docs/recompiler/README.md).
+- A change to one edition usually has a counterpart in the other: [AGENTS.md](AGENTS.md) says how to handle that,
+  and which tests to run.
+- A change a player or a mod's author will notice gets its entry in
+  [docs/release/next.md](docs/release/next.md) in the same pull request.
 
 ## Licence
 

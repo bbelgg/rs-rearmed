@@ -10,26 +10,28 @@ into the notes as it stands. -->
 - No online features: Ubisoft services are not available.
 - **Not run in the game yet:** two of 1.12.0's fixes, which a test can't reach: the Mac game's restart with the network
   guard when its app is started directly and not through the launcher, and the launcher forcing the game's offline
-  settings when there is no `Rocksmith.ini` yet. Both games have been run on this code started the usual way. If the
+  settings when there is no `Rocksmith.ini` yet. Both editions have been run on this code started the usual way. If the
   game doesn't start after updating, `logs/last-run.log` says why; please open an issue with it.
-- **Played briefly:** the fixes from the code review of 2026-11-09 that 1.14.0 added were played with a guitar
-  for a few songs in each game, not in a long session or in every mode. If the game misbehaves after updating, `logs/last-run.log`
-  says why; please open an issue with it.
-- The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A `Channel`
-  in `guitar-input.ini` makes an interface one entry, which leaves room.
+- **Played briefly:** the fixes from the code review of 2026-11-09 that 1.14.0 added were played with a guitar for a
+  few songs in each edition, not in a long session or in every mode. If the game misbehaves after updating,
+  `logs/last-run.log` says why; please open an issue with it.
+- The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A
+  `Channel` in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
-- **Not played yet:** the frame rate fixes, which make calibration and the tuner run above 60 Hz as they do at 60 Hz, have not
-  been played with a guitar on a display faster than 60 Hz, in either game. `RS_MODS_FRAME_RATE=0` turns them off.
+- **Not played yet:** the frame rate fixes, which make calibration and the tuner run above 60 Hz as they do at 60 Hz,
+  have not been played with a guitar on a display faster than 60 Hz, in either edition. `RS_MODS_FRAME_RATE=0` turns
+  them off.
 - Not tested yet with this release: the Mac game downloaded by Steam when it isn't installed there (checked with a
   stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
   the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game
   files back to the game's drive, the Game files choice in Learn & Play, a run of the installer app for Learn & Play,
-  a build from scratch, a mod serving files in
-  the Mac edition on this code (Learn & Play's was played with 2250 archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac
-  edition, an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game
-  Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an
-  interface while the game runs, and in Multiplayer a cable with an interface, two interfaces, or the swap in Learn & Play.
-  The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+  a build from scratch, a mod serving files in the Mac edition on this code (Learn & Play's was played with 2250
+  archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10
+  or ultrawide screen in the Mac edition, an ultrawide screen in Learn & Play, full screen on a second display in
+  Learn & Play, the music category (Game Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone
+  profile with the Auto Save skip, unplugging an interface while the game runs, and in Multiplayer a cable with an
+  interface, two interfaces, or the swap in Learn & Play. The stuck tone that Prevent Buggy Tones fixes is rare and
+  hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**
@@ -49,7 +51,7 @@ into the notes as it stands. -->
 - Shaders are prepared for what was played in testing. The Guitarcade's games and venues not reached there can stall
   briefly the first time. If you skip Preparing shaders, or after a macOS update, the first play stalls as before: run the
   installer again.
-- The Windows game reads PC song archives (`*_p.psarc`), so a Mac-only custom song collection doesn't load. Official
+- This edition reads PC song archives (`*_p.psarc`), so a Mac-only custom song collection doesn't load. Official
   DLC has both kinds.
 - Two crashes have been seen once each and not reproduced.
 - It uses more memory than the Mac edition (1.5 GB against 1.2 GB) and more CPU (about 10 points of a core in a song).

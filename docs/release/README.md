@@ -22,22 +22,26 @@ the release turns it into `(new in 1.13.0)`. [install.md](install.md) is the not
 | 1. What to check | `tools/release/scope.py` | maps the files changed since the last tag to editions, game builds, suites and game runs |
 | 2. Suites | `tools/release/check.py` | runs those suites, several at a time; a line each and `checks.json` |
 | 3. Game runs | `tools/release/smoke.sh --mac`, `--lp` | one run to the note highway, for the editions step 1 names |
-| 4. The edits | `tools/release/bump.py 1.13.0` | `VERSION`, the issue template, the plans' marks, the notes and a commit message draft |
+| 4. The edits | `tools/release/bump.py 1.13.0` | `VERSION`, the issue template, the plans' marks, `next.md` emptied; the notes and a commit message draft |
 | 5. The commit | by hand | `Release 1.13.0: …`, finished from the draft |
 | 6. The installer | `RS_LP_SEED=… tools/release/package.sh` | the installer with the seed, zipped, with its SHA-256 |
 | 7. Ready? | `tools/release/publish.sh 1.13.0` | every check of the tree, the history, the notes and the zip; sends nothing |
 | 8. Publish | `tools/release/publish.sh 1.13.0 --yes` | the tag, the push, a draft release, the upload compared by download, then published |
 
-Everything the steps write goes to `build/release` (`$RS_RELEASE_OUT`), never into the tree. Steps 2, 3 and 6
-build or run, so they refuse to start while a game is running.
+Step 4 edits the tree. Everything else the steps write (logs, `checks.json`, the notes, the commit message draft,
+the zip) goes to `build/release` (`$RS_RELEASE_OUT`), which git ignores. Steps 2, 3 and 6 build or run, so they
+refuse to start while a game is running.
 
 ### What decides the checks
 
-`scope.py` has one rule per path: the editions a change there reaches, whose game it makes stale, which suites
-cover it and whether a game run is called for. A release of docs and installer changes needs no game build; a
-change under `win-x86/` needs no Mac run; a change to the recompiler, the renderer or the tables needs both. A file
-no rule knows counts as everything and is listed, so give a new directory its rule in the same change. `--all` is
-there for a release you want checked whole.
+`scope.py` has one rule per path prefix, and the longest prefix that matches a file decides for it: the editions
+a change there reaches, whose game it makes stale, which suites cover it and whether a game run is called for. A
+release of docs and installer changes needs no game build; a change under `win-x86/` needs no Mac run; a change to
+the recompiler, the renderer or the tables needs both. What Learn & Play borrows from the Mac edition's folders
+reaches both editions too: the Steam layer's sources (`shims/steam/src`), the shader warm-up
+(`tools/play-native/warm-shaders.sh`) and the scripts' environment (`tools/rs-env.sh`). A file no rule knows
+counts as everything and is listed, so give a new directory its rule in the same change. `--all` is there for a
+release you want checked whole.
 
 What a release leaves unrun is said, not hidden: in the commit's "Checked for the release" paragraph, and in
 known-issues.md's "Not tested yet" entry when a player could meet it.

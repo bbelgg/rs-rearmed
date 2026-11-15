@@ -1,6 +1,6 @@
 # Testing the Mac port
 
-What this repository can test, how to run it, and what needs tooling that is not in it. The Windows port's
+What this repository can test, how to run it, and how the game is run unattended and by hand. Learn & Play's
 tests: [Windows testing](../windows/TESTING.md).
 
 ## Tests in the repository
@@ -21,15 +21,15 @@ game is in the repository.
 | Area | Tests | What they check |
 |---|---|---|
 | Decryption | `steamless.decrypt` (`tools/steamless/test_decrypt.py`) | the key found in a made-up Mach-O, and what is refused; with `RS_DEPOT_GAME` set to a clean Mac depot folder, the real output against the pin |
-| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game |
-| Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
-| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with the Windows port: `settings.env`. The launcher's reader (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
-| Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with the Windows port: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
-| Release tools | `release.tools` (`tools/release/test_release.py`) | shared with the Windows port: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
-| Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names, Learn & Play's own only names `win-x86` has |
-| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with the Windows port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention: what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks; the files a mod serves (`test_files`: `rc_file.h` as descriptors, as a `FILE` and in a folder's listing); the arithmetic of the frame rate fixes (`test_framerate`: `overrides/mods/framerate.h`, with the game's whole-millisecond frame times from 30 to 360 Hz); the built-in fixes both editions share (`test_shared64`, `test_shared32`: `overrides/mods/mods_shared.c` as one object beside each runtime: its switches, log lines and start, and each fix's hook against a game of the test's own, called by that runtime's convention). It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
+| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | shared with Learn & Play: the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game |
+| Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | shared with Learn & Play: the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
+| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with Learn & Play: `settings.env`. The launcher's reader (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
+| Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with Learn & Play: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
+| Release tools | `release.tools` (`tools/release/test_release.py`) | shared with Learn & Play: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
+| Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | shared with Learn & Play: every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names, Learn & Play's own only names `win-x86` has |
+| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with Learn & Play: one mod dylib in the 64-bit and the 32-bit runtime, for each convention (`test_hooks64`, `test_hooks32`): what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks. `test_files`: the files a mod serves (`rc_file.h`) as descriptors, as a `FILE` and in a folder's listing. `test_framerate`: the arithmetic of the frame rate fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times from 30 to 360 Hz. `test_shared64`, `test_shared32` (`test_mods_shared.c`): the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`), as one object beside each runtime: the switches, the log lines and the start, and each fix's hook against a game of the test's own, called by that runtime's convention. It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
 | Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | [The recompiler](#the-recompiler) |
-| Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with the Windows port: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
+| Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with Learn & Play: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
 | Renderer | `opengl.*` (`shims/opengl/test`) | the GL entry-point table and its clients (`opengl.table.clients`), offscreen contexts on both backends, 43 GL sequences run on GL and Metal with their pixels compared (`opengl.metal.*`), every game import with `RS_GL_CHECK=1` (`opengl.metal.coverage`), the Metal disk cache (`opengl.metal.cache`) |
 | Shader translator | `msl.unit`, `msl.verify.builtin`, `msl.verify.corpus` | GLSL to MSL; `msl_verify` runs programs on offscreen GL and Metal with the same inputs and compares pixels, depth and vertex outputs (the corpus test needs shader dumps) |
@@ -39,7 +39,8 @@ game is in the repository.
 | libstdc++ | `libstdcxx.*` | the system library provides the GNU ABI the game needs |
 | Shims | `shim.<name>.macho` | each built shim has the expected architectures and install name (`tools/check-shim.sh`) |
 
-`win-x86.install` and `win-x86.shaders` are in the same CTest run: [Windows testing](../windows/TESTING.md#tests-in-the-repository).
+`win-x86.install` and `win-x86.shaders` are in the same CTest run:
+[Windows testing](../windows/TESTING.md#tests-in-the-repository).
 
 Outside CTest:
 
@@ -76,23 +77,6 @@ and `play-native.cache_overlay` cover what it runs. The app is checked by hand, 
 HOME=/path/to/test-home "tools/installer/RS Re-ARMed Installer.app/Contents/MacOS/RS Re-ARMed Installer"
 ```
 
-**The game without a Steam install** (`gamefiles.py mac-game`, and `install.sh` with a downloaded game) runs
-against the stand-ins of [Windows testing](../windows/TESTING.md#the-installer-app), without touching Steam:
-`RS_STEAM_DIR` at a made-up Steam folder (`logs/console_log.txt`, a `[Logged On, 4, 7] [U:1:42]` line in
-`logs/connection_log.txt`, the account's ticket in `userdata/42/config/localconfig.vdf` for the DLC step),
-`LP_STEAM_EXE` at a script that takes `+download_depot APP DEPOT [MANIFEST]`, writes Steam's lines to the
-console log and fills `steamapps/content/app_APP/depot_DEPOT`, `LP_STEAM_PROCESS` at a small program that is
-running, and `RS_MAC_TARGET` at a `target.toml` with the made-up program's `exe_size` and `exe_sha256`
-(`depot_disk_bytes = 0`), so the real depot is not needed. `mac-game --locate` then fails, `mac-game` sends one
-command and prints `game-from download` and the folder, and `RS_NATIVE_HOME=… RS_NATIVE_LAUNCHER=…
-tools/play-native/install.sh <a built app>` with `RS_GAME_DIR` at that folder fetches each DLC of the ticket and
-copies only the `_m` archives. With the real Steam, the rules of the Windows page hold: point Steam's `content`
-link at a test folder first, and never send a second command while a download runs. A clean download of the
-Mac depot made earlier is found by `mac-game --locate` with nothing sent, and
-`gamefiles.py sync <that folder> <test home>/game --edition mac` shows what an install from it copies. Not yet
-run: the download itself from the real Steam through this code, the installer's window on this route (Finding
-the Mac game, Downloading your DLC), and a game started from such a copy.
-
 Its build folder, logs, the launcher and `~/Library/Application Support/RS Re-ARMed` then go under the test
 home. Its preferences do not: the installer keeps its choices (game, build folder, renderer) in the real user's
 defaults (`UserDefaults`), so a test run changes what the next real run starts with.
@@ -105,11 +89,25 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
   common/Rocksmith2014` to the clean depot, start the app with `-Game mac` from outside the repository (it takes
   the current folder's repository if there is one), and click Build & Install: the only click until the run
   ends, about 20 minutes, with `Rocksmith2014_x64_decrypted` matching the pin.
+- **The game without a Steam install** (`gamefiles.py mac-game`, and `install.sh` with a downloaded game) runs
+  without touching Steam, on the stand-ins of [Windows testing](../windows/TESTING.md#the-installer-app)
+  (`RS_STEAM_DIR`, `LP_STEAM_EXE`, `LP_STEAM_PROCESS`). For this game the made-up Steam folder signs in account
+  42 (`[Logged On, 4, 7] [U:1:42]`) and has its ticket in `userdata/42/config/localconfig.vdf`, for the DLC step;
+  the script takes `+download_depot APP DEPOT [MANIFEST]` and fills `steamapps/content/app_APP/depot_DEPOT`; and
+  `RS_MAC_TARGET` is a `target.toml` with the made-up program's `exe_size` and `exe_sha256` and
+  `depot_disk_bytes = 0`, so the real depot is not needed. `mac-game --locate` then fails, `mac-game` sends one
+  command and prints `game-from download` and the folder, and `RS_NATIVE_HOME=… RS_NATIVE_LAUNCHER=…
+  tools/play-native/install.sh <a built app>` with `RS_GAME_DIR` at that folder fetches each DLC of the ticket
+  and copies only the `_m` archives. A clean download of the Mac depot made earlier is found by
+  `mac-game --locate` with nothing sent, and `gamefiles.py sync <that folder> <test home>/game --edition mac`
+  shows what an install from it copies. With the real Steam, the rules of the Windows page hold. Not yet run:
+  the download itself from the real Steam through this code, the installer's window on this route (Finding the
+  Mac game, Downloading your DLC), and a game started from such a copy.
 - **The window as a run leaves it**, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed` or `update` in
   the app's environment shows the box of a finished install (Start the Game, Show in Finder), of a failed step
   (Try Again, Show Log File), or the title row's button for a newer release. Close (Escape) is at the bottom
-  right once a run has ended, with Build Again beside it. This window (new in 1.14.0) has been looked at in the
-  three previews, not yet after a real run.
+  right once a run has ended, with Build Again beside it. Looked at in the three previews, not yet after a real
+  run.
 - **The standalone installer's check of its download**: `tools/installer/build.sh` prints `source digest:` and
   builds it in, and the app logs `The source is the one this installer was made from` before it runs anything.
   An archive of another commit in `RS_SOURCE_URL` must stop it at Downloading source. Not yet tried through the
@@ -144,9 +142,8 @@ in a cache that has the entries.
 
 ### Unattended runs
 
-The input injector, the virtual audio cable (a recording played into the Real Tone input) and the scripts and
-reference screenshots of the first unattended runs are from the private project RS Re-ARMed was split from and
-are **not in this repository**. What the repository has:
+The repository has no virtual audio cable (a recording played into the Real Tone input), so an unattended run
+of either edition has no guitar input. What it has:
 
 - **`tools/ws8/keyfifo`**: keys for a running game from a FIFO, in either edition. Build it with
   `tools/ws8/keyfifo/build.sh OUTDIR`, start the game's executable with `RS_KEY_FIFO=FILE` and
@@ -158,8 +155,9 @@ are **not in this repository**. What the repository has:
   else on the Mac gets them.
 - **Starting it**: export the variables and start the executable itself, with the launcher's environment
   (`tools/play-native/launch.sh`: `RS_STEAM_MODE=stub`, `RS_STEAM_DATA_DIR`, `RS_NATIVE_HOME`). Through `env`
-  or `nohup` macOS drops every `DYLD_` variable, so neither the guard nor keyfifo loads. Check that
-  `netguard.log` says `mode=block` before going on. A launcher in a test home on an external drive stops at
+  or `nohup` macOS drops every `DYLD_` variable, so neither the guard nor keyfifo loads (a command then leaves
+  no `keyfifo:` line in the log, and no key arrives). In zsh a job started with `&` also runs at nice 5. Check
+  that `netguard.log` says `mode=block` before going on. A launcher in a test home on an external drive stops at
   macOS's prompt for that drive; the executable started directly does not.
 - **The focus**: a key reaches the window only while the game has the focus, and any other app coming forward
   loses it quietly: send `front` before keys. With `RS_KEY_DIRECT=1` keys arrive in front or not. Started from a
@@ -175,15 +173,15 @@ are **not in this repository**. What the repository has:
   `Contents/Resources/launch.sh` adds keyfifo, `HOME`, `CFFIXED_USER_HOME` and any other variable to `open`'s
   `--env`s; without `HOME` the game writes to the real `~/Library/Caches`.
 
-**The screens by key**, from the start to the note highway (the `menu:` name in brackets). Times are from test
-runs: look at a snapshot, or wait for the `menu:` line, rather than count on them.
+**The screens by key**, from the start to the note highway (the `menu:` name in brackets). The times are what
+test runs showed: wait for the `menu:` line, or look at a snapshot, rather than count on them.
 
 | Screen | Keys | Notes |
 |---|---|---|
 | Title (TitleScreen) | Return | up about 8 s after the start with the intro skip, about 31 s without. Give it 6-8 s after it appears: a Return in the fade-in is lost, and Esc there opens EXIT GAME |
 | Profile list (ProfileSelect) | Return | `fwddelete` here deletes the profile. With no profile, Return starts the first-time screens (Down to New profile, Return, a name, Return, then "Have you played Rocksmith before?"). With rearmed-mods' `ForceProfileLoad` the game goes to the main menu by itself |
-| Main menu (MainMenu) | Return on LEARN A SONG | up about 25 s after the profile with a few DLC archives, about 85 s with 2,400; no key is taken while the DLC is enumerated, and a Return sooner is lost. The list: LEARN A SONG, ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, UPLAY |
-| Song list (LearnASong_Songs) | `/`, the letters, Down, Return | `/` opens the search (the Mac binding; Shift is the Windows one), Tab opens SORT BY. The open box says how many songs match: with nothing typed, how many the list has (`263 Matches`). Letters 1.5 s apart; a key down and up in one frame is lost for text. Return with no match leaves the box open |
+| Main menu (MainMenu) | Return on LEARN A SONG | up about 25 s after the profile with a few DLC archives, about 85 s with 2,400; no key is taken while the DLC is enumerated, and a Return sooner is lost. The list: LEARN A SONG, ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, EXIT GAME. ENUMERATE and EXIT GAME are the overlay's: without it (`RS_MODS_OVERLAY=0`) there is no ENUMERATE, and SHOP and UPLAY follow TONE DESIGNER |
+| Song list (LearnASong_Songs) | `/`, the letters, Down, Return | `/` opens the search (Shift in Learn & Play), Tab opens SORT BY. The open box says how many songs match: with nothing typed, how many the list has (`263 Matches`). Letters 1.5 s apart; a key down and up in one frame is lost for text. Return with no match leaves the box open |
 | Song page (LearnASong_SongOptions) | Return on Play Song | |
 | Tuner (LearnASong_PreSongTuner) | `fwddelete`, then Return | up 15-30 s after Play Song. `fwddelete` is Skip Tuner, Return answers "Yes, continue without tuning" about 5 s later. Return on the tuner itself starts Calibration, which waits for a guitar (Esc cancels) |
 | "TUNE UP!" (SelectionListDialog) | Return | instead of the tuner on a profile with no input (DISCONNECTED) |
@@ -196,10 +194,10 @@ runs: look at a snapshot, or wait for the `menu:` line, rather than count on the
   the menus, as a kill loses it.
 - **Without a guitar**: on REAL TONE CABLE or DIRECT CONNECT with nothing connected the tuner stops at "It
   sounds like your cable is unplugged", so set DISCONNECTED first (from REAL TONE CABLE: Ctrl, Down, Right twice,
-  Esc; a kill loses it, so each such run sets it). DISCONNECTED
-  plays songs but greys out Session Mode, Lessons, Guitarcade, Multiplayer and the Tone Designer. Exactly one
-  device named "Rocksmith USB Guitar Adapter" (a Loopback device of that name works) gives REAL TONE CABLE; two
-  give "Two Rocksmith Real Tone Cables have been detected" at the tuner.
+  Esc; a kill loses it, so each such run sets it). DISCONNECTED plays songs but greys out Session Mode, Lessons,
+  Guitarcade, Multiplayer and the Tone Designer. Exactly one device named "Rocksmith USB Guitar Adapter" (a
+  Loopback device of that name works) gives REAL TONE CABLE; two give "Two Rocksmith Real Tone Cables have been
+  detected" at the tuner.
 - **In a song**: Esc pauses (LearnASong_Pause): RESUME, RESTART, TUNER, MIXER, CHORDS, EXIT; Bass has no
   CHORDS. The menu keeps its cursor, so press Up six times before counting Down, keys 0.6 s apart, and look
   before Return: a key is lost now and then. CHORDS lists only the named chords met so far; Esc goes back to the
@@ -217,35 +215,37 @@ runs: look at a snapshot, or wait for the `menu:` line, rather than count on the
   and Return on EXIT GAME? is a normal quit, which saves the profile.
 
 **Checks that have a route.** Learn & Play's counterparts are in
-[Windows testing](../windows/TESTING.md#unattended-runs).
+[Windows testing](../windows/TESTING.md#unattended-runs). The `[rs-mods] ` lines are the built-in fixes', logged
+with `RS_MODS_LOG=1`.
 
 - **No intro screens** (`RS_MODS_INTRO`): boot to the title several times, with the original `cache.psarc`.
-  Snapshots show white, about three seconds of black, then the title, and `RS_MODS_LOG=1` logs `intro: skipped`;
-  with `RS_MODS_INTRO=0` the Ubisoft logo and the legal screens must still show. The failure to look for is the
-  loft fading in with no title on it. Switched off through `settings.env`, the log starts with `[settings]
-  RS_MODS_INTRO=0` and the mods say `intro skip off`; an `RS_NETGUARD=log` line in that file is logged as
-  ignored.
+  Snapshots show white, about three seconds of black, then the title, and the log has `[rs-mods] intro:
+  skipped`; with `RS_MODS_INTRO=0` the Ubisoft logo and the legal screens must still show. The failure to look
+  for is the loft fading in with no title on it. Switched off through `settings.env`, the log starts with
+  `[settings] RS_MODS_INTRO=0` and the fixes' `[rs-mods] fixes on, …` line says `intro skip off`; an
+  `RS_NETGUARD=log` line in that file is logged as ignored.
 - **Auto Save warning** (`RS_MODS_AUTOSAVE`): the main menu comes up after the profile with no dialog, and the
-  log has `auto save warning skipped`; with `RS_MODS_AUTOSAVE=0` the RS2AutosaveWarning dialog comes back. The
-  skip must keep the game's input mode step: a DIRECT CONNECT profile with an interface connected must reach the
-  tuner, not "It sounds like your cable is unplugged". Not checked: a Real Tone cable or Microphone profile, and
-  a cached mode to restore.
-- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `frame rate: on, 8 of 8 points`, and `frame
-  rate: off` with `RS_MODS_FRAME_RATE=0`; `--init-only` is enough to see it. `RS_FPS=120` makes the frames short
-  enough for the hooks to act on a 60 Hz screen, and a route to the highway then goes through the tuner with them.
-  What they do takes a guitar, by hand: at `RS_FPS=120` or `240`, Return on a tuner opens calibration, which should
-  settle as at 60 Hz, and a Guitarcade game's tuner should complete. Not done yet.
-- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): `RS_MODS_LOG=1` logs `DLC: N archives mounted in F frames, T s`
-  once the profile has loaded, which is the end of the mounting. A step that took an archive and mounted nothing
-  would lose its songs, as Learn & Play's did before 1.14.1
-  ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)), so compare the song list of a start with the
-  budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original: the search box of the song list
-  says how many songs there are. With 147 archives in `dlc/`: 263 both ways, mounted in 5 to 8 frames with the
-  budget and in 147 without. Not run that way with a library of thousands.
+  log has `[rs-mods] auto save warning skipped`; with `RS_MODS_AUTOSAVE=0` the RS2AutosaveWarning dialog comes
+  back. The skip must keep the game's input mode step: a DIRECT CONNECT profile with an interface connected must
+  reach the tuner, not "It sounds like your cable is unplugged". Not checked: a Real Tone cable or Microphone
+  profile, and a cached mode to restore.
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): the log has `[rs-mods] frame rate: on, 8 of 8 points`, and
+  `[rs-mods] frame rate: off` with `RS_MODS_FRAME_RATE=0`; `--init-only` is enough to see it. `RS_FPS=120` makes
+  the frames short enough for the hooks to act on a 60 Hz screen, and a route to the highway then goes through
+  the tuner with them. What they do takes a guitar, by hand: at `RS_FPS=120` or `240`, Return on a tuner opens
+  calibration, which should settle as at 60 Hz, and a Guitarcade game's tuner should complete. Not done yet.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log has `[rs-mods] DLC: N archives mounted in F frames,
+  T s` once the profile has loaded, which is the end of the mounting. A step that took an archive and mounted
+  nothing would lose its songs, so compare the song list of a start with the budget with one at
+  `RS_MODS_BUDGET_MS=0`, a step a frame as in the original: the search box of the song list says how many songs
+  there are. The two counts were the same with 147 archives in `dlc/`; not run with a library of thousands.
+- **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
+  REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
+  shows which one the launcher linked.
 - **Direct Connect overlay**: with `game/Update/patcharchives.psarc` made by `cache_overlay.py`, INPUT offers
-  DIRECT CONNECT as a fourth value, and the log has `cache overlay: cache7.7z from Update/patcharchives.psarc`.
-  Without screen control, change the title's `pressstart` label in the overlay's copy of
-  `ui_menu_pillar_startup` and look at a snapshot.
+  DIRECT CONNECT as a fourth value, and the log has `[rs-mods] cache overlay: cache7.7z from
+  Update/patcharchives.psarc`. Without screen control, change the title's `pressstart` label in the overlay's
+  copy of `ui_menu_pillar_startup` and look at a snapshot.
 - **Enumerate**: take a custom song out of the test install's copy, point `source` and `dlc_from` in its
   `.rearmed/source.json` at folders of your own, and put the song in one of them once the main menu is up. Down
   to ENUMERATE, Return: the notice "Looking for new songs…"; Return closes it, Up, Return on LEARN A SONG, then
@@ -338,8 +338,8 @@ What is the same in every run, in both editions:
 - **The song**: Cherub Rock by the search (`/` here, Shift in Learn & Play, then `cher` and Down until the log
   says `song: CherubRock`), Play Song, Skip Tuner and its "continue". The window is 150 s from 45 s after
   `menu: LearnASong_Game`. Cherub Rock is DLC in this edition: its archive has to be in the test home's `dlc/`.
-  With a few thousand archives there the main menu takes no key for about 20 s after it comes up, so the first
-  key there is pressed until the screen changes.
+  With a few thousand archives there the main menu takes no key for about 20 s after it comes up, so a key
+  there is pressed again until the screen changes.
 
 What is measured over the window, into `OUT/<edition>-<n>/result.json` with what the run was (the commit, the
 executable's and the mods' hashes, the settings, the display): when frames went on the screen
@@ -372,7 +372,7 @@ the user's alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-
 - **The full-screen keys**, without a person: System Events brings the game to the front and types the key,
   and the window's frame says what happened (`osascript -e 'tell application "System Events" to keystroke "f"
   using {control down, command down}'`, then `get {position, size} of window 1` of the process `Rocksmith2014`).
-  At the title each of Control-Command-F and Shift-Command-F went from the screen's size to a 1280x720 window
+  At the title each of Control-Command-F and Shift-Command-F goes from the screen's size to a 1280x720 window
   and back.
 - **An interface's channel and gain**: `RS_AUDIO_LOG=1` with a `guitar-input.ini` (`RS_AUDIO_INPUT_FILE` for a
   test one). INPUT to DIRECT CONNECT, the interface from the list, the calibration, then play: the log has
@@ -387,7 +387,7 @@ the user's alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-
   Connect, and swaps the channels. A second player with no input stops the song at "It sounds like Player 2's
   cable is unplugged". With `RS_MODS_LOG=1` the log has `[rs-mods] player 2 on "NAME"` when the fix gives Player
   2's saved input its slot. Not played since that fix became one source with Learn & Play
-  ([PLAN.md](PLAN.md#status)).
+  ([PLAN.md](PLAN.md#open-issues)).
 - **Fallback**: two forced kills (`kill -9`) of Metal starts in a row; the next start must use OpenGL and write
   `opengl` into `renderer` and `renderer-fallback.txt`; a clean quit removes `metal-session`. To take a test
   install back, write `metal` into its `renderer` and delete `renderer-fallback.txt`.
@@ -404,7 +404,7 @@ the user's alone, see [Learn & Play's notes](../windows/TESTING.md#shaders-of-a-
 ### The capture VM
 
 Not applicable: the Mac edition's game is not packed. See
-[the Windows port's notes](../windows/TESTING.md#the-capture-vm).
+[Learn & Play's notes](../windows/TESTING.md#the-capture-vm).
 
 ## Diagnostics
 
@@ -413,7 +413,7 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 
 | Switch | What |
 |---|---|
-| `RS_MODS_LOG=1` | what the built-in fixes apply, and the DLC mounting's end (archives, frames, time), in lines that start `[rs-mods] `, as Learn & Play's |
+| `RS_MODS_LOG=1` | what the built-in fixes apply and the DLC mounting's end (archives, frames, time), in lines that start `[rs-mods] ` |
 | `RS_AUDIO_LOG=1` | device buffers, the real-time thread, dropped input, each level set, each input's channel and its peak and clips every few seconds |
 | `RS_STEAM_LOG=1` | the offline Steam layer's calls (`[steam-shim]`) |
 | `RS_FILE_LOG=1` | each open a mod's file provider served, and each folder listing it added names to (`[rc] file:`) |
@@ -427,14 +427,15 @@ the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switc
 | `RS_CG_LOG=1`, `RS_BINK_DEBUG=1` | the Cg shim's and the Bink shim's own logs |
 | `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | Metal: each new texture content with its hash, RSMods' checksum, size and format, and in `FILE.draws` each kind of draw (program, mode, count, vertex stride, the textures of units 0-3); each content saved to DIR; textures of those hashes drawn as solid magenta, to see what uses them |
 | `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
-| `RS_GL_FRAMETIMES=FILE` | frame times, a line per frame |
+| `RS_GL_FRAMETIMES=FILE` | frame times, an event a line, among them a frame handed over (`F`), the game's frame (`G`), and on Metal a frame on the screen (`P`) and a command buffer on the GPU (`U`) |
 | `RS_METAL_PASS_TIMES=FILE` | Metal: the GPU's time in each render pass of a frame, by its place in the frame, from every eighth frame; with the present, and "between" for the upscaler. The file is rewritten about every 8 s. Read the shares: at a fixed frame rate the GPU's clock follows the load |
+| `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the game's screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's) |
+| `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen (the log has `upscaling WxH to WxH with MetalFX` when it runs); the layer left untagged (not sRGB) |
+| `RS_MODS_…=0`, `RS_MODS_BUDGET_MS=N` | one of the built-in fixes off, and the DLC mounting's time per frame (0: one archive a frame): [INSTALL.md](INSTALL.md#settings-and-switches) |
 | `--renderer-check` | the renderer a start would use, without starting the game |
 | `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
 | `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |
 | `RS_METAL_CACHE=0`, `RS_MTL_COMPILE_THREADS=N`, `RS_METAL_DRAWABLES=2\|3` | no disk cache, the compile pool's size, the drawable count |
-| `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the game's screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's) |
-| `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen (the log has `upscaling WxH to WxH with MetalFX` when it runs); the layer left untagged (not sRGB) |
 | `RS_FPS=N`, `RS_NO_VSYNC=1\|0`, `RS_NO_VSYNC_AFTER=S`, `RS_RENDER_THREAD=0` | a fixed frame rate; swap interval 0 or not, from S seconds on (default 30); the original's frame in the display link's callback |
 | `RS_LUA_TRACE=1` | Lua chunk loads, failed calls and errors |
 | `RC_LOG_UNRESOLVED=1`, `RC_TRACE_INITS=1` | every unresolved bind, each initializer before it runs |
@@ -459,10 +460,11 @@ The game must never call home.
 A release runs the suites and the game runs its changes call for, not all of them: `tools/release/scope.py` maps
 the files changed since the last release to editions, suites and runs, and `tools/release/check.py` runs those
 suites, several at a time, with a line each ([Making a release](../release/README.md)). The suites are the ones
-in [Tests in the repository](#tests-in-the-repository); a new suite gets a line in `scope.py`'s table and a rule
-for the paths it covers. The tools' own test is `release.tools` (`tools/release/test_release.py`).
+in [Tests in the repository](#tests-in-the-repository) and Learn & Play's; a new suite gets a line in
+`scope.py`'s table and a rule for the paths it covers. The tools' own test is `release.tools`
+(`tools/release/test_release.py`).
 
 The Mac edition's run for a release is `tools/release/smoke.sh --mac`, which takes its route from
-`RS_SMOKE_MAC_CMD` since the injector is not in this repository ([Game runs](#game-runs)): a command that plays
-to the note highway and exits 0 (it gets `RS_SMOKE_OUT`, the folder for its log and snapshots). Without one, play
-it by hand to the highway and say so in the release commit.
+`RS_SMOKE_MAC_CMD`: a command that plays to the note highway and exits 0 (it gets `RS_SMOKE_OUT`, the folder for
+its log and snapshots), such as `tools/perf/run.py CONFIG "$RS_SMOKE_OUT" --editions mac --route-only`
+([Measured runs](#measured-runs)). Without one, play it by hand to the highway and say so in the release commit.

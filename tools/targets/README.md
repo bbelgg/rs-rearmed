@@ -2,43 +2,43 @@
 
 Everything the build knows about one game binary — which address a function is at, how its arguments are
 passed, where a field sits in a struct — lives here, one directory per supported binary. The rest of the
-tree uses names only, so the same source builds for every target
-([docs/recompiler](../../docs/recompiler/README.md#per-game-tables) has the design).
+tree uses names only, so the same source builds for every target. This file is the reference for the files
+and what is made of them; [docs/recompiler](../../docs/recompiler/README.md#per-game-tables) has the design.
 
 ```
 tools/targets/
   mac-x64/           the macOS game (Steam, x86-64 Mach-O)
-    target.toml      identity of the image (SHA-256), front end, ABI, image layout; flat `key = value` lines
+    target.toml      identity of the image (SHA-256), front end, ABI, image layout, and what an install pins
+                     (the depot, the program); flat `key = value` lines
     symbols.map      NAME  ADDRESS  CONVENTION  PROTOTYPE   functions and globals the build touches
     offsets.map      NAME  VALUE                            struct fields, sizes, vtable slots (NAME_slot)
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
     edits.map        GROUP  ADDRESS  LEN:CHECK  EDIT        instructions a mod can switch to others (below)
     mids.map         NAME  ADDRESS  (VALUES) [-> CONTS]      mid points: a mod's hook before one instruction (below)
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,063 of 1,263 symbols read, the rest
-                     `unsupported` with the reason; target.toml also has the install pins (the depot, the exe, Microsoft's DLLs)
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files, without drops.map; target.toml also pins
+                     Microsoft's DLLs
     relaxed.map      ADDRESS [+calls] WHY                   relaxed functions relaxed.list doesn't name (xlat/relaxed.py)
   names/             shared by every target
-    overrides/*.list the functions each override module replaces; win32.list is Learn & Play's built-in fixes (its
-                     `NAME wrap`: kept translated beside the native one), the others the Mac's modules
+    overrides/*.list the functions each override module replaces: the Mac's modules, and win32.list, Learn &
+                     Play's built-in fixes (`NAME wrap`: kept translated beside the native one)
     hooks.list       hook points (the names mods use with rc_hook_add_name)
     seam.list        what the platform seam (app/seam_platform.c) calls and reads
     refs.list        other functions and globals native code calls or reads (also the shims/game tests)
     offsets.list     the struct fields, sizes and vtable slots native code uses
     relaxed.list     functions the translator emits without per-access fences (xlat/relaxed.py)
     edits.list       edit groups (rc_edit_enable), mids.list mid points (rc_mid_add_name)
-  targets.py         reads the tables; `gen` writes what one build needs
-  check.py           every name resolves in every target
+  targets.py         reads the tables; `gen` writes what one build needs, `addr NAME...` prints addresses
+  check.py           the lists, the maps and the code agree (below)
   test_targets.py    check.py on the committed tables, and that it catches what it should (ctest: targets.check)
 ```
 
-A map line `NAME unsupported REASON` says a target has no counterpart: an override or hook point is then
-left out of that target's build, and native code that uses the name does not compile for it (code can test
-`#ifndef RC_UNSUPPORTED_<name>`).
+Every target has a line for every name. A map line `NAME unsupported REASON` says the target has no
+counterpart: an override or hook point is then left out of that target's build, and native code that uses the
+name does not compile for it (code can test `#ifndef RC_UNSUPPORTED_<name>`).
 
 ## In a build
 
-`RC_TARGET` (default `mac-x64`) picks the target. `tools/ws7/recomp/app/build-m4.sh` runs
-`targets.py gen OUTDIR/target`, which writes
+`RC_TARGET` (default `mac-x64`) picks the target. `targets.py gen [--target ID] OUTDIR` writes
 
 - `rc_target_names.h`: `RC_ADDR_<name>`, `RC_FN_<name>`, `RC_WFN_<name>`, `RC_CC_<name>`, `RC_OFF_<name>`, used
   through the macros of `tools/ws7/recomp/runtime/rc_abi.h` (`RC_ADDR(name)`, `RC_FN(name)`, `RC_GA(name)`,
@@ -48,30 +48,28 @@ left out of that target's build, and native code that uses the name does not com
 - `rc_target.c`: the names for the runtime: the hook points (`rc_hook_add_name`, `rc_target`), with how each
   one's call looks on a target that isn't SysV, `offsets.map` and `symbols.map` for a mod (`rc_off`, `rc_addr`), and
   the edit groups and mid points (`rc_edit_enable`, `rc_mid_add_name`);
-- `skip/<module>.skip`: the generators' skip lists, from `names/` and `drops.map`: gen_image.py's for the Mac's
-  modules, and gen_image_pe.py's `win32.skip` for Learn & Play (`win-x86/build/translate.sh`,
-  `win-x86/install/lp_build.py`), with an `ADDR wrap` line for a name its list marks `wrap`. The mark is the
-  32-bit generator's (gen_image.py reads `ADDR wrap` as a hook point), so a list that has it makes a skip file
-  for a win32 target only.
+- `skip/<module>.skip`: the generators' skip lists, one per override module (its names' addresses, and its
+  `drops.map` lines as `ADDR drop`), and `hooks.skip` (`ADDR wrap` for each hook point). A name its list marks
+  `wrap` gets an `ADDR wrap` line too. That mark is the 32-bit generator's (`gen_image.py` reads `ADDR wrap` as
+  a hook point), so a list that has it, `win32.list`, makes a skip file for a 32-bit target only.
 
-The override, seam and app builds use that directory (`RC_TARGET_DIR`), or make their own when run alone.
-Learn & Play's build makes win-x86's the same way (`win-x86/build/build.sh`, `build_shims.sh`): its built-in
-fixes (`win-x86/shims/win32_overrides.c`) are compiled against it, and name what they touch as the Mac's do.
-The CMake build makes one per target it needs (`cmake/RSTargetNames.cmake`): the differential tests of
-`shims/game` and `shims/platform` map the Mac image, so they use mac-x64's, and their `RS_ORIG_*`, `RS_KEY_*`
-and `RS_RANGE_*` defines are `RC_ADDR(name)` (`shims/game/include/rs_names.h`). `check.py` reads those
-sources too, and Learn & Play's own (`win-x86/shims`, `win-x86/app`, `win-x86/online`): code built for that game
-alone may use only names `win-x86` has, not ones it marks `unsupported`.
+Who runs it: `tools/ws7/recomp/app/build-m4.sh` for the Mac build, into `OUTDIR/target`, which the override, seam
+and app builds use (`RC_TARGET_DIR`; run alone, each makes its own). Learn & Play's build makes win-x86's the same
+way (`win-x86/build/build.sh`, `translate.sh`, `build_shims.sh`, `win-x86/install/lp_build.py`): the translation
+takes `skip/win32.skip`, and the built-in fixes (`win-x86/shims/win32_overrides.c`) are compiled against
+`rc_target_names.h`, as the Mac's overrides are. The CMake build makes one per target it needs
+(`cmake/RSTargetNames.cmake`): the differential tests of `shims/game` and `shims/platform` map the Mac image, so
+they use mac-x64's, and their `RS_ORIG_*`, `RS_KEY_*` and `RS_RANGE_*` defines are `RC_ADDR(name)`
+(`shims/game/include/rs_names.h`).
 
 ## Hook points on a target with another ABI
 
 The runtime shows a hook the Mac's SysV call whatever the game's convention
 ([docs/recompiler](../../docs/recompiler/README.md#overrides-and-hook-points)), and goes by the prototype in
 `symbols.map`, so a hook point's prototype has to be right (`targets.py hook_abi`; `check.py` fails on one it
-can't read). `hook_abi` compares it with the Mac's:
-the same arguments in the same order, the same kind of result, an integer's width aside. What differs is adapted
-in the prototype, or hooks on that point are refused at run time, with both prototypes in the log line. The forms
-only hook points need:
+can't read). `hook_abi` compares it with the Mac's: the same arguments in the same order, the same kind of
+result, an integer's width aside. What differs is adapted in the prototype, or hooks on that point are refused
+at run time, with both prototypes in the log line. The forms only hook points need:
 
 ```
 frontend_open_file  0x0101ba80  custom    void **(void **out, const char *path@ecx)     # a register argument
@@ -82,12 +80,13 @@ rr_speed_ratio      0x00f89360  cdecl     float<100/x>(float slider_percent)    
 si_open             0x017c50a0  custom    bool<zero>(void *self@edi, int slot, ...)     # the Mac's bool is this result being 0
 ```
 
-A map line `unsupported` on a point can still run: the platform layer takes it with `rc_hook_add_seam` (Learn & Play's
-`input_sink` and `set_app_focus`, `win-x86/shims/win32_input.c`).
+A point a map marks `unsupported` can still run: the platform layer takes it with `rc_hook_add_seam` (Learn &
+Play's `input_sink` and `set_app_focus`, `win-x86/shims/win32_input.c`). So Learn & Play has 19 of the 21 hook
+points, 17 in its table and these two; it lacks `si_io` and `input_mode_is_cable`.
 
-A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose stack
-arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments, so no check
-stands behind those prototypes: 10 of the 17 points `win-x86` has.
+A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose
+stack arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments,
+so no check stands behind those prototypes: 10 of the 17 points `win-x86` has.
 
 ## Edits and mid points
 
@@ -131,8 +130,19 @@ is no count to edit: the Mac needs a mid point of its own that does the extra st
 ## Adding a game function, global or field
 
 1. Add the name to the list in `names/` for the code that uses it.
-2. Add its address (or offset) to every target's map, or mark it `unsupported` there with a reason.
+2. Add its address (or offset) to every target's map, or mark it `unsupported` there with a reason. What two
+   games have in different forms gets a name for each form, `unsupported` in the other target: a name means
+   the same thing wherever it resolves.
 3. Use it by name: `OV_GUEST(path_intern, ...)`, `RC_GA(game_config)`, `RC_OFF(si_state)`.
 
-`python3 tools/targets/check.py` (and the test) fails until every target has it, and also when native code
-uses a name no list has, or Learn & Play's code one that is `unsupported` there. Comments may cite addresses of the Mac binary as evidence; code may not use them.
+Comments may cite addresses of a game binary as evidence; code may not use them.
+
+`python3 tools/targets/check.py` (and the test) fails until every target has the name, and also when
+
+- a map has a name no list has, a list has a name twice, an overridden or hooked name is not a function, or a
+  hook point's prototype can't be shown to a hook;
+- native code uses a name no list has. It reads the override, seam and app sources (`tools/ws7/recomp/overrides`,
+  `app`), the differential tests of `shims/game`, and Learn & Play's own sources (`win-x86/shims`, `win-x86/app`,
+  `win-x86/online`);
+- Learn & Play's own sources, built for that game alone, use a name `win-x86` marks `unsupported`: it would not
+  compile there.

@@ -1,24 +1,29 @@
 # Testing the Windows port
 
 What this repository can test, how to run it, and how the game is run unattended and by hand. The Mac
-port's tests: [Mac testing](../mac/TESTING.md).
+edition's tests: [Mac testing](../mac/TESTING.md).
 
 ## Tests in the repository
 
 None of these needs the game. The probes need Microsoft's or the game's DLLs as inputs; they are read from
-where you point them and never copied into the repository. `OUT=DIR` is a build folder outside the tree.
+where you point them and never copied into the repository. `OUT=DIR` is a build folder outside the tree. The
+ctest names are tests of the root CMake build ([Mac testing](../mac/TESTING.md#tests-in-the-repository)).
 
-| Area | Command | What it checks |
+| Area | Tests | What they check |
 |---|---|---|
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
 | Offline unpack | `python3 -m unittest discover -s win-x86/unpack -p 'test_*.py'` | the seed container and the QEMU capture against a fake GDB stub. With `RS_UNPACK_EXE`, `RS_UNPACK_SEED` (and `RS_UNPACK_SHA256`) also a whole unpack; skipped without them. The release suite `lp.unpack`; not a CTest test |
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md#tests-in-the-repository) |
-| Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac port: the app's own copy of the game files, for both editions, on made-up game folders |
-| Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac port: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
-| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac port: `settings.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launcher's read the same made-up files and must set and log the same; the same keys in both and in the installer |
-| Kernel32 and input | `make -C win-x86/shims/tests test OUT=DIR` | waits (`test_ksync`, run again with `LP_WAKE_ALL=1`): events, mutexes, semaphores, wait-any and wait-all, timeouts, `PulseEvent`, an idle waiter not woken by other objects, a wait keeping objects whose handles are closed; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); files (`test_kfile`: paths per thread, finds, the overlay folder, moves, a file a mod's provider serves); the open-file limit from 256 (`test_nofile`, `rc_nofile.h`, shared with the Mac port); `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game) |
+| Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac edition: the app's own copy of the game files, for both editions, on made-up game folders |
+| Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac edition: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
+| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac edition: `settings.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launcher's read the same made-up files and must set and log the same; the same keys in both and in the installer |
+| Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac edition: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
+| Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac edition: what a change calls for, and a release's edits and notes |
+| Per-game tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac edition: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's; the names this edition's own code uses (`win32_overrides.c`) are in `win-x86`, none `unsupported` there |
+| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac edition, whose page lists the cases ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): `test_hooks32` and `test_shared32` are this edition's runtime, `test_hooks64` and `test_shared64` the Mac's; it also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
+| Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac edition: `guitar-input.ini` and the switches, on made-up buffers |
+| Kernel32 and input | `make -C win-x86/shims/tests test OUT=DIR` | waits (`test_ksync`, run again with `LP_WAKE_ALL=1`): events, mutexes, semaphores, wait-any and wait-all, timeouts, `PulseEvent`, an idle waiter not woken by other objects, a wait keeping objects whose handles are closed; `CloseHandle` against the other handle calls (`test_close`, under the address sanitizer); files (`test_kfile`: paths per thread, finds, the overlay folder, moves, a file a mod's provider serves); the open-file limit from 256 (`test_nofile`, `rc_nofile.h`, shared with the Mac edition); `input_sink` and `set_app_focus` (`test_input`: events held for the game thread, the Mac's values, a pre hook keeping one from the game) |
 | Audio layer | `make -C win-x86/shims/audio test OUT=DIR` (`test_audio --list` prints the endpoints the game would see) | the WASAPI and winmm faces on CoreAudio: endpoints and names, formats, rings, exclusive event mode, trimming |
-| Guitar input | ctest `audio.input` (`shims/coreaudio/test`) | shared with the Mac port: `guitar-input.ini` and the switches, on made-up buffers |
 | Steam face | `make -C win-x86/shims/steam test OUT=DIR` | the guest ABI end to end (`test_steam32`): exports, interface vtables, `thiscall`, callbacks and call results |
 | Online layer | `make -C win-x86/online test OUT=DIR` | the three vtables in guest memory with fake game functions: every replaced slot, the posted events, a layout that does not match left alone |
 | D3D9 layer | `win-x86/test/d3d9_test.sh <cmake build dir> [out dir]` (needs `cmake --build <dir> --target opengl`) | the layer's host test on both libRSOpenGL backends: fixed-function draws checked pixel by pixel, every stage operation, lights, fog, generated texture coordinates, the draw-time upload of dynamic buffers, the wait in Present while the window is hidden |
@@ -26,22 +31,18 @@ where you point them and never copied into the repository. `OUT=DIR` is a build 
 | CRT | `win-x86/crt/tests/build.sh <msvcr100.dll> [<msvcp100.dll>] OUT`, then `OUT/crt_probe <msvcr100.dll> [<msvcp100.dll>] [-v] [-bench] [-eh OUT/eh.dll]` | the translated CRT without the game: start-up, heap, strings, `printf`/`sscanf`, iostreams, `DllMain` attach and detach; `math_probe` (linked in): every native math override against the translated export (result bits, errno, x87 depth, return address); `-bench` times them; `-eh`: C++ throw and catch, unwinding through inner frames, `__except`, `setjmp` and `longjmp` on that CRT (`test/x86/ehcases.py`, needs clang's i386 PE target) |
 | D3DX | `win-x86/d3dx/tests/build.sh <dir with the DLLs> OUT [<cmake dir>]`, then `OUT/d3dx_probe OUT [-v] [step ...]` | the translated d3dx9_42 and D3DCompiler_42: matrices, buffers, the assembler, the HLSL compiler and constant tables, image info, an effect against the D3D9 layer |
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
-| Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac port: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
-| Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port: what a change calls for, and a release's edits and notes |
-| Tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's; the names this port's own code uses (`win32_overrides.c`) are in `win-x86`, none `unsupported` there |
-| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention; the files a mod serves (`test_files`); the arithmetic of the frame rate fixes (`test_framerate`); the built-in fixes both editions share (`test_shared32` is this port's runtime, `test_shared64` the Mac's); `probe_mod.dylib` and `files_mod.dylib` for the game runs ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
 
 ### The recompiler
 
 The 32-bit front end's differential test runs each translated function and the original bytes under
 Unicorn and compares the end state ([recompiler](../recompiler/README.md#tests)). It needs a Python with
-Capstone and Unicorn (Unicorn is for maintainers only and not in `requirements.txt`'s packages:
-`pip install unicorn`):
+Capstone and Unicorn (`$PY` below): a Learn & Play build's venv has both (`win-x86/install/requirements.txt`),
+the root `requirements.txt` has no Unicorn.
 
 ```sh
 cd tools/ws7/recomp
-UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.handcases --out DIR                    # no DLL needed
-UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.innercases --out DIR                   # edits and mid points, no DLL needed
+UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.handcases --out DIR                    # no DLL needed (release suite hand32)
+UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.innercases --out DIR                   # edits and mid points, no DLL (inner32)
 "$PY" -m test.x64.innercases --out DIR                                        # the same for the Mac's front end (ctest recomp.inner64)
 UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.difftest IMAGE.dll --out DIR --cases 6 --jobs 8
 ```
@@ -50,9 +51,9 @@ UC_IGNORE_REG_BREAK=1 "$PY" -m test.x86.difftest IMAGE.dll --out DIR --cases 6 -
 the plain DLLs in the game folder (`bink2w32.dll`, `steam_api.dll`, `systemdetection.dll`) and `msvcr100.dll`
 from the redistributables. None of the four shows a mismatch, so any mismatch is new and worth reading. A case
 where the reference is known not to be hardware counts as `reference_limit`, not as a match: 32 of
-`msvcr100.dll`'s, 5 of `steam_api.dll`'s. `msvcr100.dll` leaves out its import slots: what Unicorn runs there is the value bound to the slot, what was translated is the file's bytes.
-Every math export an image imports is a native override (`win32_crtmath.c`), so the translated ones do not run
-in the game either way.
+`msvcr100.dll`'s, 5 of `steam_api.dll`'s. `msvcr100.dll` leaves out its import slots: what Unicorn runs there is
+the value bound to the slot, what was translated is the file's bytes. Every math export an image imports is a
+native override (`win32_crtmath.c`), so the translated ones do not run in the game either way.
 
 The app build's checks, the seam unit test and the translation's determinism are the Mac edition's:
 [Mac testing](../mac/TESTING.md#the-recompiler).
@@ -81,8 +82,8 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
 - `RS_SOURCE_URL`: a `git archive --prefix=rs-rearmed/` of the commit under test, for the tag that isn't
   published yet. Delete `.installer-version` in the source folder to make it unpack a new one. It has to be the
   commit the app was built at: the app checks the download against the digest `build.sh` built in.
-- `RS_INSTALLER_PREVIEW=installed|failed|update`: the window as such a run leaves it, with nothing run. A run's
-  end is the box above the log: its buttons and Close are in the window.
+- `RS_INSTALLER_PREVIEW=installed|failed|update`: the window as such a run leaves it, with nothing run
+  ([Mac testing](../mac/TESTING.md#installer-tests)).
 - `-BuildFolder`: typing into the field does not work from the background (`app_click` then `app_type` is
   refused), so the folder comes as a launch argument. Starting a run writes it to the real defaults: note
   `defaults read io.github.bbelgg.rs-rearmed.installer` first and put `BuildFolder` back afterwards.
@@ -195,8 +196,8 @@ Tuner, "Yes, continue without tuning"), which `tools/release/smoke.sh --lp` runs
 RS_STEAM_LOG=1 LP_INPUT_SCRIPT='@callback 1101,3:24,10:24,20:24,32:24,44:24,62:75,68:24'
 ```
 
-Runs have lost Returns up to 35 s after the title came up (the cause was not found), so longer scripts keep a
-margin and wait for the DLC (add `RS_MODS_LOG=1`):
+A Return has been lost as late as 35 s after the title came up, so longer scripts keep a margin and wait for
+the DLC (add `RS_MODS_LOG=1`):
 
 | Route | Script |
 |---|---|
@@ -216,35 +217,32 @@ Beside it:
   and the window losing and regaining the keyboard, `audio` as the system's default output changing.
 - **`LP_OFFSCREEN=1`** runs without a window and starts neither script, so the game stays on the title screen
   and a `quit` step never comes. Use `RS_FULLSCREEN=0` for a scripted run.
-- **`tools/ws8/keyfifo`** ([Mac testing](../mac/TESTING.md#unattended-runs)) takes keys one at a time while the
-  game runs, to find a route rather than repeat one: start `rs2014_lp` with `RS_KEY_FIFO=FILE
-  DYLD_INSERT_LIBRARIES=<dir>/libkeyfifo.dylib`, then `echo "key return" > FILE`. In this edition Shift and Ctrl
-  are `lpshift` and `lpctrl`. Send `front` before keys, or the game takes none. `nohup` and `env` drop
-  `DYLD_INSERT_LIBRARIES` (no `keyfifo:` line in the log, and no key arrives): export the variables in the shell
-  and start the binary from it. In zsh a job started with `&` also runs at nice 5. If the log says `lp: the
-  window is hidden` at the title, keys don't arrive, `front` and `RS_KEY_DIRECT=1` included: click the window
-  and press Return by hand, then go on.
-- **Seeing a run**: `RS_GL_SNAPSHOT_DIR=DIR RS_GL_SNAPSHOT_SECS=3` and `RS_GL_FRAMETIMES=FILE`, as on the Mac.
-  For anything measured keep the game's window in front (keyfifo's `front`, and nothing else activated during
-  the run): the full-screen window hides when another app is active, and frame rate and CPU then are not a
-  player's. The rearmed-mods library (`rearmed-mods.dylib` in `<LP_HOME>/mods/`, `RSMods.ini` in the game
-  folder, `RS_MODS_LOG=1`) logs a `menu:` line for each screen. There is no virtual audio cable in this
-  repository, so unattended runs have no guitar input.
+- **`tools/ws8/keyfifo`** takes keys one at a time while the game runs, to find a route rather than repeat one.
+  Its commands and how to start it are in [Mac testing](../mac/TESTING.md#unattended-runs): `rs2014_lp` with
+  `RS_KEY_FIFO=FILE` and `DYLD_INSERT_LIBRARIES=<dir>/libkeyfifo.dylib` exported, then `echo "key return" >
+  FILE`. In this edition Shift and Ctrl are `lpshift` and `lpctrl`. Send `front` before keys, or the game takes
+  none. If the log says `lp: the window is hidden` at the title, keys don't arrive, `front` and
+  `RS_KEY_DIRECT=1` included: click the window and press Return by hand, then go on.
+- **Seeing a run**: snapshots, frame times and rearmed-mods' `menu:` lines, as on the Mac
+  (`RS_GL_SNAPSHOT_DIR=DIR RS_GL_SNAPSHOT_SECS=3`, `RS_GL_FRAMETIMES=FILE`; `rearmed-mods.dylib` in
+  `<LP_HOME>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`). For anything measured keep the game's
+  window in front (keyfifo's `front`, and nothing else activated during the run): the full-screen window hides
+  when another app is active, and frame rate and CPU then are not a player's.
 - **Display sleep**: during a run with a window, `pmset -g assertions` lists `rs2014_lp` with
   `NoDisplaySleepAssertion`, gone after the quit. Waiting out a real screen saver timeout has not been tried.
 
-**The screens by key**, from the start to the note highway (the `menu:` name in brackets). Times are from test
-runs: wait for the log line, or look at a snapshot, rather than count on them.
+**The screens by key**, from the start to the note highway (the `menu:` name in brackets). The times are what
+test runs showed: wait for the `menu:` line, or look at a snapshot, rather than count on them.
 
 | Screen | Keys | Notes |
 |---|---|---|
 | Title (TitleScreen) | Return | up about 9 s after the start with the intro skip, "ENTER Begin" at about 15 s; about 30 s with the intro. 10 s after `menu: TitleScreen` or the `callback 1101` line is safe |
 | Profile list (ProfileSelect) | Return | `fwddelete` here deletes the profile. With no profile, Return starts a new one (below). With rearmed-mods' `ForceProfileLoad` the game goes to the main menu by itself |
-| Main menu (MainMenu) | Return on LEARN A SONG | up about 20 s after the profile; wait for `[rs-mods] DLC:` and 10 s more. From LEARN A SONG down: SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, SHOP; with the overlay the first Down is ENUMERATE. Once in eight runs "The Ubisoft servers are not available" came up over it and took a Return: run again |
+| Main menu (MainMenu) | Return on LEARN A SONG | up about 20 s after the profile; wait for `[rs-mods] DLC:` and 10 s more. The list is the Mac's ([Mac testing](../mac/TESTING.md#unattended-runs)). Now and then "The Ubisoft servers are not available" comes up over it and takes a Return: run again |
 | Mission notices (MissionMenu) | Return on each | Mission Complete, New Mission, on a profile that has them |
 | Song list (LearnASong_Songs) | Shift, the letters, Down, Return | Shift opens the search (`/` on the Mac). The default sort is DATE ADDED, so search rather than count rows. Letters 1.5-2 s apart, the second of two equal letters a second later; a letter is dropped now and then, so read the search text in a snapshot. Esc clears the search (with no match it closes it), and Esc with it closed leaves the list. A new account owns no DLC: Down to the first song with no DLC tag |
 | Song page (LearnASong_SongOptions) | Return on Play Song | a song with only an Alternate Lead shows an X instead of a percentage on the Lead path; it still plays |
-| Tuner (LearnASong_PreSongTuner) | forward delete, then Return | up about 30 s after Play Song on a warm cache. Forward delete is Skip Tuner, Return answers "Yes, continue without tuning". A Return on the tuner starts Calibration, which waits for a guitar (Esc is its Cancel) |
+| Tuner (LearnASong_PreSongTuner) | `fwddelete`, then Return | up about 30 s after Play Song on a warm cache. `fwddelete` (`75` in a script) is Skip Tuner, Return answers "Yes, continue without tuning". Return on the tuner itself starts Calibration, which waits for a guitar (Esc cancels) |
 | "TUNE UP!" (SelectionListDialog) | Return | instead of the tuner on a profile with no input (DISCONNECTED) |
 | Note highway (LearnASong_Game) | | 15-30 s after the tuner |
 
@@ -259,12 +257,11 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   now" saves the profile; a second Esc cancels the question and stays on Path/Input. The choice reaches the
   profile only when the game saves it: a kill loses it.
 - **In a song**: Esc opens the pause menu (LearnASong_Pause): RESUME, RESTART, TUNER, MIXER, CHORDS, EXIT (TUNER
-  and MIXER greyed without an input; in the runs of the stage loop four Downs reached EXIT, so look at a
-  snapshot before Return). EXIT leaves for the song's page in about 8 s, with no dialog; Esc there is the list,
-  Esc again clears its search. Space in the pause menu is Riff Repeater (LearnASong_RiffRepeater, with a notice
-  the first time): Down twice to SPEED, Left moves it, `key fwddelete` resumes. A finished song shows notices
-  that each take Return, and a Return too many starts the next song; a DISCONNECTED song ends on the song's
-  page, with no score screen.
+  and MIXER greyed without an input, and four Downs reach EXIT: look at a snapshot before Return). EXIT leaves
+  for the song's page in about 8 s, with no dialog; Esc there is the list, Esc again clears its search. Space in
+  the pause menu is Riff Repeater (LearnASong_RiffRepeater, with a notice the first time): Down twice to SPEED,
+  Left moves it, `key fwddelete` resumes. A finished song shows notices that each take Return, and a Return too
+  many starts the next song; a DISCONNECTED song ends on the song's page, with no score screen.
 - **The other modes**: SESSION MODE: a first visit shows two notices; Space starts it, then the tuner; Esc, Down,
   Return ends it. NONSTOP PLAY: Return on START, the tuner, the song; Esc pauses with SKIP on top. LESSONS: Down
   to a lesson, Return twice; Esc, Down, Return leaves. A lesson with practice (Bass 101, the third Down from the
@@ -282,33 +279,29 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   and Return on EXIT GAME is the game's own Exit, which saves the profile. keyfifo's `quit` ends the run.
 
 **Checks that have a route.** What is the same in both editions is said once, in
-[Mac testing](../mac/TESTING.md#unattended-runs); this is what differs here.
+[Mac testing](../mac/TESTING.md#unattended-runs), log lines included; this is what differs here.
 
-- **No intro screens** (`RS_MODS_INTRO`): `RS_MODS_LOG=1` logs `[rs-mods] intro: skipped`, as on the Mac (the
-  skip is the same source); snapshots every 3 s show the rest. With `RS_MODS_INTRO=0` the Ubisoft logo is up at
-  about 6 s and the title at about 30 s. The failure to look for is an empty screen after the loading screen.
+- **No intro screens** (`RS_MODS_INTRO`): snapshots every 3 s show what the log line doesn't. With
+  `RS_MODS_INTRO=0` the Ubisoft logo is up at about 6 s and the title at about 30 s. The failure to look for is
+  an empty screen after the loading screen.
 - **Auto Save warning** (`RS_MODS_AUTOSAVE`): with `RS_MODS_AUTOSAVE=0` "WARNING! This game uses an auto save
   feature" comes after "Loading profile…" and clears itself about 4 s later, so take snapshots every 2 s.
   `RC_HOOK_TRACE=autosave_warning` shows the handler either way. Not checked: a Real Tone cable or Microphone
   profile, and the tuner with the switch off.
-- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `[rs-mods] frame rate: on, 8 of 8 points`,
-  and `[rs-mods] frame rate: off` with `RS_MODS_FRAME_RATE=0`. This app has no switch for the frame rate, so on a
-  60 Hz screen the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a
-  guitar ([Mac testing](../mac/TESTING.md#unattended-runs)). Not done yet.
-- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here. With `RS_MODS_LOG=1`, `[rs-mods] DLC: N
-  archives were not mounted` comes before the `archives mounted` line when a step dropped its archive (the seam
-  counts each open of a song archive). The count of songs in the search box, as in
-  [Mac testing](../mac/TESTING.md#unattended-runs), has not been read in this edition.
-- **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
-  REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
-  shows which one the app linked.
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): this app has no switch for the frame rate, so on a 60 Hz screen
+  the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar. Not
+  done yet.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here: `[rs-mods] DLC: N archives were not
+  mounted` comes before the `archives mounted` line when a step dropped its archive (the seam counts each open
+  of a song archive). The count of songs in the search box has not been read in this edition.
+- **Title logo** (`RS_REARMED`): as on the Mac; here the app makes the link, at each start.
 - **Direct Connect overlay**: the INPUT slider has four dots and its last value is DIRECT CONNECT, after which
   Available Inputs is enabled and shows the current input device. With `RS_MODS_OVERLAY=0` it has three (NORMAL,
   MICROPHONE, DISCONNECTED), and on the main menu the seventh Down reaches SHOP, whose Return shows "You must
   enable Steam Community In-Game to access the Shop." with nothing scanned: the game as it was.
 - **Enumerate**: only `dlc_from` in `.rearmed/source.json` needs a folder of your own; copy the song there once
-  `[rs-mods] DLC:` is logged, then the Enumerate script of the table. The log also has a second `[rs-mods] DLC:` line
-  with one archive more. `song folder not there` for the depot's own `dlc` is normal: a depot has none.
+  `[rs-mods] DLC:` is logged, then the Enumerate script of the table. The log also has a second `[rs-mods] DLC:`
+  line with one archive more. `song folder not there` for the depot's own `dlc` is normal: a depot has none.
 - **Song ownership**: put the re-packed archive in the `dlc/` of a game folder of its own and make the copy with
   `gamefiles.Copier` (`steam.env` then lists the new AppID; `RS_PSARC_KEY_IMAGE` is the unpacked code image
   here). A search finds the song; with `RS_STEAM_DLC` set to the list without that AppID it finds nothing.
@@ -322,9 +315,7 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   check, each from the title.
 - **Rocksmith 1 songs** (`RS_STEAM_OWNED`): not run on Learn & Play yet, the test account owns none of them. The
   face's answer is covered by `test_steam32`.
-- **Files a mod serves**, **Decoded song audio**, **The render API in a game**: as on the Mac, with the same
-  dylibs. The render mod logs `[render_mod] on win-x86, API 1`; a song's `.wem` is in `audio/windows/` of
-  `dlc/<song>_p.psarc`.
+- **Files a mod serves**: as on the Mac, with the same dylib.
 - **Mods**: `DIR/probe_mod.dylib` in `<LP_HOME>/mods/` and a script to the note highway, with
   `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:
   probe_mod.dylib` and `[probe]` lines (the overlay, `OV_VCALL`, `si_open`, each key and focus change, `[probe]
@@ -340,11 +331,13 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   points`; a chart logs its RS7X block, its tuning's name (`names: ... -> "B STANDARD 7STR"`), the guitar
   rebuilt with 7 strings and the headstock bound, and `chords: SNG ... freed` on leaving. The snapshots show the
   seventh string, grey, above the low E.
-- **The screen shape**: with `ScreenWidth` and `ScreenHeight` the main screen's size and `Fullscreen=0`, the
-  game opens full screen at that shape: the log has `the game draws WxH at its own shape`, and the mods' `loft:
-  camera` lines show each frustum keeping its 16:9 height. A window's resize: a size that isn't the screen's and
-  `LP_WINDOW_SCRIPT=45:1200x600`; with `Fullscreen=1` and `RS_FULLSCREEN=0` the log says `the game is in full
-  screen (Windowed Mode is not Windowed): its resolution stays`.
+- **Decoded song audio**: as on the Mac; a song's `.wem` is in `audio/windows/` of `dlc/<song>_p.psarc`.
+- **Sharper picture and screen shape**: with `ScreenWidth` and `ScreenHeight` the main screen's size and
+  `Fullscreen=0`, the game opens full screen at that shape: the log has `the game draws WxH at its own shape`,
+  and the mods' `loft: camera` lines show each frustum keeping its 16:9 height. A window's resize: a size that
+  isn't the screen's and `LP_WINDOW_SCRIPT=45:1200x600`; with `Fullscreen=1` and `RS_FULLSCREEN=0` the log says
+  `the game is in full screen (Windowed Mode is not Windowed): its resolution stays`.
+- **The render API in a game**: as on the Mac, with the same dylib, which logs `[render_mod] on win-x86, API 1`.
 - **Riff Repeater's speed and the focus** (`rr_speed_ratio` and `ui_event` with a mod): the slider calls the
   point on each step, and ACCELERATE on goes on calling it in the song. Focus loss: another app in front during
   a song (`open -a Finder`); keyfifo's `front` comes back.
@@ -354,8 +347,8 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   shows any `longjmp` or C++ exception on the way.
 - **Finding which check drops a song**: a name for the function in `tools/targets` (`names/refs.list`, both
   `symbols.map`), a `NAME wrap` line in `names/overrides/win32.list` and an `RC_FN(NAME)` in `win32_overrides.c`
-  that calls `RC_WFN(NAME)` and logs its arguments or result (filtered by the return address, `[esp]` on entry) show
-  what the game does for one song without changing it; one re-translation per set of probes.
+  that calls `RC_WFN(NAME)` and logs its arguments or result (filtered by the return address, `[esp]` on entry)
+  show what the game does for one song without changing it; one re-translation per set of probes.
 
 ### Measured runs
 
@@ -399,22 +392,20 @@ a build that is not installed, wrap the binary in a small `.app` (an `Info.plist
 `CFBundleExecutable` the binary, `LSEnvironment` for `LP_GAME_DIR`, `LP_USER_DIR` and other variables, the
 runtime library next to it).
 
-The full-screen keys are pressed as on the Mac ([Mac testing](../mac/TESTING.md#by-hand-and-with-computer-use)),
-with the process `rs2014_lp`: at the title each of Control-Command-F and Shift-Command-F went from the game's
-full screen to a window of the screen's shape and back, with `lp: window macOS:` lines in the log.
-
-- **An interface's channel and gain**, as on the Mac ([Mac testing](../mac/TESTING.md#by-hand-and-with-computer-use)),
-  with `RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log has `guitar input "<device>": channel N, gain G dB`
-  when the capture stream opens, `input level:` for each level set, and a peak for each open input every five
-  seconds, the microphones among them.
+- **The full-screen keys** are pressed as on the Mac ([Mac testing](../mac/TESTING.md#by-hand-and-with-computer-use)),
+  with the process `rs2014_lp`: at the title each of Control-Command-F and Shift-Command-F goes from the game's
+  full screen to a window of the screen's shape and back, with `lp: window macOS:` lines in the log.
+- **An interface's channel and gain**, as on the Mac, with `RS_AUDIO_LOG=1` and `RS_AUDIO_INPUT_FILE`. The log
+  has `guitar input "<device>": channel N, gain G dB` when the capture stream opens, `input level:` for each
+  level set, and a peak for each open input every five seconds, the microphones among them.
 - **Two players**: load the second profile on its own, `lpctrl`, Down to INPUT, DIRECT CONNECT, Down and Return
   lists the inputs, Return takes `HX Stomp channel 6`, say; leave by the menus, or it isn't saved. Load the
   first profile the same way on another channel, then MULTIPLAYER: a song with each player on their channel.
   With `RS_MODS_LOG=1` the log has `[rs-mods] player 2 on "NAME"` when the fix gives Player 2's saved input its
   slot, and `RC_HOOK_TRACE=input_bind` shows the game's searches for a slot (the input is in `eax`, which the
   trace doesn't print; `esi` points at it in the caller's list of four). A single player's way to the note
-  highway makes no such call (the trace logs none), so only two players check that fix in the game. Not played
-  since the fix became the Mac's source ([PLAN.md](PLAN.md#status)).
+  highway makes no such call, so only two players check that fix in the game. Not played since that fix became
+  one source with the Mac edition ([PLAN.md](PLAN.md#open-issues)).
 - **Full screen on a second display**: not run on Learn & Play. The Mac edition's way of moving the window,
   sending the keys and reading the frame applies; here the game's own full screen comes from its Windowed Mode
   setting.
@@ -437,21 +428,34 @@ over VNC or from the monitor socket (`sendkey`, `screendump`):
   the monitor's `change ide1-cd0` brings files in without a reboot; the shared folder is read only at boot.
 - The game's window covers the desktop while its Steam error is open. `powershell -noexit` from the Run box
   opens on top of it. PowerShell takes about two minutes to start in the guest.
-- The evaluation image says its license is expired; setting the guest's clock back did not change it. A capture
-  takes minutes.
+- The evaluation image says its license is expired, whatever the guest's clock is set to. A capture takes
+  minutes.
 
 ## Diagnostics
 
-The app logs to `<LP_HOME>/logs/last-run.log`, and with mods to `logs/netguard.log`. All off unless set (from
-`getenv` in `win-x86/`, the runtime and the shared shims):
+The app logs to `<LP_HOME>/logs/last-run.log` (the run before in `previous-run.log`), and with mods to
+`logs/netguard.log`. Pass switches to the installed app with `open --env` or `launchctl setenv`
+([INSTALL.md](INSTALL.md#settings-and-switches)). All off unless set. The first rows are those of the Mac
+edition's table, in its order ([Mac testing](../mac/TESTING.md#diagnostics)).
 
 | Switch | What |
 |---|---|
-| `LP_LOG=1\|2\|3` | imports: the first call of each / every call / and every call into the seam's COM objects (D3D9, audio, Steam) with its result; also every `LoadLibrary` and `GetProcAddress` |
-| `LP_LOG_FILES=1\|2` | files the game opens, including the missing ones it probes for |
-| `LP_LOG_DLC_CLOSE=1` | for the first closes of a song archive the game read from, the code addresses on the caller's stack (how the DLC update's head was found) |
+| `RS_MODS_LOG=1` | what the built-in fixes apply and the DLC mounting's end (archives, frames, time), in lines that start `[rs-mods] `; here also the path cache's and number hash's counts, each song-file signature skip and each DLC preview job that fails offline |
+| `RS_AUDIO_LOG=1` | device buffers, stream setups, the real-time threads, dropped input, each level set, each input's channel and its peak and clips every few seconds |
+| `RS_STEAM_LOG=1` | the Steam face's calls (`[steam-shim]`) |
 | `RS_FILE_LOG=1` | each open a mod's file provider served, and each folder listing it added names to (`[rc] file:`) |
 | `RC_HOOK_TRACE=NAME,NAME` | the raw calls of those hook points, the first 8 of each, refused ones too: return address, `ecx edx esi edi`, four stack words, then `eax` and `st0`. The way to check a table's address and prototype in a run |
+| `RS_NETGUARD_BT=1` | with mods: the backtrace of each call the network guard refuses, in `netguard.log` |
+| `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | the texture log, as on the Mac |
+| `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
+| `RS_GL_FRAMETIMES=FILE` | frame times, an event a line, as on the Mac: `F` for each Present, and no game frame (`G`) |
+| `RS_METAL_PASS_TIMES=FILE` | the GPU's time in each render pass of a frame, as on the Mac |
+| `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the game's screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's) |
+| `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen (the log has `upscaling WxH to WxH with MetalFX` when it runs); the layer left untagged (not sRGB) |
+| `RS_MODS_…=0`, `RS_MODS_BUDGET_MS=N` | one of the built-in fixes off, and the DLC mounting's time per frame (0: one archive a frame): [INSTALL.md](INSTALL.md#settings-and-switches) |
+| `LP_LOG=1\|2\|3` | imports: the first call of each / every call / and every call into the seam's COM objects (D3D9, audio, Steam) with its result; also every `LoadLibrary` and `GetProcAddress` |
+| `LP_LOG_FILES=1\|2` | files the game opens, including the missing ones it probes for |
+| `LP_LOG_DLC_CLOSE=1` | for the first closes of a song archive the game read from, the code addresses on the caller's stack |
 | `LP_LOG_TO=FILE` | append the log there |
 | `LP_FRAME_LOG=MS` | every frame longer than MS ms, with the game thread's CPU, context switches and what ran in it (links, file reads, first import calls, exceptions, the slowest COM methods); the frame rate every 10 s |
 | `LP_THREAD_CPU=S` | each thread's CPU over the last S seconds, by name (`w32 game`, `w32 thread <start address>`), and a line of what has gone of the guest's memory: the arena, `VirtualAlloc` and `VirtualFree`, threads made, handles open, GL programs |
@@ -460,37 +464,26 @@ The app logs to `<LP_HOME>/logs/last-run.log`, and with mods to `logs/netguard.l
 | `LP_DUMP_WAITS=S` | each guest thread's pending wait, its handles and their state, every S seconds |
 | `RC32_LOG_RAISE=N` | the first N guest exceptions: code, C++ type, guest and host stack |
 | `LP_SHADER_LOG=DIR` | a line in `DIR/log.tsv` per shader created and program linked, the bytecode in `DIR/sm`, the GLSL in `DIR/glsl` ([Shaders of a run](#shaders-of-a-run)) |
-| `RS_GL_FRAMETIMES=FILE` | a line per Present |
-| `RS_METAL_PASS_TIMES=FILE` | the GPU's time in each render pass of a frame, as on the [Mac](../mac/TESTING.md#diagnostics) |
-| `RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N` | a PNG of the frame every N seconds |
-| `RS_GL_TEX_LOG=FILE`, `RS_GL_TEX_DUMP=DIR`, `RS_GL_TEX_MARK=HASH,HASH` | the texture log, as on the [Mac](../mac/TESTING.md#diagnostics) |
-| `RS_AUDIO_LOG=1` | device buffers, stream setups, real-time threads, dropped input, each level set, each input's peak and clips every few seconds |
-| `RS_STEAM_LOG=1` | the Steam face's calls (`[steam-shim]`) |
-| `RS_MODS_LOG=1` | the built-in fixes: the open-file limit, the DLC mounting's end (archives, frames, time, and the path cache's and number hash's counts), each song-file signature skip, each DLC preview job that fails offline |
-| `RS_MODS_FIXES=0`, `RS_MODS_BUDGET_MS=N`, `RS_MODS_BYPASS=0` | the built-in fixes off, the DLC mounting's time per frame (0: one archive a frame), the song-file signature check on |
-| `RS_NETGUARD_BT=1` | with mods: the backtrace of each call the network guard refuses, in `netguard.log` |
 | `RS_D3D9_DISPLAY=WxH` | the desktop size the game sees |
 | `RS_FULLSCREEN=1\|0` | full screen or a window, whatever the game's setting |
 | `RS_WINDOW_ANY_SHAPE=0` | 16:9 with the game's bars, and a resized window keeps the resolution ([DESIGN.md](DESIGN.md#screen-and-window)) |
 | `RS_METAL_RETINA=1` | render in backing pixels |
-| `RS_METAL_UPSCALE=0`, `RS_METAL_COLORS=vivid` | no MetalFX upscaling on a Retina screen; the layer left untagged (not sRGB) |
-| `RS_METAL_MSAA=1\|2\|4\|8`, `RS_METAL_ANISO=1-16` | MSAA on the screen-sized targets with depth (1 off), the least anisotropy of mipmapped textures (1: the game's) |
 | `RS_AUDIO_RS_NAMES=0` | keep CoreAudio's device names |
 | `RS_AUDIO_FRAMES`, `RS_AUDIO_RT`, `RS_AUDIO_INPUT_TRIM`, `RS_AUDIO_SET_RATE` | the audio policy ([INSTALL.md](INSTALL.md#settings-and-switches)) |
 | `RS_REARMED=0` | the game's own title logo ([INSTALL.md](INSTALL.md#the-title-logo)) |
 | `LP_NATIVE_MATH=0` | the CRT's math translated instead of libm |
 | `LP_NATIVE_MEM=0` | the CRT's `memcpy`, `memmove`, `memset` and `memcpy_s` translated instead of the host's |
 | `LP_QOS=0` | the default QoS for the game's threads |
-| `LP_WAKE_ALL=1` | every wait woken on every change (the old way) |
+| `LP_WAKE_ALL=1` | every wait woken on every change |
 | `LP_D3D9_EAGER=1` | dynamic buffers uploaded at `Unlock` instead of at the draw |
 | `LP_INPUT_SCRIPT`, `LP_INPUT_WAIT`, `LP_WINDOW_SCRIPT`, `LP_OFFSCREEN=1` | [Unattended runs](#unattended-runs) |
 | `LP_GAME_DIR`, `LP_USER_DIR`, `LP_HOME`, `LP_IMAGE`, `LP_DLL_DIR`, `LP_ARGS`, `RS_STEAM_DATA_DIR` | folders, images and the command line (`win-x86/app/lp_main.c`) |
 
 The Steam face also reads the Mac layer's `RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_ID`, `RS_STEAM_PERSONA`,
 `RS_STEAM_LANGUAGE` and `RS_STEAM_KEEP_CREDENTIALS` ([shims/steam/README.md](../../shims/steam/README.md));
-libRSOpenGL's `RS_GL_*`, `RS_MTL_*` and `RS_METAL_*` switches apply as on the Mac
-([Mac testing](../mac/TESTING.md#diagnostics)). The game's own audio log: `[Audio] DumpAudioLog=1` in
-`Rocksmith.ini` writes `audiodump.txt` beside it, listing each input with its USB IDs.
+libRSOpenGL's other `RS_GL_*`, `RS_MTL_*` and `RS_METAL_*` switches apply as on the Mac. The game's own audio
+log: `[Audio] DumpAudioLog=1` in `Rocksmith.ini` writes `audiodump.txt` beside it, listing each input with its
+USB IDs.
 
 ## Offline checks
 
@@ -500,7 +493,7 @@ The game must never call home.
   (`win-x86/shims/win32_net.c`, `win32_misc.c`); with `LP_LOG=1` the log shows each attempt.
 - The Steam face never loads Valve's library and refuses the Ubisoft and Valve DLLs by name.
 - The online layer never reads `crd`; with `LP_LOG_FILES=1`, no `open "crd"` should appear in a run.
-- Without mods the Mac port's network guard is not loaded; these checks are the seam's own. With a mod in
+- Without mods the Mac edition's network guard is not loaded; these checks are the seam's own. With a mod in
   `mods/` the app restarts with `libnetguard.dylib` inserted, and no mod runs without it
   ([Mods](#unattended-runs)); `logs/netguard.log` then starts with `mode=block` and lists every refused
   attempt. The guard's own test is the Mac's (`tools/ws8/netguard/build.sh --test`,
@@ -511,11 +504,11 @@ The game must never call home.
 As on the Mac ([Mac testing](../mac/TESTING.md#release-checks), [Making a release](../release/README.md)):
 `tools/release/scope.py` says which of the suites in [Tests in the repository](#tests-in-the-repository) and
 which game runs a release's changes call for, and `tools/release/check.py` runs the suites. The CRT, D3DX and
-Bink probes and the 32-bit difftest on real DLLs are not among them: run them by
-hand for a change to what they cover.
+Bink probes and the 32-bit difftest on real DLLs are not among them: run them by hand for a change to what they
+cover.
 
 Learn & Play's run for a release is `tools/release/smoke.sh --lp`: the first input script of
 [Unattended runs](#unattended-runs) on a test build (`RS_SMOKE_LP_EXE`, with `LP_GAME_DIR`, `LP_USER_DIR` and
 `RS_STEAM_DATA_DIR` as in [Game runs](#game-runs); `RS_SMOKE_LP_SCRIPT` for another script, `RS_SMOKE_HOLD` for
 the seconds on the highway), a wait once the last key is sent, and a check that the game is still up; the last
-snapshot shows the highway. Not run yet as a script: the input script itself is the verified one.
+snapshot shows the highway. `smoke.sh --lp` itself has not been run yet; its input script is the verified one.

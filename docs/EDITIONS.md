@@ -41,7 +41,8 @@ Learn & Play's changes mostly take things out:
   Rocksmith theme. Official DLC you own works in either. The song archives of the Mac game itself can't be used by
   Learn & Play.
 - **What depended on those songs.** 9 of the 127 prizes, which unlock songs, and one mission, to play a song from the 80s.
-- **Lessons.** A few lessons replace a voice line that had a licensed song in it with a plain one. One lesson video differs.
+- **Lessons.** A few lessons replace a voice line that had a licensed song in it with a plain one. One lesson
+  video differs.
 
 What it adds is small: PS4 and Xbox button art, Uplay key tips and a second cut of the credits video.
 

@@ -24,7 +24,8 @@ notes and empties this file. -->
   `rc_addr` and `rc_call_name` gave nothing for them there.
 - **The built-in fixes log the same lines in both editions.** With `RS_MODS_LOG=1`, Learn & Play's lines start
   `[rs-mods] ` as the Mac's do (they started `mods: `), and its log has the Mac's line of which fixes are on at the
-  start. The switches and their defaults were the same already; they are now read by one piece of code.
+  start; the Mac's log has Learn & Play's line of what a DLC mounting did (`DLC: N archives mounted in F frames, T s`).
+  The switches and their defaults were the same already; they are now read by one piece of code.
 - **Learn & Play: the intro skip and the song ownership during a mount are the Mac's, to a mod as well.** Each was
   a function of Learn & Play's own around the game's, so a mod's hook on `boot_intro_update` or `steam_dlc_owned` ran
   before it; they are now the same pre hooks as on the Mac, added before any mod's, and a mod's hook there runs after

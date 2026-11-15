@@ -206,3 +206,6 @@ or double-click "$(basename "$app" .app)" in $(dirname "$app") (Launchpad and Sp
 macOS asks for microphone access the first time the game listens for your guitar. The game runs
 offline; no Steam client is needed while you play. Logs: ~/Library/Application Support/RS Re-ARMed/learn-play/logs
 EOF
+# Last, so it is what the run ends with (install.sh ends the same way, and so does the installer app's log).
+echo "custom songs (CDLC): put them in \"$game/dlc\", as PC archives (*_p.psarc)."
+echo "The game has them at its next start, or at once with ENUMERATE in its main menu."

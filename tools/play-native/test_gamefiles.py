@@ -672,6 +672,27 @@ class LearnPlay(Base):
         gamefiles.refresh(self.dest, progress=quiet(), is_running=lambda e: False)
         self.assertEqual(self.read("dlc/more_p.psarc"), b"more")
 
+    def test_the_song_folder_is_there_without_dlc(self):
+        # the Windows game's folder has no dlc, and this account no DLC: the folder the installers name is made
+        depot = self.lp_game()
+        shutil.rmtree(os.path.join(depot, "dlc"))
+        self.copier("learn-play", depot).run()
+        self.assertEqual(os.listdir(os.path.join(self.dest, "dlc")), [])
+        self.assertNotIn("dlc", " ".join(self.manifest()["files"]))
+        # a song put in it by hand stays, and the folder with it, whatever a refresh removes
+        write(os.path.join(self.dest, "dlc", "mine_p.psarc"), b"put in the copy by hand")
+        gamefiles.refresh(self.dest, progress=quiet(), is_running=lambda e: False)
+        self.assertEqual(self.read("dlc/mine_p.psarc"), b"put in the copy by hand")
+
+    def test_the_song_folder_stays_when_the_last_dlc_goes(self):
+        depot = self.lp_game()
+        self.copier("learn-play", depot).run()
+        self.assertEqual(self.read("dlc/own_p.psarc"), b"own pc")
+        for n in os.listdir(os.path.join(depot, "dlc")):  # (the folder stays: one that is away removes nothing)
+            os.unlink(os.path.join(depot, "dlc", n))
+        gamefiles.refresh(self.dest, progress=quiet(), is_running=lambda e: False)
+        self.assertEqual(os.listdir(os.path.join(self.dest, "dlc")), [])
+
 
 def ticket(account, licenses, app=221680):
     """An app ownership ticket as localconfig.vdf keeps it (hex)."""

@@ -127,7 +127,8 @@ run; what is done is kept, and Build & Install goes on from there.
   [Mac edition](../mac/INSTALL.md#the-steps). **Renderer** has no effect here ([Renderer](#renderer)).
 
 When a run ends, the box above the log says how: **Start the Game** and **Show in Finder**, or **Try Again** and
-**Show Log File** when a step didn't work. **Close** (or Escape) ends the installer. Later, start
+**Show Log File** when a step didn't work. The log's last lines say where everything is, with the folder for
+[custom songs](#how-the-game-finds-dlc). **Close** (or Escape) ends the installer. Later, start
 **RS Re-ARMed Learn & Play** from `~/Applications` (double-click, Launchpad or Spotlight).
 
 ## Install from a clone
@@ -228,7 +229,10 @@ it starts. Nothing is downloaded by the game, and Steam's folders are read only 
    song the copy has shows, those of the first Rocksmith (4) too
    ([Settings and switches](#settings-and-switches)).
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
-   off in Built-in Mods…, and they must be the PC version, `_p.psarc`.
+   off in Built-in Mods…. Put them straight into `game/dlc`, as the PC version, `_p.psarc`: every install ends
+   by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
+   they carry, and no refresh removes a song you put there. Songs in the Mac game's `dlc` folder in a Steam
+   library work too: a copy or a refresh brings them over.
 4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
    (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
    came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
@@ -253,6 +257,7 @@ makes it again.
 |---|---|
 | `~/Applications/RS Re-ARMed Learn & Play.app` | the game: `rs2014_lp`, libRSOpenGL, the game image and the DLL images; ad-hoc signed |
 | `~/Library/Application Support/RS Re-ARMed/learn-play/game/` | the app's own copy of the game files, the only game folder it reads ([Game files](#game-files)); for a game on another APFS drive a link to `<drive>/RS Re-ARMed/learn-play/game`, where the copy is |
+| `…/learn-play/game/dlc/` | the songs the game has: your DLC, and the place for custom songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `…/learn-play/game/.rearmed/` | the copy's manifest (written last), where it comes from (`source.json`) and the Steam facts (`steam.env`: your installed DLC, the language, the account) |
 | `…/learn-play/game/static.psarc` | a link the app sets at each start: to `static.psarc.original`, the game's own, or `static.psarc.rearmed`, the [title logo](#the-title-logo) |
 | `…/learn-play/game-dir` | the game folder the app reads (one line): `game/` |
@@ -272,8 +277,10 @@ copied into `steam/` (without `crd`).
 
 Start **RS Re-ARMed Learn & Play** from `~/Applications`. It runs offline: no Steam client, no Ubisoft login,
 no network. Enter on the title screen goes straight to the profile list. Custom songs (CDLC) load as they are,
-in their PC version, `*_p.psarc` ([Known issues](#known-issues)); to add one while you play, see
-[Game files](#game-files).
+in their PC version, `*_p.psarc` ([Known issues](#known-issues)): put them in `game/dlc`
+([How the game finds DLC](#how-the-game-finds-dlc)). To add a song while you play, put it there (or in the Mac
+game's `dlc` folder) and press **ENUMERATE** in the main menu: it is in the list a moment later, with no restart.
+Changed or removed songs and new DLC need a [refresh](#game-files).
 
 ### Keys
 

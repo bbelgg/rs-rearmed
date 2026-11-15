@@ -5,6 +5,12 @@ change, in the words the release notes will use: the bold lead says what is now 
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
 
+- **An install ends by saying where custom songs go.** The last lines of the installer's log, and of
+  `install.sh` and `learn-play.sh`, name the game's own `dlc` folder (`~/Library/Application Support/RS
+  Re-ARMed/game/dlc`, or `…/learn-play/game/dlc` for Learn & Play) as the place for custom songs: the Mac
+  archives (`*_m.psarc`) for the Mac game, the PC ones (`*_p.psarc`) for Learn & Play. The game has a song put
+  there at its next start, or at once with ENUMERATE, and no refresh removes it. The folder is now there after
+  every install; a Learn & Play install with no DLC had none. Before, the folder was only in the install guide.
 - **Calibration and the tuner are the same at any frame rate.** The game counts some things in frames, so on a
   display faster than 60 Hz (the 120 Hz screen of a MacBook Pro, say) calibration moved the input level too fast for
   its own average, its samples could run past their buffer (with two players they did from 100 frames a second), and

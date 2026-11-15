@@ -92,6 +92,15 @@ func gameCopyElsewhereNote(_ game: String) -> String {
     return " The game files themselves are on the drive with the game, in \(t) (the folder above leads there): " +
         "to uninstall, delete that folder too."
 }
+// For the log's last lines: where the player's own songs go, the copy's dlc folder. It is always there, a
+// refresh never removes a song put in it (gamefiles.py), and the game reads it at each start and on ENUMERATE.
+// install.sh and learn-play.sh end with the same words.
+func customSongsNote(_ game: String) -> String {
+    let dlc = ((gameCopy(game) + "/dlc") as NSString).abbreviatingWithTildeInPath
+    let kind = game == "learnplay" ? "PC archives (*_p.psarc)" : "Mac archives (*_m.psarc)"
+    return "Custom songs (CDLC): put them in \(dlc), as \(kind). The game has them at its next start, or at once "
+        + "with ENUMERATE in its main menu."
+}
 
 // Where the copy is kept when the game is on another drive (gamefiles.py's RS_GAME_COPY_DIR): on that drive as
 // clones, or on this Mac as a real copy. An install or a refresh moves a copy that is in the other place.
@@ -2110,6 +2119,7 @@ class InstallerWindow: NSWindow {
                 settings, saves and logs are in ~/Library/Application Support/RS Re-ARMed/learn-play: the game no \
                 longer needs Steam's download folder. After new DLC in Steam, click Refresh Game Files. To \
                 uninstall, delete the app and that folder.\(gameCopyElsewhereNote("learnplay"))
+                \(customSongsNote("learnplay"))
                 The installer log is in \(logPath).
                 """
         } else {
@@ -2121,8 +2131,10 @@ class InstallerWindow: NSWindow {
             where_ = """
                 The app is ~/Applications/RS Re-ARMed.app. The game build, its own copy of the game files and your \
                 saves are in ~/Library/Application Support/RS Re-ARMed/: Steam updates or moving the Steam game do \
-                not change it. After new DLC or custom songs, click Refresh Game Files. To uninstall, delete both \
-                (keep the folder learn-play in there if you have Learn & Play).\(gameCopyElsewhereNote("mac"))
+                not change it. After new DLC, or custom songs put in the Steam game's dlc folder, click Refresh Game \
+                Files. To uninstall, delete both (keep the folder learn-play in there if you have Learn & \
+                Play).\(gameCopyElsewhereNote("mac"))
+                \(customSongsNote("mac"))
                 The installer log is in \(logPath).
                 """
         }

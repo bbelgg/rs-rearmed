@@ -166,3 +166,6 @@ if [[ $renderer == metal ]]; then
 else
     echo "shader warm-up skipped (renderer opengl; tools/play-native/warm-shaders.sh prepares them for a switch to Metal)"
 fi
+# Last, so it is what the run ends with (learn-play.sh ends the same way, and so does the installer app's log).
+echo "custom songs (CDLC): put them in \"$home/game/dlc\", as Mac archives (*_m.psarc)."
+echo "The game has them at its next start, or at once with ENUMERATE in its main menu."

@@ -109,7 +109,8 @@ ends the run; what is done is kept, and Build & Install goes on from there.
 - A newer release shows as a button in the title row, which opens its download page.
 
 When a run ends, the box above the log says how: **Start the Game** and **Show in Finder**, or **Try Again** and
-**Show Log File** when a step didn't work. **Close** (or Escape) ends the installer. Later, start **RS Re-ARMed**
+**Show Log File** when a step didn't work. The log's last lines say where everything is, with the folder for
+[custom songs](#how-the-game-finds-dlc). **Close** (or Escape) ends the installer. Later, start **RS Re-ARMed**
 from `~/Applications` (double-click, Launchpad or Spotlight).
 
 ## Build by hand
@@ -292,7 +293,10 @@ Nothing is downloaded by the game, and Steam's folders are read only when you pr
    carries, with the Steam client closed. `RS_STEAM_DLC=all` (with `launchctl setenv`) counts every AppID as
    owned, so every song the copy has shows, those of the first Rocksmith (4) too.
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
-   off in Built-in Mods….
+   off in Built-in Mods…. Put them straight into `game/dlc`, as the Mac version, `_m.psarc`: every install ends
+   by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
+   they carry, and no refresh removes a song you put there. Songs in the Steam game's `dlc` folder work too: a
+   copy or a refresh brings them over.
 4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
    (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
    came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
@@ -317,6 +321,7 @@ makes it again.
 |---|---|
 | `~/Applications/RS Re-ARMed.app` | the launcher |
 | `~/Library/Application Support/RS Re-ARMed/game/` | the game folder the game reads: RS Re-ARMed's own copy of the game files ([Game files](#game-files)), the installed `Rocksmith2014.app` and an offline `Rocksmith.ini`; for a game on another APFS drive a link to `<drive>/RS Re-ARMed/game`, where all of that is |
+| `…/game/dlc/` | the songs the game has: your DLC, and the place for custom songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `…/game/.rearmed/` | the copy's manifest (written last), where it comes from (`source.json`), the Steam facts (`steam.env`: the installed DLC, the language, the account) and the install's `Rocksmith.ini` |
 | `…/game-dir`, `…/game-source`, `…/gamefiles.py` | the folder the game reads, the folder the copy comes from, and the tool that refreshes it |
 | `…/libnetguard.dylib` | the network guard, loaded into the game at every start |
@@ -334,10 +339,10 @@ credentials). The native build never writes your Steam saves.
 ## Playing
 
 Start **RS Re-ARMed** from `~/Applications`. The Steam client is not needed. Enter on the title screen goes
-straight to the profile list. Custom songs (CDLC) in the game's `dlc` folder load as they are. To add a song
-while you play, put it in Steam's `dlc` folder (or `game/dlc`) and press **ENUMERATE** in the main menu: it is in
-the list a moment later, with no restart. Changed or removed songs and new DLC need a
-[refresh](#game-files).
+straight to the profile list. Custom songs (CDLC) load as they are, in their Mac version, `*_m.psarc`: put them
+in `game/dlc` ([How the game finds DLC](#how-the-game-finds-dlc)). To add a song while you play, put it there (or
+in Steam's `dlc` folder) and press **ENUMERATE** in the main menu: it is in the list a moment later, with no
+restart. Changed or removed songs and new DLC need a [refresh](#game-files).
 
 ### Keys
 

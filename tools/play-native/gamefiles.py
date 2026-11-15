@@ -48,6 +48,8 @@ What is copied (DEST/.rearmed/manifest.json lists it; it is written last, so a c
               Steam downloads both kinds).
 In both, the title logo, static.psarc.rearmed, is made in the copy by the install (install.sh; lp_install.py
 title_logo), never in the game folder.
+In both, DEST/dlc is there after a copy, with no archive in it too: the installers end by naming it as the place
+for custom songs. A song put there by hand is not one of the copy's files, so no refresh removes it.
 In both, DEST/static.psarc is a link: to static.psarc.original here, and the launcher and the Learn & Play app
 point it at static.psarc.rearmed at each start when that is there (RS_REARMED=0: the original). A
 static.psarc.rearmed that was made in the copy is removed when static.psarc changes: it was made from the old one.
@@ -1375,6 +1377,9 @@ class Copier:
             while d != self.dest and self._inside(d) and os.path.isdir(d) and not os.listdir(d):
                 os.rmdir(d)
                 d = os.path.dirname(d)
+        # The folder the installers name for the player's own songs, there with no archive in it too (the
+        # Windows game's folder has no dlc, so a Learn & Play copy without DLC had none).
+        self._make_dirs("dlc")
 
         appmanifest = find_appmanifest(self.source, self.steam)
         env_path = os.path.join(meta, STEAM_ENV)

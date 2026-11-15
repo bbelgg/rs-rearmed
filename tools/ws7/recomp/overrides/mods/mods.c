@@ -12,7 +12,6 @@
 #include <errno.h>
 #include <pthread.h>
 #include <sched.h>
-#include <stdarg.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,10 +20,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "framerate.h"
 #include "mods.h"
 #include "rc_hook.h"
-#include "rc_nofile.h"
 
 // libc++'s operator new / delete, as the translated code calls them (nodes and bucket arrays are freed by
 // translated code with operator delete)
@@ -32,47 +29,10 @@ extern void *rs_op_new(size_t) __asm__("__Znwm");
 extern void rs_op_delete(void *) __asm__("__ZdlPv");
 
 // ------------------------------------------------------------------------------------------------
-// Configuration
+// The switches (rs_mods_cfg), the log (rs_mods_logf) and the start are mods_shared.c's, one source with Learn & Play.
 // ------------------------------------------------------------------------------------------------
-static rs_mods_config g_cfg = {.bypass = 1, .fixes = 1, .autosave = 1, .multiplayer = 1, .budget_s = 0.050, .intro = 1};
-static int g_log;
 static atomic_ulong g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed, g_overlaid;
 #define COUNT(x) atomic_fetch_add_explicit(&(x), 1, memory_order_relaxed)
-
-static void logf_(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
-static void logf_(const char *fmt, ...) {
-  if (!g_log) return;
-  va_list ap;
-  va_start(ap, fmt);
-  fputs("[rs-mods] ", stderr);
-  vfprintf(stderr, fmt, ap);
-  fputc('\n', stderr);
-  va_end(ap);
-}
-
-static int env_on(const char *name, int dflt) {
-  const char *v = getenv(name);
-  if (!v || !*v) return dflt;
-  return !(v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F');
-}
-
-void rs_mods_reload_config(void) {
-  g_log = env_on("RS_MODS_LOG", 0);
-  g_cfg.bypass = env_on("RS_MODS_BYPASS", 1);
-  g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
-  g_cfg.intro = env_on("RS_MODS_INTRO", 1);
-  g_cfg.overlay = env_on("RS_MODS_OVERLAY", 1);
-  g_cfg.autosave = env_on("RS_MODS_AUTOSAVE", 1);
-  g_cfg.multiplayer = env_on("RS_MODS_MULTIPLAYER", 1);
-  g_cfg.budget_s = 0.050;
-  const char *b = getenv("RS_MODS_BUDGET_MS");
-  if (b && *b) {
-    char *end;
-    double ms = strtod(b, &end);
-    if (end != b && ms >= 0 && ms <= 1000) g_cfg.budget_s = ms / 1000;
-  }
-}
-const rs_mods_config *rs_mods_config_get(void) { return &g_cfg; }
 
 rs_mods_stats rs_mods_stats_get(void) {
   return (rs_mods_stats){g_path_hits, g_path_misses, g_installed, g_frames, g_bypassed};
@@ -88,19 +48,6 @@ static double elapsed_s(void) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// OS-level fix: open-file limit (rsmacfixes fix 4). The arm64 runtime does it itself, once, at startup.
-// ------------------------------------------------------------------------------------------------
-uint64_t rs_mods_raise_nofile(void) {
-  uint64_t old;
-  int failed;
-  uint64_t now = rc_raise_nofile(&old, &failed);
-  if (now != old || failed)
-    logf_("open-file limit %llu -> %llu%s", (unsigned long long)old, (unsigned long long)now,
-          failed ? " (setrlimit failed)" : "");
-  return now;
-}
-
-// ------------------------------------------------------------------------------------------------
 // End key in menus (rsmacfixes keys()): the game fills the macOS-keycode -> Scaleform-key table at
 // 0x101909f20 at startup; kVK_End (0x77) is missing. Added once the game has filled the table (a known
 // entry is set), and again should the table be rebuilt. Runs on a poller thread (as in the mod) because
@@ -112,12 +59,12 @@ uint64_t rs_mods_raise_nofile(void) {
 #define KEYTAB_CHECK_VALUE 0x24
 
 int rs_mods_keys_poll_once(void) {
-  if (!g_cfg.fixes || !rc_img_lo) return 0;
+  if (!rs_mods_cfg.fixes || !rc_img_lo) return 0;
   volatile uint32_t *t = (volatile uint32_t *)(uintptr_t)RC_GA(scaleform_keycode_table);
   if (t[KEYTAB_CHECK_INDEX] != KEYTAB_CHECK_VALUE || t[KEYTAB_END_INDEX] == KEYTAB_END_VALUE) return 0;
   if (t[KEYTAB_END_INDEX] != 0) return 0;  // something else is there: leave it
   t[KEYTAB_END_INDEX] = KEYTAB_END_VALUE;
-  logf_("keys: End key (menus) added");
+  rs_mods_logf("keys: End key (menus) added");
   return 1;
 }
 
@@ -131,30 +78,25 @@ static void *keys_thread(void *arg) {
 }
 
 static int before_open_file(rc_ctx *c, void *user);
-static int before_dlc_owned(rc_ctx *c, void *user);
 static int before_autosave_warning(rc_ctx *c, void *user);
 static int before_is_cable(rc_ctx *c, void *user);
 static int before_input_bind(rc_ctx *c, void *user);
 
+// The launcher has set the environment by now, so the switches are read here (Learn & Play reads its
+// settings.env in main, and starts from there: lp_mods_init).
 __attribute__((constructor)) static void mods_init(void) {
-  rs_mods_reload_config();
-  if (rc_hook_add_name("frontend_open_file", before_open_file, NULL, NULL)) logf_("no FrontEnd_OpenFile hook point");
-  if (rc_hook_add_name("steam_dlc_owned", before_dlc_owned, NULL, NULL)) logf_("no DLC ownership hook point");
-  if (rc_hook_add_name("autosave_warning", before_autosave_warning, NULL, NULL)) logf_("no Auto Save warning hook point");
+  rs_mods_start();  // mods_shared.c: the switches, the open-file limit, the fixes both editions share
+  if (rc_hook_add_name("frontend_open_file", before_open_file, NULL, NULL))
+    rs_mods_logf("no FrontEnd_OpenFile hook point");
+  if (rc_hook_add_name("autosave_warning", before_autosave_warning, NULL, NULL))
+    rs_mods_logf("no Auto Save warning hook point");
   if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL) ||
       rc_hook_add_name("input_bind", before_input_bind, NULL, NULL))
-    logf_("no two-player input hook points");
-  if (g_cfg.fixes) rs_mods_raise_nofile();
-  if (g_cfg.fixes && !env_on("RS_MODS_NO_THREAD", 0)) {
+    rs_mods_logf("no two-player input hook points");
+  if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
   }
-  logf_("fixes %s, bypass %s, overlay %s, intro skip %s, autosave %s, budget %.0f ms",
-        g_cfg.fixes ? "on" : "off", g_cfg.bypass ? "on" : "off", g_cfg.overlay ? "on" : "off",
-        g_cfg.intro ? "on" : "off", g_cfg.autosave ? "on" : "off", g_cfg.budget_s * 1000);
-  int fr = rs_framerate_init();  // framerate.c: its own switch, RS_MODS_FRAME_RATE
-  if (fr < 0) logf_("frame rate: off");
-  else logf_("frame rate: on, %d of %d points", fr, RS_FR_POINTS);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -212,7 +154,7 @@ static void key_event(rc_ctx *c, uint32_t down) {
   OV_ARGS(a, c);
   (void)OV_U64(a);  // this
   int ch = OV_I32(a);
-  if (g_cfg.fixes) set_key_fixed(c, ch, down);
+  if (rs_mods_cfg.fixes) set_key_fixed(c, ch, down);
   else set_key(c, ch, down);
   ov_ret_void(c);
 }
@@ -244,7 +186,7 @@ void RC_FN(thread_set_priority)(rc_ctx *c) {
       memset(&sp, 0, sizeof sp);
       pthread_getschedparam(th, &policy, &sp);
       sp.sched_priority = want;
-      if (g_cfg.fixes && want < DEFAULT_PRIO) sp.sched_priority = DEFAULT_PRIO;
+      if (rs_mods_cfg.fixes && want < DEFAULT_PRIO) sp.sched_priority = DEFAULT_PRIO;
       pthread_setschedparam(th, policy, &sp);
       *(int32_t *)(self + RC_OFF(thread_priority_index)) = idx;
     }
@@ -282,7 +224,7 @@ static pthread_mutex_t *path_lock(void) {
       g_cache[i].s = NULL;
       g_cache[i].obj = NULL;
     }
-    if (g_cache_table) logf_("path table recreated; MD5 cache dropped");
+    if (g_cache_table) rs_mods_logf("path table recreated; MD5 cache dropped");
     g_cache_table = table;
   }
   return m;
@@ -301,7 +243,8 @@ void RC_FN(path_md5)(rc_ctx *c) {
   void **out = OV_PTR(a, void *);
   const char *s = OV_PTR(a, const char);
   void *obj;
-  if (!g_cfg.fixes || !RC_LD(uint64_t, RC_GA(path_table_lock))) {  // the game's path; the lock is created later than the hook
+  // the game's path with the fixes off, and until its lock is made: later than the hook
+  if (!rs_mods_cfg.fixes || !RC_LD(uint64_t, RC_GA(path_table_lock))) {
     obj = intern_path(s);
     *out = obj;
     OV_RET_PTR(c, obj);
@@ -352,17 +295,8 @@ void RC_FN(path_md5)(rc_ctx *c) {
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
 
-// Mounting an archive asks whether its AppID is in the DLC list the game made once at start, so no answer of the
-// Steam layer can cover a song added while the game runs (shims/steam/src/enumerate.h). During the install step
-// an archive in dlc/ counts as owned, whatever AppID it carries; RS_MODS_BYPASS=0 asks the list.
-static int g_mounting;  // the game thread's
-
-static int before_dlc_owned(rc_ctx *c, void *user) {
-  (void)user;
-  if (!g_mounting || !g_cfg.bypass) return 0;
-  ov_ret_u32(c, 1);
-  return 1;
-}
+// During the install steps an archive in dlc/ counts as owned, whatever AppID it carries: mods_shared.c's hook on
+// steam_dlc_owned, one source with Learn & Play, which rs_mods_mounting tells when the steps run.
 
 // RS_MODS_LOG=1 says what a mounting did once its list is empty, in Learn & Play's words: the archives its steps
 // took, the frames and the time. Learn & Play's steps dropped archives when several ran in a frame, until its loop
@@ -379,7 +313,7 @@ static struct {
 static int mount_step(uint8_t *self, uint64_t o) {
   OV_GUEST(dlc_install_step, o);
   if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) return 0;
-  if (g_log) g_mount.steps++;
+  if (rs_mods_cfg.log) g_mount.steps++;
   return 1;
 }
 
@@ -387,24 +321,25 @@ void RC_FN(dlc_update)(rc_ctx *c) {
   OV_ARGS_OF(dlc_update, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
-  if (g_log && !g_mount.steps) g_mount.t0 = elapsed_s();
+  if (rs_mods_cfg.log && !g_mount.steps) g_mount.t0 = elapsed_s();
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
-  g_mounting = 1;
+  rs_mods_mounting(1);
   unsigned steps = g_mount.steps;
-  if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
     mount_step(self, o);
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
     do {
       if (mount_step(self, o)) COUNT(g_installed);
-    } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < g_cfg.budget_s);
+    } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < rs_mods_cfg.budget_s);
   }
-  g_mounting = 0;
+  rs_mods_mounting(0);
   if (g_mount.steps != steps) g_mount.frames++;
   if (g_mount.steps && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-    logf_("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames, elapsed_s() - g_mount.t0);
+    rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames,
+                 elapsed_s() - g_mount.t0);
     memset(&g_mount, 0, sizeof g_mount);
   }
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;
@@ -452,7 +387,7 @@ static uint64_t hash_orig(double v, int insert) {
   return big ? (uint64_t)rc_cvtt_f64_i64(v - k) ^ 0x8000000000000000ull : (uint64_t)rc_cvtt_f64_i64(v);
 }
 static uint64_t hash_num(double v, int insert) {
-  if (!g_cfg.fixes) return hash_orig(v, insert);
+  if (!rs_mods_cfg.fixes) return hash_orig(v, insert);
   double z = 0.0 + v;  // -0 -> +0
   uint64_t u;
   memcpy(&u, &z, 8);
@@ -636,55 +571,12 @@ void RC_FN(num_dtor)(rc_ctx *c) {
 extern void rs_crypto_dsa_verify(rc_ctx *c);  // the crypto module's adapter (build.sh renames it)
 
 void RC_FN(sng_verify)(rc_ctx *c) {
-  if (g_cfg.bypass && RC_RET_ADDR(c) == RC_GA(sng_load_verify_ret)) {
+  if (rs_mods_cfg.bypass && RC_RET_ADDR(c) == RC_GA(sng_load_verify_ret)) {
     COUNT(g_bypassed);
     ov_ret_u32(c, 1);
     return;
   }
   rs_crypto_dsa_verify(c);
-}
-
-// ------------------------------------------------------------------------------------------------
-// No intro screens. RSBootService (RSBootService.cpp) boots in phases (u32 at boot_phase): 0 and 1 start the
-// services and the preload groups; 2 ("OnInit_Intro") waits for the shader, database, GE, UI, reactive-effects
-// and fork services; 3 runs boot_phase3_steps steps (u32 counter at boot_step: the patch and other archives
-// mounted, the venues) and then loads the start-up sound bank and, once the intro is over, pushes the title
-// screen. Phases 2 and 3 first tick the intro (boot_intro_update: the Scaleform intro movie with the logos,
-// legal screens and intro video) and wait while it returns true. Its state (u32 at boot_intro_state): 0 load
-// the movie's model, 1 wait for it, 2 wait for the movie to start (busy), 3 play (not busy: the boot goes on
-// meanwhile), 4 end (release the model, state 5, start the boot service's 3-second tail timer), 5 done.
-//
-// The game's own skip (in phase 2, just before the tick: a key press once the movie is on its last screen) sets
-// state 4 and clears the playing flag (boot_intro_playing). The skip here takes the same transition, without
-// the movie ever playing: the model is loaded as usual (states 0 and 1); then, instead of starting the movie,
-// the tick reports "not busy" (as it does while the movie plays) until phase 3 has done its steps, and then
-// ends the intro. Both conditions are needed, measured on the Mac build: without the model loaded, or with
-// the intro ended before phase 3's steps, the title screen never gets its menu movie and the game sits on an
-// empty screen (the stall that RSMods' short "fast load" intros also run into, see its QualityOfLife.cpp).
-// The screen is white, then black for a few seconds while the title loads. Only during boot (phases 2 and 3).
-// With RS_MODS_INTRO=0 the intro plays.
-// ------------------------------------------------------------------------------------------------
-static int before_intro_update(rc_ctx *c, void *user) {
-  (void)user;
-  if (!g_cfg.intro) return 0;
-  OV_ARGS(a, c);
-  uint8_t *boot = OV_PTR(a, uint8_t);
-  uint32_t phase = *(uint32_t *)(boot + RC_OFF(boot_phase));
-  uint32_t *state = (uint32_t *)(boot + RC_OFF(boot_intro_state));
-  if ((phase != 2 && phase != 3) || *state < 2 || *state >= 4) return 0;  // loading the model: the original
-  if (phase == 2 || *(uint32_t *)(boot + RC_OFF(boot_step)) < RC_OFF(boot_phase3_steps)) {
-    ov_ret_u32(c, 0);  // not busy, the movie not started
-    return 1;
-  }
-  logf_("intro: skipped");
-  *state = 4;  // the game's skip: the original ends the intro (state 5) and starts the tail timer
-  boot[RC_OFF(boot_intro_playing)] = 0;
-  return 0;
-}
-
-__attribute__((constructor)) static void intro_init(void) {
-  if (rc_hook_add(RC_ADDR(boot_intro_update), before_intro_update, NULL, NULL))
-    fputs("[rs-mods] intro: no boot_intro_update hook point\n", stderr);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -729,7 +621,7 @@ static int autosave_token_ready(void) {
 
 static int before_autosave_warning(rc_ctx *c, void *user) {
   (void)user;
-  if (!g_cfg.autosave) return 0;
+  if (!rs_mods_cfg.autosave) return 0;
   OV_ARGS(a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   const char *cat = OV_PTR(a, const char);
@@ -746,7 +638,7 @@ static int before_autosave_warning(rc_ctx *c, void *user) {
   // A foreign object already in the slot is left alone: the zeroed timer below hurries it the same way.
   if (*slot == NULL) *slot = g_autosave_token;
   RC_ST(double, self + RC_OFF(autosave_timer), 0.0);
-  logf_("auto save warning skipped");
+  rs_mods_logf("auto save warning skipped");
   ov_ret_void(c);
   return 1;
 }
@@ -806,7 +698,8 @@ static int any_input(uint8_t mode) { return mode == MODE_MIC || mode == MODE_DIR
 static int before_is_cable(rc_ctx *c, void *user) {
   (void)user;
   OV_ARGS(a, c);
-  if (!g_cfg.multiplayer || OV_U32(a) != PLAYER_2 || !any_input((uint8_t)OV_GUEST(input_mode, PLAYER_2))) return 0;
+  if (!rs_mods_cfg.multiplayer || OV_U32(a) != PLAYER_2 || !any_input((uint8_t)OV_GUEST(input_mode, PLAYER_2)))
+    return 0;
   ov_ret_u32(c, 1);
   return 1;
 }
@@ -828,7 +721,7 @@ static void profile_string(const void *key, char *out, size_t n) {
 static int before_input_bind(rc_ctx *c, void *user) {
   (void)user;
   OV_ARGS(a, c);
-  if (!g_cfg.multiplayer || OV_U32(a) != INPUT_P2_GUITAR) return 0;
+  if (!rs_mods_cfg.multiplayer || OV_U32(a) != INPUT_P2_GUITAR) return 0;
   uint8_t mode = (uint8_t)OV_GUEST(input_mode, PLAYER_2);
   if (!any_input(mode)) return 0;
   int32_t *binding = (int32_t *)RC_GA(input_binding);
@@ -846,7 +739,7 @@ static int before_input_bind(rc_ctx *c, void *user) {
   int32_t held = binding[slot];  // a microphone input takes any slot, and finds another
   if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
     binding[slot] = INPUT_P2_GUITAR;
-    logf_("player 2 on \"%s\"", name);
+    rs_mods_logf("player 2 on \"%s\"", name);
   }
   return 0;
 }
@@ -856,13 +749,13 @@ static int before_open_file(rc_ctx *c, void *user) {
   OV_ARGS(a, c);
   uint64_t out = OV_U64(a);
   const char *path = OV_PTR(a, const char);
-  if (!g_cfg.overlay || !out || !path || !is_cache_7z(path)) return 0;
+  if (!rs_mods_cfg.overlay || !out || !path || !is_cache_7z(path)) return 0;
   char alt[64];
   if (snprintf(alt, sizeof alt, "patchupdate/%s", path) >= (int)sizeof alt) return 0;
   OV_GUEST(frontend_open_file, out, (uint64_t)(uintptr_t)alt);
   if (!*(uint64_t *)(uintptr_t)out) return 0;  // not in the overlay: the original opens it from cache.psarc
   COUNT(g_overlaid);
-  logf_("cache overlay: %s from Update/patcharchives.psarc", path);
+  rs_mods_logf("cache overlay: %s from Update/patcharchives.psarc", path);
   ov_ret_u64(c, out);
   return 1;
 }

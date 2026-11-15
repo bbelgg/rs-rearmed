@@ -8,7 +8,8 @@
     tools/targets/<id>/edits.map     GROUP ADDRESS LEN:CHECK EDIT        (instructions a mod can switch to others)
     tools/targets/<id>/mids.map      NAME ADDRESS (VALUES) [-> CONT=ADDRESS, ...]   (mid points: hooks before an
                                                                           instruction inside a function)
-    tools/targets/names/             which names are overridden, hooked, called or read (shared by all targets)
+    tools/targets/names/             which names are overridden, hooked, called or read (shared by all targets); an
+                                     override list's `NAME wrap` keeps the function translated beside the native one
 
 A map line `NAME unsupported REASON...` says the target has no counterpart; the name then resolves to
 nothing there (an override or hook point is left out, code that uses it does not compile for that target).
@@ -187,30 +188,39 @@ def target_ids(base=HERE):
 
 
 # --- names/ ---------------------------------------------------------------------------------------
-def read_list(path):
-    """Names, one per line (the first word; the rest of the line is a comment)."""
+def read_list(path, wraps=None):
+    """Names, one per line; what follows # is a comment. With `wraps` (a set: an override module's list), a line
+    `NAME wrap` puts the name there too: the function stays translated, as W_<addr>, beside the module's native one
+    (the 32-bit generator's: gen_skip)."""
     out = []
     with open(path) as f:
         lines = f.readlines()
     for ln in lines:
-        s = _strip(ln)
-        if s:
-            name = s.split()[0]
-            if not IDENT.match(name):
-                raise TargetError("%s: bad name %r" % (path, name))
-            out.append(name)
+        p = _strip(ln).split()
+        if p:
+            if not IDENT.match(p[0]):
+                raise TargetError("%s: bad name %r" % (path, p[0]))
+            if len(p) > 1 and (wraps is None or p[1:] != ["wrap"]):
+                raise TargetError("%s: %s: one name a line%s" % (path, p[0], "" if wraps is None else ", or NAME wrap"))
+            if len(p) > 1:
+                wraps.add(p[0])
+            out.append(p[0])
     return out
 
 
-def name_lists(base=HERE):
-    """{'overrides/<module>': [...], 'hooks': [...], 'seam': [...], 'refs': [...], 'offsets': [...]}"""
+def name_lists(base=HERE, wraps=None):
+    """{'overrides/<module>': [...], 'hooks': [...], 'seam': [...], 'refs': [...], 'offsets': [...]}. wraps (a dict)
+    gets {'overrides/<module>': the names its list marks `wrap`}."""
     d = {}
     names = os.path.join(base, "names")
     for dp, _, fs in os.walk(names):
         for f in sorted(fs):
             if f.endswith(".list"):
                 rel = os.path.relpath(os.path.join(dp, f), names)[:-5]
-                d[rel] = read_list(os.path.join(dp, f))
+                marked = set() if rel.startswith("overrides/") else None
+                d[rel] = read_list(os.path.join(dp, f), marked)
+                if wraps is not None and marked:
+                    wraps[rel] = marked
     return d
 
 
@@ -229,7 +239,10 @@ def gen_header(t):
     if "text" in t.info:
         L += ["#define RC_TARGET_TEXT_LO 0x%xull" % t.info["text"][0],
               "#define RC_TARGET_TEXT_HI 0x%xull" % t.info["text"][1]]
+    pe = t.info.get("abi") == "win32"   # gen_image_pe.py's: a function that is replaced and a hook point is N_<addr>
     L += ["", "// RC_ADDR_<name>: unslid image address; RC_FN_<name>: the F_ symbol of a function;",
+          "// RC_WFN_<name>: its W_ symbol, the translated function where the build wraps it%s;"
+          % (", and RC_NFN_<name>: its N_ symbol,\n// the native function of a hook point (gen_image_pe.py)" if pe else ""),
           "// RC_CC_<name>: its calling convention (RC_CC_SYSV, RC_CC_CDECL, RC_CC_STDCALL, RC_CC_THISCALL, ...)"]
     for name in sorted(t.symbols):
         a, conv, _ = t.symbols[name]
@@ -237,6 +250,9 @@ def gen_header(t):
         if conv not in ("data", "code"):
             # a build may give an override's F_ symbol another name (-DRC_FN_<name>=...)
             L += ["#ifndef RC_FN_%s" % name, "#define RC_FN_%s F_%x" % (name, a), "#endif"]
+            L.append("#define RC_WFN_%s W_%x" % (name, a))
+            if pe:
+                L.append("#define RC_NFN_%s N_%x" % (name, a))
             L.append("#define RC_CC_%s RC_CC_%s" % (name, conv.upper()))
     L += ["", "// RC_OFF_<name>: struct field offsets"]
     for name in sorted(t.offsets):
@@ -567,13 +583,21 @@ def gen_runtime_c(t, lists):
     return "\n".join(L)
 
 
-def gen_skip(t, lists):
-    """{module: text} of gen_image.py --skip files: the override modules, `drop` lines, hooks (`wrap`)."""
+def gen_skip(t, lists, wraps=None):
+    """{module: text} of gen_image.py and gen_image_pe.py --skip files: the override modules, `drop` lines, hooks
+    (`wrap`). A name its list marks `wrap` (name_lists' wraps) is an `ADDR wrap` line, which is gen_image_pe.py's:
+    gen_image.py reads `ADDR wrap` as a hook point and would make an F_ of its own beside the module's. So a module
+    with such marks has a skip file on a win32 target only."""
     out = {}
+    pe = t.info.get("abi") == "win32"
     for key, names in sorted(lists.items()):
         if key.startswith("overrides/"):
             mod = key.split("/", 1)[1]
-            lines = ["%x" % a for a in (t.addr(n) for n in names) if a is not None]
+            marked = (wraps or {}).get(key, ())
+            if marked and not pe:
+                continue
+            lines = ["%x%s" % (a, " wrap" if n in marked else "") for n, a in ((n, t.addr(n)) for n in names)
+                     if a is not None]
             lines += ["%x drop" % a for m, a in t.drops if m == mod]
             out[mod] = lines
     out["hooks"] = ["%x wrap" % a for a in (t.addr(n) for n in lists.get("hooks", [])) if a is not None]
@@ -595,11 +619,12 @@ def write_if_changed(path, text):
 
 def gen(tid, outdir, base=HERE):
     t = Target(tid, base)
-    lists = name_lists(base)
+    wraps = {}
+    lists = name_lists(base, wraps)
     os.makedirs(os.path.join(outdir, "skip"), exist_ok=True)
     write_if_changed(os.path.join(outdir, "rc_target_names.h"), gen_header(t))
     write_if_changed(os.path.join(outdir, "rc_target.c"), gen_runtime_c(t, lists))
-    for mod, text in gen_skip(t, lists).items():
+    for mod, text in gen_skip(t, lists, wraps).items():
         write_if_changed(os.path.join(outdir, "skip", mod + ".skip"), text)
     write_if_changed(os.path.join(outdir, "target"), t.id + "\n")
     return t

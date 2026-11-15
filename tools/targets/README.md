@@ -14,11 +14,12 @@ tools/targets/
     drops.map        MODULE  ADDRESS                        dead code once MODULE replaces a library wholesale
     edits.map        GROUP  ADDRESS  LEN:CHECK  EDIT        instructions a mod can switch to others (below)
     mids.map         NAME  ADDRESS  (VALUES) [-> CONTS]      mid points: a mod's hook before one instruction (below)
-  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,042 of 1,250 symbols read, the rest
+  win-x86/           Learn & Play (Steam, 32-bit PE): the same files (no drops.map); 1,063 of 1,264 symbols read, the rest
                      `unsupported` with the reason; target.toml also has the install pins (the depot, the exe, Microsoft's DLLs)
     relaxed.map      ADDRESS [+calls] WHY                   relaxed functions relaxed.list doesn't name (xlat/relaxed.py)
   names/             shared by every target
-    overrides/*.list the functions each override module replaces
+    overrides/*.list the functions each override module replaces; win32.list is Learn & Play's built-in fixes (its
+                     `NAME wrap`: kept translated beside the native one), the others the Mac's modules
     hooks.list       hook points (the names mods use with rc_hook_add_name)
     seam.list        what the platform seam (app/seam_platform.c) calls and reads
     refs.list        other functions and globals native code calls or reads (also the shims/game tests)
@@ -39,19 +40,28 @@ left out of that target's build, and native code that uses the name does not com
 `RC_TARGET` (default `mac-x64`) picks the target. `tools/ws7/recomp/app/build-m4.sh` runs
 `targets.py gen OUTDIR/target`, which writes
 
-- `rc_target_names.h`: `RC_ADDR_<name>`, `RC_FN_<name>`, `RC_CC_<name>`, `RC_OFF_<name>`, used through the
-  macros of `tools/ws7/recomp/runtime/rc_abi.h` (`RC_ADDR(name)`, `RC_FN(name)`, `RC_GA(name)`, `RC_OFF(name)`,
-  `RC_SLOT(name)`) and `overrides/rc_ov.h` (`OV_GUEST(name, ...)`, `OV_ARGS_OF(name, a, c)`, `OV_ALIAS`);
+- `rc_target_names.h`: `RC_ADDR_<name>`, `RC_FN_<name>`, `RC_WFN_<name>`, `RC_CC_<name>`, `RC_OFF_<name>`, used
+  through the macros of `tools/ws7/recomp/runtime/rc_abi.h` (`RC_ADDR(name)`, `RC_FN(name)`, `RC_GA(name)`,
+  `RC_OFF(name)`, `RC_SLOT(name)`; `RC_WFN(name)` is the translated function of one the build wraps, and
+  `RC_NFN(name)`, win-x86 only, the native function of one that is a hook point too) and `overrides/rc_ov.h`
+  (`OV_GUEST(name, ...)`, `OV_ARGS_OF(name, a, c)`, `OV_ALIAS`);
 - `rc_target.c`: the names for the runtime: the hook points (`rc_hook_add_name`, `rc_target`), with how each
   one's call looks on a target that isn't SysV, `offsets.map` and `symbols.map` for a mod (`rc_off`, `rc_addr`), and
   the edit groups and mid points (`rc_edit_enable`, `rc_mid_add_name`);
-- `skip/<module>.skip`: gen_image.py's skip lists, from `names/` and `drops.map`.
+- `skip/<module>.skip`: the generators' skip lists, from `names/` and `drops.map`: gen_image.py's for the Mac's
+  modules, and gen_image_pe.py's `win32.skip` for Learn & Play (`win-x86/build/translate.sh`,
+  `win-x86/install/lp_build.py`), with an `ADDR wrap` line for a name its list marks `wrap`. The mark is the
+  32-bit generator's (gen_image.py reads `ADDR wrap` as a hook point), so a list that has it makes a skip file
+  for a win32 target only.
 
 The override, seam and app builds use that directory (`RC_TARGET_DIR`), or make their own when run alone.
+Learn & Play's build makes win-x86's the same way (`win-x86/build/build.sh`, `build_shims.sh`): its built-in
+fixes (`win-x86/shims/win32_overrides.c`) are compiled against it, and name what they touch as the Mac's do.
 The CMake build makes one per target it needs (`cmake/RSTargetNames.cmake`): the differential tests of
 `shims/game` and `shims/platform` map the Mac image, so they use mac-x64's, and their `RS_ORIG_*`, `RS_KEY_*`
 and `RS_RANGE_*` defines are `RC_ADDR(name)` (`shims/game/include/rs_names.h`). `check.py` reads those
-sources too.
+sources too, and Learn & Play's own (`win-x86/shims`, `win-x86/app`, `win-x86/online`): code built for that game
+alone may use only names `win-x86` has, not ones it marks `unsupported`.
 
 ## Hook points on a target with another ABI
 
@@ -125,4 +135,4 @@ is no count to edit: the Mac needs a mid point of its own that does the extra st
 3. Use it by name: `OV_GUEST(path_intern, ...)`, `RC_GA(game_config)`, `RC_OFF(si_state)`.
 
 `python3 tools/targets/check.py` (and the test) fails until every target has it, and also when native code
-uses a name no list has. Comments may cite addresses of the Mac binary as evidence; code may not use them.
+uses a name no list has, or Learn & Play's code one that is `unsupported` there. Comments may cite addresses of the Mac binary as evidence; code may not use them.

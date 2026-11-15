@@ -1256,6 +1256,16 @@ class TestBuild(BuildBase):
         self.assertEqual(self.fractions, sorted(self.fractions))
         self.assertEqual(self.fractions[-1], 1.0)
 
+    def test_the_skip_list_is_made_from_the_tables(self):
+        # the functions the built-in fixes replace: tools/targets/names/overrides/win32.list at win-x86's addresses
+        self.builder().run()
+        skip = os.path.join(self.work, "game", "target", "skip", "win32.skip")
+        self.assertIn("--skip " + skip, self.lines(os.path.join(self.work, "logs", "translate-game.log"))[0])
+        self.assertNotIn("--skip", self.lines(os.path.join(self.work, "logs", "translate-msvcr100.log"))[0])
+        made = self.lines(skip)
+        self.assertIn("1449310", made)        # dlc_update: the native one in its place
+        self.assertIn("141c130 wrap", made)   # path_intern: kept translated beside the native one
+
     def test_the_corpus_switches_are_the_macs(self):
         given = os.path.join(self.work, "given.bin")
         write(given, b"given")

@@ -33,6 +33,19 @@ input_slot                        0x14    # SoundInput: its slot (0x10131acb0)
 autosave_menu                     0x418   # UI event handler: created-dialog slot
 autosave_timer                    0x428   # UI event handler: state-machine timer double
 autosave_query_slot               0x1f    # sign-in query object vtable: the dialog predicate
+frontend_fs_open_slot             unsupported  not located: see frontend_fs in symbols.map
+stream_add_ref_slot               unsupported  not located: see frontend_fs in symbols.map
+menu_refs                         0x8     # the dialog at autosave_menu: int32 reference count (the handler 0x1005e48b0 drops it)
+cs_lock_owner                     unsupported  a pthread mutex here: rmutex_owner
+cs_lock_depth                     unsupported  a pthread mutex here: rmutex_depth
+sng_loader_data                   unsupported  not read: the Mac's bypass is in the verifier's override, by its caller's return address (sng_verify)
+sng_loader_begin                  unsupported  as sng_loader_data
+sng_loader_end                    unsupported  as sng_loader_data
+sng_loader_busy                   unsupported  as sng_loader_data
+efd_allocator_free_slot           unsupported  the Mac frees through a function (efd_free, efd_delete)
+settings_width                    unsupported  no such record: get_resolution and set_resolution are functions here
+settings_height                   unsupported  as settings_width
+settings_mode                     unsupported  as settings_width: get_fullscreen and set_fullscreen
 ak_ps_refills                     0x54    # AkPlatformInitSettings: u16 uNumRefillsInVoice
 ak_sink_refills                   0x94    # CoreAudio sink: u32 ring refill count
 ak_sink_ring                      0x28    # CoreAudio sink: ring buffer pointer

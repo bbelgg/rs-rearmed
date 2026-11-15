@@ -50,13 +50,15 @@ dcomp=$b/modules/d3dcompiler_42/obj/libgame_rc.a
 bink=$b/modules/bink2w32/obj/libgame_rc.a
 [ -f "$bink" ] || { echo "note: no $bink: linking without Bink 2"; bink=-Wl,-U,_bink2w32_rc32_mod; }
 
-echo "===== Shims ====="
-OBJ_DIR=$obj "$here/build_shims.sh"
-
-echo "===== Runtime ====="
-# the target's names and hook points for the runtime (rc_hook_add_name, rc_off): tools/targets
+# The target's names (tools/targets): rc_target_names.h for the built-in fixes, and rc_target.c, the names and
+# hook points the runtime looks up (rc_hook_add_name, rc_off)
 tgt=$obj/target
 "${LP_PY:-python3}" -I "$root/tools/targets/targets.py" gen --target win-x86 "$tgt"
+
+echo "===== Shims ====="
+OBJ_DIR=$obj RC_TARGET_DIR=$tgt "$here/build_shims.sh"
+
+echo "===== Runtime ====="
 CC="clang -arch arm64 -O2 -g -DRC_GUEST32 -I$runtime"
 for m in rc32_mem rc32_image rc32_main rc32_teb rc32_seh rc32_wrappers rc32_hook rc_hook rc_mods rc_mid rc_file; do
   $CC -w -c "$runtime/$m.c" -o "$obj/rt/$m.o"

@@ -221,22 +221,28 @@ original lacked ([INSTALL.md](INSTALL.md#keys)). Learn & Play's input is a layer
 
 Each is a native override or a hook in `tools/ws7/recomp/overrides/mods/mods.c`, with a switch
 ([INSTALL.md](INSTALL.md#settings-and-switches)); `RS_MODS_LOG=1` logs what they apply. Learn & Play has the
-same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)).
+same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). What needs
+nothing of one game alone is one source, built into both apps: `mods_shared.c` beside it has the switches, the
+log (`[rs-mods] ` lines), the start (`rs_mods_start`, from a constructor here, since the launcher has set the
+environment by then), the intro skip and the song ownership during a mount, and `framerate.c` the frame rate
+fixes. They are written as a mod is (`rc_mod.h`): the game's functions and fields by name, looked up when they
+run. What is still written twice, and why, is in the [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours (keys, the End key in
   menus, faster loading with large libraries, the song path cache, the number-table hash, worker-thread priority,
-  the open-file limit, in `rc_nofile.h`, which the Windows build shares) and the RSBypass CDLC signature skip.
+  the open-file limit, which Learn & Play has from the same source) and the RSBypass CDLC signature skip.
   The faster loading is the batched DLC mounting: the DLC coordinator's update runs its install step for
   `RS_MODS_BUDGET_MS` (default 50) a frame instead of once. Learn & Play's loop has to wait for each mount to be
   finished, or archives are dropped ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)); this
   game's needs no wait, as its song list is the same with the budget as with a step a frame
   ([TESTING.md](TESTING.md#unattended-runs)).
-- **No intro screens** (`before_intro_update`, a pre-hook on `boot_intro_update`; `RS_MODS_INTRO=0` plays the
-  intro): the boot service ticks the intro movie (logos, legal screens, intro video) in its boot phases 2 and 3
-  and shows the title only once the intro has ended. The movie's model is loaded as usual, but the movie is
-  never started: the tick reports "not busy" until phase 3 has done its steps (archives mounted, venues), and
-  then the intro takes the transition of the game's own skip key. Both parts matter: without the model loaded,
-  or with the intro ended before phase 3's steps, the title screen never gets its menu movie.
+- **No intro screens** (`before_intro_update` in `mods_shared.c`, a pre-hook on `boot_intro_update` and the same one
+  in Learn & Play; `RS_MODS_INTRO=0` plays the intro): the boot service ticks the intro movie (logos, legal screens,
+  intro video) in its boot phases 2 and 3 and shows the title only once the intro has ended. The movie's model is
+  loaded as usual, but the movie is never started: the tick reports "not busy" until phase 3 has done its steps
+  (archives mounted, venues), and then the intro takes the transition of the game's own skip key. Both parts matter:
+  without the model loaded, or with the intro ended before phase 3's steps, the title screen never gets its menu
+  movie.
 - **Auto Save warning skipped** (`before_autosave_warning`, a pre-hook on `autosave_warning`;
   `RS_MODS_AUTOSAVE=0` shows the dialog): on `OnSignInFlowComplete` the game's UI event handler restores the
   player's input mode, shows `RS2AutosaveWarning` and starts a 4 s timer. The hook does the first and leaves out
@@ -293,7 +299,8 @@ same ones on its own functions ([Windows design](../windows/DESIGN.md#built-in-f
   source no longer has it.
 - **Song ownership during a mount.** The game checks an archive's AppID against the list it made once at start
   from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later. While the install step runs, a hook
-  on `steam_dlc_owned` answers yes: an archive in `dlc/` counts as owned, whatever AppID it carries.
+  on `steam_dlc_owned` answers yes (`mods_shared.c`, the same hook in Learn & Play; each edition's `dlc_update`
+  says when its steps run): an archive in `dlc/` counts as owned, whatever AppID it carries.
   `RS_MODS_BYPASS=0` asks the list again, and such a song then needs a refresh and a restart.
 - **Title logo.** `tools/loadscreen` builds `static.psarc.rearmed` in the copy (`install.sh`; never in Steam's
   folder) from the copy's `static.psarc.original` with a "Re-ARMed" tag on the title logo; the launcher uses it

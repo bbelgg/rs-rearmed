@@ -1,6 +1,6 @@
 // The open-file limit (rsmacfixes' fix 4), for both editions: an app started from Finder gets launchd's soft
-// limit of 256, and every file the game has open is one host descriptor. Mac: overrides/mods/mods.c; Learn &
-// Play: win-x86/shims/win32_overrides.c.
+// limit of 256, and every file the game has open is one host descriptor. Both raise it at the start of their
+// built-in fixes (overrides/mods/mods_shared.c).
 #ifndef RC_NOFILE_H
 #define RC_NOFILE_H
 

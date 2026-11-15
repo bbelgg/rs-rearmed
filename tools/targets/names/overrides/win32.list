@@ -1,0 +1,47 @@
+# Override module `win32`: the game functions Learn & Play's built-in fixes replace (win-x86/shims/win32_overrides.c),
+# the counterpart of the Mac's `mods` module (mods.list). tools/targets/targets.py makes gen_image_pe.py's skip file
+# of it for win-x86 (skip/win32.skip; win-x86/build/translate.sh and win-x86/install/lp_build.py pass it): a function
+# named here is left out of translation and the native F_<addr> takes its place. `NAME wrap`: it stays translated, as
+# W_<addr>, and the native one runs in front of it and calls it for the original. One that is also a hook point
+# (hooks.list) is defined as N_<addr>: the generated F_<addr> runs a mod's hooks around it. The Mac build has no
+# such module, and no skip file of it is made for the Mac (`wrap` is the 32-bit generator's); what only Learn & Play
+# has is `unsupported` in mac-x64.
+#
+# CDLC (RSBypass): the SNG loader's signature check, which calls the DSA verifier on a song file. Skipped as on the
+# Mac (sng_verify): unsigned song files load; the verifier's other caller keeps the real check. RS_MODS_BYPASS=0
+# checks again.
+sng_check
+# CDLC: the song-key list. The Learn a Song list keeps a song only when the CRC-32 of its SongKey is in a table of
+# known keys in the image; custom songs' keys are not, so the native one answers true (the Windows image only; the
+# Mac has no such table). The original for RS_MODS_BYPASS=0.
+song_key_known wrap
+# Batched DLC mounting (rsmacfixes): the DLC coordinator's per-frame update, which mounts one dlc/ archive a frame;
+# the native one mounts several within a frame budget, as the Mac's. RS_MODS_BUDGET_MS / RS_MODS_FIXES.
+dlc_update
+# Two players on any input: what forces Player 2 to Real Tone (inlined at the Mac's three callers of
+# input_mode_is_cable), and the search for an input's slot (the Mac input_bind). The native ones run first, off with
+# RS_MODS_MULTIPLAYER=0.
+input_p2_force_cable wrap
+input_find_slot wrap
+# No Auto Save warning: the UI event handler, and the navigate call that makes a dialog, which the handler calls for
+# RS2AutosaveWarning. The native navigate leaves that one call out, as the Mac mods.c does, off with
+# RS_MODS_AUTOSAVE=0; every other caller gets the original, and so does the handler's rest.
+autosave_warning wrap
+ui_navigate wrap
+# Direct Connect: FrontEnd_OpenFile, replaced by a native one that opens a cacheN.7z from the installer's overlay
+# (Update/patcharchives.psarc, which the engine mounts at PatchUpdate/) before cache.psarc: the counterpart of the
+# Mac's pre hook. The original never runs, but its `ret N` is what a mod's hook point on it goes by
+# (rc_hook_code_pops).
+frontend_open_file wrap
+# Path MD5 cache (rsmacfixes): the path intern, with the Mac's wrapper path_md5 inlined into its callers. The
+# original for a path not cached and for RS_MODS_FIXES=0.
+path_intern wrap
+# Number-table hash (rsmacfixes): the hash of the game's table of number objects, its integer part, so every value
+# in [0, 1) lands in one bucket. A function of its own here (the Mac has it inlined in num_dtor, num_intern and
+# num_rehash). The original for RS_MODS_FIXES=0.
+num_hash wrap
+# The DLC preview's download jobs: RSRDVDownloadManager's queue functions. Offline each job fails at once, as on the
+# Mac (online.list); its flush does nothing, as on the Mac.
+dlc_job_preview
+dlc_job_request
+dlc_worker_flush

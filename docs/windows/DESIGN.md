@@ -80,14 +80,15 @@ the stack check: [recompiler](../recompiler/README.md#the-32-bit-front-end-windo
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,042 of the 1,250 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,063 of the 1,264 symbols read, an
 `unsupported` line with the reason for the rest: inlined, folded or specialised by LTCG, or no counterpart),
 `offsets.map`, `edits.map`, `mids.map` and `relaxed.map`, and in its `target.toml` the pins (the depot,
-manifest, exe and DLL hashes, build figures). The build uses them for the hook points and what a mod asks for by
-name. The other addresses the build needs are in `win-x86/imports/*.tsv` (import sites) and
-`win-x86/online/names.tsv` (the vtables the online layer patches, with their Mac counterparts); the built-in
-fixes name their addresses in `win32_overrides.c`, and the Mac overrides are not built here
-([PLAN.md](PLAN.md#next-work)).
+manifest, exe and DLL hashes, build figures). The build uses them for the hook points, what a mod asks for by
+name, and the built-in fixes: `win32_overrides.c` is compiled against the generated `rc_target_names.h` and names
+every function, global and field of the game it touches (`RC_FN`, `RC_WFN`, `RC_NFN`, `RC_ADDR`, `RC_OFF`,
+`RC_SLOT` of `runtime/rc_abi.h`), as the Mac's overrides do. The other addresses the build needs are in
+`win-x86/imports/*.tsv` (import sites) and `win-x86/online/names.tsv` (the vtables the online layer patches, with
+their Mac counterparts). The Mac overrides are not built here.
 
 ## Runtime
 
@@ -378,45 +379,58 @@ TLS to those threads.
 
 The Mac port's built-in fixes and mods ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods), which says what
 each is for) are in, on this game's own functions and with the Mac's switches. The Mac's are hooks on named
-functions; here a function listed in `win-x86/build/skip.txt` (by image VA) is left out of translation, or kept
-as `W_<addr>` with `wrap`, and `win-x86/shims/win32_overrides.c` defines its `F_<addr>` against the 32-bit
-runtime. `RS_MODS_LOG=1` logs them.
+functions; here a function named in `tools/targets/names/overrides/win32.list` is left out of translation, or
+kept as `W_<addr>` with `wrap` (the build makes the translator's skip file of the list and `win-x86`'s
+addresses), and `win-x86/shims/win32_overrides.c` defines its `F_<addr>` against the 32-bit runtime, by the same
+name (`RC_FN(dlc_update)`; the names below are those). `RS_MODS_LOG=1` logs them.
+
+What needs nothing of one game alone is the Mac's source, built into this app as a mod is built
+(`tools/ws7/recomp/overrides/mods`): `mods_shared.c` has the switches, the log (`[rs-mods] ` lines), the start
+(`lp_mods_init()` calls its `rs_mods_start` once `settings.env` is in the environment, where the Mac's runs from
+a constructor), the intro skip and the song ownership during a mount; `framerate.c` has the frame rate fixes.
+The rest is written for this game, because its code differs where the fix has to go: the batched mounting has
+to wait for each mount here, the Auto Save handler has a release the Mac's lacks, `FrontEnd_OpenFile` is native
+because the original's lower-casing is behind a packer stub, the Mac's two hook points for two players are one
+inlined function and a register call here, the path cache and the number hash sit in other functions, and the
+song-key table is this image's alone.
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`):
-  - batched DLC mounting: the DLC coordinator's per-frame update (`F_1449310`) runs its install step in a loop
+  - batched DLC mounting: the DLC coordinator's per-frame update (`dlc_update`) runs its install step in a loop
     within `RS_MODS_BUDGET_MS` (default 50) instead of once. A step starts mounting one archive and leaves its
-    file open; the update's head (`F_1446570`) finishes the mount and closes it, and a step taken before that drops
-    the next archive. So the loop calls the head until the file is closed (the seam counts the open song archives
-    of `dlc/`, `win32_ksync.c`) before the next step. The Mac game's steps need no such wait
+    file open; the update's head (`dlc_update_head`) finishes the mount and closes it, and a step taken before
+    that drops the next archive. So the loop calls the head until the file is closed (the seam counts the open
+    song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac game's steps need no such wait
     ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods));
   - the open-file limit, which the batched mounting needs (a large library has more archives open than the 256
-    descriptors of an app started from Finder): `lp_mods_init()` raises it with the Mac's code (`rc_nofile.h`);
-  - the song path cache: the path intern (`F_141c130`, the Mac `path_intern`) takes each path's MD5 under the
+    descriptors of an app started from Finder): the shared start raises it, as on the Mac;
+  - the song path cache: the path intern (`path_intern`, as on the Mac) takes each path's MD5 under the
     path table's lock on every file check; the override keeps 1024 recent paths' objects;
   - the number-table hash: the game hashes a double by its integer part, so every value in [0, 1) lands in one
-    bucket. Here the hash is a function of its own (`F_1400650`), where the Mac replaces the three functions it
+    bucket. Here the hash is a function of its own (`num_hash`), where the Mac replaces the three functions it
     is inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down
     first;
-  - the RSBypass song-file signature skip: the SNG loader's check (`F_10d96a0`) returns true. As on the Mac only
+  - the RSBypass song-file signature skip: the SNG loader's check (`sng_check`) returns true. As on the Mac only
     the song loader's check is skipped, not the DSA verifier itself;
   - the song-key table skip (Windows only): the Learn a Song list keeps a song only when the CRC-32 of its
     `SongKey` is in a table of known keys in the image, so a custom song is left out even with its archive
-    mounted. `F_10f41c0` answers true (`RS_MODS_BYPASS=0`: the table again). The Mac image has no such table.
+    mounted. `song_key_known` answers true (`RS_MODS_BYPASS=0`: the table again). The Mac image has no such table.
 
   Two Mac fixes are not needed here: the keyboard ones fill the Mac game's table of Cocoa keys, and this game
   reads DirectInput ([Input](#input)); the thread priority one works around macOS refusing the game's values,
   which `LP_QOS` covers.
-- **No intro screens** (`RS_MODS_INTRO=0` plays the intro): `F_1126950`, the Mac `boot_intro_update`, runs before
-  the translated function, with the Windows build's field offsets and the Mac's behaviour.
+- **No intro screens** (`RS_MODS_INTRO=0` plays the intro): the Mac's source, the pre hook on `boot_intro_update`
+  in `mods_shared.c` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). This game's tick is a function
+  of its own with the same states, a stdcall one, and its fields are in `tools/targets/win-x86/offsets.map`; the
+  hook sees the Mac's call.
 - **Auto Save warning skipped** (`RS_MODS_AUTOSAVE=0` shows it). The Mac copies the handler's branch into a pre
-  hook; here the handler (`autosave_warning`, `0x120adf0`) runs as it is and only the dialog's call is left out:
-  `F_115db90`, the navigate call, answers for that one return address with a token, and every other caller gets
-  the original. So the rest of the branch, which has a release the Mac's lacks, stays the game's own.
-  `N_120adf0`, around the handler, clears the timer once it has returned, and the menu's tick goes on as when
-  the dialog's time is up.
+  hook; here the handler (`autosave_warning`) runs as it is and only the dialog's call is left out:
+  `ui_navigate`, the navigate call, answers for that one return address (`autosave_navigate_ret`) with a token,
+  and every other caller gets the original. So the rest of the branch, which has a release the Mac's lacks, stays
+  the game's own. The native function around the handler clears the timer once it has returned, and the menu's
+  tick goes on as when the dialog's time is up.
 - **Two players on any input** (`RS_MODS_MULTIPLAYER=0` is the original): the same two changes as `mods.c`.
-  `F_11f08d0` is the Mac's three inlined checks in one function, which sets Player 2 to Real Tone, and
-  `F_1344640` is `input_bind`.
+  `input_p2_force_cable` is the Mac's three inlined checks in one function, which sets Player 2 to Real Tone, and
+  `input_find_slot` is `input_bind` in this game's shape (the input in a register, no `force`).
 - **The same at any frame rate** (`RS_MODS_FRAME_RATE=0` is the original): the Mac's source,
   `tools/ws7/recomp/overrides/mods/framerate.c`, built as a mod is built, with this game's eight mid points in
   `tools/targets/win-x86/mids.map` ([what it does](../mac/DESIGN.md#built-in-fixes-and-mods)). The Windows code
@@ -427,15 +441,16 @@ runtime. `RS_MODS_LOG=1` logs them.
 - **Loading-screen fix.** Not needed here ([Shader corpus](#shader-corpus)).
 - **Direct Connect choice** (`RS_MODS_OVERLAY=0` as on the Mac). The same overlay, made by the same
   `tools/play-native/cache_overlay.py`. The archives' key comes from the unpacked code image, which the build
-  step hands to the copy (`gamefiles.key_from_image`). `FrontEnd_OpenFile` (`F_101ba80`) is a native function
+  step hands to the copy (`gamefiles.key_from_image`). `FrontEnd_OpenFile` (`frontend_open_file`) is a native function
   here: for a `cacheN.7z` it opens `PatchUpdate/<name>` first, then does what the original does.
 - **Exit Game.** The same entry and the same edit as the Mac's: the game has the action.
 - **Enumerate.** The same entry and the same code as the Mac's: the overlay's two edits, and
   `shims/steam/src/enumerate.h`, compiled in through `interfaces.cpp`. `steam32.c` answers `IsOverlayEnabled`
   and posts the `DlcInstalled_t`, and the game folder is `LP_GAME_DIR`.
-- **Song ownership during a mount**: `F_1448b10`, the Mac `steam_dlc_owned`, answers yes while `F_1449310` runs
-  the install step. `RS_MODS_BYPASS=0` asks the list again (and brings back the song-key table, which hides
-  custom songs here whatever their AppID).
+- **Song ownership during a mount**: the Mac's source, the pre hook on `steam_dlc_owned` in `mods_shared.c`, which
+  answers yes while this port's `dlc_update` runs its install steps (it tells the hook with `rs_mods_mounting`, as
+  the Mac's does). `RS_MODS_BYPASS=0` asks the list again (and brings back the song-key table, which hides custom
+  songs here whatever their AppID).
 - **Title logo.** The same `tools/loadscreen` and layout as the Mac's. `lp_install.py build` makes
   `static.psarc.rearmed` in the copy, and `title_logo()` in `lp_main.c` links `static.psarc` at each start as
   `launch.sh` does (`RS_REARMED=0` for the original). It isn't in the manifest, so a refresh leaves it, except
@@ -459,13 +474,14 @@ runtime. `RS_MODS_LOG=1` logs them.
     CoreAudio input ([Audio](#audio)), `input_mode_is_cable` is inlined into its caller, and `input_bind` takes
     its input in a register and nothing else; the built-in fix has both.
 
-    What differs with the call the same: a hook point that is also a built-in fix is `N_<addr>` in
-    `win32_overrides.c` and a mod's hooks run around the fix, where on the Mac the fix is a pre hook that can
-    answer first; `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames
-    are presented; while a mod hooks a seam point, events wait for the game thread (`w32_input_frame`, at the
-    start of each Present) and reach the game a frame later, and `input_sink`'s arguments, changed by a pre
-    hook, are not taken (`set_app_focus`'s is); a modifier key is a down and an up here, where the Mac sends a
-    down for both.
+    What differs with the call the same: a hook point that is also a built-in fix of this port's own
+    (`autosave_warning`, `frontend_open_file`) is `N_<addr>` in `win32_overrides.c` and a mod's hooks run around the
+    fix, where on the Mac the fix is a pre hook that can answer first (the fixes of `boot_intro_update` and
+    `steam_dlc_owned` are the Mac's pre hooks here too, so a mod's hook on those comes after the fix in both);
+    `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames are presented; while a
+    mod hooks a seam point, events wait for the game thread (`w32_input_frame`, at the start of each Present) and
+    reach the game a frame later, and `input_sink`'s arguments, changed by a pre hook, are not taken
+    (`set_app_focus`'s is); a modifier key is a down and an up here, where the Mac sends a down for both.
   - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`), for a change inside a function.
     The tables have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar after rs7string
     (735 edits and 127 mid points: the game's arrays for six strings grown to eight), and `plain_packages`, its

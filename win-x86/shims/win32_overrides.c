@@ -1,11 +1,18 @@
-// Native replacements for game functions dropped from translation (win-x86/build/skip.txt): the
-// Windows counterpart of the Mac link-level overrides (tools/ws7/recomp/overrides). A function named
-// here gets no W_<addr>; gen_image_pe.py emits the rc32_table entry {addr, F_<addr>} and the linker
-// resolves F_<addr> to the definition below (win32_shims.a). Each is entered as the translated
-// function would be: the return address at guest esp, the arguments above it, the result left in eax;
-// it pops the return address into c->ret_to as a guest `ret` does (and removes stdcall arguments).
+// Native replacements for game functions dropped from translation (tools/targets/names/overrides/win32.list,
+// of which the build makes the translator's skip file): the Windows counterpart of the Mac link-level
+// overrides (tools/ws7/recomp/overrides). A function named there gets no W_<addr> unless its line says `wrap`;
+// gen_image_pe.py emits the rc32_table entry {addr, F_<addr>} and the linker resolves F_<addr> to the
+// definition below (win32_shims.a). Each is entered as the translated function would be: the return address
+// at guest esp, the arguments above it, the result left in eax; it pops the return address into c->ret_to as a
+// guest `ret` does (and removes stdcall arguments).
 // One that is also a hook point (tools/targets/names/hooks.list) is N_<addr> here: the generated F_<addr>
 // runs a mod's hooks around it, and a mod sees the function as the game now has it.
+//
+// The game's functions, globals and fields are named, as in the Mac's (runtime/rc_abi.h): RC_FN(name),
+// RC_WFN(name) and RC_NFN(name) are a function's F_, W_ and N_ symbols, RC_ADDR(name) its or a global's
+// address in the guest (the image is mapped where it was linked, so it is what rc32_call and RC32_H take),
+// RC_OFF(name) a field and RC_SLOT(name) a vtable slot. Their values are tools/targets/win-x86's; the
+// addresses in the comments are evidence, as there.
 #include <ctype.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -16,8 +23,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#include "rc32.h"
-#include "rc_nofile.h"
+#include "rc_abi.h"
+#include "mods_shared.h"
 
 // `ret` (ret 0): the return address into c->ret_to, esp past it. For a function with no stack
 // arguments (a register `this`, or none); the same record a translated `ret` makes (rc32_gen.h),
@@ -29,52 +36,8 @@ static inline void ov_ret32(rc_ctx *c, uint32_t eax) {
   c->r[4] = sp + 4;
 }
 
-// No intro screens: the counterpart of the Mac intro skip (tools/ws7/recomp/overrides/mods/mods.c,
-// before_intro_update), off with the same RS_MODS_INTRO=0. The Mac boot_intro_update is 0x1126950
-// here (matched by its mPlaybackState / mScreenState reads and the same five-state switch), stdcall
-// bool update(RSBootService *boot) (`ret 4`), translated as W_1126950 (skip.txt `wrap`); this runs
-// first (N_: it is a hook point). RSBootService fields of the Windows build: u32 boot phase +0x48 (dispatcher 0x112614d; phase 2
-// = 0x1126680, with the game's own skip at 0x1126759; phase 3 = 0x1126fc0), u32 phase 3 step counter
-// +0x28 (10 once its steps are done: the same 11-case switch on counter + 1, 0x112727a), u32 intro
-// state +0x60 (0 load the movie's model, 1 wait for it, 2 wait for the movie to start, 3 play, 4 end,
-// 5 done), u8 intro playing +0x2d. As on the Mac: the model is loaded as usual; then the tick reports
-// "not busy" without starting the movie until phase 3 has done its steps, and then takes the game's own
-// skip (state 4, playing flag cleared) so the original ends the intro. On the Mac, ending it earlier or
-// without the model left the title screen without its menu movie.
-#define LP_BOOT_PHASE 0x48
-#define LP_BOOT_STEP 0x28
-#define LP_BOOT_PHASE3_STEPS 10
-#define LP_BOOT_INTRO_STATE 0x60
-#define LP_BOOT_INTRO_PLAYING 0x2d
-void W_1126950(rc_ctx *c);
-static int lp_intro_skip = -1;
-
-void N_1126950(rc_ctx *c) {
-  if (lp_intro_skip < 0) {
-    const char *e = getenv("RS_MODS_INTRO");
-    lp_intro_skip = !(e && (e[0] == '0' || e[0] == 'n' || e[0] == 'N' || e[0] == 'f' || e[0] == 'F'));
-  }
-  if (lp_intro_skip) {
-    uint32_t sp = (uint32_t)c->r[4], boot, phase, state, step;
-    memcpy(&boot, RC32_H(sp + 4), 4);
-    uint8_t *b = RC32_H(boot);
-    memcpy(&phase, b + LP_BOOT_PHASE, 4);
-    memcpy(&state, b + LP_BOOT_INTRO_STATE, 4);
-    memcpy(&step, b + LP_BOOT_STEP, 4);
-    if ((phase == 2 || phase == 3) && (state == 2 || state == 3)) {
-      if (phase == 2 || step < LP_BOOT_PHASE3_STEPS) {  // not busy, the movie not started
-        c->r[0] = 0;
-        memcpy(&c->ret_to, RC32_H(sp), 4);
-        c->r[4] = sp + 8;  // ret 4
-        return;
-      }
-      state = 4;  // the game's skip: the original ends the intro (state 5)
-      memcpy(b + LP_BOOT_INTRO_STATE, &state, 4);
-      b[LP_BOOT_INTRO_PLAYING] = 0;
-    }
-  }
-  W_1126950(c);
-}
+// No intro screens: not here. The intro skip is the Mac's source, a pre hook on boot_intro_update
+// (tools/ws7/recomp/overrides/mods/mods_shared.c), which the start below adds.
 
 // Direct Connect: the cache overlay (the Mac's is tools/ws7/recomp/overrides/mods/mods.c, a pre hook on the
 // same function). FrontEnd_OpenFile (image VA 0x101ba80; the Mac's 0x1003c7810): DataStream **
@@ -86,10 +49,6 @@ void N_1126950(rc_ctx *c) {
 // that off. The rest is the original: the path in lower case (the original's own lower-casing is behind a
 // packer stub), the front-end file system (the singleton at 0x1ee67c4) Open, slot +0x10, thiscall
 // bool(const char *, DataStream **), and the stream's AddRef (slot +0x4) for *out.
-#define FE_SINGLETON 0x1ee67c4u
-#define FE_OPEN_SLOT 0x10u
-#define STREAM_ADDREF_SLOT 0x4u
-
 static uint32_t rd32(uint32_t g) {
   uint32_t v;
   memcpy(&v, RC32_H(g), 4);
@@ -106,27 +65,18 @@ static int is_cache_7z(const char *p) {
   return strcasecmp(p, ".7z") == 0;
 }
 
-static int overlay_on(void) {
-  static int on = -1;
-  if (on < 0) {
-    const char *v = getenv("RS_MODS_OVERLAY");
-    on = !(v && (v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F'));
-  }
-  return on;
-}
-
 // Open `path` (guest, lower case) through the front end; the stream (0: none) with a reference for the caller.
 static uint32_t fe_open(rc_ctx *c, uint32_t path, uint32_t slot) {
-  uint32_t fs = rd32(FE_SINGLETON);
+  uint32_t fs = rd32(RC_ADDR(frontend_fs));
   wr32(slot, 0);
   uint32_t args[2] = {path, slot};
-  rc32_call(c, rd32(rd32(fs) + FE_OPEN_SLOT), args, 2, fs, 0, 0);
+  rc32_call(c, rd32(rd32(fs) + 4 * RC_SLOT(frontend_fs_open)), args, 2, fs, 0, 0);
   uint32_t s = rd32(slot);
-  if (s) rc32_call(c, rd32(rd32(s) + STREAM_ADDREF_SLOT), 0, 0, s, 0, 0);
+  if (s) rc32_call(c, rd32(rd32(s) + 4 * RC_SLOT(stream_add_ref)), 0, 0, s, 0, 0);
   return s;
 }
 
-void N_101ba80(rc_ctx *c) {
+void RC_NFN(frontend_open_file)(rc_ctx *c) {
   uint32_t esp = (uint32_t)c->r[4];
   uint32_t out = rd32(esp + 4);
   const char *path = RC32_H((uint32_t)c->r[1]);
@@ -142,7 +92,7 @@ void N_101ba80(rc_ctx *c) {
   b[pn + n] = 0;
   c->r[4] = scratch - 16;
   uint32_t s = 0;
-  if (overlay_on() && is_cache_7z(b + pn)) s = fe_open(c, buf, slot);
+  if (rs_mods_cfg.overlay && is_cache_7z(b + pn)) s = fe_open(c, buf, slot);
   if (!s) s = fe_open(c, buf + pn, slot);
   c->r[4] = esp;
   wr32(out, s);
@@ -150,52 +100,15 @@ void N_101ba80(rc_ctx *c) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// Switches, named as on the Mac (tools/ws7/recomp/overrides/mods/mods.c): RS_MODS_FIXES=0 turns the
-// fixes off, RS_MODS_BUDGET_MS=N sets the time per frame for mounting DLC archives (default 50; 0
-// mounts one per frame, as the original game does), RS_MODS_LOG=1 logs what they did.
+// The switches, the log and the start are the Mac's, one source (tools/ws7/recomp/overrides/mods/mods_shared.c,
+// which says what each switch is): RS_MODS_FIXES=0 turns the fixes off, RS_MODS_BUDGET_MS=N sets the time per
+// frame for mounting DLC archives (default 50; 0 mounts one per frame, as the original game does), RS_MODS_LOG=1
+// logs what they did. The start reads them, raises the open-file limit as on the Mac (each CreateFile holds a
+// host descriptor; RS_MODS_FIXES=0 leaves it) and adds the hooks of the fixes that are the Mac's source: the
+// intro skip, the song ownership during a mount, the frame rate fixes (framerate.c). At the start of lp_main.c,
+// once settings.env is in the environment and the log is set up.
 // ------------------------------------------------------------------------------------------------
-static int env_on(const char *name, int dflt) {
-  const char *v = getenv(name);
-  if (!v || !*v) return dflt;
-  return !(v[0] == '0' || v[0] == 'n' || v[0] == 'N' || v[0] == 'f' || v[0] == 'F');
-}
-static struct { int init, log, fixes, bypass, autosave, multiplayer; double budget_s; } g_cfg;
-static void cfg_load(void) {
-  if (g_cfg.init) return;
-  g_cfg.log = env_on("RS_MODS_LOG", 0);
-  g_cfg.bypass = env_on("RS_MODS_BYPASS", 1);
-  g_cfg.fixes = env_on("RS_MODS_FIXES", 1);
-  g_cfg.autosave = env_on("RS_MODS_AUTOSAVE", 1);
-  g_cfg.multiplayer = env_on("RS_MODS_MULTIPLAYER", 1);
-  g_cfg.budget_s = 0.050;
-  const char *b = getenv("RS_MODS_BUDGET_MS");
-  if (b && *b) {
-    char *end;
-    double ms = strtod(b, &end);
-    if (end != b && ms >= 0 && ms <= 1000) g_cfg.budget_s = ms / 1000;
-  }
-  g_cfg.init = 1;
-}
-// The frame rate fixes, the Mac's (tools/ws7/recomp/overrides/mods/framerate.c, which says what they are): the same
-// source and the same switch, RS_MODS_FRAME_RATE=0. The number of points hooked, of eight, or -1 when off.
-int rs_framerate_init(void);
-// The open-file limit, as on the Mac (rc_nofile.h): each CreateFile holds a host descriptor. At the start of
-// lp_main.c, after the log is set up; RS_MODS_FIXES=0 leaves it.
-void lp_mods_init(void) {
-  cfg_load();
-  int fr = rs_framerate_init();
-  if (g_cfg.log) {
-    if (fr < 0) fprintf(stderr, "mods: frame rate: off\n");
-    else fprintf(stderr, "mods: frame rate: on, %d of 8 points\n", fr);
-  }
-  if (!g_cfg.fixes) return;
-  uint64_t old;
-  int failed;
-  uint64_t now = rc_raise_nofile(&old, &failed);
-  if (g_cfg.log && (now != old || failed))
-    fprintf(stderr, "mods: open-file limit %llu -> %llu%s\n", (unsigned long long)old, (unsigned long long)now,
-            failed ? " (setrlimit failed)" : "");
-}
+void lp_mods_init(void) { rs_mods_start(); }
 static double now_s(void) {
   struct timespec t;
   clock_gettime(CLOCK_MONOTONIC, &t);
@@ -225,31 +138,28 @@ static void log_counts(void);
 // The Mac copies the branch into a pre hook. Here only the navigate call is left out and the handler runs
 // as it is, so the input mode step, the slot, the string and the release of the third argument (0x120af52) all
 // happen by construction, and a Direct Connect profile keeps its input (without that step it stops at the tuner with
-// "It sounds like your cable is unplugged"). The timer is written after the call, so N_120adf0 clears it
+// "It sounds like your cable is unplugged"). The timer is written after the call, so the handler's N_ clears it
 // once the handler has returned, and the tick advances on its next run.
 // ------------------------------------------------------------------------------------------------
-#define AUTOSAVE_NAVIGATE_RET 0x120aeceu  // after the handler's navigate call
-#define AUTOSAVE_TIMER 0x20
 #define AUTOSAVE_TOKEN_REFS 1000000u
-void W_115db90(rc_ctx *c);
-void W_120adf0(rc_ctx *c);
+void RC_WFN(ui_navigate)(rc_ctx *c);
+void RC_WFN(autosave_warning)(rc_ctx *c);
 static uint32_t autosave_token;  // made once, for the life of the process
-static int autosave_skipped;     // the game thread's: F_115db90 tells N_120adf0
+static int autosave_skipped;     // the game thread's: ui_navigate's F_ tells autosave_warning's N_
 
 // navigate (edi = the name), stdcall (menu system, Menu **out, payload); eax = out. The handler's payload is NULL.
-void F_115db90(rc_ctx *c) {
+void RC_FN(ui_navigate)(rc_ctx *c) {
   uint32_t sp = (uint32_t)c->r[4], ret = ld32(sp);
-  cfg_load();
-  if (ret != AUTOSAVE_NAVIGATE_RET || !g_cfg.autosave) {
-    W_115db90(c);
+  if (ret != RC_ADDR(autosave_navigate_ret) || !rs_mods_cfg.autosave) {
+    RC_WFN(ui_navigate)(c);
     return;
   }
   if (!autosave_token && (autosave_token = rc32_alloc(16))) {
     st32(autosave_token, 0);
-    st32(autosave_token + 4, AUTOSAVE_TOKEN_REFS);
+    st32(autosave_token + RC_OFF(menu_refs), AUTOSAVE_TOKEN_REFS);
   }
   if (!autosave_token) {  // out of memory: the original shows the dialog
-    W_115db90(c);
+    RC_WFN(ui_navigate)(c);
     return;
   }
   uint32_t out = ld32(sp + 8);
@@ -260,30 +170,26 @@ void F_115db90(rc_ctx *c) {
   c->r[4] = sp + 16;  // ret 0xc
 }
 
-void N_120adf0(rc_ctx *c) {
+void RC_NFN(autosave_warning)(rc_ctx *c) {
   uint32_t self = (uint32_t)c->r[1];
-  W_120adf0(c);
+  RC_WFN(autosave_warning)(c);
   if (!autosave_skipped) return;
   autosave_skipped = 0;
-  memset(g8(self + AUTOSAVE_TIMER), 0, sizeof(double));
-  if (g_cfg.log) fprintf(stderr, "mods: auto save warning skipped\n");
+  memset(g8(self + RC_OFF(autosave_timer)), 0, sizeof(double));
+  rs_mods_logf("auto save warning skipped");
 }
 
 // ------------------------------------------------------------------------------------------------
 // Two players on any input: the counterpart of the Mac's (tools/ws7/recomp/overrides/mods/mods.c, before_is_cable
 // and before_input_bind, which say why), off with the same RS_MODS_MULTIPLAYER=0. 0x11f08d0 is the Mac's three
-// inlined checks in one function: it sets Player 2 to Real Tone unless they are, and returns al = it did. 0x1344640 is
-// input_bind, with the input in eax. The profile's string is the Mac's with 32-bit pointers: the end at +0x10, and
-// +0x14 says whether the text is in place or behind the pointer at +0.
+// inlined checks in one function (input_p2_force_cable): it sets Player 2 to Real Tone unless they are, and returns
+// al = it did. 0x1344640 is input_bind, with the input in eax (input_find_slot). The profile's string is the Mac's
+// with 32-bit pointers: the end at +0x10, and +0x14 says whether the text is in place or behind the pointer at +0.
 // ------------------------------------------------------------------------------------------------
-#define INPUT_MODE 0x13e3fb0u       // cdecl (player) -> al
-#define PROFILE_STRING 0x13e2080u   // cdecl (player, key, string)
-#define INPUT_MANAGER 0x17c3200u    // -> the manager
-#define INPUT_BY_NAME 0x17c3890u    // stdcall (manager, name) -> the input, or 0
-#define INPUT_BINDING 0x1ed87b0u    // int[10]: what each slot serves: 0-3 an input, 5 nothing
-#define INPUT_SLOT 0xc
-#define INPUT_KEY_DIRECT 0x1d57a4cu
-#define INPUT_KEY_MIC 0x1d57a34u
+// The game's own: input_mode, cdecl (player) -> al; input_profile_string, cdecl (player, key, string);
+// input_manager, -> the manager; input_by_name, stdcall (manager, name) -> the input, or 0; input_binding, int[10]:
+// what each slot serves, 0-3 an input, 5 nothing; input_key_direct and input_key_mic, pointers to the profile keys'
+// text (the game's own code has the texts' addresses as literals; the pointers are in its data as on the Mac).
 #define PLAYER_2 1u
 #define INPUT_P1_MIC 1u
 #define INPUT_P2_GUITAR 2u
@@ -292,19 +198,18 @@ void N_120adf0(rc_ctx *c) {
 #define MODE_MIC 1
 #define MODE_DIRECT 3
 #define INPUT_SLOTS 10
-void W_11f08d0(rc_ctx *c);
-void W_1344640(rc_ctx *c);
+void RC_WFN(input_p2_force_cable)(rc_ctx *c);
+void RC_WFN(input_find_slot)(rc_ctx *c);
 
 static uint8_t p2_mode(rc_ctx *c) {
   uint32_t player = PLAYER_2;
-  return (uint8_t)rc32_call(c, INPUT_MODE, &player, 1, 0, 0, 0);
+  return (uint8_t)rc32_call(c, RC_ADDR(input_mode), &player, 1, 0, 0, 0);
 }
 
-void F_11f08d0(rc_ctx *c) {
-  cfg_load();
-  uint8_t mode = g_cfg.multiplayer ? p2_mode(c) : 0;
+void RC_FN(input_p2_force_cable)(rc_ctx *c) {
+  uint8_t mode = rs_mods_cfg.multiplayer ? p2_mode(c) : 0;
   if (mode == MODE_MIC || mode == MODE_DIRECT) ov_ret32(c, 0);
-  else W_11f08d0(c);
+  else RC_WFN(input_p2_force_cable)(c);
 }
 
 static void p2_saved_input(rc_ctx *c) {
@@ -312,37 +217,37 @@ static void p2_saved_input(rc_ctx *c) {
   uint8_t mode = p2_mode(c);
   if (mode != MODE_MIC && mode != MODE_DIRECT) return;
   for (uint32_t i = 0; i < INPUT_SLOTS; i++)
-    if (ld32(INPUT_BINDING + 4 * i) == INPUT_P2_GUITAR) return;
+    if (ld32(RC_ADDR(input_binding) + 4 * i) == INPUT_P2_GUITAR) return;
   if ((!s && !(s = rc32_alloc(32))) || (!name && !(name = rc32_alloc(256)))) return;
-  st32(s + 0x10, s);
-  st32(s + 0x14, s + 0x10);
+  const uint32_t end = RC_OFF(efd_str_size), in_place = RC_OFF(efd_str_inline);
+  st32(s + end, s);
+  st32(s + in_place, s + end);
   *g8(s) = 0;
-  uint32_t args[3] = {PLAYER_2, mode == MODE_DIRECT ? INPUT_KEY_DIRECT : INPUT_KEY_MIC, s};
-  rc32_call(c, PROFILE_STRING, args, 3, 0, 0, 0);
-  uint32_t from = ld32(s + 0x14) == s + 0x10 ? s : ld32(s), to = ld32(s + 0x10), len = to > from ? to - from : 0;
+  uint32_t args[3] = {PLAYER_2, ld32(mode == MODE_DIRECT ? RC_ADDR(input_key_direct) : RC_ADDR(input_key_mic)), s};
+  rc32_call(c, RC_ADDR(input_profile_string), args, 3, 0, 0, 0);
+  uint32_t from = ld32(s + in_place) == s + end ? s : ld32(s), to = ld32(s + end), len = to > from ? to - from : 0;
   if (!len) return;
   if (len > 255) len = 255;
   memcpy(g8(name), g8(from), len);
   *g8(name + len) = 0;
-  uint32_t manager = rc32_call(c, INPUT_MANAGER, 0, 0, 0, 0, 0);
+  uint32_t manager = rc32_call(c, RC_ADDR(input_manager), 0, 0, 0, 0, 0);
   uint32_t find[2] = {manager, name};
-  uint32_t in = rc32_call(c, INPUT_BY_NAME, find, 2, 0, 0, 0);
+  uint32_t in = rc32_call(c, RC_ADDR(input_by_name), find, 2, 0, 0, 0);
   if (!in) return;
-  uint32_t slot = ld32(in + INPUT_SLOT);
+  uint32_t slot = ld32(in + RC_OFF(input_slot));
   if (slot >= INPUT_SLOTS) return;
-  uint32_t held = ld32(INPUT_BINDING + 4 * slot);  // a microphone input takes any slot, and finds another
+  uint32_t held = ld32(RC_ADDR(input_binding) + 4 * slot);  // a microphone input takes any slot, and finds another
   if (held == INPUT_NONE || held == INPUT_P1_MIC || held == INPUT_P2_MIC) {
-    st32(INPUT_BINDING + 4 * slot, INPUT_P2_GUITAR);
-    if (g_cfg.log) fprintf(stderr, "mods: player 2 on \"%s\"\n", (const char *)g8(name));
+    st32(RC_ADDR(input_binding) + 4 * slot, INPUT_P2_GUITAR);
+    rs_mods_logf("player 2 on \"%s\"", (const char *)g8(name));
   }
 }
 
-void F_1344640(rc_ctx *c) {
+void RC_FN(input_find_slot)(rc_ctx *c) {
   uint32_t input = (uint32_t)c->r[0];
-  cfg_load();
-  if (g_cfg.multiplayer && input == INPUT_P2_GUITAR) p2_saved_input(c);
+  if (rs_mods_cfg.multiplayer && input == INPUT_P2_GUITAR) p2_saved_input(c);
   c->r[0] = input;
-  W_1344640(c);
+  RC_WFN(input_find_slot)(c);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -353,38 +258,37 @@ void F_1344640(rc_ctx *c) {
 // as on the Mac (sng_verify): its other caller (0x130aaed) takes a 0x38-byte signature off the end
 // of data that verifies, so forcing it would cut unsigned data short. RS_MODS_BYPASS=0 checks again.
 // ------------------------------------------------------------------------------------------------
-#define GAME_ALLOC 0x147aa80u      // eax = size, one cdecl argument (0): a heap block
-#define CRT_MEMSET 0x1adba30u      // cdecl (p, value, n)
-#define SNG_KEY_DECODE 0x10d9730u  // ecx = the encoded key, edx = its length, cdecl (out)
-#define DSA_VERIFY 0x19bfeb0u      // cdecl (data, len, key) -> al
-#define GAME_ALLOCATOR 0x149e770u  // -> the allocator (its vtable +8 frees: block, 9, -1)
-#define NO_FREE_FLAG 0x1ee1926u    // nonzero: blocks are not freed (shutdown)
+// The game's own: efd_malloc, eax = size, one cdecl argument (0): a heap block; crt_memset, cdecl (p, value, n);
+// rsg_bpe_expand, ecx = the encoded key, edx = its length, cdecl (out); sng_verify, cdecl (data, len, key) -> al;
+// efd_allocator, -> the allocator (its free: block, 9, -1); efd_no_free, nonzero: blocks are not freed (shutdown).
+#define SNG_KEY_SIZE 0x68du   // the decoded key's buffer
+#define SNG_KEY_BLOB 0x4e7u   // key_sng_dsa_blob's length, an immediate at the call
 
-void F_10d96a0(rc_ctx *c) {
-  cfg_load();
-  if (g_cfg.bypass) {
-    if (g_cfg.log) fprintf(stderr, "mods: CDLC: song file signature check skipped\n");
+void RC_FN(sng_check)(rc_ctx *c) {
+  if (rs_mods_cfg.bypass) {
+    rs_mods_logf("CDLC: song file signature check skipped");
     ov_ret32(c, 1);
     return;
   }
   // the original check, as the game does it
   uint32_t self = (uint32_t)c->r[7];
-  uint32_t buf = ld32(self + 0x10), begin = ld32(self + 0x14), end = ld32(self + 0x18);
-  *g8(self + 0x21) = 1;
+  uint32_t buf = ld32(self + RC_OFF(sng_loader_data)), begin = ld32(self + RC_OFF(sng_loader_begin)),
+           end = ld32(self + RC_OFF(sng_loader_end));
+  *g8(self + RC_OFF(sng_loader_busy)) = 1;
   uint32_t zero = 0;
-  c->r[0] = 0x68d;
-  uint32_t key = rc32_call(c, GAME_ALLOC, &zero, 1, 0, 0, 0);
-  uint32_t ms[3] = {key, 0, 0x68d};
-  rc32_call(c, CRT_MEMSET, ms, 3, 0, 0, 0);
-  rc32_call(c, SNG_KEY_DECODE, &key, 1, 0x1e6ea08u, 0x4e7, 0);
+  c->r[0] = SNG_KEY_SIZE;
+  uint32_t key = rc32_call(c, RC_ADDR(efd_malloc), &zero, 1, 0, 0, 0);
+  uint32_t ms[3] = {key, 0, SNG_KEY_SIZE};
+  rc32_call(c, RC_ADDR(crt_memset), ms, 3, 0, 0, 0);
+  rc32_call(c, RC_ADDR(rsg_bpe_expand), &key, 1, RC_ADDR(key_sng_dsa_blob), SNG_KEY_BLOB, 0);
   uint32_t va[3] = {buf + begin, end - begin, key};
-  uint8_t ok = (uint8_t)rc32_call(c, DSA_VERIFY, va, 3, 0, 0, 0);
-  if (key && !*g8(NO_FREE_FLAG)) {
-    uint32_t a = ld32(rc32_call(c, GAME_ALLOCATOR, 0, 0, 0, 0, 0));
+  uint8_t ok = (uint8_t)rc32_call(c, RC_ADDR(sng_verify), va, 3, 0, 0, 0);
+  if (key && !*g8(RC_ADDR(efd_no_free))) {
+    uint32_t a = ld32(rc32_call(c, RC_ADDR(efd_allocator), 0, 0, 0, 0, 0));
     uint32_t fa[3] = {key, 9, 0xffffffffu};
-    rc32_call(c, ld32(ld32(a) + 8), fa, 3, a, 0, 0);
+    rc32_call(c, ld32(ld32(a) + 4 * RC_SLOT(efd_allocator_free)), fa, 3, a, 0, 0);
   }
-  *g8(self + 0x21) = 0;
+  *g8(self + RC_OFF(sng_loader_busy)) = 0;
   ov_ret32(c, ok);
 }
 
@@ -395,14 +299,13 @@ void F_10d96a0(rc_ctx *c) {
 // through the pointer at 0x1ed9160). A custom song's key is not in it, so the song was left out of
 // the list even with its archive mounted and its manifest read. The Mac image has no such table.
 // Answering true lists every song whose manifest the game reads (official keys are in the table
-// anyway); RS_MODS_BYPASS=0 asks the table again (W_10f41c0, skip.txt `wrap`).
+// anyway); RS_MODS_BYPASS=0 asks the table again (its W_, win32.list `wrap`).
 // ------------------------------------------------------------------------------------------------
-void W_10f41c0(rc_ctx *c);
+void RC_WFN(song_key_known)(rc_ctx *c);
 
-void F_10f41c0(rc_ctx *c) {
-  cfg_load();
-  if (!g_cfg.bypass) {
-    W_10f41c0(c);
+void RC_FN(song_key_known)(rc_ctx *c) {
+  if (!rs_mods_cfg.bypass) {
+    RC_WFN(song_key_known)(c);
     return;
   }
   ov_ret32(c, 1);
@@ -413,51 +316,35 @@ void F_10f41c0(rc_ctx *c) {
 // 0x1449310 (thiscall, ecx = the DLC coordinator) is the coordinator's per-frame update; it calls the
 // install step 0x1449580 (esi = coordinator) once per frame, which takes one name off the list of
 // dlc/*_p.psarc at +0xe0/+0xe4 and mounts that archive (0x1449a10), or, with the list empty, clears
-// the installing flag +6. This native update calls the step in a loop bounded by a frame budget and
+// the installing flag. This native update calls the step in a loop bounded by a frame budget and
 // otherwise does what the original does (the same calls in the same order). The step stays
-// translated. Coordinator fields:
-//   +4, +5   enumeration requested / checks on        +6    installing
-//   +0x30    std::map (root +0x34, size +0x40)        +0x68 clear the map once installing is done
-//   +0xdc    first update done                        +0xdd follow-up done
+// translated. Coordinator fields (tools/targets, as the Mac's dlc_update reads them):
+//   dlc_pending, dlc_check_on   enumeration requested / checks on    dlc_installing  installing
+//   dlc_map                     std::map (dlc_map_root, _begin, _end, _size)
+//   dlc_clear_map               clear the map once installing is done
+//   dlc_first_done              first update done                    dlc_tail_done   follow-up done
 // ------------------------------------------------------------------------------------------------
-// During the install step an archive in dlc/ counts as owned whatever AppID it carries, as on the Mac (mods.c,
-// before_dlc_owned): the game's DLC list is made once at start, so it can't have a song added while the game runs.
-// 0x1448b10 (thiscall, the AppID on the stack, `ret 4`; the Mac steam_dlc_owned) stays translated as W_1448b10 for
-// everyone else and for RS_MODS_BYPASS=0.
-void W_1448b10(rc_ctx *c);
+// During the install steps an archive in dlc/ counts as owned whatever AppID it carries, as on the Mac: the Mac's
+// source, mods_shared.c's hook on steam_dlc_owned, which rs_mods_mounting tells when the steps run.
 extern _Atomic int w32_dlc_archives_open;  // win32_ksync.c: the song archives of dlc/ open now
 extern _Atomic unsigned w32_dlc_archive_opens;
-static int dlc_mounting;  // the game thread's
 
-void N_1448b10(rc_ctx *c) {
-  cfg_load();
-  if (!dlc_mounting || !g_cfg.bypass) {
-    W_1448b10(c);
-    return;
-  }
-  uint32_t sp = (uint32_t)c->r[4];
-  c->r[0] = 1;
-  memcpy(&c->ret_to, RC32_H(sp), 4);
-  c->r[4] = sp + 8;  // ret 4
-}
+// The game's own: dlc_update_head, thiscall (coordinator); dlc_install_step, esi = coordinator; dlc_enum_check,
+// esi = coordinator, al: the enumeration has started; dlc_update_tail, stdcall (coordinator); std_tree_destroy,
+// thiscall (the map), the root node. MAP_FIELD: a field of the coordinator's map, from the map (the tables count
+// them from the coordinator).
+#define MAP_FIELD(m, off) ((m) + ((off) - RC_OFF(dlc_map)))
 
-#define DLC_UPDATE_HEAD 0x1446570u   // thiscall (coordinator)
-#define DLC_INSTALL_STEP 0x1449580u  // esi = coordinator
-#define DLC_ENUM_CHECK 0x14493a0u    // esi = coordinator; al: the enumeration has started
-#define DLC_UPDATE_TAIL 0x1449660u   // stdcall (coordinator)
-#define STD_TREE_DESTROY 0xf964a0u   // thiscall (the map), the root node
-
-void F_1449310(rc_ctx *c) {
+void RC_FN(dlc_update)(rc_ctx *c) {
   static unsigned n_installed, n_frames;
   static double t_first;
-  cfg_load();
   uint32_t self = (uint32_t)c->r[1];
   uint64_t ebx = c->r[3], esi = c->r[6], edi = c->r[7];  // callee-saved
-  rc32_call(c, DLC_UPDATE_HEAD, 0, 0, self, 0, 0);
+  rc32_call(c, RC_ADDR(dlc_update_head), 0, 0, self, 0, 0);
   c->r[6] = self;
-  dlc_mounting = 1;
-  if (!g_cfg.fixes || g_cfg.budget_s <= 0 || !*g8(self + 6)) {
-    rc32_call(c, DLC_INSTALL_STEP, 0, 0, 0, 0, 0);
+  rs_mods_mounting(1);
+  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !*g8(self + RC_OFF(dlc_installing))) {
+    rc32_call(c, RC_ADDR(dlc_install_step), 0, 0, 0, 0, 0);
   } else {
     // The step takes a name off the list and starts mounting that archive, whose file it leaves open. The mount is
     // finished by the update's head (0x1446570, above: it closes the file; seen with LP_LOG_DLC_CLOSE), which the
@@ -476,8 +363,8 @@ void F_1449310(rc_ctx *c) {
     if (!n_frames++) t_first = t0, n_dropped = 0, level = -1;
     do {
       if (level >= 0) {
-        while (atomic_load(&w32_dlc_archives_open) > level && now_s() - t0 < g_cfg.budget_s) {
-          rc32_call(c, DLC_UPDATE_HEAD, 0, 0, self, 0, 0);
+        while (atomic_load(&w32_dlc_archives_open) > level && now_s() - t0 < rs_mods_cfg.budget_s) {
+          rc32_call(c, RC_ADDR(dlc_update_head), 0, 0, self, 0, 0);
           if (atomic_load(&w32_dlc_archives_open) > level) usleep(50);  // what the head waits for is another thread's
         }
         if (atomic_load(&w32_dlc_archives_open) > level && now_s() - waiting_since < 1.0) break;
@@ -486,42 +373,40 @@ void F_1449310(rc_ctx *c) {
       int before = atomic_load(&w32_dlc_archives_open);
       unsigned opens = atomic_load(&w32_dlc_archive_opens);
       c->r[6] = self;
-      rc32_call(c, DLC_INSTALL_STEP, 0, 0, 0, 0, 0);
-      if (*(volatile uint8_t *)g8(self + 6)) n_installed++;  // the step that finds the list empty mounts none
+      rc32_call(c, RC_ADDR(dlc_install_step), 0, 0, 0, 0, 0);
+      // the step that finds the list empty mounts none
+      if (*(volatile uint8_t *)g8(self + RC_OFF(dlc_installing))) n_installed++;
       if (atomic_load(&w32_dlc_archive_opens) - opens == 3) n_dropped++;  // opened three times to look, not a fourth
       if (atomic_load(&w32_dlc_archives_open) > before) level = before, waiting_since = now_s();
-    } while (*(volatile uint8_t *)g8(self + 6) && now_s() - t0 < g_cfg.budget_s);
-    if (!*g8(self + 6) && g_cfg.log && n_dropped) fprintf(stderr, "mods: DLC: %u archives were not mounted\n", n_dropped);
-    if (!*g8(self + 6)) {
-      if (g_cfg.log) {
-        fprintf(stderr, "mods: DLC: %u archives mounted in %u frames, %.2f s\n", n_installed, n_frames,
-                now_s() - t_first);
-        log_counts();
-      }
+    } while (*(volatile uint8_t *)g8(self + RC_OFF(dlc_installing)) && now_s() - t0 < rs_mods_cfg.budget_s);
+    if (!*g8(self + RC_OFF(dlc_installing))) {
+      if (n_dropped) rs_mods_logf("DLC: %u archives were not mounted", n_dropped);
+      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", n_installed, n_frames, now_s() - t_first);
+      log_counts();
       n_installed = n_frames = 0;
     }
   }
-  dlc_mounting = 0;
-  if (!*g8(self + 0xdc)) *g8(self + 0xdc) = 1;
-  if (*g8(self + 5) && *g8(self + 4)) {
+  rs_mods_mounting(0);
+  if (!*g8(self + RC_OFF(dlc_first_done))) *g8(self + RC_OFF(dlc_first_done)) = 1;
+  if (*g8(self + RC_OFF(dlc_check_on)) && *g8(self + RC_OFF(dlc_pending))) {
     c->r[6] = self;
-    if ((uint8_t)rc32_call(c, DLC_ENUM_CHECK, 0, 0, 0, 0, 0)) {
-      *g8(self + 4) = 0;
-      *g8(self + 0xdd) = 0;
+    if ((uint8_t)rc32_call(c, RC_ADDR(dlc_enum_check), 0, 0, 0, 0, 0)) {
+      *g8(self + RC_OFF(dlc_pending)) = 0;
+      *g8(self + RC_OFF(dlc_tail_done)) = 0;
     }
   }
-  if (!*g8(self + 0xdd)) rc32_call(c, DLC_UPDATE_TAIL, &self, 1, 0, 0, 0);
-  if (*g8(self + 0x68)) {
-    uint32_t m = self + 0x30;
-    if (!*g8(self + 6) && ld32(m + 0x10)) {  // clear the std::map
-      uint32_t root = ld32(m + 4);
-      rc32_call(c, STD_TREE_DESTROY, &root, 1, m, 0, 0);
-      st32(m + 8, m);
-      st32(m + 4, 0);
-      st32(m + 0xc, m);
-      st32(m + 0x10, 0);
+  if (!*g8(self + RC_OFF(dlc_tail_done))) rc32_call(c, RC_ADDR(dlc_update_tail), &self, 1, 0, 0, 0);
+  if (*g8(self + RC_OFF(dlc_clear_map))) {
+    uint32_t m = self + RC_OFF(dlc_map);
+    if (!*g8(self + RC_OFF(dlc_installing)) && ld32(MAP_FIELD(m, RC_OFF(dlc_map_size)))) {  // clear the std::map
+      uint32_t root = ld32(MAP_FIELD(m, RC_OFF(dlc_map_root)));
+      rc32_call(c, RC_ADDR(std_tree_destroy), &root, 1, m, 0, 0);
+      st32(MAP_FIELD(m, RC_OFF(dlc_map_begin)), m);
+      st32(MAP_FIELD(m, RC_OFF(dlc_map_root)), 0);
+      st32(MAP_FIELD(m, RC_OFF(dlc_map_end)), m);
+      st32(MAP_FIELD(m, RC_OFF(dlc_map_size)), 0);
     }
-    *g8(self + 0x68) = 0;
+    *g8(self + RC_OFF(dlc_clear_map)) = 0;
   }
   c->r[3] = ebx;
   c->r[6] = esi;
@@ -535,18 +420,16 @@ void F_1449310(rc_ctx *c) {
 // object, with a reference for the caller. It takes the MD5 of the path (0x141be80) and looks it up in a
 // std::map (0x1ed9158), under the path table's lock. Every mounted archive's file checks hash the same
 // paths again, quadratic in the number of archives, as on the Mac. The Windows build inlines the Mac's
-// wrapper, so the function itself is wrapped (skip.txt `wrap`), and a cached path takes the same object
+// wrapper, so the function itself is wrapped (win32.list `wrap`), and a cached path takes the same object
 // with its reference count raised, under the same lock.
-// The lock (*0x1ed915c): a CRITICAL_SECTION, then the owner thread +0x18 and the depth +0x1c, which the
-// game keeps around it (0x141c370). Object: refs +0x1c. A cached object has a reference of the cache's,
-// so it stays until it is evicted: 0x141c3c0 (edi = the object) drops that one.
+// The lock (*0x1ed915c, path_table_cs): a CRITICAL_SECTION, then the owner thread +0x18 and the depth +0x1c
+// (cs_lock_owner, cs_lock_depth), which the game keeps around it (0x141c370). Object: refs +0x1c. A cached object
+// has a reference of the cache's, so it stays until it is evicted: path_release (0x141c3c0, edi = the object)
+// drops that one.
 // ------------------------------------------------------------------------------------------------
-#define PATH_TABLE 0x1ed9158u
-#define PATH_LOCK 0x1ed915cu
-#define PATH_OBJ_REFS 0x1cu
-#define PATH_RELEASE 0x141c3c0u
+#define PATH_OBJ_REFS RC_OFF(path_obj_refs)
 #define PATH_SLOTS 1024  // direct-mapped
-void W_141c130(rc_ctx *c);
+void RC_WFN(path_intern)(rc_ctx *c);
 void w32_cs_enter(rc_ctx *c, uint32_t cs);
 void w32_cs_leave(uint32_t cs);
 
@@ -559,33 +442,33 @@ static uint32_t path_cache_table;  // the path table the cached objects belong t
 static unsigned long path_hits, path_misses;
 
 static uint32_t path_lock(rc_ctx *c) {
-  uint32_t m = ld32(PATH_LOCK);
+  uint32_t m = ld32(RC_ADDR(path_table_cs));
   w32_cs_enter(c, m);
-  st32(m + 0x18, ld32((uint32_t)c->fs + RC32_TEB_TID));
-  st32(m + 0x1c, ld32(m + 0x1c) + 1);
-  uint32_t table = ld32(PATH_TABLE);
+  st32(m + RC_OFF(cs_lock_owner), ld32((uint32_t)c->fs + RC32_TEB_TID));
+  st32(m + RC_OFF(cs_lock_depth), ld32(m + RC_OFF(cs_lock_depth)) + 1);
+  uint32_t table = ld32(RC_ADDR(path_table));
   if (table != path_cache_table) {  // a new path table: the old objects went with the old table
     for (unsigned i = 0; i < PATH_SLOTS; i++) {
       free(path_cache[i].s);
       path_cache[i].s = 0;
       path_cache[i].obj = 0;
     }
-    if (path_cache_table && g_cfg.log) fprintf(stderr, "mods: path table recreated; MD5 cache dropped\n");
+    if (path_cache_table) rs_mods_logf("path table recreated; MD5 cache dropped");
     path_cache_table = table;
   }
   return m;
 }
 static void path_unlock(uint32_t m) {
-  uint32_t d = ld32(m + 0x1c) - 1;
-  st32(m + 0x1c, d);
-  if (!d) st32(m + 0x18, 0);
+  uint32_t d = ld32(m + RC_OFF(cs_lock_depth)) - 1;
+  st32(m + RC_OFF(cs_lock_depth), d);
+  if (!d) st32(m + RC_OFF(cs_lock_owner), 0);
   w32_cs_leave(m);
 }
 
-void F_141c130(rc_ctx *c) {
-  cfg_load();
-  if (!g_cfg.fixes || !ld32(PATH_LOCK)) {  // the game's way; the lock is made later than the first paths
-    W_141c130(c);
+void RC_FN(path_intern)(rc_ctx *c) {
+  // the game's way with the fixes off, and until its lock is made: later than the first paths
+  if (!rs_mods_cfg.fixes || !ld32(RC_ADDR(path_table_cs))) {
+    RC_WFN(path_intern)(c);
     return;
   }
   uint32_t esp = (uint32_t)c->r[4], len = (uint32_t)c->r[1];
@@ -610,7 +493,7 @@ void F_141c130(rc_ctx *c) {
     memcpy(copy, s, n);  // before the call: the caller's buffer may be the guest stack's
     copy[n] = 0;
   }
-  W_141c130(c);  // +1 reference, for the caller
+  RC_WFN(path_intern)(c);  // +1 reference, for the caller
   uint32_t obj = (uint32_t)c->r[0], evicted = 0;
   if (obj && copy) {
     m = path_lock(c);
@@ -628,7 +511,7 @@ void F_141c130(rc_ctx *c) {
     uint64_t edi = c->r[7];
     uint32_t ret_to = c->ret_to;
     c->r[7] = evicted;
-    rc32_call(c, PATH_RELEASE, 0, 0, 0, 0, 0);
+    rc32_call(c, RC_ADDR(path_release), 0, 0, 0, 0, 0);
     c->r[7] = edi;
     c->ret_to = ret_to;
     c->r[0] = obj;
@@ -645,13 +528,12 @@ void F_141c130(rc_ctx *c) {
 // the Mac replaces the three functions it is inlined into. As on the Mac the hash is the value's bits,
 // with -0 made +0 so equal numbers hash equally; the table masks it, so the bits are mixed down.
 // ------------------------------------------------------------------------------------------------
-void W_1400650(rc_ctx *c);
+void RC_WFN(num_hash)(rc_ctx *c);
 static unsigned long num_hashes;
 
-void F_1400650(rc_ctx *c) {
-  cfg_load();
-  if (!g_cfg.fixes) {
-    W_1400650(c);
+void RC_FN(num_hash)(rc_ctx *c) {
+  if (!rs_mods_cfg.fixes) {
+    RC_WFN(num_hash)(c);
     return;
   }
   double v;
@@ -666,7 +548,7 @@ void F_1400650(rc_ctx *c) {
 }
 
 static void log_counts(void) {
-  fprintf(stderr, "mods: paths: %lu from the cache, %lu hashed; numbers: %lu hashed\n", path_hits, path_misses, num_hashes);
+  rs_mods_logf("paths: %lu from the cache, %lu hashed; numbers: %lu hashed", path_hits, path_misses, num_hashes);
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -674,31 +556,27 @@ static void log_counts(void) {
 // (tools/ws7/recomp/overrides/src/online_glue.c): RSRDVDownloadManager's queue functions 0x144bc80
 // (name, job) and 0x144bdb0 (type, job), thiscall on the manager at 0x1ee17d8, which goes to Ubisoft's
 // servers. Offline every request ends at once, on the calling thread, as a failed transfer: the job's
-// completion (slot 3, 0x1445f10: failed = true) releases the in-flight state, which the coordinator's
-// shutdown waits for (0x1443960), and the job is deleted (slot 0, flag 1). The answer is true when a
+// completion (dlc_job_fail_slot, 0x1445f10: failed = true) releases the in-flight state, which the coordinator's
+// shutdown waits for (0x1443960), and the job is deleted (dlc_job_delete_slot, flag 1). The answer is true when a
 // job was taken, as the original's. Job: the 0x14-byte Callback<RSDLCCoordinator> or
 // Callback<PreviewFile>.
 // ------------------------------------------------------------------------------------------------
-#define DLC_JOB_DELETE_SLOT 0u
-#define DLC_JOB_DONE_SLOT 3u
-
 static void dlc_job_fail(rc_ctx *c) {
   uint32_t esp = (uint32_t)c->r[4], job = ld32(esp + 8), one = 1;
-  cfg_load();
-  if (g_cfg.log) fprintf(stderr, "mods: DLC preview: download job 0x%x failed (offline)\n", job);
+  rs_mods_logf("DLC preview: download job 0x%x failed (offline)", job);
   if (job) {
-    rc32_call(c, ld32(ld32(job) + 4 * DLC_JOB_DONE_SLOT), &one, 1, job, 0, 0);
-    rc32_call(c, ld32(ld32(job) + 4 * DLC_JOB_DELETE_SLOT), &one, 1, job, 0, 0);
+    rc32_call(c, ld32(ld32(job) + 4 * RC_SLOT(dlc_job_fail)), &one, 1, job, 0, 0);
+    rc32_call(c, ld32(ld32(job) + 4 * RC_SLOT(dlc_job_delete)), &one, 1, job, 0, 0);
   }
   c->r[0] = job != 0;
   memcpy(&c->ret_to, RC32_H(esp), 4);
   c->r[4] = esp + 12;  // ret 8
 }
-void F_144bc80(rc_ctx *c) { dlc_job_fail(c); }
-void F_144bdb0(rc_ctx *c) { dlc_job_fail(c); }
+void RC_FN(dlc_job_preview)(rc_ctx *c) { dlc_job_fail(c); }
+void RC_FN(dlc_job_request)(rc_ctx *c) { dlc_job_fail(c); }
 // The manager's flush (0x144bbd0, esi = the manager; the Mac dlc_worker_flush): nothing in flight. The
 // coordinator's shutdown calls it with a manager that was never made offline.
-void F_144bbd0(rc_ctx *c) { ov_ret32(c, 0); }
+void RC_FN(dlc_worker_flush)(rc_ctx *c) { ov_ret32(c, 0); }
 
 // ------------------------------------------------------------------------------------------------
 // Any window or screen shape, as the Mac edition (RS_WINDOW_ANY_SHAPE, on unless 0, read by
@@ -730,10 +608,9 @@ void F_144bbd0(rc_ctx *c) { ov_ret32(c, 0); }
 // RS_FULLSCREEN=0 or Control-Command-F, has the layer fit that back buffer), and a client size changed
 // alone would bring the fit's bars back.
 // ------------------------------------------------------------------------------------------------
-#define GAME_16_9 0x1da5e18u       // double, 1.7777777910232544 (16/9 as a float)
-#define SETTINGS_READ 0x13afbd0u   // esi = the record
-#define SETTINGS_APPLY 0x13afc50u  // eax = the record (0x44 bytes)
-#define SETTINGS_MODE 0x10u        // flags: Windowed Mode, as set_fullscreen (0x13afd30) reads them
+// The game's own: display_ratio_16_9, a double, 1.7777777910232544 (16/9 as a float); settings_read, esi = the
+// record; settings_apply, eax = the record (0x44 bytes: settings_width, settings_height, and settings_mode, the
+// Windowed Mode flags as set_fullscreen, 0x13afd30, reads them).
 #define MODE_NONEXCLUSIVE 0x80u    // Non-Exclusive Fullscreen (a windowed device the desktop's size)
 #define MODE_EXCLUSIVE 0x04u       // Exclusive Fullscreen; neither: Windowed
 void w32_window_size(uint32_t hwnd, int w, int h);  // win32_user32.c
@@ -746,7 +623,7 @@ void lp_game_shape(int w, int h) {
   static double game_16_9;
   static int have;
   if (!have) {
-    memcpy(&game_16_9, RC32_H(GAME_16_9), 8);
+    memcpy(&game_16_9, RC32_H(RC_ADDR(display_ratio_16_9)), 8);
     have = 1;
   }
   if (!atomic_load(&shape_thread_set)) {
@@ -754,9 +631,9 @@ void lp_game_shape(int w, int h) {
     atomic_store(&shape_thread_set, 1);
   }
   double r = w > 0 && h > 0 && (int64_t)w * 9 != (int64_t)h * 16 ? (double)w / h : game_16_9, was;
-  memcpy(&was, RC32_H(GAME_16_9), 8);
+  memcpy(&was, RC32_H(RC_ADDR(display_ratio_16_9)), 8);
   if (r == was) return;
-  memcpy(RC32_H(GAME_16_9), &r, 8);
+  memcpy(RC32_H(RC_ADDR(display_ratio_16_9)), &r, 8);
   fprintf(stderr, "lp: the game draws %dx%d at its own shape (%.4f; 16:9 is %.4f)\n", w, h, r, game_16_9);
 }
 
@@ -778,20 +655,20 @@ void w32_pump(rc_ctx *c) {
   uint32_t esp = (uint32_t)c->r[4], rec = (esp - 0x100) & ~0xfu;  // below PeekMessage's arguments
   c->r[4] = rec;
   c->r[6] = rec;
-  rc32_call(c, SETTINGS_READ, 0, 0, 0, 0, 0);
-  uint32_t ow = ld32(rec), oh = ld32(rec + 4);
-  if (*g8(rec + SETTINGS_MODE) & (MODE_NONEXCLUSIVE | MODE_EXCLUSIVE)) {
+  rc32_call(c, RC_ADDR(settings_read), 0, 0, 0, 0, 0);
+  uint32_t ow = ld32(rec + RC_OFF(settings_width)), oh = ld32(rec + RC_OFF(settings_height));
+  if (*g8(rec + RC_OFF(settings_mode)) & (MODE_NONEXCLUSIVE | MODE_EXCLUSIVE)) {
     // the game's full screen shown in a window (RS_FULLSCREEN=0, Control-Command-F): its device stays the
     // desktop's or its own size whatever the record says, so it keeps it, and the layer fits it to the window
     memcpy(c->r, saved, sizeof saved);
     fprintf(stderr, "lp: the game is in full screen (Windowed Mode is not Windowed): its resolution stays\n");
     return;
   }
-  st32(rec, (uint32_t)w);
-  st32(rec + 4, (uint32_t)h);
+  st32(rec + RC_OFF(settings_width), (uint32_t)w);
+  st32(rec + RC_OFF(settings_height), (uint32_t)h);
   w32_window_size(hwnd, w, h);
   c->r[0] = rec;
-  rc32_call(c, SETTINGS_APPLY, 0, 0, 0, 0, 0);
+  rc32_call(c, RC_ADDR(settings_apply), 0, 0, 0, 0, 0);
   memcpy(c->r, saved, sizeof saved);
   fprintf(stderr, "lp: the game's resolution %ux%u -> %dx%d, the window's\n", ow, oh, w, h);
 }

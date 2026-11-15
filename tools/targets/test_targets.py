@@ -29,6 +29,10 @@ class Repo(unittest.TestCase):
             self.assertIn("#define RC_FN_game_frame F_10017a020", h)
             self.assertIn("#define RC_ADDR_autosave_warning 0x1005e7e10ull", h)
             self.assertIn("#define RC_FN_autosave_warning F_1005e7e10", h)
+            self.assertIn("#define RC_WFN_game_frame W_10017a020", h)   # a hook point's translated function
+            self.assertFalse(os.path.exists(os.path.join(d, "skip", "win32.skip")))   # Learn & Play's module
+            self.assertNotIn(" wrap", open(os.path.join(d, "skip", "mods.skip")).read())
+            self.assertNotIn("RC_NFN_", h)                              # gen_image_pe.py's alone
             hooks = open(os.path.join(d, "skip", "hooks.skip")).read().split("\n")
             self.assertIn("10017a020 wrap", hooks)
             self.assertIn("1005e7e10 wrap", hooks)
@@ -43,6 +47,21 @@ class Repo(unittest.TestCase):
         d = tempfile.mkdtemp()
         try:
             targets.gen("win-x86", d)
+            h = open(os.path.join(d, "rc_target_names.h")).read()
+            # what Learn & Play's built-in fixes are compiled against (win-x86/shims/win32_overrides.c)
+            self.assertIn("#define RC_FN_dlc_update F_1449310", h)
+            self.assertIn("#define RC_WFN_path_intern W_141c130", h)
+            self.assertIn("#define RC_NFN_autosave_warning N_120adf0", h)
+            self.assertIn("#define RC_ADDR_input_binding 0x1ed87b0ull", h)
+            self.assertIn("#define RC_OFF_dlc_installing 0x6", h)
+            # and the skip file its translation takes, of names/overrides/win32.list
+            skip = open(os.path.join(d, "skip", "win32.skip")).read().split("\n")
+            self.assertIn("1449310", skip)        # dlc_update: replaced
+            self.assertIn("141c130 wrap", skip)   # path_intern: kept as W_ beside the native one
+            self.assertIn("120adf0 wrap", skip)   # autosave_warning: a hook point too, so the native one is N_
+            self.assertNotIn("1126950 wrap", skip)   # boot_intro_update: the shared pre hook, nothing native
+            self.assertEqual(len([x for x in skip if x and not x.startswith("#")]),
+                             len(targets.name_lists()["overrides/win32"]))   # every name is a function here
             c = open(os.path.join(d, "rc_target.c")).read()
             self.assertIn("""{"steam_dlc_owned", 0x1448b10ull, 0x100a07800ull, 0, 3, 'b', 4, 2, {{'p', -2, 0}, {'i', 0, 0}}, 0, 0},""", c)
             self.assertIn("""{"frontend_open_file", 0x101ba80ull, 0x1003c7810ull, 0, 5, 'p', -1, 2, {{'p', 0, 0}, {'p', -2, 0}}, 0, 0},""", c)
@@ -175,6 +194,30 @@ class Synthetic(Tree, unittest.TestCase):
         self.assertEqual(skip["m"].split("\n")[1:], ["401000", ""])  # f_two is left out
         self.assertIn("401020 wrap", skip["hooks"])
 
+    def test_wrap_mark(self):
+        # `NAME wrap` in an override module's list: the function stays translated beside the native one
+        self.write("names/overrides/m.list", "f_one wrap  # the original for the rest\nf_two\n")
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two 0x401010 cdecl -\nframe 0x401020 thiscall -\n"
+                                          "glob 0x500000 data int\n")
+        self.write("mac-x64/target.toml", 'id = "mac-x64"\nfront_end = "x"\nabi = "sysv64"\n')
+        self.write("win-x86/target.toml", 'id = "win-x86"\nfront_end = "x"\nabi = "win32"\n')
+        self.assertEqual(self.errs(), [])
+        wraps = {}
+        lists = targets.name_lists(self.base, wraps)
+        self.assertEqual((lists["overrides/m"], wraps), (["f_one", "f_two"], {"overrides/m": {"f_one"}}))
+        skip = targets.gen_skip(targets.Target("win-x86", self.base), lists, wraps)
+        self.assertEqual(skip["m"].split("\n")[1:], ["401000 wrap", "401010", ""])
+        # the 64-bit generator reads `ADDR wrap` as a hook point: no skip file of such a module there
+        mac = targets.gen_skip(targets.Target("mac-x64", self.base), lists, wraps)
+        self.assertNotIn("m", mac)
+        self.assertIn("hooks", mac)
+        # any other second word, and the mark outside an override list, are mistakes
+        self.write("names/overrides/m.list", "f_one wrapped\nf_two\n")
+        self.assertIn("f_one: one name a line, or NAME wrap", "\n".join(self.errs()))
+        self.write("names/overrides/m.list", "f_one\nf_two\n")
+        self.write("names/refs.list", "glob wrap\n")
+        self.assertIn("glob: one name a line", "\n".join(self.errs()))
+
     def test_missing_offset_and_stale_and_data_override(self):
         self.write("win-x86/offsets.map", "")
         self.write("win-x86/symbols.map", "f_one 0x401000 data -\nf_two 0x401010 cdecl -\nframe 0x401020 cdecl -\n"
@@ -283,6 +326,55 @@ class Sources(unittest.TestCase):
         self.assertIn("efd_inc_ref_slot", offs)        # RC_SLOT
         self.assertIn("service_manager_quit", offs)    # RC_OFF
         self.assertNotIn("name", syms)                 # macro parameters are not uses
+        # Learn & Play's built-in fixes (win-x86/shims/win32_overrides.c)
+        self.assertIn("song_key_known", syms)          # RC_FN and RC_WFN
+        self.assertIn("frontend_open_file", syms)      # RC_NFN
+        self.assertIn("dlc_install_step", syms)        # RC_ADDR
+        self.assertIn("dlc_installing", offs)          # RC_OFF
+        self.assertIn("dlc_job_fail_slot", offs)       # RC_SLOT
+        own, own_offs, _ = check.source_uses(patterns=check.TARGET_SOURCES["win-x86"])
+        self.assertIn("num_hash", own)
+        self.assertNotIn("lua_gettop", own)            # the Mac's overrides are not Learn & Play's
+        self.assertIn("dlc_map_size", own_offs)        # a field handed to a macro of the file's own is still read
+        self.assertNotIn("path_table_lock", own)       # the Mac's lock: Learn & Play's is path_table_cs
+
+
+class TargetSources(Tree, unittest.TestCase):
+    """Code built for one target alone (check.TARGET_SOURCES): a name it uses has to be in that target."""
+
+    def setUp(self):
+        Tree.setUp(self)
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two unsupported inlined here\n"
+                                          "frame 0x401020 thiscall -\nglob 0x500000 data int\n")
+
+    def errs(self):
+        return check.check(self.base, root=self.base)
+
+    def test_names_of_the_target_pass(self):
+        self.write("win-x86/shims/win32_x.c", "void RC_FN(f_one)(rc_ctx *c) { RC_WFN(f_one)(c); }\n"
+                                               "void RC_NFN(frame)(rc_ctx *c) { st(RC_ADDR(glob) + RC_OFF(fld)); }\n")
+        self.assertEqual(self.errs(), [])
+
+    def test_unknown_name_fails(self):
+        self.write("win-x86/shims/win32_x.c", "void f(void) { call(RC_ADDR(f_three)); read(RC_OFF(no_field)); }\n")
+        e = "\n".join(self.errs())
+        self.assertIn("win-x86/shims/win32_x.c:1: f_three is used as a game symbol but no list", e)
+        self.assertIn("win-x86/shims/win32_x.c:1: no_field is used as an offset", e)
+
+    def test_unsupported_name_fails(self):
+        # the Mac has f_two, Learn & Play doesn't: code of every target may name it, Learn & Play's own may not
+        self.write("tools/ws7/recomp/overrides/src/x.c", "void RC_FN(f_two)(rc_ctx *c) {}\n")
+        self.assertEqual(self.errs(), [])
+        self.write("win-x86/app/lp_x.c", "void g(void) { call(RC_ADDR(f_two)); }\n")
+        e = self.errs()
+        self.assertEqual(len(e), 1, e)
+        self.assertIn("win-x86/app/lp_x.c:1: f_two is used in code built for win-x86 alone, where it is unsupported "
+                      "(inlined here)", e[0])
+
+    def test_offset_as_symbol_fails(self):
+        self.write("win-x86/shims/d3d9/x.c", "void g(void) { call(RC_ADDR(fld)); }\n")
+        self.assertIn("fld is used as a game symbol but no list in tools/targets/names has it (it is an offset)",
+                      "\n".join(self.errs()))
 
 
 if __name__ == "__main__":

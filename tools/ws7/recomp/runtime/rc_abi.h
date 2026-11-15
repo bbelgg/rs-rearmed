@@ -9,6 +9,10 @@
 //   RC_ADDR(name)        the unslid image address of a function or global (uint64_t constant)
 //   RC_GA(name)          its host address now (uint64_t): the image is mapped at RC_A(RC_ADDR(name))
 //   RC_FN(name)          the F_ symbol of a function: `void RC_FN(lua_gettop)(rc_ctx *c) { ... }` overrides it
+//   RC_WFN(name)         its W_ symbol: the translated function, where the build keeps it beside a native one (a hook
+//                        point, or a `wrap` line of a skip list); the native function calls it for the original
+//   RC_NFN(name)         win-x86: its N_ symbol, which a native function has in place of F_ when the function is a
+//                        hook point too (the generated F_ runs a mod's hooks around it, gen_image_pe.py)
 //   RC_OFF(name)         a struct field offset (or a size) from offsets.map
 //   RC_SLOT(name)        a vtable slot index (offsets.map: NAME_slot)
 //   RC_HOST(g), RC_GUEST(h)  guest pointer -> host pointer, and back
@@ -61,6 +65,8 @@ static inline uint64_t RC_GUEST(const void *h) {
 // Each takes the name itself (pasted, never macro-expanded first: a name may also be a C macro).
 #define RC_ADDR(name) RC_ADDR_##name
 #define RC_FN(name) RC_FN_##name
+#define RC_WFN(name) RC_WFN_##name
+#define RC_NFN(name) RC_NFN_##name
 #define RC_CC(name) RC_CC_##name
 #define RC_OFF(name) RC_OFF_##name
 #define RC_SLOT(name) RC_OFF_##name##_slot

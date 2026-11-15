@@ -494,7 +494,7 @@ def main():
         rep.append(s)
 
     src = Source(args.harvest)
-    if src.stamp not in {k[0] for k in KEY_CHECKS}:   # skip.txt, the overrides and the tables are for one build
+    if src.stamp not in {k[0] for k in KEY_CHECKS}:   # the overrides and the tables are for one build
         raise SystemExit("the game in %s is build 0x%x, which this tree has no tables for (known: %s)"
                          % (args.harvest, src.stamp, ", ".join(sorted({"0x%x" % k[0] for k in KEY_CHECKS}))))
     img = src.img

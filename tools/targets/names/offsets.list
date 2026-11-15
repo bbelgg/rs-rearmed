@@ -39,6 +39,21 @@ autosave_menu             # UI event handler: created-dialog slot
 autosave_timer            # UI event handler: state-machine timer double
 autosave_query_slot       # sign-in query object vtable: the dialog predicate
 
+# Learn & Play's built-in fixes (win-x86/shims/win32_overrides.c)
+frontend_fs_open_slot     # front-end file system vtable: Open(const char *path, DataStream **) -> bool
+stream_add_ref_slot       # DataStream vtable: AddRef
+menu_refs                 # a menu or dialog: its reference count
+cs_lock_owner             # Learn & Play's recursive lock, a CRITICAL_SECTION and two words (the Mac's is a pthread mutex: rmutex_owner): u32 owner thread id
+cs_lock_depth             # Learn & Play's recursive lock: u32 depth
+sng_loader_data           # SNG loader: the file's data
+sng_loader_begin          # SNG loader: where the signed part begins in the data
+sng_loader_end            # SNG loader: where it ends
+sng_loader_busy           # SNG loader: u8, set around the signature check
+efd_allocator_free_slot   # efd allocator vtable: free (block, 9, -1)
+settings_width            # display settings record: u32 width
+settings_height           # display settings record: u32 height
+settings_mode             # display settings record: u8 flags, the Windowed Mode setting
+
 # audio (overrides/src/audio_*.c)
 ak_ps_refills    # AkPlatformInitSettings: u16 uNumRefillsInVoice
 ak_sink_refills  # CoreAudio sink: u32 ring refill count

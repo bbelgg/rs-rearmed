@@ -34,8 +34,9 @@ Win32 seam by name (`shims/win32_dispatch.c`).
   the build, the app bundle and the clean-up (`lp_build.py`, through `lp_install.py build`, `app-install`, `build-clean`)
 - `imports/` — the import tables (IAT slots and VMProtect wrapper sites) at link addresses
 - `build/` — `translate.sh` (the game, ~15-25 min), `build_modules.sh` (the DLLs), `build_shims.sh`,
-  `build_gl.sh` (libRSOpenGL without CMake), `build.sh` (everything, then the link); `skip.txt`, the game
-  functions the seam replaces
+  `build_gl.sh` (libRSOpenGL without CMake), `build.sh` (everything, then the link). The game functions the
+  built-in fixes replace are named in `tools/targets/names/overrides/win32.list`, which the translation's skip
+  file is made of
 - `shims/` — the Win32 seam: `win32_dispatch.c` (imports by name), `win32_kernel32.c` / `win32_kfile.c` /
   `win32_ksync.c` (kernel32), `win32_user32.c`, `win32_input.c` (keyboard and mouse from the host window),
   `win32_net.c` (ws2_32, iphlpapi, wininet: offline), `win32_misc.c` (advapi32, ole32, shell32, winmm,

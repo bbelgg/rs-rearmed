@@ -18,6 +18,16 @@ measurements in [PERFORMANCE.md](PERFORMANCE.md); earlier releases are in git an
   unit tests, by the translator's checks of the points against the image, and by a run to the note highway on a
   60 Hz screen, where the hooks leave the game as it is. Not yet run above 60 Hz: this edition has no switch for the
   frame rate, so that takes a faster display.
+- **Built-in fixes by name** (not released): `win32_overrides.c` names every function, global and field of the game
+  through `tools/targets/win-x86`, as the Mac's overrides do through `mac-x64`; it held their addresses and offsets
+  itself before ([DESIGN.md](DESIGN.md#per-game-tables)). The renaming changed nothing it does: the compiled code
+  was the same to the byte before and after it. The list of functions it replaces is a table too
+  (`names/overrides/win32.list`), and the translation's skip file is made of it, where `skip.txt` was kept by hand.
+- **Built-in fixes shared with the Mac edition** (not released): the switches, the log and the start, the intro skip
+  and the song ownership during a mount are the Mac's source now, as the frame rate fixes were
+  (`overrides/mods/mods_shared.c`; [DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what stays this port's own
+  and why). The log's lines start `[rs-mods] ` as the Mac's. Checked by unit tests of the shared object on both
+  runtimes and a run to the note highway.
 - **Batched DLC mounting**: since 1.14.1 the loop waits for each mount to be finished, so every archive of a
   large library is mounted ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)). The Mac edition was checked for the
   same fault and does not have it ([Mac plan](../mac/PLAN.md#status)).

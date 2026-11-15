@@ -28,8 +28,8 @@ where you point them and never copied into the repository. `OUT=DIR` is a build 
 | Bink | `win-x86/bink/tests/build.sh <bink2w32.dll> OUT <cmake dir>`, then `OUT/bink_probe OUT/in/bink2w32.dll <file.bk2> [-n frames] [-png out.png] [-wait]` | the translated Bink on the game's Win32 seam: header, every frame a picture, the PCM; `.bk2` files come from the game's `video.psarc` and `etudes.psarc` (`tools/psarc_extract.py <psarc> <dir> --match .bk2`). The audio check wants a peak over 64 in the frames it decodes, so a video that opens quietly fails it with `-n 60`: use another video or more frames |
 | Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac port: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac port: what a change calls for, and a release's edits and notes |
-| Tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's |
-| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention; the files a mod serves (`test_files`); the arithmetic of the frame rate fixes (`test_framerate`); `probe_mod.dylib` and `files_mod.dylib` for the game runs ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
+| Tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac port: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's; the names this port's own code uses (`win32_overrides.c`) are in `win-x86`, none `unsupported` there |
+| Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac port: one mod dylib in the 64-bit and the 32-bit runtime, for each convention; the files a mod serves (`test_files`); the arithmetic of the frame rate fixes (`test_framerate`); the built-in fixes both editions share (`test_shared32` is this port's runtime, `test_shared64` the Mac's); `probe_mod.dylib` and `files_mod.dylib` for the game runs ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
 
 ### The recompiler
 
@@ -184,7 +184,7 @@ LP_GAME_DIR=<game folder> LP_USER_DIR=<test user folder> RS_STEAM_DATA_DIR=<test
   `00,2e,1f,0f` `amor`).
 - `@text` waits until `text` appears in the log (at most `LP_INPUT_WAIT` seconds, default 120). `@callback 1101`
   (the Steam stats callback, logged with `RS_STEAM_LOG=1`) means the title screen takes keys; `@DLC:` (with
-  `RS_MODS_LOG=1`, the `mods: DLC: N archives mounted in F frames, T s` line) is the end of the DLC mounting,
+  `RS_MODS_LOG=1`, the `[rs-mods] DLC: N archives mounted in F frames, T s` line) is the end of the DLC mounting,
   after the profile has loaded.
 
 The script's log lines carry the seconds since it started and the wall time, to match them with snapshots. The
@@ -240,7 +240,7 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
 |---|---|---|
 | Title (TitleScreen) | Return | up about 9 s after the start with the intro skip, "ENTER Begin" at about 15 s; about 30 s with the intro. 10 s after `menu: TitleScreen` or the `callback 1101` line is safe |
 | Profile list (ProfileSelect) | Return | `fwddelete` here deletes the profile. With no profile, Return starts a new one (below). With rearmed-mods' `ForceProfileLoad` the game goes to the main menu by itself |
-| Main menu (MainMenu) | Return on LEARN A SONG | up about 20 s after the profile; wait for `mods: DLC:` and 10 s more. From LEARN A SONG down: SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, SHOP; with the overlay the first Down is ENUMERATE. Once in eight runs "The Ubisoft servers are not available" came up over it and took a Return: run again |
+| Main menu (MainMenu) | Return on LEARN A SONG | up about 20 s after the profile; wait for `[rs-mods] DLC:` and 10 s more. From LEARN A SONG down: SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, SHOP; with the overlay the first Down is ENUMERATE. Once in eight runs "The Ubisoft servers are not available" came up over it and took a Return: run again |
 | Mission notices (MissionMenu) | Return on each | Mission Complete, New Mission, on a profile that has them |
 | Song list (LearnASong_Songs) | Shift, the letters, Down, Return | Shift opens the search (`/` on the Mac). The default sort is DATE ADDED, so search rather than count rows. Letters 1.5-2 s apart, the second of two equal letters a second later; a letter is dropped now and then, so read the search text in a snapshot. Esc clears the search (with no match it closes it), and Esc with it closed leaves the list. A new account owns no DLC: Down to the first song with no DLC tag |
 | Song page (LearnASong_SongOptions) | Return on Play Song | a song with only an Alternate Lead shows an X instead of a percentage on the Lead path; it still plays |
@@ -284,18 +284,18 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
 **Checks that have a route.** What is the same in both editions is said once, in
 [Mac testing](../mac/TESTING.md#unattended-runs); this is what differs here.
 
-- **No intro screens** (`RS_MODS_INTRO`): this app logs nothing about the intro, so use snapshots every 3 s.
-  With `RS_MODS_INTRO=0` the Ubisoft logo is up at about 6 s and the title at about 30 s. The failure to look
-  for is an empty screen after the loading screen.
+- **No intro screens** (`RS_MODS_INTRO`): `RS_MODS_LOG=1` logs `[rs-mods] intro: skipped`, as on the Mac (the
+  skip is the same source); snapshots every 3 s show the rest. With `RS_MODS_INTRO=0` the Ubisoft logo is up at
+  about 6 s and the title at about 30 s. The failure to look for is an empty screen after the loading screen.
 - **Auto Save warning** (`RS_MODS_AUTOSAVE`): with `RS_MODS_AUTOSAVE=0` "WARNING! This game uses an auto save
   feature" comes after "Loading profile…" and clears itself about 4 s later, so take snapshots every 2 s.
   `RC_HOOK_TRACE=autosave_warning` shows the handler either way. Not checked: a Real Tone cable or Microphone
   profile, and the tuner with the switch off.
-- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `mods: frame rate: on, 8 of 8 points`, and
-  `mods: frame rate: off` with `RS_MODS_FRAME_RATE=0`. This app has no switch for the frame rate, so on a 60 Hz
-  screen the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a guitar
-  ([Mac testing](../mac/TESTING.md#unattended-runs)). Not done yet.
-- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here. With `RS_MODS_LOG=1`, `mods: DLC: N
+- **Frame rate fixes** (`RS_MODS_FRAME_RATE`): `RS_MODS_LOG=1` logs `[rs-mods] frame rate: on, 8 of 8 points`,
+  and `[rs-mods] frame rate: off` with `RS_MODS_FRAME_RATE=0`. This app has no switch for the frame rate, so on a
+  60 Hz screen the hooks are called and change nothing; what they do takes a display faster than 60 Hz and a
+  guitar ([Mac testing](../mac/TESTING.md#unattended-runs)). Not done yet.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here. With `RS_MODS_LOG=1`, `[rs-mods] DLC: N
   archives were not mounted` comes before the `archives mounted` line when a step dropped its archive (the seam
   counts each open of a song archive). The count of songs in the search box, as in
   [Mac testing](../mac/TESTING.md#unattended-runs), has not been read in this edition.
@@ -307,13 +307,13 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   MICROPHONE, DISCONNECTED), and on the main menu the seventh Down reaches SHOP, whose Return shows "You must
   enable Steam Community In-Game to access the Shop." with nothing scanned: the game as it was.
 - **Enumerate**: only `dlc_from` in `.rearmed/source.json` needs a folder of your own; copy the song there once
-  `mods: DLC:` is logged, then the Enumerate script of the table. The log also has a second `mods: DLC:` line
+  `[rs-mods] DLC:` is logged, then the Enumerate script of the table. The log also has a second `[rs-mods] DLC:` line
   with one archive more. `song folder not there` for the depot's own `dlc` is normal: a depot has none.
 - **Song ownership**: put the re-packed archive in the `dlc/` of a game folder of its own and make the copy with
   `gamefiles.Copier` (`steam.env` then lists the new AppID; `RS_PSARC_KEY_IMAGE` is the unpacked code image
   here). A search finds the song; with `RS_STEAM_DLC` set to the list without that AppID it finds nothing.
 - **Custom songs** (the song-key table skip): search for a custom song in the copy's `dlc/` and play it;
-  `mods: CDLC: song file signature check skipped` is logged as it loads. With `RS_MODS_BYPASS=0` the search
+  `[rs-mods] CDLC: song file signature check skipped` is logged as it loads. With `RS_MODS_BYPASS=0` the search
   gives "No Matching Songs": the song-key table is back and hides every custom song, so that switch is no check
   of ownership here.
 - **All the song overrides in one build**: make the test copy with the install code,
@@ -352,8 +352,9 @@ runs: wait for the log line, or look at a snapshot, rather than count on them.
   the table. Esc on the highway, four Downs and Return exit to the song's page; Return is Play Song, forward
   delete and Return pass the tuner; the first Esc is at `58 + 28`, and each round adds 74 s. `RC32_LOG_RAISE`
   shows any `longjmp` or C++ exception on the way.
-- **Finding which check drops a song**: a `wrap` line in `skip.txt` and an `F_<addr>` in `win32_overrides.c`
-  that calls `W_<addr>` and logs its arguments or result (filtered by the return address, `[esp]` on entry) show
+- **Finding which check drops a song**: a name for the function in `tools/targets` (`names/refs.list`, both
+  `symbols.map`), a `NAME wrap` line in `names/overrides/win32.list` and an `RC_FN(NAME)` in `win32_overrides.c`
+  that calls `RC_WFN(NAME)` and logs its arguments or result (filtered by the return address, `[esp]` on entry) show
   what the game does for one song without changing it; one re-translation per set of probes.
 
 ### Measured runs

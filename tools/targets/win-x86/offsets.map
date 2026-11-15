@@ -16,8 +16,8 @@ input_sink_full_char              unsupported  Mac-only: a slot of the Mac input
 thread_priority_index             0x14    # engine thread: int32 priority index (read at the inlined sites, 0x106b4eb, 0x163cc0e)
 thread_pthread                    unsupported  Mac-only (pthread_t); the Windows thread handle is +0x20, read at the inlined sites of thread_set_priority
 path_obj_refs                     0x1c    # interned path object: int refcount
-rmutex_owner                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its owner at +0x18
-rmutex_depth                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its depth at +0x1c
+rmutex_owner                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its owner at cs_lock_owner
+rmutex_depth                      unsupported  Mac-only (pthread recursive mutex); the CRITICAL_SECTION-based lock keeps its depth at cs_lock_depth
 dlc_installing                    0x6     # DLC coordinator: the batched mount runs on these (win32_overrides.c, 0x1449310)
 dlc_pending                       0x4     # DLC coordinator: u8
 dlc_check_on                      0x5     # DLC coordinator: u8
@@ -82,7 +82,7 @@ dlc_job_fail_slot                 0x3     # job functor vtable: completion, 0x14
 # --- offsets added after the initial fill
 boot_intro_playing                0x2d    # RSBootService: cleared by the game's own skip, 0x1126759
 boot_intro_state                  0x60    # RSBootService: the same five-state switch in 0x1126950
-boot_phase                        0x48    # RSBootService: dispatcher 0x112614d; the intro skip reads it (win32_overrides.c)
+boot_phase                        0x48    # RSBootService: dispatcher 0x112614d (phase 2 = 0x1126680, phase 3 = 0x1126fc0); the intro skip reads it (overrides/mods/mods_shared.c)
 boot_phase3_steps                 0xa     # RSBootService: the same count
 boot_step                         0x28    # RSBootService: 11-case switch on counter + 1 at 0x112727a
 # The mods library (names/offsets.list)
@@ -134,6 +134,19 @@ input_slot                        0xc     # 0x11decca: [eax + 0xc]
 autosave_menu                     0x14    # 0x120aece: the slot's reference at +4 (0x120aedd), not the Mac's +8
 autosave_timer                    0x20    # 0x120af2f: 4.0 from 0x1d18d48
 autosave_query_slot               0x1e    # 0x120ae5a: [edx + 0x78]
+frontend_fs_open_slot             0x4     # 0x101ba80: call [vtable + 0x10], thiscall bool(const char *, DataStream **)
+stream_add_ref_slot               0x1     # 0x101ba80: call [vtable + 4] on the stream it opened
+menu_refs                         0x4     # 0x120aedd: the reference of the dialog stored at autosave_menu; its release is vtable +4
+cs_lock_owner                     0x18    # the game's lock: u32 owner thread id, after the CRITICAL_SECTION (the lock's own code, 0x141c370)
+cs_lock_depth                     0x1c    # the game's lock: u32 depth
+sng_loader_data                   0x10    # 0x10d96a0: the verifier's data is [edi + 0x10] + [edi + 0x14]
+sng_loader_begin                  0x14    # 0x10d96a0
+sng_loader_end                    0x18    # 0x10d96a0: its length is [edi + 0x18] - [edi + 0x14]
+sng_loader_busy                   0x21    # 0x10d96a0: set to 1 before the check, 0 after
+efd_allocator_free_slot           0x2     # the inlined free: call [vtable + 8] of efd_allocator's object with (block, 9, -1)
+settings_width                    0x0     # 0x13afbd0's record
+settings_height                   0x4     # 0x13afbd0's record
+settings_mode                     0x10    # 0x13afbd0's record: the flags set_fullscreen (0x13afd30) reads, 0x80 Non-Exclusive Fullscreen, 0x04 Exclusive
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
 guitar_headstock            0x18    # Rnd_Guitar: its Rnd_Headstock (the tuner's colour reset 0x1131dea: [+0x2c]+0x18, then +0xc)
 headstock_pegs              0xc     # Rnd_Headstock: its PegSet (0x1131df0)

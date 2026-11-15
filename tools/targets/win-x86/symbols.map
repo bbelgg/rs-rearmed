@@ -52,7 +52,7 @@ scaleform_keycode_table                                          unsupported  Ma
 game_char_to_key                                                 unsupported  Mac-only: the table of the Mac keyboard stand-in (key_down)
 game_key_state                                                   unsupported  Mac-only: the table of the Mac keyboard stand-in (key_down)
 thread_priority_table                                            unsupported  no table: the Windows priorities are constants at each inlined site (thread_set_priority)
-path_table_lock                                                  unsupported  a CRITICAL_SECTION here (*0x1ed915c, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply
+path_table_lock                                                  unsupported  a CRITICAL_SECTION here, not a pthread_mutex_t, so the Mac code on it does not apply: path_table_cs (*0x1ed915c, owner +0x18, depth +0x1c)
 path_table                                                       0x1ed9158  data      void *  # std::map of MD5 -> object, read by path_intern
 path_intern                                                      0x0141c130  custom    void *(const char *s, int len)  # ecx = len, stack = s; the Mac path_md5 wrapper is inlined into its callers
 path_release                                                     0x0141c3c0  custom    int(void *obj)  # edi = obj
@@ -70,18 +70,32 @@ efd_alloc                                                        0x014791e0  cde
 json_number_base_ctor                                            unsupported  inlined into num_intern (0x1400040), which writes the vtable and fields itself
 json_number_base_dtor                                            unsupported  inlined into num_dtor (0x13fff60), which writes the base vtable 0x1d5a358
 sng_load_verify_ret                                              0x010d96f7  code      -  # the return of the verifier's call at 0x10d96f2 in the SNG check 0x10d96a0; its only other caller is the package config, 0x130aaed
-input_mode_is_cable                                              unsupported  inlined into 0x11f08d0, which forces Player 2 to Real Tone: win32_overrides.c replaces that
-input_bind                                                       unsupported  0x1344640 takes the input in eax with no arguments else: win32_overrides.c runs it
-input_mode                                                       unsupported  0x13e3fb0: used by address in win32_overrides.c
-input_profile_string                                             unsupported  0x13e2080: used by address in win32_overrides.c
-input_manager                                                    unsupported  0x17c3200: used by address in win32_overrides.c
-input_by_name                                                    unsupported  0x17c3890: used by address in win32_overrides.c
-input_binding                                                    unsupported  0x1ed87b0: used by address in win32_overrides.c
-input_key_direct                                                 unsupported  a literal, 0x1d57a4c: used by address in win32_overrides.c
-input_key_mic                                                    unsupported  a literal, 0x1d57a34: used by address in win32_overrides.c
+input_mode_is_cable                                              unsupported  inlined into input_p2_force_cable (0x11f08d0), which forces Player 2 to Real Tone: win32_overrides.c replaces that
+input_bind                                                       unsupported  not the Mac's call: 0x1344640 takes the input in eax and has no `force`. It is input_find_slot here, which win32_overrides.c runs
+input_mode                                                       0x013e3fb0  cdecl     uint8_t(int player)  # al = the mode
+input_profile_string                                             0x013e2080  cdecl     bool(int player, const char *key, void *out)
+input_manager                                                    0x017c3200  cdecl     void *(void)
+input_by_name                                                    0x017c3890  stdcall   void *(void *manager, const char *name)
+input_binding                                                    0x1ed87b0  data      int[10]
+input_key_direct                                                 0x1e69558  data      const char *  # the Mac's table of pointers to the profile keys is in .data here too, in the same order ("InputMode" at 0x1e69554 before this one). No code reads the word: where the Mac loads it, this game pushes its value 0x1d57a4c, the text "DirectConnectDefaultInput", as a literal (0x11dec45 for input_profile_string, 0x13e7419)
+input_key_mic                                                    0x1e6955c  data      const char *  # the next word of that table, as on the Mac: 0x1d57a34, "MicrophoneDefaultInput", a literal in the code too (0x11dec55, 0x13e742f)
 autosave_signin_query                                            unsupported  inlined into 0x120adf0: the global 0x1ef5e90, made by 0x1438320
 autosave_query_arg                                               unsupported  folded: push 1 at 0x120ae60
 input_mode_restore                                               unsupported  inlined into 0x120adf0, 0x120ae72-0x120ae8d: 0x13e3ed0 and 0x13e3de0 (edi = the player), then 0x1342300 and 0x1342400
+frontend_fs                                                      0x1ee67c4  data      void *  # the singleton FrontEnd_OpenFile (0x101ba80) opens through; its Open is slot frontend_fs_open_slot
+path_table_cs                                                    0x1ed915c  data      void *  # a pointer to the path table's lock: a CRITICAL_SECTION, then the owner thread and the depth the game keeps around it (0x141c370)
+ui_navigate                                                      0x0115db90  custom    void **(void *menu_system, void **out, void *payload)  # edi = the name, the rest on the stack (ret 0xc); eax = out. The Auto Save handler calls it at 0x120aec9
+autosave_navigate_ret                                            0x0120aece  code      -  # the return of the call at 0x120aec9 in autosave_warning (0x120adf0)
+input_p2_force_cable                                             0x011f08d0  cdecl     bool(void)  # the Mac's three inlined checks in one function: al = it set Player 2 to Real Tone
+input_find_slot                                                  0x01344640  custom    void(int input@eax)  # the Mac input_bind without its `force`
+crt_memset                                                       0x01adba30  cdecl     void *(void *p, int value, size_t n)  # the static C library's; the SNG check clears its key buffer with it
+efd_no_free                                                      0x1ee1926  data      uint8_t  # read before every inlined free (the SNG check's, 0x10d96a0)
+sng_check                                                        0x010d96a0  custom    bool(void *loader@edi)  # builds the public key (rsg_bpe_expand on key_sng_dsa_blob), calls the verifier at 0x10d96f2 (sng_load_verify_ret) and returns its answer
+song_key_known                                                   0x010f41c0  custom    bool(const char *key@eax)  # the CRC-32 of the key in the table of 1590 at 0x1d1a0d0; the list builder 0x11da6a0 asks it for each manifest entry (0x10f4f20)
+num_hash                                                         0x01400650  custom    uint32_t(const double *key@eax)  # (long)v ^ 0xdeadbeef, then a minimal-standard generator step; the table's find, equal_range, erase and insert call it
+display_ratio_16_9                                               0x1da5e18  data      double  # 1.7777777910232544: the camera setup (0x1539adb, 0x1539a06) and GRDisplayRatioAdjuster's update (0x13ab236) read it, nothing else
+settings_read                                                    0x013afbd0  custom    void(void *record@esi)  # the 0x44-byte record of the display settings
+settings_apply                                                   0x013afc50  custom    void(void *record@eax)  # resets the device; the game's pick of a display mode calls the pair (0x130c3a9)
 si_io                                                            unsupported  Mac-only: the CoreAudio IOProc; Learn & Play's channel and gain are in its capture stream (win-x86/shims/audio/wa_engine.c)
 audio_mono_to_stereo                                             unsupported  Mac-only: used for the Mac input; Learn & Play's capture stream gives the game the channel
 ak_platform_settings                                             0x1ed2860  data      AkPlatformInitSettings  # Wwise's own copy: the 0xd0 bytes 0x1a4a5a0 copies from the argument, or fills through the defaults 0x1a454c0; the game's is 0x1f089e8
@@ -1157,7 +1171,7 @@ uncompress                                                       0x19b0790  cdec
 RSConnectExtension_RDV_ctor                                      0x0144b3e0  stdcall   void(void *obj)  # win-x86/online/names.tsv: this on the stack, ret 4; the factory's only call, as on the Mac
 RSConnectExtension_RDV_vtable                                    0x1d5d934  data      void *[]  # win-x86/online/names.tsv: MSVC RTTI
 adler32                                                          0x019b4b10  cdecl     unsigned long(unsigned long, const uint8_t *, unsigned)  # zlib: the 65521 loop, called by the matched inflate and deflate family; the other copy, 0x1b0e6f0, is another library's
-boot_intro_update                                                0x01126950  stdcall   bool(void *boot)
+boot_intro_update                                                0x01126950  stdcall   bool(void *boot)  # matched by its mPlaybackState / mScreenState reads and the same five-state switch as the Mac's; ret 4; the game's own skip is at 0x1126759, in phase 2
 efd_free                                                         unsupported  inlined by LTCG: the allocator (0x149e770) and its slot 2 at each caller
 efd_ibase_get_class_id                                           0x00f81300  thiscall  uint32_t(const void *)
 efd_init                                                         unsupported  not needed: only the Mac differential tests read it (shims/game/harness/efd_env.h)

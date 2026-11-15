@@ -40,20 +40,25 @@ Everything tied to one binary (function addresses, calling conventions, struct o
 [tools/targets/README.md](../../tools/targets/README.md).
 
 - `RC_TARGET` (default `mac-x64`) picks the target. `targets.py gen OUTDIR/target` writes
-  `rc_target_names.h` (`RC_ADDR_`, `RC_FN_`, `RC_CC_`, `RC_OFF_` defines), `rc_target.c` (the names the
-  runtime looks up) and the skip lists for the generator.
-- Native code reads game state through `runtime/rc_abi.h` (`RC_ADDR`, `RC_FN`, `RC_GA`, `RC_OFF`,
-  `RC_SLOT`, `RC_HOST`/`RC_GUEST`) and `overrides/rc_ov.h` (`OV_GUEST(name, ...)`, `OV_ARGS_OF`,
+  `rc_target_names.h` (`RC_ADDR_`, `RC_FN_`, `RC_WFN_`, `RC_CC_`, `RC_OFF_` defines), `rc_target.c` (the names
+  the runtime looks up) and the skip lists for the generator.
+- Native code reads game state through `runtime/rc_abi.h` (`RC_ADDR`, `RC_FN`, `RC_WFN`, `RC_NFN`, `RC_GA`,
+  `RC_OFF`, `RC_SLOT`, `RC_HOST`/`RC_GUEST`) and `overrides/rc_ov.h` (`OV_GUEST(name, ...)`, `OV_ARGS_OF`,
   `OV_ALIAS`). No literal addresses or offsets in code. The differential tests (`shims/game/harness`,
   `shims/game/test`) name the originals they run the same way, through mac-x64's tables.
 - `tools/targets/check.py` (ctest `targets.check`) fails when a name in `names/` has no entry in a target
-  that does not mark it `unsupported`, or when native code uses a name no list has.
+  that does not mark it `unsupported`, when native code uses a name no list has, or when code built for Learn &
+  Play alone (`win-x86/shims`, `app`, `online`) uses one that `win-x86` marks `unsupported`.
 
-`mac-x64` is a full target. `win-x86` has an entry for every name: 1,042 of the 1,250 symbols and 344 of the
-368 offsets are read from the Windows code, and an `unsupported` line says why for the rest (inlined by LTCG,
+`mac-x64` is a full target. `win-x86` has an entry for every name: 1,063 of the 1,264 symbols and 359 of the
+383 offsets are read from the Windows code, and an `unsupported` line says why for the rest (inlined by LTCG,
 Mac-only, not needed, or not proved). The Windows build uses it for the hook points, edits and mid points
-(`gen_image_pe.py --target`) and for what a mod asks for by name; its built-in fixes still name addresses in
-`win-x86/shims/win32_overrides.c`.
+(`gen_image_pe.py --target`), for what a mod asks for by name, and for its built-in fixes
+(`win-x86/shims/win32_overrides.c`), which are compiled against `rc_target_names.h` as the Mac's overrides are.
+A function, global or field only Learn & Play's fixes touch has a name too, `unsupported` in `mac-x64` with the
+reason, and so has one that both games have in another form: a name means the same thing in every target that
+has it, since a mod built once reads both (Learn & Play's path table lock is `path_table_cs`, a
+`CRITICAL_SECTION`, beside the Mac's `path_table_lock`, a pthread mutex).
 
 ## Overrides and hook points
 
@@ -67,7 +72,9 @@ Mac-only, not needed, or not proved). The Windows build uses it for the hook poi
   address; `rc_target()` names the target. Both apps export this runtime to mods. A name the game doesn't
   have (`unsupported` in its `symbols.map`) gives -1 and a log line, at load, in either edition. A hook
   point is translated as `W_<addr>`, and its `F_<addr>` is one load and a branch more than the function
-  until a hook is registered (`rc_hook_on`). The generators refuse more than 256.
+  until a hook is registered (`rc_hook_on`). The generators refuse more than 256. The apps' own code hooks them
+  as well: the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`: the intro
+  skip, the song ownership during a mount) are pre hooks by name, built into both apps as a mod is built.
 - **What a hook sees.** The same on every target: the Mac's SysV call. On the Mac the hook gets the guest's
   context. On the 32-bit guest its `rc_ctx *` is a view of the call (`runtime/rc32_hook.c`): the arguments
   in `rdi rsi rdx rcx r8 r9` and `xmm0-7` whatever the convention, a guest pointer as a host pointer (null
@@ -160,7 +167,10 @@ The build's scripts and switches: [tools/ws7/recomp/build/README.md](../../tools
 
 A `--skip` line `ADDR` is an override, as on the Mac. A line `ADDR wrap` keeps the function translated, as
 `W_<addr>`, and the override module's `F_<addr>` (what every call and `rc32_table` reach) runs native code
-and calls `W_<addr>` for the original (main image only).
+and calls `W_<addr>` for the original (main image only). The game's skip file is generated, as the Mac's are:
+`tools/targets/names/overrides/win32.list` names the functions and marks the wrapped ones, and `targets.py gen`
+writes `skip/win32.skip` with `win-x86`'s addresses (for a 32-bit target only: the Mac's generator reads `wrap`
+as a hook point).
 
 `--target ID` makes the target's hook points, edits and mid points (main image only). A hook point that is
 also an override is `N_<addr>` in the override module, and the hooks run around that.
@@ -316,7 +326,9 @@ How to run them: [Windows testing](../windows/TESTING.md#the-recompiler), [Mac t
   checks the refusals (no such group, none on this game, too late), the hook's values, flags and
   continuation, a point that is `none`, and that registers the hook changed without setting them are put
   back. `test_files` checks the file provider, and `test_framerate` the arithmetic of the built-in frame rate
-  fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times.
+  fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times. `test_shared64` and
+  `test_shared32` link the built-in fixes both editions share (`overrides/mods/mods_shared.c`, one object built
+  as a mod is) with each runtime and tables of that game's kind.
 - **Edits and mid points in translated code, 32-bit**: `test/x86/innercases.py` builds a small PE and
   translates it with edits and mid points of its own (`gen_image_pe.py --inner`). It runs the edited
   snippets against Unicorn twice: switches off against the image, on against a copy with the new bytes.

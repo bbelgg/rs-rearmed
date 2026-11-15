@@ -6,37 +6,10 @@
 #include <stdint.h>
 
 #include "rc_ov.h"
+#include "mods_shared.h"
 
-// Run-time switches (environment, read at startup and by rs_mods_reload_config):
-//   RS_MODS_BYPASS=0   RSBypass off: the .sng signature check is enforced (default on)
-//   RS_MODS_FIXES=0    rsmacfixes off: keyboard keys, path-MD5 cache, batched DLC mounting, number-table
-//                      hash, thread priority raised, open-file limit; every overridden function then
-//                      behaves exactly like the original (default on)
-//   RS_MODS_INTRO=0    the intro screens (logos, legal screens, intro video) play at start-up (default:
-//                      skipped, the game goes straight to the title screen)
-//   RS_MODS_BUDGET_MS  per-frame budget of the batched DLC mounting (default 50; 0 = one per frame)
-//   RS_MODS_AUTOSAVE=0 the Auto Save warning dialog is shown (default: skipped)
-//   RS_MODS_MULTIPLAYER=0 Player 2 takes a Real Tone cable only, as in the original (default: any input)
-//   RS_MODS_NO_THREAD=1  do not start the End-key poller thread (tests)
-//   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only, without the
-//                      menu entries the installer's overlay adds (Direct Connect) (default on)
-//   RS_MODS_FRAME_RATE=0 what the game counts in frames (calibration, the tuner) is left to the frame rate, as in
-//                      the original (default: as at 60 Hz at any rate; framerate.h)
-//   RS_MODS_LOG=1      log what is applied to stderr
-typedef struct {
-  int bypass;
-  int fixes;
-  int autosave;
-  int multiplayer;
-  double budget_s;
-  int intro;  // skip the intro screens
-  int overlay;
-} rs_mods_config;
-
-const rs_mods_config *rs_mods_config_get(void);
-void rs_mods_reload_config(void);
-// Raises RLIMIT_NOFILE (rsmacfixes' fix 4); returns the new soft limit.
-uint64_t rs_mods_raise_nofile(void);
+// The switches (rs_mods_config, rs_mods_cfg), the log and the start, one source with Learn & Play: mods_shared.h. Here
+// there is one switch more, for tests: RS_MODS_NO_THREAD=1 does not start the End-key poller thread.
 // One pass of the End-key fix over the keyboard table (the poller thread runs it every 100 ms).
 // Returns 1 if it added the entry.
 int rs_mods_keys_poll_once(void);

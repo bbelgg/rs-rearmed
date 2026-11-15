@@ -12,6 +12,8 @@
 #   LP_WRAPPERS  wrapper table at the image base (default: IMAGE without .exe + .wrappers.tsv)
 #   LP_IAT       optional: an iat_resolved.json to replace imports.c with (gen_iat_imports.py);
 #                unset, imports.c comes from the image's own import directory
+#   RC_TARGET_DIR  the game's tables as tools/targets/targets.py gen --target win-x86 writes them; unset, this
+#                script makes them beside GEN_DIR (target/)
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -40,9 +42,11 @@ fi
 
 mkdir -p "$gen" "$obj"
 
-# Skip file: addresses the override/shim modules define
-skip=
-[ -f "$here/skip.txt" ] && skip="--skip $here/skip.txt"
+# Skip file: the functions the built-in fixes define (win-x86/shims/win32_overrides.c), from the tables:
+# tools/targets/names/overrides/win32.list with win-x86's addresses
+tgt=${RC_TARGET_DIR:-$(dirname "$gen")/target}
+[ -n "${RC_TARGET_DIR:-}" ] || "$py" -I "$root/tools/targets/targets.py" gen --target win-x86 "$tgt" >/dev/null
+skip="--skip $tgt/skip/win32.skip"
 
 # VMProtect import-call sites at the image's base: lp_image.py writes IMAGE.wrappers.tsv
 wrap=${LP_WRAPPERS:-${img%.exe}.wrappers.tsv}

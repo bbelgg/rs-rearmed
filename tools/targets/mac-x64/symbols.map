@@ -1255,3 +1255,19 @@ tuning_store_song_select2    0x1006b1715 code -  # another copy, from NonStopPla
 tuning_store_song_select3    0x10085a9a5 code -  # another copy, from Score Attack 0x100859eb0 (LP: = song_select)
 tuning_store_guitarcade3     0x10054c649 code -  # GUESS: 0x10054c590 from the Guitarcade tuner 0x100546e30 (LP: = guitarcade)
 # --- Seven-String Guitar: end
+# --- Learn & Play's built-in fixes (names/refs.list, win-x86/shims/win32_overrides.c): what that game has as a function
+# or global of its own
+frontend_fs                  unsupported  not located: the Mac's cache overlay is a pre hook that calls frontend_open_file again, and opens nothing itself
+path_table_cs                unsupported  a pthread mutex here: path_table_lock
+ui_navigate                  0x100306ac0 sysv -  # the Auto Save handler's call at 0x1005e7f92 (mods.c leaves the call out with its branch, and calls nothing here)
+autosave_navigate_ret        0x1005e7f97 code -  # the return of that call: the handler then reads the dialog at autosave_menu
+input_p2_force_cable         unsupported  inlined: each of the three callers of input_mode_is_cable sets the mode itself
+input_find_slot              unsupported  Learn & Play's form of input_bind, which is the function here
+crt_memset                   unsupported  an import here (the system's memset)
+efd_no_free                  unsupported  not located: nothing native frees one of the game's blocks by hand here
+sng_check                    unsupported  inlined into the SNG loader 0x1001eb6a0, which calls the verifier itself (sng_load_verify_ret)
+song_key_known               unsupported  no counterpart: the Mac image has no table of known song keys
+num_hash                     unsupported  inlined into num_dtor, num_intern and num_rehash
+display_ratio_16_9           unsupported  no such constant: the camera setup takes its render target's width / height (0x101168cdc)
+settings_read                unsupported  inlined: get_resolution and set_resolution are functions here
+settings_apply               unsupported  inlined: get_resolution and set_resolution are functions here

@@ -128,6 +128,8 @@ RULES = {
     "tools/targets/": rule(BOTH, build=BOTH, run=BOTH, suites=["targets", "hooks"]),
     "tools/targets/mac-x64/": rule([MAC], build=[MAC], run=[MAC], suites=["targets", "hooks", "inner64"]),
     "tools/targets/win-x86/": rule([LP], build=[LP], run=[LP], suites=["targets", "hooks", "inner32"]),
+    # (what Learn & Play's built-in fixes replace: its translation's skip file is made of it)
+    "tools/targets/names/overrides/win32.list": rule([LP], build=[LP], run=[LP], suites=["targets", "lp.install"]),
     "tools/metal/": rule(BOTH, run=BOTH, suites=["ct.msl", "lp.shaders"]),
     "shims/opengl/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.opengl", "ct.msl", "lp.d3d9"]),
     "shims/coreaudio/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.audio", "lp.audio"]),
@@ -157,6 +159,8 @@ RULES = {
     "win-x86/shims/steam/": rule([LP], build=[LP], run=[LP], suites=["lp.steam"]),
     "win-x86/shims/d3d9/": rule([LP], build=[LP], run=[LP], suites=["lp.d3d9"]),
     "win-x86/shims/win32_d3d9.c": rule([LP], build=[LP], run=[LP], suites=["lp.d3d9"]),
+    # (the built-in fixes name the game through the tables, and tools/targets/check.py reads them)
+    "win-x86/shims/win32_overrides.c": rule([LP], build=[LP], run=[LP], suites=["targets", "lp.shims"]),
     "win-x86/shims/tests/": rule(suites=["lp.shims"]),
     "win-x86/online/": rule([LP], build=[LP], run=[LP], suites=["lp.online"]),
     # (settings: the test compiles lp_settings.c beside the Mac launcher's reader)

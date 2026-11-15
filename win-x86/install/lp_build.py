@@ -363,11 +363,20 @@ class Builder:
             src = os.path.join(mods, "in", name + ".dll")
             out.append(Unit(name, src, name, os.path.join(mods, name, "gen"), os.path.join(mods, name, "obj")))
         wrappers = os.path.splitext(self.image)[0] + ".wrappers.tsv"
-        skip = os.path.join(WINBUILD, "skip.txt")
         out.append(Unit("game", self.image, None, os.path.join(self.work, "game", "gen"),
                         os.path.join(self.work, "game", "obj"),
-                        wrappers if os.path.isfile(wrappers) else None, skip if os.path.isfile(skip) else None))
+                        wrappers if os.path.isfile(wrappers) else None, self.skip_list()))
         return out
+
+    def skip_list(self):
+        """The functions the built-in fixes replace (win-x86/shims/win32_overrides.c), which the translation leaves
+        out or keeps as W_<addr>: tools/targets/names/overrides/win32.list with this game's addresses, written to
+        WORK/game/target/skip/win32.skip, as win-x86/build/translate.sh does."""
+        sys.path.insert(0, os.path.join(ROOT, "tools", "targets"))
+        import targets
+        tgt = os.path.join(self.work, "game", "target")
+        targets.gen(TARGET, tgt)
+        return os.path.join(tgt, "skip", "win32.skip")
 
     def check_inputs(self):
         if not os.path.isfile(self.image):

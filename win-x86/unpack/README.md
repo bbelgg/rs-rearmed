@@ -43,7 +43,7 @@ functions reached only through a pointer. Against the image of a capture on Wind
 | `.data` | identical where the unpacked image stores it; past that the capture has 3,889 non-zero bytes of runtime state, and the game runs without them |
 | the wrapper table | identical |
 | `.UBX0/1/2` | a few thousand bytes differ; VMProtect's own sections, not translated |
-| translated functions | the same but for one, leaving out the overrides in `skip.txt` |
+| translated functions | the same but for one, leaving out the overrides (`tools/targets/names/overrides/win32.list`) |
 
 The relocation sites come from comparing the output with a copy of the game loaded elsewhere
 (`make_seed.py --loaded`); VMProtect's own table stays packed. For this build that copy was a capture.

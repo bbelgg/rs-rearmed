@@ -1,12 +1,12 @@
 // Frame rate (framerate.h says what and why): the hooks, one source for both editions. Each is at a mid point of
 // tools/targets/names/mids.list, whose place and values each game's mids.map gives; the frame's time is the game's
-// own, read by name. Built into both apps (overrides/mods/build.sh, win-x86/build/build_shims.sh) and started by
-// their built-in fixes (mods.c, win-x86/shims/win32_overrides.c).
-#include <stdlib.h>
+// own, read by name. Built into both apps (overrides/mods/build.sh, win-x86/build/build_shims.sh) and started with
+// their built-in fixes (mods_shared.c: rs_mods_start).
 
 #include "rc_mod.h"
 
 #include "framerate.h"
+#include "mods_shared.h"
 
 // The game's time for this frame, in seconds; a 60 Hz frame where the game has none to read, which leaves it be.
 static float frame_dt(void) {
@@ -70,8 +70,7 @@ static void on_gate(rc_mid_frame *f, void *user) {
 }
 
 int rs_framerate_init(void) {
-  const char *e = getenv("RS_MODS_FRAME_RATE");
-  if (e && (*e == '0' || *e == 'n' || *e == 'N' || *e == 'f' || *e == 'F')) return -1;
+  if (!rs_mods_env_on("RS_MODS_FRAME_RATE", 1)) return -1;
   static const rc_mid_fn fn[RS_FR_POINTS] = {
       [P_WINDOW] = on_window, [P_STEP_PLAY] = on_step,   [P_STEP_MUTE] = on_step,   [P_HOLD] = on_step,
       [P_MISS] = on_miss,     [P_VOLUME] = on_gate,      [P_INSTRUMENT] = on_gate,  [P_HINT] = on_gate,

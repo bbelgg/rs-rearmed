@@ -35,6 +35,17 @@ autosave_signin_query    # object answering the sign-in predicate gating the Aut
 autosave_query_arg       # int argument (1) of that predicate
 input_mode_restore       # (ServiceManager): restores player 0's cached input mode and applies it, before the Auto Save dialog
 
+# Learn & Play's built-in fixes (win-x86/shims/win32_overrides.c): what they call and read that only that game has as
+# a function or global of its own (the functions they replace are in overrides/win32.list)
+frontend_fs              # the front end's file system: the object FrontEnd_OpenFile opens a file through
+path_table_cs            # the interned path table's lock as Learn & Play has it: a pointer to a CRITICAL_SECTION with its owner and depth after it (cs_lock_owner, cs_lock_depth); the Mac's is path_table_lock, a pthread mutex
+autosave_navigate_ret    # the Auto Save handler: return address of its ui_navigate call
+crt_memset               # the C library's memset, linked into the game
+efd_no_free              # u8: nonzero while the allocator's blocks are not freed (shutdown)
+display_ratio_16_9       # double: 16/9, the shape the cameras and the display fit draw at
+settings_read            # (record): reads the display settings
+settings_apply           # (record): applies them, resetting the device
+
 # audio (overrides/src/audio_*.c)
 ak_platform_settings   # Wwise's AkPlatformInitSettings copy
 ak_init                # AK::SoundEngine::Init

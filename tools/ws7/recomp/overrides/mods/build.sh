@@ -21,10 +21,12 @@ CC="clang -arch arm64 -O2 -g0 -Wall -Wno-unused-function -ffp-contract=off -fno-
 SH="-I$root/shims/game/include"
 
 $CC -c "$here/mods.c" -o "$out/obj/mods/mods.o"
-# the frame rate fixes: one source for both editions, with the game's names looked up at run time as a mod's are
+# what is one source for both editions (Learn & Play: win-x86/build/build_shims.sh): the switches, the log and the
+# start, and the frame rate fixes, with the game's names looked up at run time as a mod's are
+$CC -c "$here/mods_shared.c" -o "$out/obj/mods/mods_shared.o"
 $CC -c "$here/framerate.c" -o "$out/obj/mods/framerate.o"
 rm -f "$out/lib/liboverrides_mods.a"
-ar rcs "$out/lib/liboverrides_mods.a" "$out/obj/mods/mods.o" "$out/obj/mods/framerate.o"
+ar rcs "$out/lib/liboverrides_mods.a" "$out/obj/mods/mods.o" "$out/obj/mods/mods_shared.o" "$out/obj/mods/framerate.o"
 
 # the crypto module with the DSA verifier renamed (the wrapper in mods.c calls it)
 $CC $SH -DRC_FN_rsg_cryptopp_dsa_sha1_verify=rs_crypto_dsa_verify -c "$ov/gen/crypto.c" -o "$out/obj/crypto_mods/crypto.o"

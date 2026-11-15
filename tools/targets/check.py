@@ -7,8 +7,11 @@ Fails (exit 1) when
   - a name in names/ has no entry in a target (symbols.map for functions and globals, offsets.map for
     names/offsets.list), unless that target marks it `unsupported` with a reason;
   - an overridden or hooked name is not a function in a target (convention data / code);
-  - native code uses a name (RC_ADDR, RC_FN, RC_GA, RC_OFF, RC_SLOT, OV_GUEST, OV_ALIAS, OV_ARGS_OF, the
-    seam's G, rc_hook_add_name) that no list in names/ has, or uses a symbol as an offset or the reverse;
+  - native code uses a name (RC_ADDR, RC_FN, RC_WFN, RC_NFN, RC_GA, RC_OFF, RC_SLOT, OV_GUEST, OV_ALIAS,
+    OV_ARGS_OF, the seam's G, rc_hook_add_name) that no list in names/ has, or uses a symbol as an offset or the
+    reverse;
+  - code built for one target alone (TARGET_SOURCES: Learn & Play's Win32 seam and built-in fixes) uses a name
+    that target marks `unsupported`: it would not compile there;
   - a target's map has a name that no list has (stale), or a list has a name twice;
   - a hook point of a target with another ABI has a prototype the runtime can't show a hook (targets.py hook_abi).
 So adding a game function to the build means: its name in names/, its address in every target.
@@ -25,7 +28,12 @@ import targets  # noqa: E402
 ROOT = targets.ROOT
 SOURCES = ["tools/ws7/recomp/overrides/**/*.[ch]", "tools/ws7/recomp/app/*.c", "tools/ws7/recomp/app/*.h",
            "tools/ws7/recomp/test/hooks/probe_mod.c", "shims/game/include/*.h", "shims/game/harness/*.[ch]", "shims/game/test/*.[ch]"]
-SYM_USE = re.compile(r"\b(?:RC_ADDR|RC_FN|RC_GA|RC_CC|OV_GUEST|OV_GUESTV|OV_ALIAS|OV_ARGS_OF)\(\s*([A-Za-z_]\w*)")
+# Sources built for one target alone. What they name has to be in that target's maps: a name it marks
+# `unsupported` has no value there. (The sources above are written for every target, or are a mod's, which looks
+# a name up when it runs and can ask whether the game has it.)
+TARGET_SOURCES = {"win-x86": ["win-x86/shims/*.[ch]", "win-x86/shims/*/*.[ch]", "win-x86/app/*.[chm]",
+                              "win-x86/online/*.[ch]"]}
+SYM_USE = re.compile(r"\b(?:RC_ADDR|RC_FN|RC_WFN|RC_NFN|RC_GA|RC_CC|OV_GUEST|OV_GUESTV|OV_ALIAS|OV_ARGS_OF)\(\s*([A-Za-z_]\w*)")
 SEAM_USE = re.compile(r"\bG0?\(\s*([a-z_]\w*)")
 OFF_USE = re.compile(r"\bRC_OFF\(\s*([A-Za-z_]\w*)")
 SLOT_USE = re.compile(r"\bRC_SLOT\(\s*([A-Za-z_]\w*)")
@@ -33,11 +41,12 @@ HOOK_USE = re.compile(r"\brc_hook_add_name\(\s*\"(\w+)\"")
 MACRO_DEF = re.compile(r"^\s*#\s*define\s+\w+\(")
 
 
-def source_uses(root=ROOT):
-    """{name: [file:line, ...]} for symbols, offsets and hook names the native sources use."""
+def source_uses(root=ROOT, patterns=None):
+    """{name: [file:line, ...]} for symbols, offsets and hook names the native sources use: every source, or the
+    ones `patterns` match."""
     syms, offs, hooks = {}, {}, {}
     files = set()
-    for pat in SOURCES:
+    for pat in patterns if patterns is not None else SOURCES + [p for v in TARGET_SOURCES.values() for p in v]:
         files.update(glob.glob(os.path.join(root, pat), recursive=True))
     for path in sorted(files):
         rel = os.path.relpath(path, root)
@@ -140,6 +149,12 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
         for n, where in sorted(hooks.items()):
             if n not in lists.get("hooks", []):
                 errs.append("%s: hook point %s is not in names/hooks.list" % (where[0], n))
+        for t in tgts:
+            syms, offs, _ = source_uses(root, TARGET_SOURCES.get(t.id, []))
+            for n, where in sorted(list(syms.items()) + list(offs.items())):
+                if n in t.unsupported:
+                    errs.append("%s: %s is used in code built for %s alone, where it is unsupported (%s)"
+                                % (where[0], n, t.id, t.unsupported[n]))
     return errs
 
 

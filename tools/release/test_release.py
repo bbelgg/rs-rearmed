@@ -27,6 +27,11 @@ class Scope(unittest.TestCase):
         s = scope.scope(["win-x86/shims/win32_net.c"])
         self.assertEqual((s["editions"], s["build"], s["run"]), (["lp"], ["lp"], ["lp"]))
         self.assertEqual(s["suites"], ["lp.shims"])
+        # the built-in fixes name the game through the tables
+        s = scope.scope(["win-x86/shims/win32_overrides.c"])
+        self.assertEqual((s["build"], s["run"], s["suites"]), (["lp"], ["lp"], ["targets", "lp.shims"]))
+        s = scope.scope(["tools/targets/names/overrides/win32.list"])
+        self.assertEqual((s["build"], s["run"], s["suites"]), (["lp"], ["lp"], ["targets", "lp.install"]))
 
     def test_the_mac_alone(self):
         s = scope.scope(["shims/steam/steam_api.c"])

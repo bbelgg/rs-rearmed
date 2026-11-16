@@ -520,3 +520,9 @@ editions and the parts both share). Neither touches the Mac game install or its 
    cache that makes the next run skip to the link.
 9. **The shaders** (`tools/play-native/warm-shaders.sh`, the Mac edition's): the installed app's `--warm-shaders`
    ([Shader corpus](#shader-corpus)).
+
+`tools/play-native/learn-play.sh` runs all of it in a terminal; `RS Re-ARMed Installer.app` runs the same
+commands with its own steps and its Refresh Game Files button runs the installed `gamefiles.py refresh`. Its
+Settings and switches… sheet, with Learn & Play chosen, writes `learn-play/settings.env` and
+`learn-play/options.env`, as it writes the Mac edition's
+([Mac DESIGN](../mac/DESIGN.md#installer-and-build)). Neither touches the Mac game install or its saves.

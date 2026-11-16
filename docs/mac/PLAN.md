@@ -39,8 +39,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 
-- **Switched off in the installer**: **Built-in Mods…** writes `settings.env`, which the launcher reads at every
-  start, so a change needs no reinstall ([INSTALL.md](INSTALL.md#settings-and-switches)).
+- **Switched off in the installer**: **Settings and switches…** writes `settings.env` (the built-in mods
+  switched off) and `options.env` (every other switch) (not released), which the launcher reads at every start,
+  so a change needs no reinstall ([INSTALL.md](INSTALL.md#settings-and-switches)).
 - **Batched DLC mounting** (new in 1.16.0): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. This game's loop drops no archive: the fault Learn & Play's had was looked for here and not found
   ([TESTING.md](TESTING.md#unattended-runs)).

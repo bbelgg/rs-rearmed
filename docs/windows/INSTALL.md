@@ -98,7 +98,7 @@ in the Mac edition.
   elsewhere, such as a Windows PC.
 - **Refresh Game Files** (shown once the game is installed) has Steam fetch DLC you bought since, and syncs the
   app's copy of the game files with Steam's folders again ([Game files](#game-files)).
-- **Game files**, **Built-in Mods…**, **Build folder**, quitting, the log and a newer release are as in the
+- **Game files**, **Settings and switches…**, **Build folder**, quitting, the log and a newer release are as in the
   [Mac edition](../mac/INSTALL.md#the-steps); for **Game files**, the game's drive is the one Steam's download
   is on. **Renderer** has no effect here ([Renderer](#renderer)).
 
@@ -190,7 +190,7 @@ differs here:
 2. **Which archives the game shows.** As in the Mac edition, from `game/.rearmed/steam.env`: the DLC your
    account's license lists, and the AppID of every archive in `game/dlc`.
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
-   off in Built-in Mods…. Put them straight into `game/dlc`, as the PC version, `_p.psarc`: every install ends
+   off in Settings and switches…. Put them straight into `game/dlc`, as the PC version, `_p.psarc`: every install ends
    by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
    they carry, and no refresh removes a song you put there. Songs in the Mac game's `dlc` folder in a Steam
    library work too: a copy or a refresh brings them over.
@@ -224,6 +224,7 @@ In the table, `…` is `~/Library/Application Support/RS Re-ARMed`.
 | `…/learn-play/logs/` | `last-run.log`, `previous-run.log`, `netguard.log` (with mods) |
 | `…/learn-play/mods/` | mods loaded at startup |
 | `…/learn-play/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
+| `…/learn-play/options.env` | if you set any: every other switch set in the installer ([Settings and switches](#settings-and-switches)) |
 | `…/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 | `…/learn-play/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
 
@@ -298,11 +299,13 @@ been played in this edition yet.
 
 ## Settings and switches
 
-The switches below that say **Built-in Mods…** can be switched off in the installer. It writes them to
-`settings.env` in `~/Library/Application Support/RS Re-ARMed/learn-play/`, which the app reads at every start;
-without the file every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches: other lines
-are ignored, and the top of `logs/last-run.log` says what was used. The Mac edition has its own file, read the
-same way.
+Every `RS_*` switch below is set in the installer (**Settings and switches…**), except `RS_MODS_PATH` (only
+with `launchctl setenv` or `open --env`) and the diagnostics-only switches in [TESTING.md](TESTING.md#diagnostics).
+The installer writes the built-in mods to `settings.env` and every other switch to `options.env` in
+`~/Library/Application Support/RS Re-ARMed/learn-play/`, which the app reads at every start; without the files
+everything is the game's own setting. By hand they are lines of `KEY=0` or `KEY=1` for the built-in mods and
+`KEY=value` for the rest: other lines are ignored, and the top of `logs/last-run.log` says what was used. The
+Mac edition has its own files, read the same way.
 
 ```
 RS_MODS_INTRO=0
@@ -311,7 +314,7 @@ RS_REARMED=0
 
 Every switch is an environment variable, and the app reads its own: there is no launcher between. Start the app
 with `open --env`, or set the switch for the login session with `launchctl setenv`, as for the
-[Mac edition](../mac/INSTALL.md#settings-and-switches), which then sees it too. Either wins over `settings.env`:
+[Mac edition](../mac/INSTALL.md#settings-and-switches), which then sees it too. Either wins over both files:
 
 ```bash
 open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
@@ -321,14 +324,14 @@ Each row is a switch set away from its default, and what that does. Everything i
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed (Built-in Mods…) |
-| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit (Built-in Mods…) |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed (Settings and switches…) |
+| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit (Settings and switches…) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame, as the game does |
-| `RS_MODS_INTRO=0` | on | the intro screens play (Built-in Mods…) |
-| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Built-in Mods…) |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Built-in Mods…) |
-| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Built-in Mods…) |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Built-in Mods…); set for the build, no logo is made |
+| `RS_MODS_INTRO=0` | on | the intro screens play (Settings and switches…) |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Settings and switches…) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Settings and switches…) |
+| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Settings and switches…) |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Settings and switches…); set for the build, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
 | `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
@@ -350,7 +353,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](../mac/INSTALL.md#guitar-input) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
-| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library |
+| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods (Settings and switches… too); another folder of mods, or one library (`launchctl setenv` or `open --env` only) |
 | `LP_HOME=DIR` | `~/Library/Application Support/RS Re-ARMed/learn-play` | another folder for settings, saves and logs |
 | `LP_GAME_DIR=DIR` | the folder in `game-dir` | another game folder (any folder with the game; the copy check is skipped) |
 

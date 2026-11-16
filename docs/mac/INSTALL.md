@@ -92,10 +92,12 @@ ends the run; what is done is kept, and Build & Install goes on from there.
   makes a full copy in your home folder, and the game plays without the drive. It shows where the copy is now.
   Choose the other and click Build & Install or Refresh Game Files, and the copy is moved
   ([Game files](#game-files)).
-- **Built-in Mods…** (also ⌘,) switches off built-in mods of the game chosen above: custom songs, the
-  rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the title
-  logo. A change takes effect the next time the game starts, with nothing to reinstall
-  ([Settings and switches](#settings-and-switches)).
+- **Settings and switches…** (also ⌘,) sets the game chosen above: the built-in mods (custom songs,
+  the rs-mac-fixes fixes, the intro and Auto Save skips, the menu additions, two players on any input, the
+  title logo) and every other switch below, grouped with the common ones first and the rest under Advanced. A
+  change takes effect the next time the game starts, with nothing to reinstall
+  ([Settings and switches](#settings-and-switches)). The page starts at what the installed app has, can copy
+  the other edition's, and Reset to Defaults returns everything to the defaults.
 - Quitting the installer while it works stops the build (it asks first); Build & Install starts it again.
   The log of every run is kept in `~/Library/Logs/RS Re-ARMed Installer/`.
 - A newer release shows as a button in the title row, which opens its download page.
@@ -284,7 +286,7 @@ Nothing is downloaded by the game, and Steam's folders are read only when you pr
    closed. `RS_STEAM_DLC=all` counts every AppID as owned, so every song the copy has shows, those of the first
    Rocksmith (4) too ([Settings and switches](#settings-and-switches)).
 3. **Custom songs** need one more thing, the built-in CDLC signature skip, which is on unless you switched it
-   off in Built-in Mods…. Put them straight into `game/dlc`, as the Mac version, `_m.psarc`: every install ends
+   off in Settings and switches…. Put them straight into `game/dlc`, as the Mac version, `_m.psarc`: every install ends
    by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
    they carry, and no refresh removes a song you put there. Songs in the Steam game's `dlc` folder work too: a
    copy or a refresh brings them over.
@@ -303,7 +305,7 @@ The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
 
 The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it
 needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` (or the logo off in the installer's
-Built-in Mods…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next install
+Settings and switches…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next install
 makes it again.
 
 ## Where things are
@@ -324,6 +326,7 @@ In the table, `…` is `~/Library/Application Support/RS Re-ARMed`.
 | `…/logs/` | `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log` |
 | `…/mods/` | mods loaded at startup |
 | `…/settings.env` | if you switched any off: the built-in mods switched off in the installer ([Settings and switches](#settings-and-switches)) |
+| `…/options.env` | if you set any: every other switch set in the installer ([Settings and switches](#settings-and-switches)) |
 | `…/renderer`, `…/renderer-fallback.txt` | `metal` or `opengl`, and why a fallback changed it ([Renderer](#renderer)) |
 | `…/guitar-input.ini` | if you made one: the guitar input's channel and gain, for both editions ([Guitar input](#guitar-input)) |
 | `…/input-level-calibrated` | made by the game's first calibration: the level saved in your profile counts from then on; delete it to start over ([Guitar input](#guitar-input)) |
@@ -441,20 +444,28 @@ For two channels of one interface, leave `Channel` out of `guitar-input.ini` for
 
 ## Settings and switches
 
-The switches below that say **Built-in Mods…** can be switched off in the installer. It writes them to
-`settings.env` in `~/Library/Application Support/RS Re-ARMed/`, which the launcher reads at every start; without
-the file every one is on. By hand it is lines of `KEY=0` (off) or `KEY=1` of those switches: other lines are
-ignored, and the top of `logs/last-run.log` says what was used. Learn & Play has its own file, read the same way.
+Every `RS_*` switch below is set in the installer (**Settings and switches…**), except `RS_MODS_PATH` (only
+with `launchctl setenv`) and the diagnostics-only switches in [TESTING.md](TESTING.md#diagnostics). The
+installer writes the built-in mods to `settings.env` and every other switch to `options.env` in
+`~/Library/Application Support/RS Re-ARMed/`, which the launcher reads at every start; without the files
+everything is the game's own setting. By hand they are lines of `KEY=0` or `KEY=1` for the built-in mods and
+`KEY=value` for the rest: other lines are ignored, and the top of `logs/last-run.log` says what was used.
+Learn & Play has its own files, read the same way.
 
 ```
 RS_MODS_INTRO=0
 RS_REARMED=0
 ```
 
+```
+RS_METAL_MSAA=2
+RS_AUDIO_FRAMES=128
+```
+
 Every switch is an environment variable. The launcher starts the game through macOS, so the game has the login
-session's variables and what the launcher passes on (the `settings.env` switches, the renderer, the Steam facts of
-the copy): a variable set in a Terminal does not reach it. Set a switch for the login session, which wins over
-`settings.env` too and holds until you log out:
+session's variables and what the launcher passes on (the `settings.env` and `options.env` switches, the
+renderer, the Steam facts of the copy): a variable set in a Terminal does not reach it. Set a switch for the
+login session, which wins over both files too and holds until you log out:
 
 ```bash
 launchctl setenv RS_MODS_BYPASS 0     # takes effect on the next launch
@@ -468,14 +479,14 @@ Each row is a switch set away from its default, and what that does. Everything i
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed (Built-in Mods…) |
-| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit (Built-in Mods…) |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed (Settings and switches…) |
+| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit (Settings and switches…) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame, as the game does |
-| `RS_MODS_INTRO=0` | on | the intro screens play (Built-in Mods…) |
-| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Built-in Mods…) |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Built-in Mods…) |
-| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Built-in Mods…) |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Built-in Mods…); set for the install, no logo is made |
+| `RS_MODS_INTRO=0` | on | the intro screens play (Settings and switches…) |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Settings and switches…) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Settings and switches…) |
+| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Settings and switches…) |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Settings and switches…); set for the install, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
 | `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
@@ -498,7 +509,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` | on | the game's own device scan, which loses an interface when another device, such as a webcam, fails to open |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](#guitar-input) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
-| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library |
+| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods (Settings and switches… too); another folder of mods, or one library (`launchctl setenv` only) |
 | `RS_NATIVE_HOME=DIR` | `~/Library/Application Support/RS Re-ARMed` | another folder for the game files, settings, saves and logs, as at the install ([6. Install](#6-install)) |
 
 Without a switch: the offline Steam layer (`libsteam_api` with no client, cloud saves in a local folder), the
@@ -506,7 +517,9 @@ network guard, the Uplay sign-in prompt skipped, and a device whose identifier c
 device scan (the original crashes at the title). Diagnostics switches: [TESTING.md](TESTING.md#diagnostics).
 
 Mods: every `.dylib` in `~/Library/Application Support/RS Re-ARMed/mods/` is loaded at startup and survives a
-reinstall. Include `tools/ws7/recomp/runtime/rc_mod.h` and one dylib serves both editions:
+reinstall (`RS_LOAD_MODS=0`, in Settings and switches… too, starts without them; `RS_MODS_PATH` loads another
+folder or one library and is only set with `launchctl setenv`). Include `tools/ws7/recomp/runtime/rc_mod.h` and
+one dylib serves both editions:
 
 ```bash
 clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runtime -Itools/ws7/recomp/overrides \

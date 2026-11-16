@@ -42,8 +42,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
 **Built-in fixes** (the Mac edition's, on this game's own functions and with the same switches:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))
 
-- **Switched off in the installer**: as the Mac edition; `lp_settings.c` reads `learn-play/settings.env` before
-  anything reads a switch, and logs what it used at the top of `last-run.log`, as the Mac launcher does.
+- **Switched off in the installer**: as the Mac edition; `lp_settings.c` reads `learn-play/settings.env` and
+  `learn-play/options.env` (not released) before anything reads a switch, and logs what it used at the top of
+  `last-run.log`, as the Mac launcher does.
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
   mounted. The Mac edition's loop needs no wait.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this

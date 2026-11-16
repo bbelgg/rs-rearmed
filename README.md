@@ -33,7 +33,7 @@ it better. The priorities:
   [rearmed-mods](https://github.com/glebb/rearmed-mods) has RSMods' features and more, with an app to set them up.
 
 Your Steam saves are copied in once and never written, and stored Ubisoft credentials are never copied. Every fix can
-be switched off, the built-in mods with a checkbox in the installer (**Built-in Mods…**):
+be switched off, and every switch set in the installer (**Settings and switches…**):
 [Mac](docs/mac/INSTALL.md#settings-and-switches), [Learn & Play](docs/windows/INSTALL.md#settings-and-switches).
 
 ## Requirements
@@ -78,7 +78,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Colors of notes, the highway and strings, by mods | ✅ | ✅ |
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Calibration and the tuner the same at any frame rate | ⚠️ not yet played with a guitar above 60 Hz | ⚠️ the same |
-| Built-in mods switched off in the installer (Built-in Mods…) | ✅ | ✅ |
+| Switches set in the installer (Settings and switches…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |

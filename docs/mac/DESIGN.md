@@ -356,8 +356,9 @@ choose the game ─┬─ Rocksmith 2014 for Mac → the game in Steam, else Ste
   environment, the game image (`decrypt.py`), the shims, the app, the install and the shader warm-up. For Learn & Play
   it runs [that edition's steps](../windows/DESIGN.md#installer-and-build). What the user has to do is shown in a box
   above the log, from the `guide` lines of the step that waits. Its Refresh Game Files button runs the installed
-  `gamefiles.py refresh`. Its Built-in Mods… sheet writes the chosen edition's `settings.env` (`KEY=0` lines, no file
-  when every mod is on), which that edition's launcher reads at every start; `tools/play-native/test_settings.py` checks
+  `gamefiles.py refresh`. Its Settings and switches… sheet writes the chosen edition's `settings.env`
+  (the built-in mods switched off, no file when every mod is on) and `options.env` (every other switch set), which
+  that edition's launcher reads at every start; `tools/play-native/test_settings.py` checks
   that the installer and both launchers have the same keys. The standalone installer builds only a download that is,
   file for file, the source it was made from: `build.sh` builds in a digest of the source, and the app works it out over
   what it unpacked before anything runs.

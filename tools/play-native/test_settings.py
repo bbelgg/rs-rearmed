@@ -75,7 +75,7 @@ def read(path):
 def launch_snippet():
     """launch.sh's settings_keys, options_keys, options_toggles, settings_env and options_env, as written there."""
     src = read(LAUNCH)
-    keys = re.search(r"^settings_keys=\(.*\)$", src, re.M)
+    keys = re.search(r"^settings_keys=\(.*?\)$", src, re.M | re.S)
     okeys = re.search(r"^options_keys=\((.*?)\)$", src, re.M | re.S)
     toggles = re.search(r'^options_toggles=".*"$', src, re.M)
     fn = re.search(r"^settings_env\(\) \{.*?^\}$", src, re.M | re.S)
@@ -85,7 +85,7 @@ def launch_snippet():
 
 
 def launch_keys():
-    return re.search(r"^settings_keys=\((.*)\)$", read(LAUNCH), re.M).group(1).split()
+    return re.search(r"^settings_keys=\((.*?)\)$", read(LAUNCH), re.M | re.S).group(1).split()
 
 
 def launch_options():

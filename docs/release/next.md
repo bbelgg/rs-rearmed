@@ -9,3 +9,4 @@ notes and empties this file. -->
   Settings and switches: the built-in mods plus audio, picture, songs and logging, with the common ones first
   and the rest under Advanced. The page starts at what the installed app has, imports the other edition's, and
   Reset to Defaults returns everything to the defaults; a change still takes effect at the next start with no reinstall.
+  Skip Tuner in the Guitarcade and the frame rate fixes of 1.16.0 are among the built-in mods there.

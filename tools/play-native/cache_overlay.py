@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice): a small patch archive made from the user's own cache.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the song list's scroll bar): a small
+patch archive made from the user's own cache.psarc.
 
     cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
     cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing
@@ -20,12 +21,17 @@ INPUT SUPPORT, says what two players can use now.
 The main menu's UPLAY can't work either: there is no Uplay here. So the same file's entry becomes EXIT GAME, the
 game's own label (row 19651, in every language) and its own action, which the file's help list has too.
 
+Learn a Song's scroll bar can be dragged only near the top of the list: the rows of songs below the one in focus
+take the clicks on it. Its menu (gfxassets/views/las_songslist.gfx, a Scaleform movie) gives the game the bar's
+clickable area; the edit makes that area the bar's whole track, above the rows, by changing a few bytes of its
+ActionScript (edit_songs_list).
+
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
 <game>/Update/patcharchives.psarc:
 
     patcharchives.psarc             mounted by the engine at PatchUpdate/
-      cache4.7z, cache7.7z          the cache.psarc archives with the changed files (whichever cacheN.7z has them)
+      cache4.7z, cache7.7z, ...     the cache.psarc archives with the changed files (whichever cacheN.7z has them)
 
 The engine's own patch layer takes only .new/.delta archives from the container, so the game reads the
 cacheN.7z from there through a hook: FrontEnd_OpenFile opens PatchUpdate/cacheN.7z first and the cache.psarc
@@ -685,7 +691,156 @@ def edit_notice(text):
     return None if out == text else out
 
 
+# --- the song list's scroll bar ----------------------------------------------------------------------------
+
+SONGS_LIST = "gfxassets/views/las_songslist.gfx"
+LIST_SCENE, THUMB_ID = "ListScene", "ListSceneThumb"
+DO_INIT_ACTION = 59  # Flash tag: a sprite's script
+A_CONSTANT_POOL, A_PUSH, A_GET_MEMBER, A_SET_MEMBER, A_CALL_METHOD, A_JUMP, A_POP = (
+    0x88, 0x96, 0x4E, 0x4F, 0x52, 0x99, 0x17)
+P_STRING, P_REGISTER, P_DOUBLE, P_INT, P_POOL = 0, 4, 6, 7, 8  # a push's value kinds
+P_SIZES = {1: 4, 2: 0, 3: 0, 4: 1, 5: 1, 6: 8, 7: 4, 8: 1, 9: 2}  # (a string's ends at its zero byte)
+THUMB_READS = 6  # the area's bounds: the thumb's _x, _y, _x and _width, _y and _height
+THUMB_TOP = 1000000  # the area's depth: the list's own are small numbers
+
+
+def _swf_tags(movie):
+    """Each tag of an uncompressed Flash movie: (code, start of its body, its end)."""
+    bits = movie[8] >> 3
+    at = 8 + (5 + 4 * bits + 7) // 8 + 4  # past the frame's size, the rate and the frame count
+    tags = []
+    while at + 2 <= len(movie):
+        word = struct.unpack_from("<H", movie, at)[0]
+        code, length, body = word >> 6, word & 0x3F, at + 2
+        if length == 0x3F:
+            length, body = struct.unpack_from("<I", movie, at + 2)[0], at + 6
+        tags.append((code, body, body + length))
+        if code == 0:
+            break
+        at = body + length
+    return tags
+
+
+def _as_pool(code):
+    """An ActionScript's constant pool, its first action; None when it has none."""
+    if not code or code[0] != A_CONSTANT_POOL:
+        return None
+    size, count = struct.unpack_from("<HH", code, 1)
+    return [s.decode("latin-1") for s in code[5:3 + size].split(b"\x00")[:count]]
+
+
+def _as_pushes(code, pool):
+    """The pool strings each push of a script pushes, in order: [(string, where its index byte is)]. A function's
+    body follows its header as more actions, so this walks them all. None for a push it doesn't know."""
+    out, at = [], 0
+    while at < len(code):
+        op = code[at]
+        length = struct.unpack_from("<H", code, at + 1)[0] if op >= 0x80 else 0
+        body = at + (3 if op >= 0x80 else 1)
+        if op == A_PUSH:
+            names, i = [], body
+            while i < body + length:
+                kind = code[i]
+                if kind == P_STRING:
+                    i = code.index(b"\x00", i + 1) + 1
+                    continue
+                if kind not in P_SIZES:
+                    return None
+                if kind == P_POOL and code[i + 1] < len(pool):
+                    names.append((pool[code[i + 1]], i + 1))
+                i += 1 + P_SIZES[kind]
+            out.append(names)
+        at = body + length
+    return out
+
+
+def _thumb_reads(pushes, part):
+    """Where the list reads the bounds of the thumb's clickable area from PART (mScrollBarThumb, or mScrollBarTrack
+    once edited): the index bytes of PART's name in the pushes from the bounds' xMin to the area's id."""
+    ids = [k for k, push in enumerate(pushes) if any(name == THUMB_ID for name, _ in push)]
+    if len(ids) != 1:
+        return []
+    starts = [k for k, push in enumerate(pushes[:ids[0]])
+              if [name for name, _ in push][:2] in (["xMin", "mScrollBarThumb"], ["xMin", "mScrollBarTrack"])]
+    if not starts:
+        return []
+    return [at for push in pushes[starts[-1]:ids[0]] for name, at in push if name == part]
+
+
+def _thumb_depth(pool, edited):
+    """The area's depth as the list gives it: push r4, "depth", 0, r1, "mScrollBarThumb"; getMember;
+    push "getDepth"; callMethod; setMember. Edited, as many bytes: push r4, "depth", THUMB_TOP; a jump over pops
+    that never run; setMember."""
+    depth = pool.index("depth")
+    old = (bytes([A_PUSH]) + struct.pack("<H", 17) + bytes([P_REGISTER, 4, P_POOL, depth, P_DOUBLE]) + bytes(8)
+           + bytes([P_REGISTER, 1, P_POOL, pool.index("mScrollBarThumb"), A_GET_MEMBER, A_PUSH])
+           + struct.pack("<H", 2) + bytes([P_POOL, pool.index("getDepth"), A_CALL_METHOD, A_SET_MEMBER]))
+    if not edited:
+        return old
+    head = (bytes([A_PUSH]) + struct.pack("<H", 9) + bytes([P_REGISTER, 4, P_POOL, depth, P_INT])
+            + struct.pack("<i", THUMB_TOP))
+    pops = len(old) - len(head) - 5 - 1  # (the jump is 5 bytes, setMember 1)
+    return head + bytes([A_JUMP]) + struct.pack("<Hh", 2, pops) + bytes([A_POP]) * pops + bytes([A_SET_MEMBER])
+
+
+def _edit_list_script(script):
+    """The list's script with the thumb's clickable area the whole track's, on top; None when it has that already
+    or is not the script this knows. Each change is as long as what it replaces, so nothing in the script moves."""
+    pool = _as_pool(script)
+    names = ("xMin", "depth", "getDepth", "mScrollBarThumb", "mScrollBarTrack", THUMB_ID, LIST_SCENE)
+    if pool is None or any(n not in pool or pool.index(n) > 0xFF for n in names):
+        return None
+    pushes = _as_pushes(script, pool)
+    if pushes is None:
+        return None
+    code = bytearray(script)
+    reads = _thumb_reads(pushes, "mScrollBarThumb")
+    if reads:
+        if len(reads) != THUMB_READS:
+            return None
+        for at in reads:
+            code[at] = pool.index("mScrollBarTrack")
+    elif len(_thumb_reads(pushes, "mScrollBarTrack")) != THUMB_READS:
+        return None
+    old, new = _thumb_depth(pool, False), _thumb_depth(pool, True)
+    if new not in script:
+        if script.count(old) != 1:
+            return None
+        at = script.index(old)
+        code[at:at + len(old)] = new
+    return None if code == script else bytes(code)
+
+
+def edit_songs_list(data):
+    """Learn a Song's list with its scroll bar's thumb grabbed anywhere on the track; None when it has that already
+    or is not the expected file. The script keeps its length, so no tag's or the movie's length changes."""
+    if len(data) < 9 or data[:3] not in (b"GFX", b"FWS"):  # (an uncompressed movie, as the game's is)
+        return None
+    try:
+        for code, body, end in _swf_tags(data):
+            if code != DO_INIT_ACTION:
+                continue
+            script = _edit_list_script(data[body + 2:end])  # (after the sprite's id)
+            if script is not None:
+                return data[:body + 2] + script + data[end:]
+    except (struct.error, ValueError, IndexError):
+        return None
+    return None
+
+
 EDITS = {STARTUP: edit_startup, MISSION: edit_mission, MAIN: edit_main, NOTICES: edit_notice}
+BYTE_EDITS = {SONGS_LIST: edit_songs_list}  # (a movie, not text)
+
+
+def edit_file(name, data):
+    """A file's bytes with its edit made (NAME in lower case, in EDITS or BYTE_EDITS); None when it needs none."""
+    if name in BYTE_EDITS:
+        edited = BYTE_EDITS[name](data)
+        return None if edited is None or edited == data else edited
+    # surrogateescape: the main menu's file has bytes that are not UTF-8, and they stay as they are
+    text = data.decode("utf-8", "surrogateescape")
+    edited = EDITS[name](text)
+    return None if edited is None or edited == text else edited.encode("utf-8", "surrogateescape")
 
 
 # --- the overlay -------------------------------------------------------------------------------------------
@@ -706,15 +861,13 @@ def plan(cache_path):
             z = SevenZip(ps.read(name))
             for inner in z.names():
                 want = inner.lower()
-                if want not in EDITS or want in found:
+                if want in found or (want not in EDITS and want not in BYTE_EDITS):
                     continue
                 found.add(want)
-                # surrogateescape: the main menu's file has bytes that are not UTF-8, and they stay as they are
-                text = z.read(inner).decode("utf-8", "surrogateescape")
-                edited = EDITS[want](text)
-                if edited is not None and edited != text:
-                    out.setdefault(name, {})[inner] = edited.encode("utf-8", "surrogateescape")
-            if len(found) == len(EDITS):
+                edited = edit_file(want, z.read(inner))
+                if edited is not None:
+                    out.setdefault(name, {})[inner] = edited
+            if len(found) == len(EDITS) + len(BYTE_EDITS):
                 break
     finally:
         ps.close()

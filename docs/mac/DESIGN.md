@@ -367,6 +367,14 @@ What each does:
   posts `DlcInstalled_t` for 248750, whose listener asks the DLC service to enumerate, and the game mounts what it
   finds. Only new names are written, so nothing the game has open is touched; `.rearmed/enumerated.txt` names them, so a
   refresh takes them into the manifest and `steam.env`, or removes one the source no longer has.
+- **Song list scroll bar.** In Learn a Song's list, the scroll bar's thumb can be dragged only near the top of the
+  list. The list's menu (`gfxassets/views/las_songslist.gfx`, a Scaleform movie in one of `cache.psarc`'s `cacheN.7z`
+  archives) gives the game each part that can be clicked, with a depth, and a click goes to the deepest one under the
+  mouse. The rows of songs reach over the bar, and the ones below the song in focus are deeper than the thumb. The game
+  also takes the parts only now and then, so the thumb's clickable area stays where the thumb was. The overlay's copy
+  makes that area the whole track, which doesn't move, above everything else: a few bytes of the list's ActionScript,
+  each change as long as what it replaces. A click anywhere on the bar then grabs the thumb. A list it doesn't know is
+  left as it is.
 - **Song ownership during a mount** (shared, a pre hook on `steam_dlc_owned`). The game checks an archive's AppID
   against the list it made once at start from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later.
   While the install steps run the hook answers yes (each edition's mounting loop says when they do): an archive in

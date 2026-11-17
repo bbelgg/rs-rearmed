@@ -343,7 +343,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files)) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the song list's scroll bar as the game has it ([Game files](#game-files)) |
 | `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |

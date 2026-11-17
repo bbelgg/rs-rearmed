@@ -4,3 +4,6 @@
 change, in the words the release notes will use: the bold lead says what is now true, the rest says what it was
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
+
+- **Learn a Song's scroll bar can be dragged from anywhere on it:** before, it could be grabbed only near the top of
+  the list. Mac edition; Learn & Play gets the same edit, not yet tried there.

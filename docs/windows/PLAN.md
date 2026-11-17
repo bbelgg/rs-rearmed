@@ -158,6 +158,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
   exists to try), a mount that is not finished (the steps then go on after 1 s, with a line in the log) and a
   manifest that does not come (the mounting then goes on after 5 s, with a line in the log: the shared source's
   test has that case, no game run has either).
+- **The song list's scroll bar** (not released): the Mac edition's edit, made by the same overlay; this game's
+  song list not yet checked against it.
 - **A mount that takes more than a second**: this loop then takes its steps without waiting, and a step taken
   before a mount is finished drops its archive, as the loop before 1.14.1 did for every one (the log then has
   `DLC: N archives were not mounted`, after the line that says the wait was given up). It waits on the count of

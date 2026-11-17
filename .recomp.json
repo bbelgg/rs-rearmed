@@ -1,32 +1,41 @@
 {
   "$schema": "https://recomp.fyi/schema/v1.json",
   "game": "Rocksmith 2014 Edition - Remastered",
-  "system": "Mac",
+  "system": ["Mac", "PC (Windows)"],
   "type": "recomp",
   "wikidata": "Q127951475",
-  "original": {
-    "region": "Worldwide",
-    "revision": "Steam, macOS (x86_64)",
-    "sha1": "b21643f3e61f450c1cc90f9cb0306535f97a72ce"
-  },
+  "original": [
+    {
+      "region": "Worldwide",
+      "revision": "Steam, macOS (x86_64)",
+      "sha1": "bc28fa043d35dce981b1a92cfbaa0573bf68b774"
+    },
+    {
+      "region": "Worldwide",
+      "revision": "Steam, Windows (x86, Learn & Play)",
+      "sha1": "6ebb226bb30781489e2bcfcef01dff6503967dce"
+    }
+  ],
   "project": "RS Re-ARMed",
   "status": "released",
   "targets": ["macOS"],
   "toolchain": "Custom (Python + Capstone)",
-  "approach": "The x86_64 macOS binary is statically recompiled to C at build time and compiled for arm64; small native libraries replace Steam, Bink, Cg and the Intel-only parts.",
+  "approach": "The game's x86_64 macOS binary or its 32-bit Windows binary (Learn & Play) is statically recompiled to C at build time and compiled for arm64; small native libraries replace Steam, Bink, Cg and the Intel-only parts, and Win32 and Direct3D 9 for the Windows binary.",
   "maintainers": [
     { "name": "bbelgg", "link": "https://github.com/bbelgg" }
   ],
   "links": [
     { "label": "Releases", "url": "https://github.com/bbelgg/rs-rearmed/releases" },
-    { "label": "Building", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/mac/INSTALL.md" },
+    { "label": "Building (Mac game)", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/mac/INSTALL.md" },
+    { "label": "Building (Learn & Play)", "url": "https://github.com/bbelgg/rs-rearmed/blob/main/docs/windows/INSTALL.md" },
     { "label": "Issues", "url": "https://github.com/bbelgg/rs-rearmed/issues" }
   ],
   "help": [
     "Testing on other Apple Silicon Macs, especially 120 Hz ProMotion displays",
     "Audio interfaces and inputs other than the Real Tone cable",
-    "Bug reports from long play sessions, DLC and custom songs"
+    "Bug reports from long play sessions, DLC and custom songs",
+    "Play testing of Learn & Play, which has had far less of it than the Mac game"
   ],
-  "notes": "Native arm64 build for Apple Silicon Macs, no Rosetta at run time. Builds from your own Steam copy with an installer; ships no game code. Offline by design (a network guard refuses every non-local connection). Renders through its own GL-on-Metal layer by default, with Apple's OpenGL as the choice and the fallback. Gameplay CPU is about that of the original under Rosetta at 60 fps; the frame rate follows the display (75/120 Hz). Songs, DLC, custom songs, Session Mode and lessons work.",
+  "notes": "Native arm64 builds for Apple Silicon Macs, no Rosetta at run time, from either of two games: the Steam macOS game, and Learn & Play, an edition Steam offers for Windows only. Each builds from your own Steam copy with an installer; ships no game code. Offline by design (every non-local connection is refused). Both render through the project's own GL-on-Metal layer, Learn & Play's Direct3D 9 included; the Mac game keeps Apple's OpenGL as a choice and the fallback. The frame rate follows the display (75/120 Hz); the Mac game takes about a sixth less CPU than the original under Rosetta, Learn & Play about as much as it. Songs, DLC, custom songs, Session Mode and lessons work in both.",
   "tags": ["arm64", "apple-silicon", "music", "guitar", "offline"]
 }

@@ -22,7 +22,6 @@
 
 #include "mods.h"
 #include "rc_hook.h"
-#include "rc_mid.h"
 
 // libc++'s operator new / delete, as the translated code calls them (nodes and bucket arrays are freed by
 // translated code with operator delete)
@@ -80,20 +79,18 @@ static void *keys_thread(void *arg) {
 
 static int before_open_file(rc_ctx *c, void *user);
 static int before_autosave_warning(rc_ctx *c, void *user);
-static void mods_manifest_points(void);
 static int before_is_cable(rc_ctx *c, void *user);
 
 // The launcher has set the environment by now, so the switches are read here (Learn & Play reads its
 // settings.env in main, and starts from there: lp_mods_init).
 __attribute__((constructor)) static void mods_init(void) {
-  rs_mods_start();  // mods_shared.c: the switches, the open-file limit, the fixes both editions share
+  rs_mods_start();  // mods_shared.c: the switches, the open-file limit, the fixes both editions share and their points
   if (rc_hook_add_name("frontend_open_file", before_open_file, NULL, NULL))
     rs_mods_logf("no FrontEnd_OpenFile hook point");
   if (rc_hook_add_name("autosave_warning", before_autosave_warning, NULL, NULL))
     rs_mods_logf("no Auto Save warning hook point");
   if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL))
     rs_mods_logf("no hook point for Player 2's input mode");
-  mods_manifest_points();
   if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
@@ -294,250 +291,39 @@ void RC_FN(path_md5)(rc_ctx *c) {
 // marks enumeration done when the list is empty) once per frame; the mod redirected that call to a loop
 // bounded by a frame budget. The step stays translated; the caller is replaced by this native version.
 //
-// The flag is what a player sees of all this: the menu shows "Enumerating downloadable content..." for as long as
-// it is set (0x1000e07d4), and a song list on screen fills itself in every three seconds while it is, and once more
-// when it clears (0x100345b00). But a step is a third of what it takes for an archive's songs to be in the lists:
+// What the loop is for, and everything of it that is not this game's alone, is one source with Learn & Play
+// (mods_shared.c, "Batched DLC mounting"): the flag the menu's "Enumerating downloadable content..." follows
+// (0x1000e07d4; a song list on screen fills in by it, 0x100345b00), the song manifests it is held for (asked at
+// 0x10055e740, taken by the ManifestManager's handler 0x10055bc20; the profile's loading waits for the enumeration's
+// end, 0x10035a6ff), the loader thread's pause, and a step's file questions (0x100088f96; the whole file system's
+// answer is the archive's own call on each archive in turn, 0x10015aa0d). Here:
 //
-//   1. The step opens the archive, asks for its song manifest (an AssetLoadRequest for its .hsan file,
-//      0x10055e740) and puts its package in a queue (dlc_package_queue).
-//   2. The update's head, which the game calls once a frame, takes one package off the queue (dlc_package) and
-//      ends it when its files are in.
-//   3. The asset loader thread reads the manifest, and the ManifestManager's handler (0x10055bc20) takes the
-//      answer on the game's thread: the songs are in the lists from then. The thread's loop is a pass and a pause
-//      of 10 ms, and a pass ends at the first file it finishes: 85 manifests a second at the most.
+//   - The step opens the archive, asks for its song manifest and puts its package in a queue (dlc_package_queue).
+//     The update's head, which the game calls once a frame, takes one package off the queue (dlc_package) and ends
+//     it when its files are in. Steps alone for a frame budget emptied the list of archives in a few frames and
+//     cleared the flag with the packages still to come: 147 archives were open for 2.7 s more. So the loop takes a
+//     step only when no package is left to load, and calls the head until then: a package is loaded before the next
+//     archive is opened, in the original's order, several a frame.
+//   - The loader thread's loop is replaced for its pause (asset_loader_thread below).
 //
-// Steps alone for a frame budget emptied the list of archives in a few frames and cleared the flag with the other
-// two still to come, the lists short and the menus slow to answer meanwhile: 147 archives were open for 2.7 s
-// more, and with 2,326 the manifests alone were 15 s behind the last package. So:
-//
-//   - The loop takes a step only when no package is left to load, and calls the head until then: a package is
-//     loaded before the next archive is opened, in the original's order, several a frame.
-//   - While archives are mounted the loader thread's pause is LOADER_BUSY_US (asset_loader_thread below), so the
-//     manifests come in as fast as they are read.
-//   - The step that finds the list empty ends the enumeration for the game (the profile's loading waits for that,
-//     0x10035a6ff). If manifests asked for have not been answered by then, the flag is set again and held until
-//     they have: the text stays, and a song list fills in, to the last song.
-//
-// And a step itself grew with the library. Mounting an archive, the game asks its file system for the hash file of
-// each shader of its shader cache, "data/Shaders/Generated/NAME.sha1" (ten of them, 0x100088f96), should the
-// archive bring a newer one; the file system asks every archive mounted there in turn, and a song archive never
-// has one. So a step took 2 ms with a hundred archives mounted and 19 ms with 2,300: most of a 27 s mounting.
-// Within one mounting, a question the step before had "no" for is asked of the archives this step mounted alone
-// (fs_asked below): the others have not changed.
-//
-// Learn & Play's loop waits for each mount as the first of these does, for its own reason; the rest is open there
-// (win-x86/shims/win32_overrides.c, docs/windows/PLAN.md).
+// Learn & Play's loop waits for each mount too, for its own reason and by its own sign, the archive's file being
+// closed (win-x86/shims/win32_overrides.c). Its steps dropped archives when several ran in a frame, until it did.
+// This game's do not: it lists the same songs after a mounting with the budget as after one at RS_MODS_BUDGET_MS=0,
+// a step a frame as in the original (docs/mac/TESTING.md has the check).
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
-#define LOAD_STALL_S 5.0     // nothing loaded or answered for this long: the mounting goes on without waiting
-#define LOADER_BUSY_US 200   // the loader thread's pause between passes while archives are mounted
-#define LOADER_IDLE_US 10000 // and the game's own
 
-// During the install steps an archive in dlc/ counts as owned, whatever AppID it carries: mods_shared.c's hook on
-// steam_dlc_owned, one source with Learn & Play, which rs_mods_mounting tells when the steps run.
-
-// RS_MODS_LOG=1 says what a mounting did once its list is empty, its packages are loaded and its manifests are in,
-// in Learn & Play's words: the archives its steps took, the frames and the time. Learn & Play's steps dropped
-// archives when several ran in a frame, until its loop waited for each mount to be finished
-// (win-x86/shims/win32_overrides.c). This game's do not: it lists the same songs after a mounting with the budget
-// as after one at RS_MODS_BUDGET_MS=0, a step a frame as in the original (docs/mac/TESTING.md has the check).
-static struct {
-  unsigned steps, frames;
-  double t0;
-  uint64_t left;        // the packages left to load when that last changed
-  double left_since;    // and when that was
-  unsigned asked0, answered0;  // the manifest counts when the mounting began
-  unsigned answered;    // the answers when that last changed
-  double answered_since;
-  double t_mounted;     // when the list was empty and the last package loaded
-  unsigned frames_mounted;  // and the frames until then
-  int holding;          // since then: the flag is held for the manifests
-  int stalled;          // something did not load: this mounting no longer waits
-} g_mount;  // the game thread's
-
-// The manifests asked for and answered since the game started, counted at the two mid points. A mount asks for its
-// manifests by path, with no name; the handler is also given the answers to what the game loads by name (a
-// profile's guitar and gear, urn:database:json-db:...), which are not counted. -1: a point is missing, and nothing
-// waits for manifests.
-static atomic_uint g_manifests_asked, g_manifests_answered;
-static int g_manifest_points = -1, g_manifest_response;
-static atomic_int g_loader_busy;  // archives are being mounted: read by the loader thread
-
-static void on_manifest_request(rc_mid_frame *f, void *user) {
-  (void)f, (void)user;
-  COUNT(g_manifests_asked);
-}
-static void on_manifest_response(rc_mid_frame *f, void *user) {
-  (void)user;
-  const uint8_t *name = (const uint8_t *)(uintptr_t)rc_mid_get(f, g_manifest_response);
-  if (!name) return;
-  name += RC_OFF(asset_load_name);  // the game's string: its text in place, or behind a pointer at its start
-  int in_place = RC_LD(uint64_t, name + RC_OFF(efd_str_inline)) == (uint64_t)(uintptr_t)(name + RC_OFF(efd_str_size));
-  const char *text = in_place ? (const char *)name : (const char *)(uintptr_t)RC_LD(uint64_t, name);
-  if (text && !*text) COUNT(g_manifests_answered);
-}
-
-// The asset loader thread's loop (the game's: a pass, 10 ms, until its stop byte is set). A pass of the
-// AssetFactoryManager takes the requests that have come and goes through the loads it has in hand until one is
-// finished, so with the game's pause a hundred files a second is the most it reads, however small. While archives
-// are mounted the pause is LOADER_BUSY_US; at any other time the loop is the game's.
+// The asset loader thread's loop (the game's: a pass, 10 ms, until its stop byte is set), with the shared pause:
+// short while archives are mounted, the game's at any other time (mods_shared.c, rs_mods_loader_pause_us).
 void RC_FN(asset_loader_thread)(rc_ctx *c) {
   OV_ARGS_OF(asset_loader_thread, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   while (!*(volatile uint8_t *)(self + RC_OFF(asset_loader_stop))) {
     OV_VCALL(RC_LD(uint64_t, self + RC_OFF(asset_loader_manager)), RC_SLOT(asset_loader_pass));
-    usleep(atomic_load_explicit(&g_loader_busy, memory_order_relaxed) ? LOADER_BUSY_US : LOADER_IDLE_US);
+    usleep(rs_mods_loader_pause_us());
   }
   OV_VCALL((uint64_t)(uintptr_t)self, RC_SLOT(asset_loader_end));
   ov_ret_u64(c, 0);
-}
-
-// The file questions of a step (the fs_exists and fs_mount points). A step mounts its archive (fs_mount: where, and
-// the archive's file system object) and then asks the whole file system its questions (fs_exists), the same ones
-// in every step. One the step before had "no" for, with every archive mounted then, can only be "yes" now through
-// what this step mounted: that is asked, with the game's own call on the archive (the whole file system's answer
-// is that call on each archive in turn, 0x10015aa0d), and a "yes" goes to the whole file system after all, so the
-// game goes on from the same answer either way. Nothing is taken as known across a mount that was not a step's, in
-// a step that mounted at a place this does not know how to take a path from, or with an archive that does not
-// answer for the appid.appid every archive of dlc/ has. When the mounting ends the whole file system is asked each
-// question once more: an answer other than the last one given switches this off for the run, with a line in the
-// log.
-#define FS_QUESTIONS 16    // room for the questions a step asks (ten)
-#define FS_PATH 160
-#define FS_STEP_MOUNTS 4   // and for the archives it mounts (one)
-#define FS_AT 32
-static struct {
-  int point, fs, path, found, answered;  // fs_exists: the point, its values and its continuation; point -1: none
-  int m_path, m_fs;                      // fs_mount's values
-  int off;                               // an answer was not the file system's: not in this run
-  unsigned step;                         // the step of this mounting, from 1
-  unsigned last;                         // and the last one that asked something
-  uint64_t whole;                        // the whole file system's object
-  struct {
-    char path[FS_PATH];
-    unsigned step;  // the step it was last "no" in; 0: free
-  } no[FS_QUESTIONS];
-  struct {
-    uint64_t fs;
-    char at[FS_AT];
-  } mounted[FS_STEP_MOUNTS];  // what this step mounted, and where (lower case)
-  int nmounted;               // -1: something this cannot answer for
-  unsigned asked, alone;      // the questions of this mounting, and those the step's own archives answered
-} g_fs = {.point = -1};  // the game thread's, in a step
-static _Thread_local int t_in_step;  // this thread is in an install step
-static atomic_int g_fs_stale;        // something was mounted outside a step
-
-static void fs_forget(void) {
-  for (int i = 0; i < FS_QUESTIONS; i++) g_fs.no[i].step = 0;
-}
-
-static void on_fs_mount(rc_mid_frame *f, void *user) {
-  (void)user;
-  if (!t_in_step) {
-    atomic_store(&g_fs_stale, 1);
-    return;
-  }
-  const char *at = (const char *)(uintptr_t)rc_mid_get(f, g_fs.m_path);
-  const uint64_t *fsp = (const uint64_t *)(uintptr_t)rc_mid_get(f, g_fs.m_fs);
-  uint64_t fs = fsp ? RC_LD(uint64_t, fsp) : 0;
-  int n = g_fs.nmounted;
-  size_t len = at ? strlen(at) : 0;
-  if (n < 0 || n == FS_STEP_MOUNTS || !fs || !len || len >= FS_AT) {
-    g_fs.nmounted = -1;
-    return;
-  }
-  for (size_t i = 0; i < len; i++) {  // one name of the plain kind, as "data": a path is taken from it below
-    char ch = at[i] >= 'A' && at[i] <= 'Z' ? (char)(at[i] + 32) : at[i];
-    if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_')) {
-      g_fs.nmounted = -1;
-      return;
-    }
-    g_fs.mounted[n].at[i] = ch;
-  }
-  g_fs.mounted[n].at[len] = 0;
-  if (!((uint8_t)OV_VCALL(fs, RC_SLOT(fs_exists), (uint64_t)(uintptr_t) "appid.appid") & 1)) {
-    g_fs.nmounted = -1;
-    return;
-  }
-  g_fs.mounted[n].fs = fs;
-  g_fs.nmounted = n + 1;
-}
-
-// 1 when an archive this step mounted has the file, by the path from where it is mounted
-static int fs_in_step_mounts(const char *path) {
-  for (int i = 0; i < g_fs.nmounted; i++) {
-    size_t len = strlen(g_fs.mounted[i].at);
-    if (strncmp(path, g_fs.mounted[i].at, len) || path[len] != '/' || !path[len + 1]) continue;  // not under it
-    if ((uint8_t)OV_VCALL(g_fs.mounted[i].fs, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)(path + len + 1)) & 1) return 1;
-  }
-  return 0;
-}
-
-static void on_fs_exists(rc_mid_frame *f, void *user) {
-  (void)user;
-  if (!t_in_step || g_fs.off) return;  // the game's own call
-  const char *path = (const char *)(uintptr_t)rc_mid_get(f, g_fs.path);
-  uint64_t whole = rc_mid_get(f, g_fs.fs);
-  if (!path || !whole || strlen(path) >= FS_PATH) return;
-  if (atomic_exchange(&g_fs_stale, 0)) fs_forget();
-  g_fs.whole = whole;
-  g_fs.last = g_fs.step;
-  g_fs.asked++;
-  int slot = -1, free_slot = -1;
-  for (int i = 0; i < FS_QUESTIONS; i++) {
-    if (!g_fs.no[i].step) free_slot = free_slot < 0 ? i : free_slot;
-    else if (!strcmp(g_fs.no[i].path, path)) slot = i;
-  }
-  int found;
-  if (slot >= 0 && g_fs.no[slot].step == g_fs.step - 1 && g_fs.nmounted > 0 && !fs_in_step_mounts(path)) {
-    found = 0;
-    g_fs.alone++;
-  } else {
-    found = (uint8_t)OV_VCALL(whole, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)path) & 1;
-  }
-  if (found) {
-    if (slot >= 0) g_fs.no[slot].step = 0;
-  } else if (slot >= 0 || free_slot >= 0) {
-    if (slot < 0) strcpy(g_fs.no[slot = free_slot].path, path);
-    g_fs.no[slot].step = g_fs.step;
-  }
-  rc_mid_set(f, g_fs.found, (uint64_t)found);
-  f->go = g_fs.answered;
-}
-
-// The mounting's end: every question last answered "no" to the whole file system once more.
-static void fs_check(void) {
-  if (g_fs.off || !g_fs.whole || atomic_load(&g_fs_stale)) return;
-  for (int i = 0; i < FS_QUESTIONS; i++) {
-    if (g_fs.no[i].step != g_fs.last) continue;
-    if (!((uint8_t)OV_VCALL(g_fs.whole, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)g_fs.no[i].path) & 1)) continue;
-    g_fs.off = 1;
-    rs_mods_logf("DLC: %s is there, and a step was told it was not: file questions go to the whole file system "
-                 "from here on, and a restart mounts the archives with them",
-                 g_fs.no[i].path);
-  }
-}
-
-// The mid points of the mounting: the manifests' and the file system's.
-static void mods_manifest_points(void) {
-  int asked = rc_mid_add_name("manifest_request", on_manifest_request, NULL);
-  int answered = rc_mid_add_name("manifest_response", on_manifest_response, NULL);
-  g_manifest_response = answered < 0 ? -1 : rc_mid_value(answered, "response");
-  g_manifest_points = asked >= 0 && g_manifest_response >= 0 ? 0 : -1;
-  if (g_manifest_points < 0) rs_mods_logf("no points for the song manifests: the mounting does not wait for them");
-  int mount = rc_mid_add_name("fs_mount", on_fs_mount, NULL);
-  int exists = mount < 0 ? -1 : rc_mid_add_name("fs_exists", on_fs_exists, NULL);
-  if (exists >= 0) {
-    g_fs.m_path = rc_mid_value(mount, "path"), g_fs.m_fs = rc_mid_value(mount, "fs");
-    g_fs.fs = rc_mid_value(exists, "fs"), g_fs.path = rc_mid_value(exists, "path");
-    g_fs.found = rc_mid_value(exists, "found"), g_fs.answered = rc_mid_cont(exists, "answered");
-    if (g_fs.m_path >= 0 && g_fs.m_fs >= 0 && g_fs.fs >= 0 && g_fs.path >= 0 && g_fs.found >= 0 && g_fs.answered > 0)
-      g_fs.point = exists;
-  }
-  if (g_fs.point < 0) {
-    g_fs.off = 1;
-    rs_mods_logf("no points for the file system: a step asks all of it");
-  }
 }
 
 // What is left to load of the archives the steps took: the packages in the queue, and the one the head has. 0 when
@@ -549,49 +335,19 @@ static uint64_t mount_left(const uint8_t *self) {
   return now || waiting ? (waiting << 1 | (now != 0)) + 1 : 0;
 }
 
-static void mount_stall(const char *what) {
-  g_mount.stalled = 1;
-  rs_mods_logf("DLC: %s in %.0f s, the mounting goes on without waiting", what, LOAD_STALL_S);
-}
-
-// 1 while the steps have to wait for a package to be loaded. One that makes no progress for LOAD_STALL_S is taken
-// to be none of this mounting's, and the rest of the steps go on as they did before the loop waited.
-static int mount_loading(const uint8_t *self) {
-  if (g_mount.stalled) return 0;
-  uint64_t left = mount_left(self);
-  double t = elapsed_s();
-  if (left != g_mount.left) g_mount.left = left, g_mount.left_since = t;
-  if (!left) return 0;
-  if (t - g_mount.left_since < LOAD_STALL_S) return 1;
-  mount_stall("a package did not load");
-  return 0;
-}
-
-// 1 while manifests this mounting asked for have not been answered, with the same patience.
-static int manifests_waiting(void) {
-  if (g_mount.stalled || g_manifest_points < 0) return 0;
-  unsigned answered = atomic_load(&g_manifests_answered);
-  int left = (int)(atomic_load(&g_manifests_asked) - g_mount.asked0) - (int)(answered - g_mount.answered0);
-  double t = elapsed_s();
-  if (answered != g_mount.answered) g_mount.answered = answered, g_mount.answered_since = t;
-  if (left <= 0) return 0;
-  if (t - g_mount.answered_since < LOAD_STALL_S) return 1;
-  mount_stall("a song manifest was not answered");
-  return 0;
-}
+// 1 while the steps have to wait for a package to be loaded. One that makes no progress for 5 s is taken to be none
+// of this mounting's, and the rest of the steps go on as they did before the loop waited (rs_mods_mount_loading).
+static int mount_loading(const uint8_t *self) { return rs_mods_mount_loading(mount_left(self)); }
 
 // One install step. 1 when it took an archive: the step that finds the list empty clears the flag and installs
-// nothing.
+// nothing. During it an archive in dlc/ counts as owned, whatever AppID it carries, and its file questions are the
+// ones answered by the archive it mounted: rs_mods_mounting says when.
 static int mount_step(uint8_t *self, uint64_t o) {
   rs_mods_mounting(1);
-  g_fs.step++;
-  g_fs.nmounted = 0;
-  t_in_step = rs_mods_cfg.fixes;
   OV_GUEST(dlc_install_step, o);
-  t_in_step = 0;
   rs_mods_mounting(0);
   if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) return 0;
-  g_mount.steps++;
+  rs_mods_mount_took();
   return 1;
 }
 
@@ -600,21 +356,13 @@ void RC_FN(dlc_update)(rc_ctx *c) {
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
   int installing = *(volatile uint8_t *)(self + INSTALLING_FLAG);
-  int batched = installing && rs_mods_cfg.fixes && rs_mods_cfg.budget_s > 0;
-  if (installing && !g_mount.frames++) {
-    g_mount.t0 = elapsed_s();
-    g_mount.asked0 = atomic_load(&g_manifests_asked);
-    g_mount.answered0 = atomic_load(&g_manifests_answered);
-    fs_forget();
-    g_fs.step = g_fs.last = g_fs.asked = g_fs.alone = 0;
-  }
-  atomic_store_explicit(&g_loader_busy, batched, memory_order_relaxed);
+  int batched = rs_mods_mount_frame(installing);
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
   if (!batched) {
     mount_step(self, o);
-  } else if (g_mount.holding) {
-    if (!manifests_waiting()) self[INSTALLING_FLAG] = 0;  // the end the game's step made, now for the menus too
+  } else if (rs_mods_mount_holding()) {
+    if (!rs_mods_mount_waiting()) self[INSTALLING_FLAG] = 0;  // the end the game's step made, now for the menus too
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
@@ -629,24 +377,10 @@ void RC_FN(dlc_update)(rc_ctx *c) {
       if (mount_loading(self)) break;
       if (mount_step(self, o)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < rs_mods_cfg.budget_s);
-    if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-      fs_check();
-      g_mount.t_mounted = g_mount.answered_since = elapsed_s();
-      g_mount.frames_mounted = g_mount.frames;
-      if (manifests_waiting()) self[INSTALLING_FLAG] = g_mount.holding = 1;
-    }
+    // the list was empty: if song manifests are still to come, the flag is held for them
+    if (!*(volatile uint8_t *)(self + INSTALLING_FLAG) && rs_mods_mount_listed()) self[INSTALLING_FLAG] = 1;
   }
-  if (installing && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-    double t = elapsed_s();
-    if (g_mount.holding)
-      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s, their songs in the lists %.2f s later",
-                   g_mount.steps, g_mount.frames_mounted, g_mount.t_mounted - g_mount.t0, t - g_mount.t_mounted);
-    else
-      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames, t - g_mount.t0);
-    if (g_fs.asked)
-      rs_mods_logf("DLC: %u of the steps' %u file questions asked of the step's archive alone", g_fs.alone, g_fs.asked);
-    memset(&g_mount, 0, sizeof g_mount);
-  }
+  if (installing && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) rs_mods_mount_end();
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;
   if (self[RC_OFF(dlc_check_on)] && self[RC_OFF(dlc_pending)]) {
     if ((uint8_t)OV_GUEST(dlc_enum_check, o)) {

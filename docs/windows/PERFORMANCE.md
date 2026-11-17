@@ -155,7 +155,9 @@ The apps the installer built from 1.4.0's code, on the 75 Hz display at 2560x144
 editions' starts are in the [Mac edition's](../mac/PERFORMANCE.md#start-up-and-first-play). The
 [measured runs](#measured-runs) have replaced its song figures but for the frame rate on that display: 74.9 fps,
 median 13.35-13.39 ms, p99 17.5-17.7 ms, worst 24.2 ms. This edition's start: the title up in 6.9 and 7.3 s and taking
-keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s. In the 1280x720 window (`RS_FULLSCREEN=0`, one
+keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s. Since then (not released) 150 archives
+are mounted in 0.44 s with their songs in the lists 0.18 s later, and a library of 2,250, most of it the Mac edition's
+through a mod, in 19 to 20 s where it took 42 ([TESTING.md](TESTING.md#unattended-runs)). In the 1280x720 window (`RS_FULLSCREEN=0`, one
 run) the CPU was what it was full screen, 63.4% of a core against 62.6-63.2 then, with the GPU at 35% against 56-57: the
 CPU does not follow the size of the picture. The first play without shaders prepared is in
 [Shader preparation](#shader-preparation).

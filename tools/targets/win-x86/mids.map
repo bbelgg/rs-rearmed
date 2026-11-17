@@ -198,8 +198,8 @@ fps_tuner_hint        0x012c2660  (void *menu@esi) -> skip=0x012c283e  # the tun
 # Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 tuner_skip_offer      0x012c2f37  (uint8_t offer@[ebp-0x1d])  # the tuner menu's Skip Tuner button 0x12c2df0 (the Mac's 0x100544a30; button 0xac): the same answer, a local here, at its compare with 0 before the button is added
 
-# Batched DLC mounting (built in on the Mac: tools/ws7/recomp/overrides/mods/mods.c)
-manifest_request      unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055e95e
-manifest_response     unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055bc34
-fs_mount              unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x1003c975f
-fs_exists             unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x1003c9c72
+# Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+manifest_request      0x00fac6c4  (void *request@ebx)  # in the mount's manifest requests 0xfac450 (called by the package mount, 0xf94912; the Mac's 0x10055e740), after each AssetLoadRequest is sent (0xfac6c2)
+manifest_response     0x00faaf77  (void *manager@ecx, void *response@[ebp+0x8])  # the ManifestManager's AssetLoadResponse handler 0xfaaf60 (thiscall; the Mac's 0x10055bc20), after its prologue: once a request, whatever the answer
+fs_mount              0x0101bd8b  (const char *path@[ebp+0x8], void **fs@eax)  # the package mount's call 0x101bd60 (cdecl (the mount point, the archive's file system object); the Mac's 0x1003c9750; called by the package mount at 0xf94819 and by the engine's own archives at 0x101b28a), once its own reference to the object is on the stack, where eax points
+fs_exists             0x0101bd1a  (void *fs@ecx, const char *path@eax, uint8_t found@eax) -> answered=0x0101bd20  # in the file-exists call 0x101bca0 (the Mac's 0x1003c9b80), before the path, in lower case, is pushed for its question to the whole file system (slot 6 of frontend_fs, the call at 0x101bd1e); `answered` goes on after that call, with found as the answer

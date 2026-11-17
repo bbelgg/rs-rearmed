@@ -61,7 +61,7 @@ dlc_install_step                                                 0x01449580  cus
 dlc_enum_check                                                   0x014493a0  custom    bool(void *coord)
 dlc_update_tail                                                  0x01449660  stdcall   void(void *coord)
 dlc_package_queue                                                unsupported  not matched: this game's mounting loop waits for the archive's file to be closed instead, which its Win32 seam counts (win32_overrides.c)
-asset_loader_thread                                              unsupported  not matched: the loader thread's loop and its Sleep(10) between passes (docs/windows/PLAN.md)
+asset_loader_thread                                              0x014adf20  thiscall  -  # the AssetLoaderThread's functor (vtable 0x1d60d98, made by 0x14adec0 for the thread 0x1488e20 starts; one argument it does not read, ret 4): until its stop byte is set, a pass of the AssetFactoryManager (slot 11) and Sleep(10); then its own slot 2 (0x14adf60); the Mac's 0x1012856c0
 std_tree_destroy                                                 0x00f964a0  thiscall  void(void *tree, void *root)
 json_number_table                                                0x1ee14c8  data      void *  # a Dinkumware hash_map here
 json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply

@@ -18,6 +18,9 @@ song_key_known wrap
 # Batched DLC mounting (rsmacfixes): the DLC coordinator's per-frame update, which mounts one dlc/ archive a frame;
 # the native one mounts several within a frame budget, as the Mac's. RS_MODS_BUDGET_MS / RS_MODS_FIXES.
 dlc_update
+# Batched DLC mounting: the asset loader thread's loop, for its pause between passes while archives are mounted, as
+# the Mac's.
+asset_loader_thread
 # Two players on any input: what forces Player 2 to Real Tone (inlined at the Mac's three callers of
 # input_mode_is_cable). The native one runs first, off with RS_MODS_MULTIPLAYER=0. The other half, Player 2's saved
 # input, is the Mac's pre hook on input_bind (overrides/mods/mods_shared.c), and nothing here.

@@ -195,7 +195,7 @@ fps_tuner_hint        0x10054cf10  (void *menu@rdi) -> skip=0x10054d0b3  # the t
 # Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 tuner_skip_offer      0x100544c7f  (uint8_t offer@r14)  # the tuner menu's Skip Tuner button 0x100544a30 (button 0xac; not for the menus "tuner" and "getuner" or a first encounter): whether the stage its OnComplete names is another than "Guitarcade_Game", in r14b at its test before the button is added
 
-# Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods.c)
+# Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 manifest_request      0x10055e95e  (void *request@r13)  # in the mount's manifest requests 0x10055e740 (called by the mount, 0x1000888fb), after each AssetLoadRequest is sent
 manifest_response     0x10055bc34  (void *manager@rdi, void *response@rsi)  # the ManifestManager's AssetLoadResponse handler 0x10055bc20, after its prologue: once a request, whatever the answer
 fs_mount              0x1003c975f  (const char *path@rdi, void **fs@rsi)  # the package mount's call 0x1003c9750 (its one caller: 0x100088531), after its prologue: the mount point ("data" for an archive of dlc/) and where the archive's file system object is

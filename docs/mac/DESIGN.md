@@ -222,9 +222,10 @@ edition's log. The sources are in `tools/ws7/recomp/overrides/mods`:
 - **One source for both editions.** A fix that needs nothing of one game alone is written as a mod is (`rc_mod.h`): it
   names the game's functions and fields and looks them up when it runs, so the same file is built into both apps.
   `mods_shared.c` has the switches, the log, the start (`rs_mods_start`: it reads the switches, raises the open-file
-  limit and adds the hooks), the intro skip, the song ownership during a mount and Player 2's saved input; `framerate.c`
-  has the frame rate fixes. This edition starts them from a constructor, as the launcher has set the environment by
-  then.
+  limit and adds the hooks), the intro skip, the song ownership during a mount, what the two batched DLC mountings
+  share (the song manifests, the loader thread's pause, a step's file questions) and Player 2's saved input;
+  `framerate.c` has the frame rate fixes. This edition starts them from a constructor, as the launcher has set the
+  environment by then.
 - **Each edition's own.** The batched DLC mounting loop, the Auto Save skip, the Direct Connect overlay's file open, the
   path cache, the number hash and the signature skip sit where the two games' code differs. This edition's are in
   `mods.c`, with two only it needs (the keys and the thread priority): a function named in
@@ -259,10 +260,11 @@ What each does:
     Steps alone left packages and manifests behind: the text went with songs still coming into the lists and the
     menus slow to answer, for 2.7 s with 147 archives and for 33 s with 2,326 (1.16.0: the text for 24 s, and a
     search 6 s after it had 1,227 matches of 2,037). Now the text and the last song end together, after 5 to 8 s
-    with 2,326. Learn & Play's loop waits for each mount as the first of the four does, there because a step taken
-    too early drops an archive; it has none of the other three yet
-    ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This game's steps drop none either way
-    ([TESTING.md](TESTING.md#unattended-runs)).
+    with 2,326. The first of the four is this edition's own (`mods.c`: the packages the game has left to load,
+    `dlc_package` and `dlc_package_queue`), and so is the replaced loop of the loader thread; the other three are
+    one source with Learn & Play (`mods_shared.c`), whose loop waits for each mount in its own way, there because a
+    step taken too early drops an archive ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This
+    game's steps drop none either way ([TESTING.md](TESTING.md#unattended-runs)).
   - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
     descriptors of an app started from Finder. The shared start raises it.
   - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path

@@ -29,12 +29,12 @@ dlc_map_root                      0x34    # DLC coordinator: map root node
 dlc_map_begin                     0x38    # DLC coordinator: map begin node
 dlc_map_end                       0x3c    # DLC coordinator: map end node
 dlc_map_size                      0x40    # DLC coordinator: map size
-asset_load_name                   unsupported  not matched: manifest_response
-fs_exists_slot                    unsupported  not matched: fs_exists
-asset_loader_manager              unsupported  not matched: asset_loader_thread
-asset_loader_stop                 unsupported  not matched: asset_loader_thread
-asset_loader_pass_slot            unsupported  not matched: asset_loader_thread
-asset_loader_end_slot             unsupported  not matched: asset_loader_thread
+asset_load_name                   0x10    # AssetLoadRequest (ctor 0x1488a30: name +0x10, category +0x28, path +0x30) and AssetLoadResponse (read at 0xfab0d0)
+fs_exists_slot                    0x6     # file system object vtable: thiscall bool(const char *path), the path from where the object is mounted (the whole one's is asked at 0x101bd1e; an archive's is 0x1423900, vtable 0x1d5b22c)
+asset_loader_manager              0x4     # asset loader thread's functor (0x14adf20)
+asset_loader_stop                 0x8     # asset loader thread's functor: u8
+asset_loader_pass_slot            0xb     # AssetFactoryManager vtable: 0x14adf36 calls [vtable + 0x2c]
+asset_loader_end_slot             0x2     # asset loader thread's functor vtable (0x1d60d98): 0x14adf60
 dlc_package                       unsupported  not matched: this game's mounting loop waits for the archive's file to be closed instead, which its Win32 seam counts (win32_overrides.c)
 json_number_refs                  0x4     # number object: int32 refcount
 json_number_value                 0x8     # number object: double value

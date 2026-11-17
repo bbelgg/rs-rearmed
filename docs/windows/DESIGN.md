@@ -395,18 +395,25 @@ How a fix gets into this app:
 What differs, fix by fix:
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`):
-  - Batched DLC mounting: this game's loop has to wait for each mount. An install step starts mounting one archive and
-    leaves its file open; the update's head, which the game calls once a frame, finishes the mount and closes the file,
-    and a step taken before that drops the next archive. So the loop calls the head until the file is closed (the seam
-    counts the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac edition's loop waits the
-    same way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`), and does three things
-    this one does not yet: it shortens the asset loader thread's pause while archives are mounted, it holds the flag
-    that "Enumerating downloadable content..." follows until every song manifest asked for is in, and it keeps a
-    step from asking every mounted archive for the shader cache's files
-    ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)). Here the flag clears when the last mount is finished.
-    The loader reads the manifests the same way in this game, so with a library of thousands the last songs are
-    expected to come into the lists after the text has gone, as they did on the Mac: not measured, and open
-    ([PLAN.md](PLAN.md#open-issues)).
+  - Batched DLC mounting: the loop is this edition's, and what it calls around its steps is the Mac's source.
+    - This game's loop has to wait for each mount. An install step starts mounting one archive and leaves its file
+      open; the update's head, which the game calls once a frame, finishes the mount and closes the file, and a step
+      taken before that drops the next archive. So the loop calls the head until the file is closed (the seam counts
+      the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac edition's loop waits the same
+      way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`, not matched here).
+    - The rest is one source (`mods_shared.c`; the [Mac design](../mac/DESIGN.md#built-in-fixes-and-mods) says what
+      each is for): while archives are mounted the asset loader thread's pause between passes is 0.2 ms, not the
+      game's 10 ms; the flag that "Enumerating downloadable content..." follows is held until every song manifest
+      asked for is in; and a step asks only the archive it mounted for the shader cache's ten hash files, with the
+      Mac's safeguards (the archive's `appid.appid`, the check at the mounting's end). This game has the same
+      functions for all of it. The loader thread's loop is replaced here too (`asset_loader_thread`, its `Sleep(10)`),
+      and the four mid points are in the same functions as the Mac's. One sits differently: `fs_exists` is before the
+      path is pushed for the game's question, not at the call, so that an answer given in its place leaves the stack
+      as the call would; the path and the answer are in the same register there.
+
+    With 2,250 archives (150 of this game's and 2,100 of the Mac edition's, which a mod serves) the text stayed for
+    42 s and a song list opened right after it had 1,494 of its 1,977 matches for `a`; now the text and the last
+    song end together after 20 s. What is left of that is in [PLAN.md](PLAN.md#open-issues).
   - The song path cache wraps the path intern itself, as this build has the Mac game's wrapper around it inlined.
   - The number-table hash is a function of its own here, where the Mac edition replaces the three functions it is
     inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down first.

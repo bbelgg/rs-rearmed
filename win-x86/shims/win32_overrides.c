@@ -105,8 +105,8 @@ void RC_NFN(frontend_open_file)(rc_ctx *c) {
 // frame for mounting DLC archives (default 50; 0 mounts one per frame, as the original game does), RS_MODS_LOG=1
 // logs what they did. The start reads them, raises the open-file limit as on the Mac (each CreateFile holds a
 // host descriptor; RS_MODS_FIXES=0 leaves it) and adds the hooks of the fixes that are the Mac's source: the
-// intro skip, the song ownership during a mount, the frame rate fixes (framerate.c). At the start of lp_main.c,
-// once settings.env is in the environment and the log is set up.
+// intro skip, the song ownership during a mount, the mounting's song manifests and file questions, the frame rate
+// fixes (framerate.c). At the start of lp_main.c, once settings.env is in the environment and the log is set up.
 // ------------------------------------------------------------------------------------------------
 void lp_mods_init(void) { rs_mods_start(); }
 static double now_s(void) {
@@ -268,9 +268,16 @@ void RC_FN(song_key_known)(rc_ctx *c) {
 //   dlc_map                     std::map (dlc_map_root, _begin, _end, _size)
 //   dlc_clear_map               clear the map once installing is done
 //   dlc_first_done              first update done                    dlc_tail_done   follow-up done
+//
+// What the loop is for, and everything of it that is not this game's alone, is the Mac's source
+// (tools/ws7/recomp/overrides/mods/mods_shared.c, "Batched DLC mounting"): the flag the menu's "Enumerating
+// downloadable content..." follows and its hold for the song manifests (asked for at 0xfac450, by the package mount
+// 0xf94660 the step runs; taken by the ManifestManager's handler 0xfaaf60), the loader thread's pause, and a step's
+// file questions (the ten "%s/Shaders/Generated/%s.sha1" of 0xf949f0, each a call of 0x101bca0). Here: the wait for
+// each mount, in this game's own way, and the loader thread's loop.
 // ------------------------------------------------------------------------------------------------
-// During the install steps an archive in dlc/ counts as owned whatever AppID it carries, as on the Mac: the Mac's
-// source, mods_shared.c's hook on steam_dlc_owned, which rs_mods_mounting tells when the steps run.
+// During an install step an archive in dlc/ counts as owned whatever AppID it carries, and its file questions are
+// answered by the archive it mounted, as on the Mac: rs_mods_mounting says when a step runs.
 extern _Atomic int w32_dlc_archives_open;  // win32_ksync.c: the song archives of dlc/ open now
 extern _Atomic unsigned w32_dlc_archive_opens;
 
@@ -280,16 +287,54 @@ extern _Atomic unsigned w32_dlc_archive_opens;
 // them from the coordinator).
 #define MAP_FIELD(m, off) ((m) + ((off) - RC_OFF(dlc_map)))
 
+// The asset loader thread's loop, as the Mac's asset_loader_thread: 0x14adf20, the AssetLoaderThread's functor's run
+// (thiscall, one argument it does not read, `ret 4`; vtable 0x1d60d98). Until its stop byte is set: a pass of the
+// AssetFactoryManager (slot asset_loader_pass_slot) and Sleep(10); then its own slot asset_loader_end_slot, and 0.
+// The pause is the shared one: short while archives are mounted, the game's 10 ms at any other time.
+void RC_FN(asset_loader_thread)(rc_ctx *c) {
+  uint32_t self = (uint32_t)c->r[1];
+  while (!*(volatile uint8_t *)g8(self + RC_OFF(asset_loader_stop))) {
+    uint32_t manager = ld32(self + RC_OFF(asset_loader_manager));
+    rc32_call(c, ld32(ld32(manager) + 4 * RC_SLOT(asset_loader_pass)), 0, 0, manager, 0, 0);
+    usleep(rs_mods_loader_pause_us());
+  }
+  rc32_call(c, ld32(ld32(self) + 4 * RC_SLOT(asset_loader_end)), 0, 0, self, 0, 0);
+  uint32_t esp = (uint32_t)c->r[4];
+  c->r[0] = 0;
+  memcpy(&c->ret_to, RC32_H(esp), 4);
+  c->r[4] = esp + 8;  // ret 4
+}
+
+// The wait of this game's loop. `level`: how many archives were open before the step whose mount is not finished yet
+// (another may be open for as long as it likes: a song playing), -1: none.
+static struct {
+  int level;
+  double waiting_since;
+  unsigned dropped;
+} lp_mount = {.level = -1};  // the game thread's
+
+// One install step. 1 when it took an archive: the step that finds the list empty clears the flag and mounts none.
+static int mount_step(rc_ctx *c, uint32_t self) {
+  rs_mods_mounting(1);
+  c->r[6] = self;
+  rc32_call(c, RC_ADDR(dlc_install_step), 0, 0, 0, 0, 0);
+  rs_mods_mounting(0);
+  if (!*(volatile uint8_t *)g8(self + RC_OFF(dlc_installing))) return 0;
+  rs_mods_mount_took();
+  return 1;
+}
+
 void RC_FN(dlc_update)(rc_ctx *c) {
-  static unsigned n_installed, n_frames;
-  static double t_first;
   uint32_t self = (uint32_t)c->r[1];
   uint64_t ebx = c->r[3], esi = c->r[6], edi = c->r[7];  // callee-saved
+  volatile uint8_t *flag = g8(self + RC_OFF(dlc_installing));
+  int installing = *flag;
+  int batched = rs_mods_mount_frame(installing);
   rc32_call(c, RC_ADDR(dlc_update_head), 0, 0, self, 0, 0);
-  c->r[6] = self;
-  rs_mods_mounting(1);
-  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !*g8(self + RC_OFF(dlc_installing))) {
-    rc32_call(c, RC_ADDR(dlc_install_step), 0, 0, 0, 0, 0);
+  if (!batched) {
+    mount_step(c, self);
+  } else if (rs_mods_mount_holding()) {
+    if (!rs_mods_mount_waiting()) *flag = 0;  // the end the game's step made, now for the menus too
   } else {
     // The step takes a name off the list and starts mounting that archive, whose file it leaves open. The mount is
     // finished by the update's head (0x1446570, above: it closes the file; seen with LP_LOG_DLC_CLOSE), which the
@@ -297,41 +342,36 @@ void RC_FN(dlc_update)(rc_ctx *c) {
     // (Steps alone for as long as a frame budget allowed mounted one archive a frame and dropped the rest: of 2250
     // about 150, their songs missing until an enumeration. One step a frame mounts every one, in 47 s for 2250.)
     // So after a step that left its archive open, the head is called until that file is closed, and only then the
-    // next step is taken: several archives a frame, none dropped. `level`: how many archives were open before the
-    // step whose mount is not finished yet (another may be open for as long as it likes: a song playing), -1: none.
-    // One that does not finish within the frame is waited for in the next, without a step; after a second of that
-    // it is taken to be an archive the game keeps open, and the steps go on.
-    static int level = -1;
-    static double waiting_since;
-    static unsigned n_dropped;
+    // next step is taken: several archives a frame, none dropped. One that does not finish within the frame is
+    // waited for in the next, without a step; after a second of that it is taken to be an archive the game keeps
+    // open, and the steps go on.
     double t0 = now_s();
-    if (!n_frames++) t_first = t0, n_dropped = 0, level = -1;
     do {
-      if (level >= 0) {
-        while (atomic_load(&w32_dlc_archives_open) > level && now_s() - t0 < rs_mods_cfg.budget_s) {
+      if (lp_mount.level >= 0) {
+        while (atomic_load(&w32_dlc_archives_open) > lp_mount.level && now_s() - t0 < rs_mods_cfg.budget_s) {
           rc32_call(c, RC_ADDR(dlc_update_head), 0, 0, self, 0, 0);
-          if (atomic_load(&w32_dlc_archives_open) > level) usleep(50);  // what the head waits for is another thread's
+          // what the head waits for is another thread's
+          if (atomic_load(&w32_dlc_archives_open) > lp_mount.level) usleep(50);
         }
-        if (atomic_load(&w32_dlc_archives_open) > level && now_s() - waiting_since < 1.0) break;
-        level = -1;
+        if (atomic_load(&w32_dlc_archives_open) > lp_mount.level && now_s() - lp_mount.waiting_since < 1.0) break;
+        lp_mount.level = -1;
       }
       int before = atomic_load(&w32_dlc_archives_open);
       unsigned opens = atomic_load(&w32_dlc_archive_opens);
-      c->r[6] = self;
-      rc32_call(c, RC_ADDR(dlc_install_step), 0, 0, 0, 0, 0);
-      // the step that finds the list empty mounts none
-      if (*(volatile uint8_t *)g8(self + RC_OFF(dlc_installing))) n_installed++;
-      if (atomic_load(&w32_dlc_archive_opens) - opens == 3) n_dropped++;  // opened three times to look, not a fourth
-      if (atomic_load(&w32_dlc_archives_open) > before) level = before, waiting_since = now_s();
-    } while (*(volatile uint8_t *)g8(self + RC_OFF(dlc_installing)) && now_s() - t0 < rs_mods_cfg.budget_s);
-    if (!*g8(self + RC_OFF(dlc_installing))) {
-      if (n_dropped) rs_mods_logf("DLC: %u archives were not mounted", n_dropped);
-      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", n_installed, n_frames, now_s() - t_first);
-      log_counts();
-      n_installed = n_frames = 0;
-    }
+      mount_step(c, self);
+      // a dropped archive: opened three times to look, not a fourth
+      if (atomic_load(&w32_dlc_archive_opens) - opens == 3) lp_mount.dropped++;
+      if (atomic_load(&w32_dlc_archives_open) > before) lp_mount.level = before, lp_mount.waiting_since = now_s();
+    } while (*flag && now_s() - t0 < rs_mods_cfg.budget_s);
+    // the list was empty: if song manifests are still to come, the flag is held for them
+    if (!*flag && rs_mods_mount_listed()) *flag = 1;
   }
-  rs_mods_mounting(0);
+  if (installing && !*flag) {
+    if (lp_mount.dropped) rs_mods_logf("DLC: %u archives were not mounted", lp_mount.dropped);
+    rs_mods_mount_end();
+    log_counts();
+    lp_mount.level = -1, lp_mount.dropped = 0;
+  }
   if (!*g8(self + RC_OFF(dlc_first_done))) *g8(self + RC_OFF(dlc_first_done)) = 1;
   if (*g8(self + RC_OFF(dlc_check_on)) && *g8(self + RC_OFF(dlc_pending))) {
     c->r[6] = self;

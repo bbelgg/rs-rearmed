@@ -140,8 +140,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
   archive in `dlc/` that brings a shader's hash file (the step's question then goes to
   the whole file system; none exists to try), and a package or manifest that does not come (the mounting then goes
   on after 5 s, with a line in the log; the hold itself was run, with the loader's pause left at the game's and
-  without). What a mounting still costs is the game's own: reading each archive's table and its song manifest,
-  2 to 3 ms an archive on the game's thread, and each file opened asks the archives mounted before it.
+  without, and a manifest that does not come is in the shared source's test). Not run with a large library since
+  the manifests, the loader's pause and the file questions became one source with Learn & Play: 147 archives gave
+  the lines they gave before. What a mounting still costs is the game's own: reading each archive's table and its
+  song manifest, 2 to 3 ms an archive on the game's thread, and each file opened asks the archives mounted before it.
 - **The fixes from the code review of 2026-11-09**: six songs played with a guitar since, with no fault; no long
   session.
 - **Mods**: a file provider that changes what an archive holds; the tuner's reading of a 7-string chart's low B and a

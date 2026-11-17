@@ -28,14 +28,15 @@ const char rc_target_id[] = "test";
 
 // --- the target's tables: the hook points of the fixes, each game's own convention and field offsets, and what
 // the fixes call and read in the game by name: its functions at ADDR, its data at DATA
-enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY };
+enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY, FSEXISTS = 14, MIDS = 16 };
 #define ADDR(k) (0x401000u + 0x100u * (k))
 #define DATA 0x402000u
 enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0, D_SIZE = 0x100 };
 #ifdef RC_GUEST32
-const rc_target_value rc_target_offsets[] = {{"boot_intro_playing", 0x2d}, {"boot_intro_state", 0x60},
-                                             {"boot_phase", 0x48}, {"boot_phase3_steps", 10}, {"boot_step", 0x28},
-                                             {"efd_str_inline", 0x14}, {"efd_str_size", 0x10}, {"input_slot", 0xc},
+const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x10}, {"boot_intro_playing", 0x2d},
+                                             {"boot_intro_state", 0x60}, {"boot_phase", 0x48},
+                                             {"boot_phase3_steps", 10}, {"boot_step", 0x28}, {"efd_str_inline", 0x14},
+                                             {"efd_str_size", 0x10}, {"fs_exists_slot", 6}, {"input_slot", 0xc},
                                              {0, 0}};
 // stdcall bool(void *boot), thiscall bool(void *steam, int app), and custom void(int input@eax, int force=0)
 const rc_hook_name rc_target_hooks[] = {
@@ -50,9 +51,10 @@ int rc_hook_code_pops(int index) {
 }
 #define CC(cc) RC_CC_##cc
 #else
-const rc_target_value rc_target_offsets[] = {{"boot_intro_playing", 0x39}, {"boot_intro_state", 0x78},
-                                             {"boot_phase", 0x58}, {"boot_phase3_steps", 12}, {"boot_step", 0x34},
-                                             {"efd_str_inline", 0x18}, {"efd_str_size", 0x10}, {"input_slot", 0x14},
+const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x18}, {"boot_intro_playing", 0x39},
+                                             {"boot_intro_state", 0x78}, {"boot_phase", 0x58},
+                                             {"boot_phase3_steps", 12}, {"boot_step", 0x34}, {"efd_str_inline", 0x18},
+                                             {"efd_str_size", 0x10}, {"fs_exists_slot", 7}, {"input_slot", 0x14},
                                              {0, 0}};
 const rc_hook_name rc_target_hooks[] = {{"boot_intro_update", ADDR(INTRO), ADDR(INTRO)},
                                         {"steam_dlc_owned", ADDR(OWNED), ADDR(OWNED)},
@@ -67,15 +69,31 @@ const rc_target_value rc_target_symbols[] = {
     {"input_profile_string", ADDR(PROFILE), CC(CDECL)}, {0, 0, 0}};
 const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), 0};
 const int rc_hook_npoints = NPOINTS;
-// The one mid point the fixes here hook, with its value where each game has it: the low byte of a register, a
-// local below the frame pointer.
+// The mid points the fixes here hook, with their values where each game has them. Skip Tuner's answer: the low
+// byte of a register, a local below the frame pointer. The batched mounting's four: registers on the Mac; in
+// Learn & Play an argument above the frame pointer too, and at the file question the path and the answer in one
+// register, the game's call not yet made.
 #define SKIP_LOCAL (-0x1d)
+enum { M_SKIP, M_REQUEST, M_RESPONSE, M_MOUNT, M_EXISTS };
 #ifdef RC_GUEST32
 const rc_mid_name rc_target_mids[] = {
-    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', RC_MID_MEM | 5, SKIP_LOCAL}}, 0, {0}, 0}, {0}};
+    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', RC_MID_MEM | 5, SKIP_LOCAL}}, 0, {0}, 0},
+    {"manifest_request", ADDR(MIDS), 0, 1, {{"request", 'p', 3, 0}}, 0, {0}, 0},
+    {"manifest_response", ADDR(MIDS + 1), 0, 2, {{"manager", 'p', 1, 0}, {"response", 'p', RC_MID_MEM | 5, 8}}, 0,
+     {0}, 0},
+    {"fs_mount", ADDR(MIDS + 2), 0, 2, {{"path", 'p', RC_MID_MEM | 5, 8}, {"fs", 'p', 0, 0}}, 0, {0}, 0},
+    {"fs_exists", ADDR(MIDS + 3), 0, 3, {{"fs", 'p', 1, 0}, {"path", 'p', 0, 0}, {"found", 'b', 0, 0}}, 1,
+     {"answered"}, 0},
+    {0}};
 #else
 const rc_mid_name rc_target_mids[] = {
-    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', 14, 0}}, 0, {0}, 0}, {0}};
+    {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', 14, 0}}, 0, {0}, 0},
+    {"manifest_request", ADDR(MIDS), 0, 1, {{"request", 'p', 13, 0}}, 0, {0}, 0},
+    {"manifest_response", ADDR(MIDS + 1), 0, 2, {{"manager", 'p', 7, 0}, {"response", 'p', 6, 0}}, 0, {0}, 0},
+    {"fs_mount", ADDR(MIDS + 2), 0, 2, {{"path", 'p', 7, 0}, {"fs", 'p', 6, 0}}, 0, {0}, 0},
+    {"fs_exists", ADDR(MIDS + 3), 0, 3, {{"fs", 'p', 7, 0}, {"path", 'p', 6, 0}, {"found", 'b', 0, 0}}, 1,
+     {"answered"}, 0},
+    {0}};
 #endif
 #define OFF(name) ((uint32_t)rc_off(name))
 
@@ -205,6 +223,32 @@ static void *game_by_name(void *manager, const char *name) {
   return input_name && !strcmp(name, input_name) ? input_obj : 0;
 }
 
+// A file system object's question, has it this file: the whole file system's, and three archives', which answer
+// for a path from where they are mounted. Each counts what it was asked.
+#define ARCHIVES 3
+static uint8_t *fs_whole, *fs_arch[ARCHIVES];
+static int whole_asks, arch_asks[ARCHIVES];
+static const char *whole_has, *arch_has[ARCHIVES];  // the one file each has beside an archive's appid.appid; null: none
+static int arch_appid[ARCHIVES];                    // the archive answers for its appid.appid
+static char whole_asked[200], arch_asked[200];      // the last path each kind was asked
+static uint32_t game_fs_exists(uint8_t *fs, const char *path) {
+  CHECK(fs && path);  // null: the runtime could not hand the game what it was given
+  if (fs == fs_whole) {
+    whole_asks++;
+    snprintf(whole_asked, sizeof whole_asked, "%s", path);
+    return 0xffffff00u | (uint32_t)(whole_has && !strcmp(path, whole_has));  // al, the rest whatever it was
+  }
+  for (int k = 0; k < ARCHIVES; k++) {
+    if (fs != fs_arch[k]) continue;
+    arch_asks[k]++;
+    if (!strcmp(path, "appid.appid")) return (uint32_t)arch_appid[k];
+    snprintf(arch_asked, sizeof arch_asked, "%s", path);
+    return arch_has[k] && !strcmp(path, arch_has[k]);
+  }
+  CHECK(!"a file system object the game has not");
+  return 0;
+}
+
 // --- what the runtimes need of an image: the game's functions above, by each one's convention
 #ifdef RC_GUEST32
 static uint32_t rd(uint32_t g) { uint32_t v; memcpy(&v, RC32_H(g), 4); return v; }
@@ -234,9 +278,12 @@ static void f_destroy(rc_ctx *c) {  // thiscall: the string in ecx
   game_str_destroy(as_host((uint32_t)c->r[1]));
   ret32(c, 0, 0);
 }
+static void f_fs_exists(rc_ctx *c) {  // thiscall: the object in ecx, the path on the stack, `ret 4`
+  ret32(c, game_fs_exists(as_host((uint32_t)c->r[1]), as_host(arg32(c, 0))), 4);
+}
 rc_fn rc32_lookup(uint32_t g) {
   return g == ADDR(MODE) ? f_mode : g == ADDR(PROFILE) ? f_profile : g == ADDR(MANAGER) ? f_manager
-       : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : 0;
+       : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : g == ADDR(FSEXISTS) ? f_fs_exists : 0;
 }
 int rc32_tls_images(const rc32_tls_image **out) {
   *out = 0;
@@ -265,6 +312,13 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
       return 0;
   }
   return 0;
+}
+// OV_VCALL, the Mac app's (overrides/src/rc_ov.c): the one virtual call the fixes here make
+uint64_t ov_vcall_n(uint64_t obj, int slot, const uint64_t *args, int nargs) {
+  CHECK_EQ((uint64_t)slot, (uint64_t)rc_off("fs_exists_slot"));
+  CHECK_EQ(nargs, 2);
+  CHECK_EQ(args[0], obj);
+  return game_fs_exists(as_host(obj), as_host(args[1]));
 }
 #endif
 
@@ -345,6 +399,7 @@ static void start(void) {
   CHECK_EQ(logged_lines("[rs-mods] Guitarcade Skip Tuner: on"), 1);
   CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point") +
            logged_lines("[rs-mods] no hook point for Player 2's saved input"), 0);
+  CHECK(!strstr(logged, "no points for"));  // the batched mounting's four mid points
   CHECK(!rs_mods_cfg.autosave && rs_mods_cfg.log);
 }
 
@@ -766,6 +821,315 @@ static void saved_input(void) {
   rs_mods_cfg.multiplayer = 1;
 }
 
+// --- Batched DLC mounting: what both editions' loops share. The calls below are an edition's dlc_update's
+// (mods_shared.h), and the game's side is its mid points, called as the translated code calls them.
+#define STARTS(text, with) (!strncmp((text), with, sizeof with - 1))
+// The end of a mounting whose lines are not looked at
+static void ends_quietly(void) {
+  log_start();
+  rs_mods_mount_end();
+  log_stop();
+}
+// One update of the coordinator with its flag set: the first starts a mounting
+static int frame(void) { return rs_mods_mount_frame(1); }
+#ifdef RC_GUEST32
+#define STACK_FOR_CALLS() (ctx->r[4] = esp0 - 1024, ctx->r[5] = esp0 - 64)
+#else
+#define STACK_FOR_CALLS() ((void)0)
+#endif
+
+// A response the ManifestManager's handler is given: the asset's name in the game's string, in place or behind a
+// pointer. A mount's manifest was asked for by path: its name is empty.
+static uint8_t *response_named(const char *name, int in_place) {
+  uint8_t *r = game_alloc(128), *str = r + rc_off("asset_load_name");
+  uint8_t *end = str + rc_off("efd_str_size"), *mark = str + rc_off("efd_str_inline");
+  size_t n = strlen(name);
+  if (in_place) {
+    CHECK(n < (size_t)rc_off("efd_str_size"));
+    memcpy(str, name, n + 1);
+    put_ptr(end, str + n);
+    put_ptr(mark, end);
+  } else {
+    uint8_t *text = game_alloc((uint32_t)n + 1);
+    memcpy(text, name, n + 1);
+    put_ptr(str, text);
+    put_ptr(end, text + n);
+    put_ptr(mark, text + n + 1);
+  }
+  return r;
+}
+static void manifest_asked(void) {
+  uint32_t fl = 0;
+  STACK_FOR_CALLS();
+  CHECK_EQ((uint32_t)rc_mid_call(M_REQUEST, ctx, &fl), 0);
+}
+static void manifest_answered(uint8_t *response) {
+  uint32_t fl = 0;
+  STACK_FOR_CALLS();
+#ifdef RC_GUEST32
+  ctx->r[1] = as_game(manager_obj);
+  wr((uint32_t)ctx->r[5] + 8, (uint32_t)as_game(response));
+#else
+  ctx->r[7] = as_game(manager_obj);
+  ctx->r[6] = as_game(response);
+#endif
+  CHECK_EQ((uint32_t)rc_mid_call(M_RESPONSE, ctx, &fl), 0);
+}
+
+// The song manifests: the flag is held from the step that found the list empty until every manifest this mounting
+// asked for has been answered. Answers with a name are the game's other loads, and one asked for before the
+// mounting is not this mounting's. The loader thread's pause is short for as long as archives are mounted.
+static void manifests(void) {
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  uint8_t *unnamed = response_named("", 1), *unnamed_far = response_named("", 0);
+  uint8_t *named = response_named("urn:x:guitar", 1);
+  uint8_t *named_far = response_named("urn:database:json-db:a-long-name", 0);
+  CHECK_EQ(rs_mods_loader_pause_us(), 10000);  // the game's own
+  manifest_asked();  // before the mounting: not waited for
+  CHECK_EQ(frame(), 1);
+  CHECK_EQ(rs_mods_loader_pause_us(), 200);
+  CHECK(!rs_mods_mount_holding());
+  for (int k = 0; k < 3; k++) {
+    rs_mods_mounting(1);
+    manifest_asked();
+    rs_mods_mounting(0);
+    rs_mods_mount_took();
+  }
+  manifest_answered(unnamed);
+  CHECK_EQ(frame(), 1);
+  CHECK_EQ(rs_mods_mount_listed(), 1);  // two to come: the update sets the flag again
+  CHECK(rs_mods_mount_holding());
+  CHECK_EQ(frame(), 1);
+  CHECK(rs_mods_mount_waiting());
+  manifest_answered(named);
+  manifest_answered(named_far);
+  manifest_answered(0);  // the handler given nothing
+  CHECK(rs_mods_mount_waiting());
+  manifest_answered(unnamed_far);
+  CHECK(rs_mods_mount_waiting());
+  manifest_answered(unnamed);
+  CHECK(!rs_mods_mount_waiting());
+  log_start();
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: 3 archives mounted in 2 frames, "));
+  CHECK(strstr(logged, " s, their songs in the lists ") && strstr(logged, " s later\n"));
+  CHECK(!strstr(logged, "file questions"));  // none asked
+  CHECK(!rs_mods_mount_holding());
+  CHECK_EQ(rs_mods_mount_frame(0), 0);  // the flag clear: no mounting, and the game's pause
+  CHECK_EQ(rs_mods_loader_pause_us(), 10000);
+  // every manifest in when the list is empty: no hold, and the line without the manifests' part
+  CHECK_EQ(frame(), 1);
+  rs_mods_mounting(1);
+  manifest_asked();
+  rs_mods_mounting(0);
+  rs_mods_mount_took();
+  manifest_answered(unnamed);
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  CHECK(!rs_mods_mount_holding());
+  log_start();
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: 1 archives mounted in 1 frames, ") && !strstr(logged, "their songs"));
+  // what an edition's loop waits for between two steps: while its number for what is left is not 0
+  CHECK_EQ(frame(), 1);
+  CHECK_EQ(rs_mods_mount_loading(0), 0);
+  CHECK_EQ(rs_mods_mount_loading(3), 1);
+  CHECK_EQ(rs_mods_mount_loading(5), 1);
+  CHECK_EQ(rs_mods_mount_loading(0), 0);
+  // a manifest that never comes: after 5 s without an answer the mounting waits for nothing more
+  manifest_asked();
+  CHECK_EQ(rs_mods_mount_listed(), 1);
+  CHECK(rs_mods_mount_waiting());
+  usleep(5100000);
+  log_start();
+  CHECK(!rs_mods_mount_waiting());
+  log_stop();
+  CHECK_EQ(logged_lines("[rs-mods] DLC: a song manifest was not answered in 5 s, the mounting goes on without "
+                        "waiting"), 1);
+  CHECK_EQ(rs_mods_mount_loading(7), 0);
+  ends_quietly();
+  manifest_answered(unnamed);  // it came after all: the next mounting starts from the counts as they are
+  CHECK_EQ(frame(), 1);
+  CHECK_EQ(rs_mods_mount_loading(7), 1);  // and waits again
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  ends_quietly();
+  // RS_MODS_FIXES=0 and a budget of 0: a step a frame, the game's pause
+  rs_mods_cfg.fixes = 0;
+  CHECK_EQ(frame(), 0);
+  CHECK_EQ(rs_mods_loader_pause_us(), 10000);
+  ends_quietly();
+  rs_mods_cfg.fixes = 1;
+  rs_mods_cfg.budget_s = 0;
+  CHECK_EQ(frame(), 0);
+  ends_quietly();
+  no_switches();
+  rs_mods_reload_config();
+}
+
+// The game mounts the archive `fs` at `at` (fs_mount): the mount point and where the object's pointer is
+static void mounts(const char *at, uint8_t *fs) {
+  static char *where;
+  static uint8_t *slot;
+  uint32_t fl = 0;
+  if (!where) where = game_alloc(64), slot = game_alloc(8);
+  strcpy(where, at);
+  put_ptr(slot, fs);
+  STACK_FOR_CALLS();
+#ifdef RC_GUEST32
+  wr((uint32_t)ctx->r[5] + 8, (uint32_t)as_game(where));
+  ctx->r[0] = as_game(slot);
+#else
+  ctx->r[7] = as_game(where);
+  ctx->r[6] = as_game(slot);
+#endif
+  CHECK_EQ((uint32_t)rc_mid_call(M_MOUNT, ctx, &fl), 0);
+}
+// The game asks its whole file system for `path` (fs_exists): the answer it goes on with. Where the fix has
+// answered, the game's own call is skipped; where it has not, the game makes it.
+static int asks_answered;
+static int asks(const char *path) {
+  static char *text;
+  uint32_t fl = 0;
+  if (!text) text = game_alloc(256);
+  strcpy(text, path);
+  STACK_FOR_CALLS();
+#ifdef RC_GUEST32
+  ctx->r[1] = as_game(fs_whole);
+  ctx->r[0] = as_game(text);
+#else
+  ctx->r[7] = as_game(fs_whole);
+  ctx->r[6] = as_game(text);
+  ctx->r[0] = 0x1122334455667700ull;
+#endif
+  int go = rc_mid_call(M_EXISTS, ctx, &fl);
+  asks_answered = go != 0;
+  if (!go) return (uint8_t)game_fs_exists(fs_whole, text) != 0;
+  CHECK_EQ(go, 1);
+  return (uint8_t)ctx->r[0] != 0;
+}
+// One install step that mounts `fs` at `at` (null: it mounts nothing) and asks for `n` of the paths
+static const char *const QUESTION[] = {"data/shaders/generated/a.sha1", "data/shaders/generated/b.sha1",
+                                       "data/shaders/generated/c.sha1"};
+static int step_found[3];
+static void step(const char *at, uint8_t *fs, int n) {
+  rs_mods_mounting(1);
+  if (at) mounts(at, fs);
+  for (int k = 0; k < n; k++) step_found[k] = asks(QUESTION[k]);
+  rs_mods_mounting(0);
+  rs_mods_mount_took();
+}
+static void fs_reset(void) {
+  whole_asks = 0;
+  whole_has = 0;
+  for (int k = 0; k < ARCHIVES; k++) arch_asks[k] = 0, arch_has[k] = 0, arch_appid[k] = 1;
+}
+
+// A step's file questions: one the step before had "no" for is asked of the archive this step mounted alone, by
+// the path from its mount point, and the whole file system is asked whenever that is not known to be enough.
+static void file_questions(void) {
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 3);  // the first step: nothing known
+  CHECK_EQ(arch_asks[0], 1);    // its appid.appid
+  CHECK_EQ(whole_asks, 3);
+  CHECK(asks_answered && !step_found[0] && !step_found[1] && !step_found[2]);
+  step("Data", fs_arch[1], 3);  // the second: its own archive alone, whatever the mount point's case
+  CHECK_EQ(whole_asks, 3);
+  CHECK_EQ(arch_asks[1], 4);
+  CHECK(!strcmp(arch_asked, "shaders/generated/c.sha1"));
+  CHECK(asks_answered && !step_found[0] && !step_found[1] && !step_found[2]);
+  // an archive that brings one of the files: its "yes" goes to the whole file system, whose answer is the game's
+  arch_has[2] = "shaders/generated/b.sha1";
+  whole_has = QUESTION[1];
+  step("data", fs_arch[2], 3);
+  CHECK_EQ(whole_asks, 4);
+  CHECK(!strcmp(whole_asked, QUESTION[1]));
+  CHECK(!step_found[0] && step_found[1] && !step_found[2]);
+  step("data", fs_arch[0], 3);  // and a "yes" is not kept: the whole file system again, and the others alone
+  CHECK_EQ(whole_asks, 5);
+  CHECK(!step_found[0] && step_found[1] && !step_found[2]);
+  CHECK_EQ(arch_asks[0], 1 + 1 + 2);
+  whole_has = 0;  // (gone again)
+  step("data", fs_arch[1], 3);
+  CHECK_EQ(whole_asks, 6);  // b: last "yes"
+  // something mounted outside a step: nothing is known in the next one
+  mounts("data", fs_arch[2]);
+  step("data", fs_arch[0], 3);
+  CHECK_EQ(whole_asks, 9);
+  step("data", fs_arch[1], 3);
+  CHECK_EQ(whole_asks, 9);
+  // a mount point a path can't be taken from, an archive that does not answer for its appid.appid, a step that
+  // mounts nothing: the whole file system
+  step("data/songs", fs_arch[0], 3);
+  CHECK_EQ(whole_asks, 12);
+  arch_appid[1] = 0;
+  step("data", fs_arch[1], 3);
+  CHECK_EQ(whole_asks, 15);
+  arch_appid[1] = 1;
+  step(0, 0, 3);
+  CHECK_EQ(whole_asks, 18);
+  // a file that is not under the step's mount point can't have come with it
+  int at_other = arch_asks[0];
+  step("other", fs_arch[0], 3);
+  CHECK_EQ(whole_asks, 18);
+  CHECK_EQ(arch_asks[0], at_other + 1);
+  CHECK(asks_answered && !step_found[0]);
+  // the mounting's end: each question once more to the whole file system, and the count in the log
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  CHECK_EQ(whole_asks, 21);
+  log_start();
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: 11 archives mounted in 1 frames, "));
+  CHECK_EQ(logged_lines("[rs-mods] DLC: 15 of the steps' 33 file questions asked of the step's archive alone"), 1);
+  // the next mounting knows nothing of the last one's answers
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 3);
+  CHECK_EQ(whole_asks, 3);
+  rs_mods_mount_listed();
+  ends_quietly();
+  // RS_MODS_FIXES=0: the questions are the game's own
+  rs_mods_cfg.fixes = 0;
+  fs_reset();
+  CHECK_EQ(frame(), 0);
+  step("data", fs_arch[0], 3);
+  CHECK(!asks_answered);
+  step("data", fs_arch[1], 3);
+  CHECK(!asks_answered);
+  CHECK_EQ(whole_asks, 6);
+  CHECK_EQ(arch_asks[0] + arch_asks[1], 0);
+  ends_quietly();
+  rs_mods_cfg.fixes = 1;
+  // An answer that was not the file system's (the file is there, by a way this does not know): the check at the
+  // mounting's end finds it, says so, and the questions are the game's own for the rest of the run.
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 3);
+  whole_has = QUESTION[2];
+  step("data", fs_arch[1], 3);
+  CHECK(asks_answered && !step_found[2]);
+  log_start();
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(strstr(logged, "[rs-mods] DLC: data/shaders/generated/c.sha1 is there, and a step was told it was not: "));
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 3);
+  CHECK(!asks_answered);
+  step("data", fs_arch[1], 3);
+  CHECK(!asks_answered && step_found[2]);
+  ends_quietly();
+  no_switches();
+  rs_mods_reload_config();
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -792,6 +1156,12 @@ int main(void) {
   input_obj = game_alloc(64);
   manager_obj = game_alloc(16);
   text_heap = game_alloc(TEXT_HEAP);
+  // the file system objects: in Learn & Play's kind of image each has a vtable with the question's function
+  uint8_t *vtable = game_alloc(64);
+  put_ptr(vtable + rc_off("fs_exists_slot") * rc_guest_ptr_size, as_host(ADDR(FSEXISTS)));
+  fs_whole = game_alloc(16);
+  put_ptr(fs_whole, vtable);
+  for (int k = 0; k < ARCHIVES; k++) put_ptr(fs_arch[k] = game_alloc(16), vtable);
   switches();
   log_lines();
   start();
@@ -799,6 +1169,8 @@ int main(void) {
   ownership();
   saved_input();
   skip_tuner();
+  manifests();
+  file_questions();
   printf("mods_shared: ok (%s)\n", rc_guest_ptr_size == 4 ? "32-bit guest" : "64-bit guest");
   return 0;
 }

@@ -187,7 +187,7 @@ LP_GAME_DIR=<game folder> LP_USER_DIR=<test user folder> RS_STEAM_DATA_DIR=<test
 - `@text` waits until `text` appears in the log (at most `LP_INPUT_WAIT` seconds, default 120). `@callback 1101`
   (the Steam stats callback, logged with `RS_STEAM_LOG=1`) means the title screen takes keys; `@DLC:` (with
   `RS_MODS_LOG=1`, the `[rs-mods] DLC: N archives mounted in F frames, T s` line) is the end of the DLC mounting,
-  after the profile has loaded.
+  after the profile has loaded: every archive is mounted and every song is in the lists by then.
 
 The script's log lines carry the seconds since it started and the wall time, to match them with snapshots. The
 verified script, from the title to the note highway (title, profile, Learn a Song, the song, Play Song, Skip
@@ -300,9 +300,25 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
 - **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP`): the Mac edition's check and its keys; the log's
   screens were the same here, to `menu: Guitarcade_Game`. Not run: the switch off, leaving the game, and a game
   played after a skip.
-- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log says it here: `[rs-mods] DLC: N archives were not
-  mounted` comes before the `archives mounted` line when a step dropped its archive (the seam counts each open
-  of a song archive). The count of songs in the search box has not been read in this edition.
+- **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the Mac edition's lines and checks
+  ([Mac testing](../mac/TESTING.md#unattended-runs)): `[rs-mods] DLC: N archives mounted in F frames, T s`, with
+  `, their songs in the lists S s later` when the song manifests came after the last archive, and `DLC: A of the
+  steps' Q file questions asked of the step's archive alone` (1,490 of 1,500 with 150 archives, 22,490 of 22,500
+  with 2,250: all but the first step's). Here alone: `[rs-mods] DLC: N archives were not mounted` comes before
+  them when a step dropped its archive (the seam counts each open of a song archive).
+  - A large library: the test home's `dlc/` with a link to the Mac edition's `dlc/` folder in it, and a mod that
+    serves those archives (150 of this game's and 2,100 of the Mac's: 2,250). No song comes later: at the line, go
+    to Learn a Song, search for `a` and note the matches; leave to the main menu, come back and search again.
+    1,977 both times, the list opened 1.0 s after the line (two runs); before the three fixes 1,494 in a list
+    opened 0.5 s after its line, and 1,977 on coming back.
+  - The time: 2,250 archives in 19.2 and 19.4 s, their songs 0.6 and 0.7 s later (223 frames both times), where the
+    line came after 42.0 and 42.1 s before (567 and 568 frames). 150 archives: `mounted in 8 frames, 0.44 s, their
+    songs in the lists 0.18 s later` (one run).
+  - The runs were a script on `tools/perf/run.py`'s `Game` class, as the Mac's: to the main menu by the route,
+    then the log read ten times a second for the line, Return for the list, Shift and `a` for the search, with a
+    snapshot a second (`RS_GL_SNAPSHOT_SECS=1`) for the `N Matches` beside the search box. From the main menu one
+    Return opens the song list; further ones go on to the song's options, its tuner and the calibration.
+  - Not run: what [PLAN.md](PLAN.md#open-issues) lists.
 - **Title logo** (`RS_REARMED`): as on the Mac; here the app makes the link, at each start.
 - **Direct Connect overlay**: the INPUT slider has four dots and its last value is DIRECT CONNECT, after which
   Available Inputs is enabled and shows the current input device. With `RS_MODS_OVERLAY=0` it has three (NORMAL,

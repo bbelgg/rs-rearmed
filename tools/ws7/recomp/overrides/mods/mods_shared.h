@@ -49,12 +49,41 @@ void rs_mods_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
 // from a constructor (the launcher has set it), Learn & Play's from lp_mods_init (after settings.env). Reads the
 // switches, raises the open-file limit, adds the hooks of the fixes that are here and of the frame rate fixes
 // (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), an archive
-// of dlc/ owned while it is mounted (RS_MODS_BYPASS), Player 2's saved input (RS_MODS_MULTIPLAYER), and Skip Tuner
-// in a Guitarcade game's tuner (RS_MODS_GUITARCADE_SKIP).
+// of dlc/ owned while it is mounted (RS_MODS_BYPASS), the batched mounting's song manifests and file questions
+// (RS_MODS_FIXES), Player 2's saved input (RS_MODS_MULTIPLAYER), and Skip Tuner in a Guitarcade game's tuner
+// (RS_MODS_GUITARCADE_SKIP).
 void rs_mods_start(void);
-// The game thread's: the DLC coordinator's update is in its install steps (1) or out of them again (0). Each
-// edition's dlc_update says so around the steps; an archive counts as owned between the two.
+// Batched DLC mounting (RS_MODS_FIXES, RS_MODS_BUDGET_MS): what is one source of it (mods_shared.c says what it is
+// for). Each edition's dlc_update runs the install steps and waits for a mount in its game's own way; all of these
+// are the game thread's, called from there:
+//   rs_mods_mount_frame(installing)  first in every update, with the coordinator's installing flag. 1: this update's
+//                                    steps run in the loop with the budget. A mounting's first frame starts its
+//                                    counts, and the loader thread's pause follows the answer.
+//   rs_mods_mounting(1), (0)         around each install step: an archive counts as owned between the two
+//                                    (RS_MODS_BYPASS), and the step's file questions are the ones answered here.
+//   rs_mods_mount_took()             after a step that took an archive (the flag is still set).
+//   rs_mods_mount_loading(left)      1 while the steps have to wait for what the last one left to load. `left` is the
+//                                    edition's number for it: 0 when nothing is left, otherwise one that changes
+//                                    whenever something is done. No change for 5 s ends the waiting for this
+//                                    mounting, with a line in the log.
+//   rs_mods_mount_listed()           when a step of the loop has found the list empty and cleared the flag: the file
+//                                    questions' check. 1: song manifests asked for are not in yet; the update sets
+//                                    the flag again, and from the next one on
+//   rs_mods_mount_holding()          is 1: the update takes no step, and clears the flag once
+//   rs_mods_mount_waiting()          is 0: the manifests are in, or none has come for 5 s.
+//   rs_mods_mount_end()              last, in the update that found the flag set and leaves it clear: the log's
+//                                    lines, and the mounting's state is gone.
+int rs_mods_mount_frame(int installing);
 void rs_mods_mounting(int on);
+void rs_mods_mount_took(void);
+int rs_mods_mount_loading(uint64_t left);
+int rs_mods_mount_listed(void);
+int rs_mods_mount_holding(void);
+int rs_mods_mount_waiting(void);
+void rs_mods_mount_end(void);
+// The asset loader thread's pause between two passes, in microseconds: short while archives are mounted in the loop,
+// the game's 10 ms at any other time. For each edition's replacement of the thread's loop (asset_loader_thread).
+unsigned rs_mods_loader_pause_us(void);
 
 // Two players on any input (RS_MODS_MULTIPLAYER), the game's numbers: players count from 0, and a player's input
 // mode (input_mode) is 0 Real Tone cable, 1 microphone, 2 disconnected, 3 Direct Connect, 4 not set. The fix takes a

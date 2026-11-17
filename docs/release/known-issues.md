@@ -15,6 +15,10 @@ into the notes as it stands. -->
 - **Played briefly:** the fixes from the code review of 2026-11-09 that 1.14.0 added were played with a guitar for a
   few songs in each edition, not in a long session or in every mode. If the game misbehaves after updating,
   `logs/last-run.log` says why; please open an issue with it.
+- **Not tried with an account that owns them:** the first Rocksmith's DLC songs show for the DLC a copy or refresh
+  finds as owned, and no account that owns one was at hand. The search was run against the real Steam with other apps
+  the test account owns, and both editions were played with a DLC named by hand. If songs you own in Steam are missing
+  after **Refresh Game Files**, please open an issue with the installer's log (its `Rocksmith 1 DLC:` lines).
 - The game lists 10 inputs at most. Two interfaces can fill that, and then the built-in microphone isn't listed. A
   `Channel` in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.

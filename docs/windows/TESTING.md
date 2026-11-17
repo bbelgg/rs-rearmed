@@ -14,9 +14,9 @@ ctest names are tests of the root CMake build ([Mac testing](../mac/TESTING.md#t
 | Installer | `python3 -m unittest discover -s win-x86/install -p 'test_*.py'` (also ctest `win-x86.install`) | the install steps with stand-ins made by the test: cabinets and self-extracting exes for the redistributables, a Steam folder and its logs, `file://` downloads, the build with a fake translator and compiler, the app's copy of the game files (`game-copy`, `game-refresh`), the app bundle, cleaning; the committed harvester against its SHA-256. `LP_REDIST_REAL=1` also extracts the real DLLs from this Mac's Steam, `LP_GAME_REAL=<depot folder>` checks a real download |
 | Offline unpack | `python3 -m unittest discover -s win-x86/unpack -p 'test_*.py'` | the seed container and the QEMU capture against a fake GDB stub. With `RS_UNPACK_EXE`, `RS_UNPACK_SEED` (and `RS_UNPACK_SHA256`) also a whole unpack; skipped without them. The release suite `lp.unpack`; not a CTest test |
 | Shader corpus sources | `python3 -m unittest discover -s win-x86/shaders -p 'test_*.py'` (also ctest `win-x86.shaders`) | `lp_shaders` on hand-assembled bytecode at odd offsets: a pair is made for its pixel shader, a shader that isn't there is only counted; `record_programs.py` drops the run's shader numbers and merges. The warm-up itself is `platform.warm.metal` of the [Mac tests](../mac/TESTING.md#tests-in-the-repository) |
-| Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac edition: the app's own copy of the game files, for both editions, on made-up game folders |
+| Game files | `python3 tools/play-native/test_gamefiles.py` (also ctest `play-native.gamefiles`) | shared with the Mac edition: the app's own copy of the game files, for both editions, on made-up game folders; the first Rocksmith's DLC found as owned |
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac edition: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
-| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac edition: `settings.env` and `options.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launchers' readers read the same made-up files and must set and log the same; the same keys in both and in the installer |
+| Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac edition: `settings.env`, `options.env` and the copy's `steam.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launchers' readers read the same made-up files and must set and log the same; the same keys in both and in the installer |
 | Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac edition: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
 | Installer update | `tools/installer/test_update.sh` (also ctest `installer.update`) | shared with the Mac edition: the installer app replacing itself with a signed newer release, and what it refuses ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac edition: what a change calls for, and a release's edits and notes |
@@ -345,9 +345,10 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   `gamefiles.Copier("learn-play", SRC, DEST, dlc_from=[]).run()`, from a clone of the game folder without its
   `.rearmed/`, so `steam.env` and `Update/patcharchives.psarc` come from the real code path; then one run per
   check, each from the title.
-- **Rocksmith 1 songs**: as on the Mac, the same config and route: the search finds The Final Countdown and the
-  run reaches its note highway. `RS_MODS_BYPASS=0` with `RS_STEAM_OWNED` has not been run on Learn & Play, the test
-  account owns none of them; the face's answer both ways is covered by `test_steam32`.
+- **Rocksmith 1 songs** (`RS_STEAM_OWNED`): as on the Mac, the same config and route: the search finds The Final
+  Countdown and the run reaches its note highway, and without the AppID the run stops at the search, which doesn't
+  list the song. The face's answers are covered by `test_steam32`, and how a copy finds the owned ones by the Mac
+  edition's tests, which are this edition's code too.
 - **Files a mod serves**: as on the Mac, with the same dylib.
 - **Mods**: `DIR/probe_mod.dylib` in `<LP_HOME>/mods/` and a script to the note highway, with
   `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:

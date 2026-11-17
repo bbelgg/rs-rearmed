@@ -16,8 +16,8 @@
 #   - the DLC the account owns (the ones Steam installed, recorded in the copy's .rearmed/steam.env with
 #     the language), the free 248750 that custom songs carry and every AppID the copy's dlc/ archives
 #     carry (recorded there too: custom songs show whatever AppID they carry) count as owned, and so does
-#     the first Rocksmith's DLC the account owns (RS_STEAM_OWNED, recorded there at a refresh); set
-#     RS_STEAM_DLC=all (options.env, or launchctl setenv) to own every AppID. The Steam account (its saves and
+#     the first Rocksmith's DLC the account owns (RS_STEAM_OWNED, recorded there at a refresh), with the
+#     ones set by hand beside them (options.env, or launchctl setenv). The Steam account (its saves and
 #     profiles) is the one the copy recorded there too (RS_STEAM_ID: the account whose license has the Mac game),
 #     so logging in to Steam with another account (e.g. one for Learn & Play) changes nothing here; RS_STEAM_ID
 #     the same way picks another. Without Steam's loginusers.vdf (Steam uninstalled) the account
@@ -212,13 +212,46 @@ else
     esac
 fi
 
-# The Steam facts the copy recorded (the installed DLC, the language, the account), unless set already
-# (launchctl setenv). Those four only, as Learn & Play's steam_env_defaults: the file never chooses the Steam
-# layer's mode, folder or library, or keeps the stored credentials (settings.env can't either).
-steam_env=()
-while IFS='=' read -r k v; do
-    [[ $k =~ ^RS_STEAM_(DLC|OWNED|LANGUAGE|ID)$ && -n $v && -z ${!k:-} ]] && steam_env+=(--env "$k=$v")
-done < <(grep -v '^#' "$stage/.rearmed/steam.env" 2>/dev/null)
+# The Steam facts the copy recorded (the installed DLC, the first Rocksmith's DLC found owned, the language, the
+# account), each unless set already (options.env, launchctl setenv). Those four only, as Learn & Play's
+# lp_steam_env_apply: the file never chooses the Steam layer's mode, folder or library, or keeps the stored
+# credentials (settings.env can't either). RS_STEAM_OWNED is the one a value set by hand doesn't replace: its
+# AppIDs are added to the copy's, so a test can make one more DLC count beside the ones found.
+steam_facts() {  # FILE -> steam_env (--env K=V) and steam_log; K set here, and options_args without the
+                 # RS_STEAM_OWNED that steam_env now has
+    steam_env=() steam_log=()
+    local k v id ids a kept found=0 merged=0 by_hand=${RS_STEAM_OWNED:-}
+    ids=(${by_hand//[^0-9]/ })  # the AppIDs set by hand: the numbers in it, however they are separated
+    local hand=${#ids[@]}
+    while IFS='=' read -r k v || [[ -n $k ]]; do
+        v=${v%$'\r'}
+        [[ $k =~ ^RS_STEAM_(DLC|OWNED|LANGUAGE|ID)$ && -n $v ]] || continue
+        if [[ $k == RS_STEAM_OWNED && $by_hand == all ]]; then
+            continue
+        elif [[ $k == RS_STEAM_OWNED ]]; then
+            hand=0 merged=1
+            kept=(${v//[^0-9]/ })
+            found=${#kept[@]}
+            for id in ${ids[@]+"${ids[@]}"}; do
+                [[ ",$v," != *",$id,"* ]] && { v+=,$id; hand=$((hand + 1)); }
+            done
+        elif [[ -n ${!k:-} ]]; then
+            continue
+        fi
+        printf -v "$k" %s "$v"
+        steam_env+=(--env "$k=$v")
+    done < <(grep -v '^#' "$1" 2>/dev/null)
+    if [[ $merged == 1 ]]; then
+        kept=()
+        for a in ${options_args[@]+"${options_args[@]}"}; do
+            if [[ $a == RS_STEAM_OWNED=* ]]; then unset "kept[$((${#kept[@]} - 1))]"; else kept+=("$a"); fi
+        done
+        options_args=(${kept[@]+"${kept[@]}"})
+    fi
+    steam_log=("[steam] first Rocksmith DLC counted as owned: $((found + hand)) ($found found by the copy, $hand more set by hand)")
+    [[ $by_hand != all ]] || steam_log=("[steam] first Rocksmith DLC counted as owned: all (set by hand)")
+}
+steam_facts "$stage/.rearmed/steam.env"
 # The account: RS_STEAM_ID set, else the one the copy recorded (the account whose license has the Mac game,
 # whoever is logged in to Steam now), else without Steam's list of accounts (Steam uninstalled) the account
 # whose saves are here; else the shim takes the account Steam last logged in.
@@ -235,7 +268,8 @@ fi
 [[ -f "$logs/last-run.log" ]] && mv -f "$logs/last-run.log" "$logs/previous-run.log"
 # The game's output is added after these lines (open --stdout appends).
 { [[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}";
-  [[ ${#options_log[@]} == 0 ]] || printf '%s\n' "${options_log[@]}"; } > "$logs/last-run.log"
+  [[ ${#options_log[@]} == 0 ]] || printf '%s\n' "${options_log[@]}";
+  printf '%s\n' "${steam_log[@]}"; } > "$logs/last-run.log"
 # Started through LaunchServices as an app of its own: exec'ing the game from this (LSUIElement)
 # launcher leaves it without a window when the launcher itself was opened from the Finder. The
 # environment comes from launchd plus --env, so nothing else of this shell's leaks in.

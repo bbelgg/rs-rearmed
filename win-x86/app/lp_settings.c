@@ -1,5 +1,6 @@
 // settings.env: the built-in mods switched off in the installer (lp_settings.h).
 // options.env: every other switch the installer's sheet offers (lp_options_keys).
+// The copy's steam.env: the Steam facts the copy recorded (lp_steam_env_apply).
 #include "lp_settings.h"
 
 #include <ctype.h>
@@ -134,6 +135,34 @@ static void each(const char *path, FILE *out) {
   fclose(f);
 }
 
+// The first Rocksmith's DLC that count as owned (lp_steam_env_apply): the copy's, and the ones set by hand that the
+// copy's list lacks. steam_by_hand is RS_STEAM_OWNED as it was set by hand, before the copy's AppIDs joined it:
+// what options.env's line is compared with for the log.
+static int steam_found, steam_hand;
+static char *steam_by_hand;
+
+// The AppIDs of a list: the numbers in it, however they are separated (as the Steam layer reads one).
+static int ids_count(const char *list) {
+  int n = 0;
+  for (const char *p = list; *p;) {
+    p += strcspn(p, "0123456789");
+    size_t len = strspn(p, "0123456789");
+    n += len > 0;
+    p += len;
+  }
+  return n;
+}
+
+static int ids_have(const char *list, const char *id, size_t n) {
+  for (const char *p = list; *p;) {
+    p += strcspn(p, "0123456789");
+    size_t len = strspn(p, "0123456789");
+    if (len == n && !memcmp(p, id, n)) return 1;
+    p += len;
+  }
+  return 0;
+}
+
 static void each_opt(const char *path, FILE *out) {
   FILE *f = fopen(path, "r");
   if (!f) return;
@@ -151,6 +180,7 @@ static void each_opt(const char *path, FILE *out) {
       key[klen] = 0;
     }
     const char *now = what == SWITCH ? getenv(key) : NULL;
+    if (out && now && steam_by_hand && !strcmp(key, "RS_STEAM_OWNED")) now = steam_by_hand;
     int other = now && *now && strcmp(now, v);
     if (!out) {
       if (what == SWITCH && !other) setenv(key, v, 1);
@@ -172,3 +202,55 @@ void lp_settings_apply(const char *path) { each(path, NULL); }
 void lp_settings_log(const char *path, FILE *out) { each(path, out); }
 void lp_options_apply(const char *path) { each_opt(path, NULL); }
 void lp_options_log(const char *path, FILE *out) { each_opt(path, out); }
+
+void lp_steam_env_apply(const char *path) {
+  const char *now = getenv("RS_STEAM_OWNED");
+  char *line = NULL;
+  size_t cap = 0;
+  free(steam_by_hand);
+  steam_by_hand = strdup(now ? now : "");
+  steam_found = 0;
+  steam_hand = ids_count(steam_by_hand);
+  FILE *f = fopen(path, "r");
+  while (f && getline(&line, &cap, f) > 0) {
+    line[strcspn(line, "\r\n")] = 0;
+    char *eq = strchr(line, '=');
+    if (!eq || !eq[1]) continue;
+    *eq = 0;
+    const char *v = eq + 1;
+    if (!strcmp(line, "RS_STEAM_OWNED") && !strcmp(steam_by_hand, "all")) continue;
+    if (!strcmp(line, "RS_STEAM_OWNED")) {
+      char *all = malloc(strlen(v) + strlen(steam_by_hand) + 2);
+      strcpy(all, v);
+      steam_found = ids_count(v);
+      steam_hand = 0;
+      for (const char *p = steam_by_hand; *p;) {
+        size_t skip = strcspn(p, "0123456789"), len = strspn(p + skip, "0123456789");
+        p += skip;
+        if (len && !ids_have(all, p, len)) {
+          strcat(all, ",");
+          strncat(all, p, len);
+          steam_hand++;
+        }
+        p += len;
+      }
+      setenv("RS_STEAM_OWNED", all, 1);
+      free(all);
+      continue;
+    }
+    if (strcmp(line, "RS_STEAM_DLC") && strcmp(line, "RS_STEAM_LANGUAGE") && strcmp(line, "RS_STEAM_ID")) continue;
+    now = getenv(line);
+    if (!now || !*now) setenv(line, v, 1);
+  }
+  if (f) fclose(f);
+  free(line);
+}
+
+void lp_steam_env_log(FILE *out) {
+  if (steam_by_hand && !strcmp(steam_by_hand, "all")) {
+    fprintf(out, "[steam] first Rocksmith DLC counted as owned: all (set by hand)\n");
+    return;
+  }
+  fprintf(out, "[steam] first Rocksmith DLC counted as owned: %d (%d found by the copy, %d more set by hand)\n",
+          steam_found + steam_hand, steam_found, steam_hand);
+}

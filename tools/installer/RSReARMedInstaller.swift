@@ -2305,7 +2305,7 @@ struct BuiltInMod {
 }
 let builtInMods: [BuiltInMod] = [
     BuiltInMod(key: "RS_MODS_BYPASS", title: "Custom songs (CDLC)",
-               detail: "Songs without the game's signature load, as with RSBypass, and every Rocksmith 1 DLC song shows. Off: custom songs are not listed, and of the Rocksmith 1 DLC songs only those Steam says you own."),
+               detail: "Songs without the game's signature load, as with RSBypass. Off: custom songs are not listed."),
     BuiltInMod(key: "RS_MODS_FIXES", title: "Faster loading and other fixes (rs-mac-fixes)",
                detail: "Large song libraries load faster; more keyboard keys, the End key in menus, more open files.",
                lpDetail: "Large song libraries load faster; more open files."),
@@ -2441,9 +2441,9 @@ let optionSpecs: [OptionSpec] = [
                kind: .choice([("Default (the game's setting)", ""), ("Window", "0"), ("Full screen", "1")]), editions: "lp", group: "Picture", advanced: false),
     OptionSpec(key: "RS_D3D9_DISPLAY", title: "Desktop size", detail: "As in 1920x1080. Empty: the screen's.",
                kind: .text(check: fullMatch("^[0-9]+x[0-9]+$"), hint: "1920x1080"), editions: "lp", group: "Picture", advanced: true),
-    OptionSpec(key: "RS_STEAM_DLC", title: "Owned songs", detail: "all, or AppIDs like 248750,258341. Empty: your DLC and every AppID in the copy.",
+    OptionSpec(key: "RS_STEAM_DLC", title: "The game's DLC list (for tests)", detail: "AppIDs like 248750,258341 that count as the game's DLC, in place of the copy's list. Leave empty: the copy's list has your DLC and every song in the copy.",
                kind: .text(check: nil, hint: "AppIDs"), editions: "both", group: "Songs and Steam account", advanced: true),
-    OptionSpec(key: "RS_STEAM_OWNED", title: "First Rocksmith DLC owned", detail: "AppIDs, kept by a copy or refresh that asked Steam. Empty: the copy's.",
+    OptionSpec(key: "RS_STEAM_OWNED", title: "First Rocksmith DLC list (for tests)", detail: "AppIDs of first Rocksmith DLC that count as owned, added to the ones a copy or refresh found. Leave empty: the copy finds the DLC you own.",
                kind: .text(check: nil, hint: "AppIDs"), editions: "both", group: "Songs and Steam account", advanced: true),
     OptionSpec(key: "RS_STEAM_LANGUAGE", title: "Language", detail: "As in german. Empty: the copy's.",
                kind: .text(check: nil, hint: "english"), editions: "both", group: "Songs and Steam account", advanced: true),

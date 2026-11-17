@@ -170,21 +170,29 @@ the game process, and one implementation for both editions.
 
 The songs of `rs1compatibilitydlc` need more. The archive comes with the game and carries the base AppID, but each song
 names the DLC of the first Rocksmith it came from, and the game asks `BIsSubscribedApp` for each and hides the songs of
-those not owned. Steam installs nothing for these, so nothing on disk says who owns them: a copy or refresh asks the
-Steam client, when the edition's account is the one logged in (`rs1_owned` in `gamefiles.py`, a process of its own
-through Valve's library, gone before the game starts). The answer goes into `RS_STEAM_OWNED` in `steam.env`, which the
-Steam layer reports through `BIsSubscribedApp` only: as with real Steam, these are no DLC of this game.
-`.rearmed/rs1-owned.json` keeps it for a refresh with Steam closed or on another account.
+those not owned. The editions keep that rule: a song shows for a DLC that counts as owned, and for no other, with the
+CDLC skip on or off. Steam installs nothing for these DLC, so a copy or refresh looks in every place that can say who
+owns them (`rs1_owned` in `gamefiles.py`), and one yes is enough:
 
-That answer decides only with the CDLC skip off (`RS_MODS_BYPASS=0`). With the skip on, the default, the Steam layer
-says yes to `BIsSubscribedApp` for every DLC of the first Rocksmith (the app ids above 205190 up to 222140, the last
-one the game's own loop takes for one), and every song of the pack shows. That is a decision, not something the
-game or RSBypass was found to do: the original game with RSBypass was reported to list these songs for an account
-Steam says owns none, the game's code shows no way to that but Steam's yes, and the editions are to list them
-too. The rule is in the Steam layer and not a hook beside the mount's (below), because Learn & Play calls
-`BIsSubscribedApp` inline and has no function to hook; the layer reads the mods' switch from the environment as
-the mods do. The first Rocksmith itself (205190), which the game asks about for the disc pack, is not answered
-this way.
+- **The Steam client**, when the edition's account is the one signed in: a process of its own asks
+  `BIsSubscribedApp` through Valve's library with the game's AppID, as the game would, and is gone before the game
+  starts. `.rearmed/rs1-owned.json` keeps the answer for a refresh with Steam closed or on another account. Valve's
+  library names each interface's accessor by its version, and a Steam update moves those on, so the asking takes the
+  newest one there is; the account comes from the same library, or from Steam's log when the library has no way to it.
+- **The account's ownership tickets** (`localconfig.vdf`): a ticket for the DLC itself, or the DLC list in the ticket
+  of the game or of the first Rocksmith.
+- **Steam's package cache** (`appcache/packageinfo.vdf`): a package that has the DLC. Steam keeps there the packages
+  of the licenses of the accounts that signed in to it, so this needs no running Steam; it says an account of this
+  Steam owns the DLC, not which.
+- **The first Rocksmith installed by Steam**: the DLC of its installed depots, in any Steam library.
+
+The sum goes into `RS_STEAM_OWNED` in `steam.env`, which the Steam layer reports through `BIsSubscribedApp` only: as
+with real Steam, these are no DLC of this game. The copy says what each place found, one `Rocksmith 1 DLC:` line each,
+and names every DLC that counts with its songs and the places that have it; `.rearmed/rs1-dlc.txt` lists every DLC of
+the archive. AppIDs set by hand (`RS_STEAM_OWNED` in `options.env`, the installer's "First Rocksmith DLC list (for
+tests)") are a test's way to make a DLC count: the launcher adds them to the copy's, where a value set by hand takes
+the place of the copy's for the other three keys. It logs how many count at each start
+(`[steam] first Rocksmith DLC counted as owned`).
 
 ## Online services
 
@@ -213,7 +221,9 @@ with the same guard when it has mods to load ([Windows design](../windows/DESIGN
 
 **What the launcher passes.** The launcher gives the game four keys of `game/.rearmed/steam.env` and no others
 (`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`): the file never chooses the Steam layer's mode,
-folder or library, or keeps the stored credentials. The game's `Rocksmith.ini` is the one it saved itself (the first
+folder or library, or keeps the stored credentials. Each is passed unless it is set already (`options.env`,
+`launchctl setenv`), except `RS_STEAM_OWNED`, where the AppIDs set by hand are added to the file's
+([Steam](#steam)). The game's `Rocksmith.ini` is the one it saved itself (the first
 time, the copy of the install's), with `[Net] AutoLogin=0` and `[Renderer.MacOS] DisableBrowser=1` forced at every
 launch, also in a file that lacks the key or its section; with no file at all the launcher writes one with just those.
 

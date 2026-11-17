@@ -26,3 +26,15 @@ void lp_settings_log(const char *path, FILE *out);
 // options.env: the same, with "[options] ..." lines.
 void lp_options_apply(const char *path);
 void lp_options_log(const char *path, FILE *out);
+
+// game/.rearmed/steam.env, the Steam facts the copy recorded: RS_STEAM_DLC, RS_STEAM_OWNED, RS_STEAM_LANGUAGE and
+// RS_STEAM_ID lines only (the file never chooses the Steam layer's folder or keeps the stored credentials), each
+// set unless the environment has it, as the Mac launcher's steam_facts. RS_STEAM_OWNED, the first Rocksmith's DLC
+// found owned, is the one a value set by hand (options.env, the environment) doesn't replace: its AppIDs are added
+// to the copy's, so a test can make one more DLC count beside the ones found. Lines of any length:
+// RS_STEAM_DLC lists every owned DLC and every AppID the song archives carry. After lp_options_apply.
+void lp_steam_env_apply(const char *path);
+
+// One "[steam] ..." line, in the Mac launcher's words: how many of the first Rocksmith's DLC count as owned, and
+// how many of them the copy found and how many were set by hand. After lp_steam_env_apply.
+void lp_steam_env_log(FILE *out);

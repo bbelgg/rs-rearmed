@@ -58,8 +58,8 @@ and the Learn & Play app put in the game's environment unless already set: the D
 and the language, from Steam's appmanifest (the offline Steam layer reads Steam's folder for them otherwise),
 with the AppIDs the copy's dlc/ archives carry, so custom songs show whatever AppID they carry;
 and, for Learn & Play, the DLC the account's ownership ticket lists; RS_STEAM_OWNED, the first Rocksmith's DLC the
-account owns, asked of the Steam client when that account is logged in (rs1-owned.json keeps the answer; the
-game goes by it only with the CDLC skip off, RS_MODS_BYPASS=0: with the skip on every song of them shows); and
+account owns, by the Steam client when that account is logged in (rs1-owned.json keeps the answer) and by Steam's
+files (rs1-dlc.txt lists every such DLC with its songs); and
 RS_STEAM_ID, the Steam account the edition
 plays as: the account whose Steam license has the edition's
 depot, so another account logged in to Steam later doesn't change the saves, profiles and songs. RS_STEAM_ID
@@ -500,8 +500,8 @@ def ticket_licenses(hexticket, app=APP_ID):
         return set()
 
 
-def package_depots(packageinfo):
-    """{package id: set of depot ids} from Steam's binary appcache/packageinfo.vdf (v28+: per package its id,
+def _packages(packageinfo):
+    """{package id: its key-values} from Steam's binary appcache/packageinfo.vdf (v28+: per package its id,
     SHA-1, change number, access token, then binary key-values)."""
     try:
         with open(packageinfo, "rb") as f:
@@ -546,11 +546,28 @@ def package_depots(packageinfo):
             i += 4 + 20 + 4 + (8 if token else 0)
             body, i = kv(i)
             pkg = next(iter(body.values()), {}) if body else {}
-            depots = pkg.get("depotids", {}) if isinstance(pkg, dict) else {}
-            out[pid] = {v for v in depots.values() if isinstance(v, int)}
+            out[pid] = pkg if isinstance(pkg, dict) else {}
     except (ValueError, IndexError, struct.error):
         pass
     return out
+
+
+def _package_ids(packageinfo, key):
+    out = {}
+    for pid, pkg in _packages(packageinfo).items():
+        ids = pkg.get(key, {})
+        out[pid] = {v for v in ids.values() if isinstance(v, int)} if isinstance(ids, dict) else set()
+    return out
+
+
+def package_depots(packageinfo):
+    """{package id: set of depot ids} from Steam's package cache."""
+    return _package_ids(packageinfo, "depotids")
+
+
+def package_apps(packageinfo):
+    """{package id: set of AppIDs} from Steam's package cache."""
+    return _package_ids(packageinfo, "appids")
 
 
 def steam_accounts(steam, app=APP_ID):
@@ -1642,60 +1659,81 @@ def steam_account_name(steam, account):
 #
 # The RS1 compatibility pack comes with the game and carries the base game's AppID, but the game lists one of its
 # songs only when Steam says the account owns the DLC of the first Rocksmith the song came from: DLCRS1Key's WIN32
-# in the song's manifest (the game asks for each with BIsSubscribedApp). Steam installs nothing for those, and its
-# files keep no ticket for an app that never ran, so only the Steam client knows. So a copy or refresh asks it, once,
-# when the edition's account is the one logged in: the answers go into steam.env's RS_STEAM_OWNED, for the offline
-# Steam layer, and .rearmed/rs1-owned.json keeps them for a refresh with Steam closed or on another account. The
-# asking is a process of its own, gone before the game starts: the game itself never talks to Steam.
-#
-# The Steam layer goes by the answer only with the built-in CDLC skip off (RS_MODS_BYPASS=0). With the skip on,
-# as it is unless the player switched it off, it says yes for every DLC of the first Rocksmith and every song
-# of the pack shows (shims/steam/src/interfaces.cpp), so what is said here names the switch.
+# in the song's manifest (the game asks for each with BIsSubscribedApp). Steam installs nothing for those. A copy
+# or refresh takes a DLC for owned when any of these says so, and says in its output what each found:
+#   - the Steam client, asked as the game asks it, when the edition's account is the one logged in. The asking is
+#     a process of its own, gone before the game starts: the game itself never talks to Steam. .rearmed/
+#     rs1-owned.json keeps the answer for a refresh with Steam closed or on another account;
+#   - the account's ownership tickets in Steam's localconfig.vdf: one for the DLC itself, or the DLC list of this
+#     game's or the first Rocksmith's;
+#   - Steam's package cache (appcache/packageinfo.vdf), which holds the packages of the licenses of the accounts
+#     that logged in to this Steam: a package with the DLC in it. It says an account of this Steam owns the DLC,
+#     not which, and it is there with Steam closed;
+#   - the first Rocksmith installed in a Steam library: the DLC of its installed depots.
+# The sum goes into steam.env's RS_STEAM_OWNED, for the offline Steam layer, and .rearmed/rs1-dlc.txt lists every
+# DLC of the pack with its AppID and songs. AppIDs set by hand (RS_STEAM_OWNED in options.env, a test's way to
+# make a DLC count) are added to the copy's by the launchers.
 
+RS1_APP = 205190
 RS1_PACK = "rs1compatibilitydlc_"
 RS1_OWNED = "rs1-owned.json"
+RS1_LIST = "rs1-dlc.txt"
+RS1 = "Rocksmith 1 DLC: "
 ASK_TIMEOUT = 30
 ASK_MARK = "owned-apps:"
 
 # argv: Valve's library; the AppIDs, as JSON, on stdin. Prints ASK_MARK and {"account": ..., "apps": [...]} as JSON.
-ASK_STEAM = r'''
+# The library names each interface's accessor by its version (SteamAPI_SteamUser_v024), and a Steam update moves
+# those on: the newest one there is taken, whatever its number. BIsSubscribedApp and GetSteamID have kept their
+# form since the game's own versions (008 and 017). Without an accessor for the user the account is null, and the
+# caller goes by the account Steam's own log says is signed in.
+ASK_STEAM = r"""
 import ctypes, json, sys
 ids = json.load(sys.stdin)
 L = ctypes.CDLL(sys.argv[1])
-def newest(prefix, versions):
-    for v in versions:
-        if hasattr(L, prefix + v):
-            f = getattr(L, prefix + v)
+def newest(prefix, last, first):
+    for v in range(last, first - 1, -1):
+        if hasattr(L, "%s%03d" % (prefix, v)):
+            f = getattr(L, "%s%03d" % (prefix, v))
             f.restype = ctypes.c_void_p
             return f()
-    sys.exit("no " + prefix)
+    return None
 L.SteamAPI_InitSafe.restype = ctypes.c_bool
 if not L.SteamAPI_InitSafe():
     sys.exit("SteamAPI_InitSafe failed")
-apps = newest("SteamAPI_SteamApps_v", ("009", "008"))
-user = newest("SteamAPI_SteamUser_v", ("023", "021"))
-L.SteamAPI_ISteamUser_GetSteamID.argtypes = [ctypes.c_void_p]
-L.SteamAPI_ISteamUser_GetSteamID.restype = ctypes.c_uint64
+apps = newest("SteamAPI_SteamApps_v", 99, 8)
+if not apps:
+    sys.exit("Valve's library has no SteamAPI_SteamApps_v008 or later")
+user = newest("SteamAPI_SteamUser_v", 99, 17)
+account = None
+if user:
+    L.SteamAPI_ISteamUser_GetSteamID.argtypes = [ctypes.c_void_p]
+    L.SteamAPI_ISteamUser_GetSteamID.restype = ctypes.c_uint64
+    account = L.SteamAPI_ISteamUser_GetSteamID(user) & 0xFFFFFFFF
 L.SteamAPI_ISteamApps_BIsSubscribedApp.argtypes = [ctypes.c_void_p, ctypes.c_uint32]
 L.SteamAPI_ISteamApps_BIsSubscribedApp.restype = ctypes.c_bool
-out = {"account": L.SteamAPI_ISteamUser_GetSteamID(user) & 0xFFFFFFFF,
-       "apps": [i for i in ids if L.SteamAPI_ISteamApps_BIsSubscribedApp(apps, i)]}
+out = {"account": account, "apps": [i for i in ids if L.SteamAPI_ISteamApps_BIsSubscribedApp(apps, i)]}
 L.SteamAPI_Shutdown()
 print("\n%s%s" % (sys.argv[2], json.dumps(out)), flush=True)
-'''
+"""
 
 
-def rs1_dlc_apps(dest):
-    """The AppIDs of the first Rocksmith's DLC that the songs of the copy's RS1 compatibility pack name, from the
-    pack's song index; none without a readable pack."""
-    if cache_overlay is None:
-        return set()
-    apps = set()
+def rs1_packs(dest):
+    """The names of the copy's RS1 compatibility archives (dlc/rs1compatibilitydlc_*), sorted."""
     try:
-        packs = [n for n in os.listdir(os.path.join(dest, "dlc")) if n.lower().startswith(RS1_PACK)]
+        return sorted(n for n in os.listdir(os.path.join(dest, "dlc")) if n.lower().startswith(RS1_PACK))
     except OSError:
-        return apps
-    for pack in packs:
+        return []
+
+
+def rs1_dlc_songs(dest):
+    """{AppID: [song, ...]}: the DLC of the first Rocksmith that the songs of the copy's RS1 compatibility pack
+    name, each with the songs that need it ("artist - title", sorted), from the pack's song index; empty without
+    a readable pack."""
+    songs = {}
+    if cache_overlay is None:
+        return songs
+    for pack in rs1_packs(dest):
         try:
             p = cache_overlay.Psarc(os.path.join(dest, "dlc", pack))
         except Exception:  # not a psarc, damaged, or no openssl
@@ -1703,14 +1741,21 @@ def rs1_dlc_apps(dest):
         try:
             for name in (n for n in p.names if n.lower().endswith(".hsan")):
                 for entry in json.loads(p.read(name)).get("Entries", {}).values():
-                    for key in entry.get("Attributes", {}).get("DLCRS1Key") or []:
+                    attrs = entry.get("Attributes", {})
+                    title = " - ".join(str(attrs[k]) for k in ("ArtistName", "SongName") if attrs.get(k))
+                    for key in attrs.get("DLCRS1Key") or []:
                         if str(key.get("WIN32", "")).isdigit():
-                            apps.add(int(key["WIN32"]))
+                            songs.setdefault(int(key["WIN32"]), set()).update([title] if title else [])
         except Exception:
             pass
         finally:
             p.close()
-    return apps
+    return {app: sorted(names) for app, names in songs.items()}
+
+
+def rs1_dlc_apps(dest):
+    """The AppIDs of the first Rocksmith's DLC that the songs of the copy's RS1 compatibility pack name."""
+    return set(rs1_dlc_songs(dest))
 
 
 def steam_api_library(steam):
@@ -1722,50 +1767,162 @@ def steam_api_library(steam):
 
 
 def ask_steam(steam, apps):
-    """{"account": id, "apps": [...]}: which of APPS the account logged in to the running Steam owns; None when
-    Steam can't say."""
+    """{"account": id, "apps": [...]}: which of APPS the account logged in to the running Steam owns (the id is
+    None when Valve's library has no way to it). When Steam can't say, {"error": why}."""
     lib = steam_api_library(steam)
     if not lib:
-        return None
+        return {"error": "Valve's library is not in the Steam app"}
     try:
         r = subprocess.run([sys.executable, "-I", "-c", ASK_STEAM, lib, ASK_MARK], input=json.dumps(sorted(apps)),
                            capture_output=True, text=True, timeout=ASK_TIMEOUT, cwd=steam,
                            env=dict(os.environ, SteamAppId=str(APP_ID), SteamGameId=str(APP_ID)))
-    except (OSError, subprocess.SubprocessError):
-        return None
+    except subprocess.TimeoutExpired:
+        return {"error": "no answer in %d seconds" % ASK_TIMEOUT}
+    except (OSError, subprocess.SubprocessError) as e:
+        return {"error": str(e)}
     for line in r.stdout.splitlines():
         if line.startswith(ASK_MARK):
             try:
                 out = json.loads(line[len(ASK_MARK):])
-                return {"account": int(out["account"]), "apps": [int(a) for a in out["apps"]]}
+                return {"account": None if out["account"] is None else int(out["account"]),
+                        "apps": [int(a) for a in out["apps"]]}
             except (ValueError, KeyError, TypeError):
-                return None
-    return None
+                return {"error": "an answer that can't be read"}
+    last = [line.strip() for line in r.stderr.splitlines() if line.strip()]
+    return {"error": last[-1][:200] if last else "the asking ended with status %d" % r.returncode}
+
+
+def rs1_tickets(steam, account, apps):
+    """Those of APPS that ACCOUNT's ownership tickets show (localconfig.vdf: Steam's own file, the signed part of
+    it, and nothing to do with signing in): a ticket for the DLC itself, or the DLC list in the ticket of this
+    game or of the first Rocksmith."""
+    try:
+        with open(os.path.join(steam, "userdata", str(account), "config", "localconfig.vdf"), errors="replace") as f:
+            block = _vdf_block(f.read(), "apptickets")
+    except OSError:
+        return set()
+    out = set()
+    for m in re.finditer(r'"(\d+)"\s+"([0-9a-fA-F]+)"', block):
+        app = int(m.group(1))
+        if app in apps and ticket_licenses(m.group(2), app):
+            out.add(app)
+        elif app in (APP_ID, RS1_APP):
+            out |= apps & set(ticket_dlc(m.group(2), app) or [])
+    return out
+
+
+def rs1_packages(steam, apps):
+    """Those of APPS that a package of Steam's package cache has (appcache/packageinfo.vdf). Steam keeps there the
+    packages of the licenses of the accounts that logged in to it, so an account of this Steam owns them; the
+    cache doesn't say which account."""
+    out = set()
+    for ids in package_apps(os.path.join(steam, "appcache", "packageinfo.vdf")).values():
+        out |= apps & ids
+    return out
+
+
+def rs1_installed(steam, apps):
+    """Those of APPS that Steam installed with the first Rocksmith: the DLC of the installed depots in its
+    appmanifest, in any Steam library (Steam installs only DLC the account owns)."""
+    out = set()
+    for lib in library_folders(steam):
+        try:
+            with open(os.path.join(lib, "steamapps", "appmanifest_%d.acf" % RS1_APP), errors="replace") as f:
+                out |= apps & {int(m) for m in re.findall(r'"dlcappid"\s+"(\d+)"', f.read())}
+        except OSError:
+            pass
+    return out
 
 
 def rs1_owned(steam, dest, account, say=lambda text: None):
-    """The first Rocksmith's DLC ACCOUNT owns, of the DLC the copy's RS1 compatibility pack names: asked of Steam
-    when that account is logged in, else what an earlier copy found. Sorted; empty when nothing is known."""
-    apps = rs1_dlc_apps(dest)
-    if not apps or not account:
+    """The first Rocksmith's DLC that count as owned, of the DLC the copy's RS1 compatibility pack names: what any
+    of the sources above says, for ACCOUNT where the source knows the account. Sorted; empty when nothing is
+    known. SAY gets what was looked at and what each source found."""
+    packs = rs1_packs(dest)
+    if not packs:
+        say(RS1 + "the copy has no %s archive in dlc, so the game has none of these songs." % (RS1_PACK + "*"))
         return []
+    songs = rs1_dlc_songs(dest)
+    apps = set(songs)
+    if not apps:
+        say(RS1 + "%s could not be read (the archives' key is not at hand yet, or the file is damaged), so which "
+            "DLC its songs need is not known." % ", ".join(packs))
+        return []
+    say(RS1 + "%s has %d songs from %d DLC of the first Rocksmith. The game shows a song when its DLC counts as "
+        "owned." % (", ".join(packs), len({s for names in songs.values() for s in names}), len(apps)))
+    name = steam_account_name(steam, account) if account else "no account"
+    found = {}  # AppID: the sources that have it
+
+    def add(source, ids):
+        for a in ids:
+            found.setdefault(a, []).append(source)
+
+    # The Steam client
     path = os.path.join(dest, META, RS1_OWNED)
     known = read_json(path)
-    known = set(known.get("apps", [])) if isinstance(known, dict) and known.get("account") == account else None
+    known = set(known.get("apps", [])) & apps if isinstance(known, dict) and known.get("account") == account else None
     state = steam_state(steam)
-    if state.online and state.account == account:
-        answer = ask_steam(steam, apps)
-        if answer and answer["account"] == account:
-            write_json(path, {"format": FORMAT, "account": account, "apps": sorted(answer["apps"])})
-            say("Rocksmith 1 DLC: Steam says this account owns %d of the %d the game knows. The game shows all %d "
-                "unless custom songs (CDLC) are switched off." % (len(answer["apps"]), len(apps), len(apps)))
-            return sorted(answer["apps"])
-    if known is None:
-        say("Rocksmith 1 DLC: Steam was not asked which of them %s owns. The game shows all %d unless custom songs "
-            "(CDLC) are switched off; for that case, have that account logged in to Steam and refresh the game "
-            "files." % (steam_account_name(steam, account), len(apps)))
-        return []
-    return sorted(known & apps)
+    asked = None
+    if not account:
+        say(RS1 + "Steam was not asked: no Steam account was found for this edition.")
+    elif not state.running:
+        say(RS1 + "Steam was not asked: it is not open.")
+    elif not state.online:
+        say(RS1 + "Steam was not asked: it is open, but not signed in.")
+    elif state.account != account:
+        say(RS1 + "Steam was not asked: it is signed in as %s, and this edition plays as %s."
+            % (state.name or "another account", name))
+    else:
+        answer = ask_steam(steam, apps) or {"error": "no answer"}
+        if "error" in answer:
+            say(RS1 + "Steam was asked and gave no answer (%s)." % answer["error"])
+        elif answer["account"] not in (account, None):  # None: Steam's log named the account, just above
+            say(RS1 + "Steam answered for another account than %s; the answer is not used." % name)
+        else:
+            asked = set(answer["apps"]) & apps
+            write_json(path, {"format": FORMAT, "account": account, "apps": sorted(asked)})
+            say(RS1 + "Steam, asked as the game asks it, says %s owns %d of the %d." % (name, len(asked), len(apps)))
+    if asked is not None:
+        add("Steam", asked)
+    elif known is not None:
+        add("Steam, at an earlier refresh", known)
+        say(RS1 + "an earlier refresh asked Steam, which said %s owns %d of the %d; that answer is kept."
+            % (name, len(known), len(apps)))
+
+    # Steam's files
+    tickets = rs1_tickets(steam, account, apps) if account else set()
+    cached = rs1_packages(steam, apps)
+    installed = rs1_installed(steam, apps)
+    add("ownership ticket", tickets)
+    add("package cache", cached)
+    add("installed with the first Rocksmith", installed)
+    say(RS1 + "Steam's files show %d by the ownership tickets of %s, %d in the package cache (the licenses of the "
+        "accounts that used this Steam) and %d installed with the first Rocksmith."
+        % (len(tickets), name, len(cached), len(installed)))
+
+    owned = sorted(found)
+    listing = os.path.join(dest, META, RS1_LIST)
+    try:
+        with open(listing + TMP_SUFFIX, "w") as f:
+            f.write("# The DLC of the first Rocksmith whose songs are in this copy (%s), from the last copy or\n"
+                    "# refresh. The game shows a song when its DLC counts as owned: the ones Steam or its files\n"
+                    "# show, marked yes below.\n"
+                    "# AppID   owned   songs\n" % ", ".join(packs))
+            for a in sorted(apps):
+                f.write("%-8d  %-5s   %s\n" % (a, "yes" if a in found else "-", "; ".join(songs[a])))
+        os.replace(listing + TMP_SUFFIX, listing)
+    except OSError:
+        listing = None
+    if owned:
+        say(RS1 + "%d of the %d count as owned, and the game shows their songs:" % (len(owned), len(apps)))
+        for a in owned:
+            say("  %d  %s  (%s)" % (a, "; ".join(songs[a]) or "?", ", ".join(found[a])))
+    else:
+        say(RS1 + "none counts as owned, so the game shows none of these songs. If %s owns some in Steam, sign in "
+            "to that account in Steam and refresh the game files." % (name if account else "your account"))
+    if listing:
+        say(RS1 + "every DLC of the pack is listed with its AppID and songs in %s." % listing)
+    return owned
 
 
 class SteamState:

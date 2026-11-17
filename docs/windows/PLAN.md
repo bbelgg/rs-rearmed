@@ -21,8 +21,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB
   ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The title is up in about 7 s. Guest memory doesn't grow
   over songs in a row.
-- **Rocksmith 1 songs**: by the Mac edition's rule: the DLC pack's all show while the CDLC skip is on (new in 1.17.0),
-  and one was found by a search and played to the note highway.
+- **Rocksmith 1 songs**: by the Mac edition's rule and code: the DLC pack's show for the DLC that count as owned
+  (not released), found by a copy or refresh from Steam and its files. One was found by a search and played to the
+  note highway with its DLC counted as owned, and was not listed without. 1.17.0 showed all of them while the CDLC
+  skip was on.
 - **Two players**: a song with each player on their own input, as the Mac edition.
 
 **Sound and input**
@@ -205,8 +207,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
   screen on a second display.
 - **Retina, colour and a sharper picture**: run once, full screen on a built-in Retina screen; the upscaled picture
   itself wasn't looked at (snapshots are the back buffer), and nothing was compared with them off.
-- **Rocksmith 1 songs** with the CDLC skip off (`RS_MODS_BYPASS=0`, `RS_STEAM_OWNED`) in a game run: the test
-  account owns none (`test_steam32` covers the answer both ways).
+- **Rocksmith 1 DLC found as owned** (not released): as in the [Mac edition](../mac/PLAN.md#open-issues): no account
+  that owns one has been at hand; in the game the DLC was named by hand (`test_steam32` covers the face's answers,
+  `test_settings.py` the AppIDs set by hand).
 - **Game Mode**: that macOS leaves it off for this app.
 - **Present but not tested**: the Workshop's other screens, the DLC preview, and the prebuilt harvester
   (`win-x86/harvest/rsharvest2.exe`).

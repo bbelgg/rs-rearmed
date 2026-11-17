@@ -27,9 +27,9 @@ HARNESS = r"""
 #include <stdlib.h>
 #include "lp_settings.h"
 int main(int argc, char **argv) {
-  (void)argc;
   lp_settings_apply(argv[1]);
   lp_options_apply(argv[2]);
+  if (argc > 3) lp_steam_env_apply(argv[3]);
   for (int i = 0; lp_settings_keys[i]; i++) {
     const char *v = getenv(lp_settings_keys[i]);
     if (v && *v) printf("%s=%s\n", lp_settings_keys[i], v);
@@ -40,6 +40,7 @@ int main(int argc, char **argv) {
   }
   lp_settings_log(argv[1], stdout);
   lp_options_log(argv[2], stdout);
+  if (argc > 3) lp_steam_env_log(stdout);
   const char *g = getenv("RS_NETGUARD");
   printf("RS_NETGUARD=%s\n", g ? g : "unset");
   return 0;
@@ -50,10 +51,13 @@ set -u
 eval "$SNIPPET"
 settings_env "$1"
 options_env "$2"
+steam_log=()
+[[ $# -lt 3 ]] || steam_facts "$3"
 for k in "${settings_keys[@]}"; do [[ -n ${!k:-} ]] && echo "$k=${!k}"; done
 for k in "${options_keys[@]}"; do [[ -n ${!k:-} ]] && echo "$k=${!k}"; done
 [[ ${#settings_log[@]} == 0 ]] || printf '%s\n' "${settings_log[@]}"
 [[ ${#options_log[@]} == 0 ]] || printf '%s\n' "${options_log[@]}"
+[[ ${#steam_log[@]} == 0 ]] || printf '%s\n' "${steam_log[@]}"
 echo "RS_NETGUARD=${RS_NETGUARD-unset}"
 """
 # The Mac launcher's --env pairs: what open gives the game besides launchd's environment, one word a line.
@@ -62,6 +66,9 @@ set -u
 eval "$SNIPPET"
 settings_env "$1"
 options_env "$2"
+steam_env=()
+[[ $# -lt 3 ]] || steam_facts "$3"
+[[ ${#steam_env[@]} == 0 ]] || printf '%s\n' "${steam_env[@]}"
 [[ ${#settings_args[@]} == 0 ]] || printf '%s\n' "${settings_args[@]}"
 [[ ${#options_args[@]} == 0 ]] || printf '%s\n' "${options_args[@]}"
 """
@@ -80,8 +87,10 @@ def launch_snippet():
     toggles = re.search(r'^options_toggles=".*"$', src, re.M)
     fn = re.search(r"^settings_env\(\) \{.*?^\}$", src, re.M | re.S)
     ofn = re.search(r"^options_env\(\) \{.*?^\}$", src, re.M | re.S)
-    assert keys and okeys and toggles and fn and ofn, "launch.sh has no settings/options readers"
-    return "\n".join([keys.group(0), okeys.group(0), toggles.group(0), fn.group(0), ofn.group(0)]) + "\n"
+    sfn = re.search(r"^steam_facts\(\) \{.*?^\}$", src, re.M | re.S)
+    assert keys and okeys and toggles and fn and ofn and sfn, "launch.sh has no settings/options readers"
+    return "\n".join([keys.group(0), okeys.group(0), toggles.group(0), fn.group(0), ofn.group(0),
+                      sfn.group(0)]) + "\n"
 
 
 def launch_keys():
@@ -176,6 +185,16 @@ class Used(unittest.TestCase):
         self.assertRegex(src, r'(?s)\$\{settings_args\[@\]\+"\$\{settings_args\[@\]\}"\}[^\n]*\\\n'
                               r'\s*\$\{options_args\[@\]\+"\$\{options_args\[@\]\}"\} \\\n\s*--stdout ')
 
+    def test_both_read_the_copys_steam_facts_after_the_options_and_log_them(self):
+        src = read(LAUNCH)
+        at = [src.index(s) for s in ('\noptions_env "$HOME_DIR/options.env"', '\nsteam_facts "$stage/.rearmed/steam.env"',
+                                     'printf \'%s\\n\' "${steam_log[@]}"', "exec /usr/bin/open")]
+        self.assertEqual(at, sorted(at))
+        src = read(os.path.join(LP_DIR, "lp_main.c"))
+        at = [src.index(s) for s in ("lp_options_apply(options)", "installed_defaults()", "lp_steam_env_log(stderr)")]
+        self.assertEqual(at, sorted(at))
+        self.assertIn("lp_steam_env_apply(steam_env)", src)
+
     def test_learn_and_play_reads_both_files_before_the_mods_guard(self):
         src = read(os.path.join(LP_DIR, "lp_main.c"))
         at = [src.index(s) for s in ("lp_settings_apply(settings)", "lp_options_apply(options)", "mods_guard(argv)")]
@@ -216,18 +235,20 @@ class Readers(unittest.TestCase):
     def env(self, env=None):
         return dict({"PATH": "/usr/bin:/bin", "HOME": self.tmp}, **(env or {}))
 
-    def run_both(self, settings_content, options_content=None, env=None):
-        """Both readers on files with the contents (None: no file), with ENV; their outputs, which must agree."""
+    def run_both(self, settings_content, options_content=None, env=None, steam_content=None):
+        """Both readers on files with the contents (None: no file), with ENV; their outputs, which must agree.
+        With STEAM_CONTENT, also the copy's steam.env with it ("": no such file)."""
         spath = self.write(settings_content)
         opath = self.write(options_content)
+        files = [spath, opath] + ([] if steam_content is None else [self.write(steam_content or None)])
         base = self.env(env)
-        mac = subprocess.run(["/bin/bash", "-c", BASH, "test", spath, opath], capture_output=True, text=True,
+        mac = subprocess.run(["/bin/bash", "-c", BASH, "test"] + files, capture_output=True, text=True,
                              env=dict(base, SNIPPET=launch_snippet()))
         self.assertEqual(mac.returncode, 0, mac.stderr)
         self.assertEqual(mac.stderr, "")
         if self.cc_error:
             self.fail("lp_settings.c did not compile: " + self.cc_error)
-        lp = subprocess.run([self.lp, spath, opath], capture_output=True, text=True, env=base)
+        lp = subprocess.run([self.lp] + files, capture_output=True, text=True, env=base)
         self.assertEqual(lp.returncode, 0, lp.stderr)
         self.assertEqual(mac.stdout, lp.stdout, "the Mac and Learn & Play readers disagree")
         return mac.stdout.splitlines()
@@ -283,6 +304,69 @@ class Readers(unittest.TestCase):
         self.assertEqual(out, ["RS_AUDIO_FRAMES=128", "RS_METAL_MSAA=2", "RS_STEAM_DLC=all",
                                "[options] RS_METAL_MSAA=2", "[options] RS_AUDIO_FRAMES=128",
                                "[options] RS_STEAM_DLC=all", "RS_NETGUARD=unset"])
+
+    STEAM_ENV = ("# the game's Steam facts\n# RS_STEAM_ID: the license\nRS_STEAM_DLC=248750,258341\n"
+                 "RS_STEAM_LANGUAGE=german\nRS_STEAM_OWNED=206166,222041\nRS_STEAM_ID=76561197960277777\n"
+                 "RS_STEAM_MODE=real\nRS_NETGUARD=log\n")
+
+    def test_the_copys_steam_facts(self):
+        # the four the copy records, and nothing else a steam.env might say
+        out = self.run_both(None, None, None, self.STEAM_ENV)
+        self.assertEqual(out, ["RS_STEAM_DLC=248750,258341", "RS_STEAM_OWNED=206166,222041",
+                               "RS_STEAM_LANGUAGE=german", "RS_STEAM_ID=76561197960277777",
+                               "[steam] first Rocksmith DLC counted as owned: 2 (2 found by the copy, 0 more set by hand)",
+                               "RS_NETGUARD=unset"])
+
+    def test_first_rocksmith_dlc_set_by_hand_is_added_to_the_copys(self):
+        # options.env, then the environment: beside the ones the copy found, not in their place
+        want = ["RS_STEAM_DLC=248750,258341", "RS_STEAM_OWNED=206166,222041,206090,206091",
+                "RS_STEAM_LANGUAGE=german", "RS_STEAM_ID=76561197960277777"]
+        log = "[steam] first Rocksmith DLC counted as owned: 4 (2 found by the copy, 2 more set by hand)"
+        out = self.run_both(None, "RS_STEAM_OWNED=206090, 222041,206091,\n", None, self.STEAM_ENV)
+        self.assertEqual(out, want + ["[options] RS_STEAM_OWNED=206090, 222041,206091,", log, "RS_NETGUARD=unset"])
+        out = self.run_both(None, None, {"RS_STEAM_OWNED": "206090 222041 206091 206090"}, self.STEAM_ENV)
+        self.assertEqual(out, want + [log, "RS_NETGUARD=unset"])
+        out = self.run_both(None, "RS_STEAM_OWNED=1\n", {"RS_STEAM_OWNED": "206090,206091"}, self.STEAM_ENV)
+        self.assertEqual(out[4], "[options] RS_STEAM_OWNED=1 not used: the environment has RS_STEAM_OWNED=206090,206091")
+
+    def test_mac_game_gets_the_steam_facts_once(self):
+        # the pair with the copy's and the hand-set AppIDs, and no second pair from options.env beside it
+        r = subprocess.run(["/bin/bash", "-c", MAC_ARGS, "test", self.write(None),
+                            self.write("RS_AUDIO_FRAMES=128\nRS_STEAM_OWNED=206090\nRS_METAL_MSAA=2\n"),
+                            self.write(self.STEAM_ENV)],
+                           capture_output=True, text=True, env=dict(self.env(), SNIPPET=launch_snippet()))
+        self.assertEqual(r.returncode, 0, r.stderr)
+        self.assertEqual(r.stderr, "")
+        self.assertEqual(r.stdout.splitlines(), [
+            "--env", "RS_STEAM_DLC=248750,258341", "--env", "RS_STEAM_LANGUAGE=german",
+            "--env", "RS_STEAM_OWNED=206166,222041,206090", "--env", "RS_STEAM_ID=76561197960277777",
+            "--env", "RS_AUDIO_FRAMES=128", "--env", "RS_METAL_MSAA=2"])
+
+    def test_the_other_steam_facts_set_by_hand_replace_the_copys(self):
+        out = self.run_both(None, "RS_STEAM_DLC=none\nRS_STEAM_LANGUAGE=french\n", {"RS_STEAM_ID": "5"}, self.STEAM_ENV)
+        self.assertEqual(out[:4], ["RS_STEAM_DLC=none", "RS_STEAM_OWNED=206166,222041", "RS_STEAM_LANGUAGE=french",
+                                   "RS_STEAM_ID=5"])
+
+    def test_all_set_by_hand_stays_all(self):
+        for options, env in (("RS_STEAM_OWNED=all\n", None), (None, {"RS_STEAM_OWNED": "all"})):
+            out = self.run_both(None, options, env, self.STEAM_ENV)
+            self.assertIn("RS_STEAM_OWNED=all", out)
+            self.assertIn("[steam] first Rocksmith DLC counted as owned: all (set by hand)", out)
+            self.assertFalse([line for line in out if "not used" in line], out)
+        r = subprocess.run(["/bin/bash", "-c", MAC_ARGS, "test", self.write(None), self.write("RS_STEAM_OWNED=all\n"),
+                            self.write(self.STEAM_ENV)],
+                           capture_output=True, text=True, env=dict(self.env(), SNIPPET=launch_snippet()))
+        self.assertEqual([a for a in r.stdout.splitlines() if "OWNED" in a], ["RS_STEAM_OWNED=all"])
+
+    def test_first_rocksmith_dlc_by_hand_alone(self):
+        # a copy that found none (no line, or no steam.env at all)
+        for steam in ("RS_STEAM_DLC=248750\n", ""):
+            out = self.run_both(None, "RS_STEAM_OWNED=206090,206091\n", None, steam)
+            self.assertIn("RS_STEAM_OWNED=206090,206091", out)
+            self.assertIn("[steam] first Rocksmith DLC counted as owned: 2 (0 found by the copy, 2 more set by hand)", out)
+        out = self.run_both(None, None, None, "")
+        self.assertEqual(out, ["[steam] first Rocksmith DLC counted as owned: 0 (0 found by the copy, 0 more set by hand)",
+                               "RS_NETGUARD=unset"])
 
     def test_options_comments_and_blank_lines_silent(self):
         out = self.run_both(None, "# the sheet's file\n\nRS_AUDIO_FRAMES=128\n\n# another\nRS_METAL_MSAA=2\n\n")

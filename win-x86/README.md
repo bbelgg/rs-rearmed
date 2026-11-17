@@ -50,7 +50,7 @@ Win32 seam by name (`shims/win32_dispatch.c`).
   run to the list
 - `online/` — the offline online layer: RSConnect's vtables patched at start-up (`online32.c`)
 - `app/` — `lp_main.c`: load, bind, start, run; `lp_window.m` and `lp_screen.c` (the window and its rules),
-  `lp_settings.c` (`settings.env`, `options.env`)
+  `lp_settings.c` (`settings.env`, `options.env`, the copy's `steam.env`)
 - `crt/`, `d3dx/`, `bink/` — the CRT, D3DX and Bink probes (the DLLs without the game)
 - `test/` — the D3D9 layer's and the window rules' host tests; `shims/tests`, `shims/audio/tests`,
   `shims/steam/tests`, `online/tests` — the seam's

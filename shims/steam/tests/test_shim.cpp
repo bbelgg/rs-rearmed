@@ -147,21 +147,23 @@ int main() {
     const char *dlc_env = getenv("RS_STEAM_DLC");
     bool dlc_all = dlc_env && !strcmp(dlc_env, "all");
     bool dlc_list = dlc_env && !dlc_all;
+    const char *owned_env = getenv("RS_STEAM_OWNED");
+    bool owned_all = owned_env && !strcmp(owned_env, "all");  // BIsSubscribedApp says yes to every app id
     EXPECT(vcall<bool>(apps, 7, (uint32_t)248750));                // BIsDlcInstalled: the free CDLC id
     EXPECT(vcall<bool>(apps, 7, (uint32_t)222000) == dlc_all);     // not listed: owned only with all
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == dlc_all);
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == (dlc_all || owned_all));
     EXPECT(!vcall<bool>(apps, 7, (uint32_t)221680));               // the base game is no DLC
     if (dlc_list) EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));  // BIsSubscribedApp
-    // The first Rocksmith's DLC (the Makefile runs this with RS_MODS_BYPASS=0 too): all of it with the CDLC skip
-    // on, else RS_STEAM_OWNED alone; owned, but no DLC of this game.
-    const char *bypass_env = getenv("RS_MODS_BYPASS");
-    bool rs1_all = !(bypass_env && *bypass_env == '0');
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)206166) == (rs1_all || dlc_all || getenv("RS_STEAM_OWNED") != nullptr));
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)206167) == (rs1_all || dlc_all));
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)222140) == (rs1_all || dlc_all));  // the last id the game takes for one
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)222141) == dlc_all);
-    EXPECT(vcall<bool>(apps, 6, (uint32_t)205190) == dlc_all);               // the first Rocksmith itself
-    EXPECT(vcall<bool>(apps, 7, (uint32_t)206166) == dlc_all);               // BIsDlcInstalled
+    // The first Rocksmith's DLC, which the game asks about for each song of the RS1 compatibility pack: the ones of
+    // RS_STEAM_OWNED (the Makefile's 206166,222041), and every one with RS_STEAM_OWNED=all or RS_STEAM_DLC=all;
+    // owned, but no DLC of this game. No other is, with the built-in CDLC skip on (as here, RS_MODS_BYPASS unset)
+    // or off.
+    bool rs1_listed = owned_env != nullptr;
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)206166) == (rs1_listed || dlc_all));
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)222041) == (rs1_listed || dlc_all));
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)206167) == (owned_all || dlc_all));  // not in the list
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)205190) == (owned_all || dlc_all));  // the first Rocksmith itself
+    EXPECT(vcall<bool>(apps, 7, (uint32_t)206166) == dlc_all);                 // BIsDlcInstalled
     if (dlc_list) {
         EXPECT(vcall<int>(apps, 10) == 2);                             // GetDLCCount
         uint32_t dlc_id = 0;

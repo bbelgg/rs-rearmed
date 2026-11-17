@@ -142,22 +142,24 @@ int main(void) {
   uint32_t apps = (uint32_t)vcall(client, 15, 3, (uint32_t[]){1, 1, gs("STEAMAPPS_INTERFACE_VERSION008")});
   CHECK(vcall(apps, 6, 1, (uint32_t[]){221680}) == 1);
   CHECK(vcall(apps, 6, 1, (uint32_t[]){258341}) == 1);
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){12345}) == 0);
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){206166}) == 1);  // RS_STEAM_OWNED: owned, but no DLC of this game
-  CHECK(vcall(apps, 7, 1, (uint32_t[]){206166}) == 0);
-  // The rest of the first Rocksmith's DLC: with the CDLC skip on (the Makefile runs this with RS_MODS_BYPASS=0 too)
-  const char *bypass = getenv("RS_MODS_BYPASS");
-  int rs1_all = !(bypass && *bypass == '0');
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){206167}) == rs1_all);
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){222140}) == rs1_all);  // the last id the game takes for one
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){222141}) == 0);
-  CHECK(vcall(apps, 6, 1, (uint32_t[]){205190}) == 0);        // the first Rocksmith itself
-  CHECK(vcall(apps, 7, 1, (uint32_t[]){206167}) == 0);
+  // (the Makefile runs this with RS_STEAM_DLC a list and RS_STEAM_OWNED=206166, with that list and RS_STEAM_OWNED=all,
+  // then with RS_STEAM_DLC=all and no RS_STEAM_OWNED)
+  const char *dlc_env = getenv("RS_STEAM_DLC"), *owned_env = getenv("RS_STEAM_OWNED");
+  int all = dlc_env && !strcmp(dlc_env, "all"), owned_all = owned_env && !strcmp(owned_env, "all");
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){12345}) == (all || owned_all));
+  // The first Rocksmith's DLC, for the songs of the RS1 compatibility pack: the one RS_STEAM_OWNED names, and with
+  // either all every one; owned, but no DLC of this game. No other is, with the CDLC skip on as here.
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){206166}) == 1);
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){206167}) == (all || owned_all));
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){205190}) == (all || owned_all));  // the first Rocksmith itself
+  CHECK(vcall(apps, 7, 1, (uint32_t[]){206166}) == all);
   CHECK(vcall(apps, 7, 1, (uint32_t[]){221680}) == 0);  // BIsDlcInstalled: not the base app
-  CHECK(vcall(apps, 10, 0, 0) == 2);
   uint32_t out = w32_galloc(16);
-  CHECK(vcall(apps, 11, 5, (uint32_t[]){1, out, out + 4, 0, 0}) == 1);
-  CHECK(rd(out) == 258341 && (rd(out + 4) & 0xff) == 1);
+  if (!all) {
+    CHECK(vcall(apps, 10, 0, 0) == 2);
+    CHECK(vcall(apps, 11, 5, (uint32_t[]){1, out, out + 4, 0, 0}) == 1);
+    CHECK(rd(out) == 258341 && (rd(out + 4) & 0xff) == 1);
+  }
 
   // ISteamUserStats: a stat round trip, RequestCurrentStats -> UserStatsReceived_t (1101)
   uint32_t stats = (uint32_t)vcall(client, 13, 3, (uint32_t[]){1, 1, gs("STEAMUSERSTATS_INTERFACE_VERSION011")});

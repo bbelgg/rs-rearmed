@@ -165,8 +165,10 @@ class Plan(Base):
 
 
 class Rs1Owned(Base):
-    """The songs of the RS1 compatibility pack need the first Rocksmith's DLC: the Steam client is asked for it when
-    the edition's account is logged in, and the answer is kept for a refresh without it."""
+    """The songs of the RS1 compatibility pack need the first Rocksmith's DLC. A DLC counts as owned when any
+    source says so: the Steam client, asked when the edition's account is logged in (the answer is kept for a
+    refresh without it), the account's ownership tickets, Steam's package cache, or the first Rocksmith installed
+    with it. What each found is said."""
 
     ACCOUNT = 12345
 
@@ -174,14 +176,17 @@ class Rs1Owned(Base):
         super().setUp()
         self.dest = os.path.join(self.tmp, "copy")
         os.makedirs(os.path.join(self.dest, gamefiles.META))
-        index = {"Entries": {"a": {"Attributes": {"DLCRS1Key": [{"360": "x", "WIN32": 206166}]}},
-                             "b": {"Attributes": {"DLCRS1Key": [{"WIN32": "222041"}]}},
+        final = {"ArtistName": "Europe", "SongName": "The Final Countdown", "DLCRS1Key": [{"360": "x", "WIN32": 206166}]}
+        index = {"Entries": {"a": {"Attributes": final}, "a2": {"Attributes": final},  # two arrangements, one song
+                             "b": {"Attributes": {"ArtistName": "B", "SongName": "Two",
+                                                  "DLCRS1Key": [{"WIN32": "222041"}]}},
                              "c": {"Attributes": {"DLCRS1Key": None}}, "d": {"Attributes": {}}}}
-        write(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"), gamefiles.cache_overlay.write_psarc(
+        self.pack = os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc")
+        write(self.pack, gamefiles.cache_overlay.write_psarc(
             [("appid.appid", b"221680"), ("manifests/songs_rs1dlc/songs_rs1dlc.hsan", json.dumps(index).encode())]))
         self.asked = []
         self.answer = {"account": self.ACCOUNT, "apps": [206166]}
-        self.state = gamefiles.SteamState(True, True, True, self.ACCOUNT)
+        self.state = gamefiles.SteamState(True, True, True, self.ACCOUNT, "player")
         patches = [mock.patch.object(gamefiles, "steam_state", lambda steam: self.state),
                    mock.patch.object(gamefiles, "ask_steam", lambda steam, apps: self.asked.append(apps) or self.answer)]
         for p in patches:
@@ -190,16 +195,36 @@ class Rs1Owned(Base):
         self.said = []
 
     def owned(self, account=ACCOUNT):
+        del self.said[:]
         return gamefiles.rs1_owned(self.steam, self.dest, account, self.said.append)
 
-    def test_the_pack_names_the_dlc(self):
+    def says(self, text):
+        self.assertTrue(any(text in line for line in self.said), "%r not in %r" % (text, self.said))
+
+    def closed(self):
+        self.state = gamefiles.SteamState(True, False, False)
+
+    def tickets(self, text, account=ACCOUNT):
+        write(os.path.join(self.steam, "userdata", str(account), "config", "localconfig.vdf"),
+              ('"UserLocalConfigStore" { "apptickets" { %s } }' % text).encode())
+
+    def listing(self):
+        with open(os.path.join(self.dest, gamefiles.META, gamefiles.RS1_LIST)) as f:
+            return [line.split(None, 2) for line in f.read().splitlines() if not line.startswith("#")]
+
+    def test_the_pack_names_the_dlc_and_their_songs(self):
         self.assertEqual(gamefiles.rs1_dlc_apps(self.dest), {206166, 222041})
+        self.assertEqual(gamefiles.rs1_dlc_songs(self.dest), {206166: ["Europe - The Final Countdown"], 222041: ["B - Two"]})
 
     def test_steam_says_what_the_account_owns(self):
         self.assertEqual(self.owned(), [206166])
         self.assertEqual(self.asked, [{206166, 222041}])
-        self.assertIn("owns 1 of the 2", self.said[0])
-        self.assertIn("shows all 2", self.said[0])
+        self.says("rs1compatibilitydlc_m.psarc has 2 songs from 2 DLC")
+        self.says("says this account owns 1 of the 2")
+        self.says("1 of the 2 count as owned")
+        self.says("  206166  Europe - The Final Countdown  (Steam)")
+        self.assertEqual(self.listing(), [["206166", "yes", "Europe - The Final Countdown"], ["222041", "-", "B - Two"]])
+        self.says(os.path.join(self.dest, gamefiles.META, gamefiles.RS1_LIST))
 
     def test_steam_env_keeps_them_apart_from_the_dlc(self):
         env = gamefiles.steam_env(None, archive_apps={999999}, owned=[222041, 206166])
@@ -207,44 +232,172 @@ class Rs1Owned(Base):
 
     def test_another_account_is_not_asked_and_the_answer_is_kept(self):
         self.owned()
-        self.state = gamefiles.SteamState(True, True, True, 777)
+        self.state = gamefiles.SteamState(True, True, True, 777, "other")
         self.assertEqual(self.owned(), [206166])
         self.assertEqual(len(self.asked), 1)
+        self.says("Steam was not asked: it is signed in as other")
+        self.says("an earlier refresh asked Steam")
+        self.says("(Steam, at an earlier refresh)")
 
     def test_steam_closed_keeps_the_answer(self):
         self.owned()
-        self.state = gamefiles.SteamState(True, False, False)
+        self.closed()
         self.assertEqual(self.owned(), [206166])
+        self.says("Steam was not asked: it is not open")
+
+    def test_steam_not_signed_in_is_not_asked(self):
+        self.state = gamefiles.SteamState(True, True, False)
+        self.assertEqual(self.owned(), [])
+        self.assertEqual(self.asked, [])
+        self.says("not signed in")
 
     def test_an_answer_for_another_account_is_not_used(self):
         self.answer = {"account": 777, "apps": [206166, 222041]}
         self.assertEqual(self.owned(), [])
-        self.assertIn("was not asked", self.said[0])
-        self.assertIn("shows all 2", self.said[0])
+        self.says("answered for another account")
+        self.says("none counts as owned")
+        self.assertEqual([row[1] for row in self.listing()], ["-", "-"])
 
-    def test_steam_with_no_answer_keeps_what_was_known(self):
+    def test_an_answer_without_the_account_goes_by_steams_own_log(self):
+        # Valve's library with no accessor for the user: the state above already says who is signed in
+        self.answer = {"account": None, "apps": [222041]}
+        self.assertEqual(self.owned(), [222041])
+
+    def test_steam_with_no_answer_says_why_and_keeps_what_was_known(self):
         self.owned()
-        self.answer = None
-        self.assertEqual(self.owned(), [206166])
+        for answer, why in (({"error": "no SteamAPI_SteamApps"}, "(no SteamAPI_SteamApps)"), (None, "(no answer)")):
+            self.answer = answer
+            self.assertEqual(self.owned(), [206166])
+            self.says("Steam was asked and gave no answer " + why)
 
     def test_what_one_account_owns_is_not_the_others(self):
         self.owned()
-        self.state = gamefiles.SteamState(True, False, False)
+        self.closed()
         self.assertEqual(self.owned(account=777), [])
 
     def test_nothing_is_asked_without_the_pack(self):
-        os.unlink(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"))
+        os.unlink(self.pack)
         self.assertEqual(self.owned(), [])
         self.assertEqual(self.asked, [])
+        self.says("no rs1compatibilitydlc_* archive")
+
+    def test_a_pack_that_cannot_be_read_says_so(self):
+        write(self.pack, b"not an archive")
+        self.assertEqual(self.owned(), [])
+        self.assertEqual(self.asked, [])
+        self.says("rs1compatibilitydlc_m.psarc could not be read")
+
+    def test_a_ticket_for_the_dlc_itself(self):
+        self.closed()
+        self.tickets('"222041" "%s" "5" "%s"' % (ticket(self.ACCOUNT, [9], app=222041), ticket(self.ACCOUNT, [9], app=5)))
+        self.assertEqual(self.owned(), [222041])
+        self.says("1 by the ownership tickets")
+        self.says("  222041  B - Two  (ownership ticket)")
+
+    def test_the_dlc_list_of_the_first_rocksmiths_ticket_and_of_the_games(self):
+        self.closed()
+        self.tickets('"205190" "%s" "221680" "%s"' % (lp_ticket([206166, 7], app=205190), lp_ticket([222041, 8])))
+        self.assertEqual(self.owned(), [206166, 222041])
+
+    def test_another_accounts_tickets_are_not_this_ones(self):
+        self.closed()
+        self.tickets('"222041" "%s"' % ticket(777, [9], app=222041), account=777)
+        self.assertEqual(self.owned(), [])
+
+    def test_a_package_of_steams_cache_with_the_dlc(self):
+        self.closed()
+        write(os.path.join(self.steam, "appcache", "packageinfo.vdf"),
+              packageinfo({555: [1], 556: [2]}, apps={555: [222041, 4], 556: [5]}))
+        self.assertEqual(self.owned(), [222041])
+        self.says("1 in the package cache")
+        self.says("  222041  B - Two  (package cache)")
+        self.assertEqual(gamefiles.package_apps(os.path.join(self.steam, "appcache", "packageinfo.vdf")),
+                         {555: {222041, 4}, 556: {5}})
+
+    def test_the_first_rocksmith_installed_with_the_dlc(self):
+        self.closed()
+        lib = os.path.join(self.tmp, "library")
+        write(os.path.join(self.steam, "steamapps", "libraryfolders.vdf"), b'"path" "%s"' % lib.encode())
+        write(os.path.join(lib, "steamapps", "appmanifest_205190.acf"),
+              b'"InstalledDepots" { "206167" { "manifest" "1" "dlcappid" "206166" } "9" { "dlcappid" "9" } }')
+        self.assertEqual(self.owned(), [206166])
+        self.says("1 installed with the first Rocksmith")
+
+    def test_every_source_adds_to_the_others(self):
+        write(os.path.join(self.steam, "appcache", "packageinfo.vdf"), packageinfo({555: [1]}, apps={555: [222041, 206166]}))
+        self.assertEqual(self.owned(), [206166, 222041])
+        self.says("  206166  Europe - The Final Countdown  (Steam, package cache)")
+        self.assertEqual([row[1] for row in self.listing()], ["yes", "yes"])
+
+    def test_steams_files_count_without_an_account(self):
+        write(os.path.join(self.steam, "appcache", "packageinfo.vdf"), packageinfo({555: [1]}, apps={555: [222041]}))
+        self.assertEqual(self.owned(account=None), [222041])
+        self.assertEqual(self.asked, [])
+        self.says("no Steam account was found")
 
     def test_the_owned_apps_reach_steam_env(self):
         self.mac_game()
         with mock.patch.object(gamefiles, "steam_account", lambda *a: (self.ACCOUNT, gamefiles.HOW_LICENSE)):
-            write(os.path.join(self.src, "dlc", "rs1compatibilitydlc_m.psarc"),
-                  open(os.path.join(self.dest, "dlc", "rs1compatibilitydlc_m.psarc"), "rb").read())
+            with open(self.pack, "rb") as f:
+                write(os.path.join(self.src, "dlc", "rs1compatibilitydlc_m.psarc"), f.read())
             copy = os.path.join(self.tmp, "fresh")
-            Copier("mac", self.src, copy, (), self.steam, quiet(), is_running=lambda e: False).run()
-        self.assertIn(b"RS_STEAM_OWNED=206166\n", open(os.path.join(copy, ".rearmed", "steam.env"), "rb").read())
+            out = io.StringIO()
+            Copier("mac", self.src, copy, (), self.steam, gamefiles.Progress(lines=True, stream=out),
+                   is_running=lambda e: False).run()
+        with open(os.path.join(copy, ".rearmed", "steam.env"), "rb") as f:
+            self.assertIn(b"RS_STEAM_OWNED=206166\n", f.read())
+        # what the installer app shows and keeps: every line of it
+        self.assertIn("Rocksmith 1 DLC: 1 of the 2 count as owned", out.getvalue())
+        self.assertIn("  206166  Europe - The Final Countdown  (Steam)\n", out.getvalue())
+        self.assertTrue(os.path.isfile(os.path.join(copy, ".rearmed", gamefiles.RS1_LIST)))
+
+
+FAKE_STEAM_API = r"""
+#include <stdint.h>
+int SteamAPI_InitSafe(void) { return INIT; }
+void SteamAPI_Shutdown(void) {}
+static int apps, user;
+void *APPS(void) { return &apps; }
+#ifdef USER
+void *USER(void) { return &user; }
+#endif
+uint64_t SteamAPI_ISteamUser_GetSteamID(void *self) { return self == &user ? 76561197960265728ULL + 4242 : 1; }
+int SteamAPI_ISteamApps_BIsSubscribedApp(void *self, uint32_t app) { return self == &apps && app % 2 == 0; }
+"""
+
+
+@unittest.skipUnless(shutil.which("cc"), "no C compiler")
+class AskSteam(Base):
+    """The asking itself, against a stand-in for Valve's library: it finds the accessors whatever version the
+    Steam client's library names them by (a Steam update moved SteamUser to v024, and the asking, which knew
+    v023, got no answer)."""
+
+    def library(self, apps="SteamAPI_SteamApps_v009", user="SteamAPI_SteamUser_v024", init=1):
+        src, lib = os.path.join(self.tmp, "fake.c"), os.path.join(self.tmp, "libsteam_api.dylib")
+        write(src, FAKE_STEAM_API.encode())
+        subprocess.run(["cc", "-dynamiclib", "-o", lib, src, "-DINIT=%d" % init, "-DAPPS=" + apps] +
+                       (["-DUSER=" + user] if user else []), check=True)
+        os.environ["RS_STEAM_REAL_LIB"] = lib
+        os.makedirs(self.steam, exist_ok=True)
+        return gamefiles.ask_steam(self.steam, {206166, 206167, 222041})
+
+    def test_the_answer(self):
+        self.assertEqual(self.library(), {"account": 4242, "apps": [206166]})
+
+    def test_versions_to_come_and_the_games_own(self):
+        self.assertEqual(self.library("SteamAPI_SteamApps_v031", "SteamAPI_SteamUser_v057"),
+                         {"account": 4242, "apps": [206166]})
+        self.assertEqual(self.library("SteamAPI_SteamApps_v008", "SteamAPI_SteamUser_v017"),
+                         {"account": 4242, "apps": [206166]})
+
+    def test_no_way_to_the_account_still_answers(self):
+        self.assertEqual(self.library(user=None), {"account": None, "apps": [206166]})
+
+    def test_why_there_is_no_answer(self):
+        self.assertEqual(self.library(init=0), {"error": "SteamAPI_InitSafe failed"})
+        self.assertIn("SteamAPI_SteamApps_v008", self.library(apps="SteamAPI_SteamApps")["error"])
+        os.environ["RS_STEAM_REAL_LIB"] = os.path.join(self.tmp, "none.dylib")
+        self.assertIn("not in the Steam app", gamefiles.ask_steam(self.steam, {1})["error"])
 
 
 class ArchiveKey(Base):
@@ -703,12 +856,14 @@ def ticket(account, licenses, app=221680):
     return (struct.pack("<I", len(body) + 4) + body).hex()
 
 
-def packageinfo(packages):
-    """A binary appcache/packageinfo.vdf (v40) with {package id: [depot ids]}."""
+def packageinfo(packages, apps=None):
+    """A binary appcache/packageinfo.vdf (v40) with {package id: [depot ids]} and, in APPS, {package id: [AppIDs]}
+    (else the game's)."""
     out = struct.pack("<II", 0x06565528, 1)
     for pid, depots in packages.items():
         kv = b"\0" + str(pid).encode() + b"\0" + b"\2packageid\0" + struct.pack("<i", pid)
-        kv += b"\0appids\0\x02" + b"0\0" + struct.pack("<i", 221680) + b"\x08"
+        kv += b"\0appids\0" + b"".join(b"\2%d\0" % i + struct.pack("<i", a)
+                                       for i, a in enumerate((apps or {}).get(pid, [221680]))) + b"\x08"
         kv += b"\0depotids\0" + b"".join(b"\2%d\0" % i + struct.pack("<i", d) for i, d in enumerate(depots))
         kv += b"\x08\x08\x08"
         out += struct.pack("<I", pid) + b"\0" * 20 + struct.pack("<I", 1) + b"\0" * 8 + kv

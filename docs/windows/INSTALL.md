@@ -196,7 +196,10 @@ differs here:
    by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
    they carry, and no refresh removes a song you put there. Songs in the Mac game's `dlc` folder in a Steam
    library work too: a copy or a refresh brings them over.
-4. **Songs of the first Rocksmith.** As in the Mac edition.
+4. **Songs of the first Rocksmith.** As in the [Mac edition](../mac/INSTALL.md#how-the-game-finds-dlc): the
+   game shows the songs of the first Rocksmith's DLC you own, a copy or refresh finds those from Steam and its
+   files and says in the installer's log what it found, and `game/.rearmed/rs1-dlc.txt` lists every DLC with
+   its AppID, its songs and whether it counts. The account is the one Learn & Play plays as.
 5. **New songs.** While you play, **ENUMERATE** in the main menu takes new archives from the folders the copy is
    made from (and finds ones put straight into `game/dlc`) with no restart. DLC bought since, and changed or
    removed songs, need a refresh, which has Steam fetch the new DLC first.
@@ -217,7 +220,7 @@ In the table, `…` is `~/Library/Application Support/RS Re-ARMed`.
 | `~/Applications/RS Re-ARMed Learn & Play.app` | the game: `rs2014_lp`, libRSOpenGL, the network guard, the game image and the DLL images; ad-hoc signed |
 | `~/Library/Application Support/RS Re-ARMed/learn-play/game/` | the game folder the app reads: its own copy of the game files ([Game files](#game-files)); for a game on another APFS drive a link to `<drive>/RS Re-ARMed/learn-play/game`, where the copy is |
 | `…/learn-play/game/dlc/` | the songs the game has: your DLC, and the place for custom songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
-| `…/learn-play/game/.rearmed/` | the copy's manifest (written last), where it comes from (`source.json`) and the Steam facts (`steam.env`: your DLC, the language, the account) |
+| `…/learn-play/game/.rearmed/` | the copy's manifest (written last), where it comes from (`source.json`) the Steam facts (`steam.env`: your DLC, the first Rocksmith's DLC found as owned, the language, the account) and the first Rocksmith's DLC with their songs (`rs1-dlc.txt`, and Steam's answer about them in `rs1-owned.json`) |
 | `…/learn-play/game/static.psarc` | a link the app sets at each start: to `static.psarc.original`, the game's own, or `static.psarc.rearmed`, the [title logo](#the-title-logo) |
 | `…/learn-play/game-dir` | the folder the game reads (one line) |
 | `…/learn-play/gamefiles.py` | the tool that refreshes the copy |
@@ -335,7 +338,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, custom songs are not listed, and of the first Rocksmith's DLC songs only those your account owns ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed |
 | `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
@@ -346,10 +349,10 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
 | `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
-| `RS_STEAM_DLC=all`, `none`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_DLC=LIST`, or `none` | your DLC, and the AppID of every archive in the copy's `dlc/` | only these AppIDs (or none) count as the game's DLC, in place of the list the copy keeps. For tests: that list has every song in the copy already, so no player needs it ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_ID=N` | the account whose license has the game | the Steam account the game plays as ([Game files](#game-files)) |
 | `RS_STEAM_LANGUAGE=NAME` | the Mac game's in Steam, else English | the game's language, as Steam names it (`german`; [Game files](#game-files)) |
-| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned with `RS_MODS_BYPASS=0`: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_OWNED=LIST` | none | AppIDs of the first Rocksmith's DLC that count as owned beside the ones a copy or refresh found. For tests: a copy finds the DLC you own, so no player needs it ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_PERSONA=NAME` | the name of the account Steam last logged in, else `Player` | the player name the game gets from Steam |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
 | `RS_METAL_RETINA=1` | off | render every pixel of a Retina screen, about 4x the GPU work (otherwise the game renders in points and each frame is scaled up to the screen's pixels) |

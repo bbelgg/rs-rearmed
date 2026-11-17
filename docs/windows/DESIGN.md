@@ -319,9 +319,9 @@ games share, without `crd`. It never loads Valve's library. The game does not us
 `steam32_dll_blocked()` names the Ubisoft and Valve libraries a `LoadLibrary` must refuse. See
 [win-x86/shims/steam/README.md](../../win-x86/shims/steam/README.md).
 
-Custom songs show whatever AppID they carry, and the songs of `rs1compatibilitydlc` all show while the CDLC skip is on
-(with `RS_MODS_BYPASS=0`, those of the first Rocksmith's DLC the account owns), by the Mac edition's means
-([Mac design](../mac/DESIGN.md#steam)): the install's `gamefiles.py` writes `RS_STEAM_DLC` and `RS_STEAM_OWNED` to
+Custom songs show whatever AppID they carry, and the songs of `rs1compatibilitydlc` show for the first Rocksmith's DLC
+that count as owned, by the Mac edition's means and from the same code ([Mac design](../mac/DESIGN.md#steam): the Steam
+client, the account's ownership tickets, Steam's package cache and an installed first Rocksmith): the install's `gamefiles.py` writes `RS_STEAM_DLC` and `RS_STEAM_OWNED` to
 `game/.rearmed/steam.env` at each copy and refresh, and the face answers from them (`GetDLCCount`, `BGetDLCDataByIndex`
 and `BIsDlcInstalled` for the first, `BIsSubscribedApp` alone for the second). This game also keeps a song out of its
 list when it doesn't know the song's key, which a built-in fix answers
@@ -355,7 +355,10 @@ looks whether it has mods to load and, if so, starts itself again with `libnetgu
 the Mac edition always runs with. Without the guard no mods load.
 
 **What the app passes.** `lp_main.c` takes four keys of `game/.rearmed/steam.env` as `RS_STEAM_*` defaults and no others
-(`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`), as the Mac launcher does.
+(`RS_STEAM_DLC`, `RS_STEAM_OWNED`, `RS_STEAM_LANGUAGE`, `RS_STEAM_ID`), as the Mac launcher does
+(`lp_steam_env_apply` in `lp_settings.c`): each unless it is set already, except `RS_STEAM_OWNED`, where the AppIDs set
+by hand are added to the file's. It logs how many of the first Rocksmith's DLC count at each start, in the Mac
+launcher's words.
 
 ## Input
 

@@ -39,8 +39,9 @@
 //                A game on another drive: game/ is a link to the copy on that drive; when that drive is
 //                not connected the app says so and quits.
 //   game/.rearmed/steam.env  RS_STEAM_* defaults (the installed DLC and the AppIDs the dlc/
-//                archives carry, the language, the account: the one whose license has Learn & Play)
-//                for the offline Steam layer, recorded from Steam when the copy was made
+//                archives carry, the first Rocksmith's DLC found owned, the language, the account: the
+//                one whose license has Learn & Play) for the offline Steam layer, recorded from Steam
+//                when the copy was made (lp_settings.h)
 //   settings.env the built-in mods switched off in the installer (lp_settings.h), as the Mac launcher's,
 //   options.env every other switch the installer's sheet offers
 //   userdata/    LP_USER_DIR: Rocksmith.ini and the game's other writes
@@ -175,29 +176,6 @@ static void title_logo(const char *game) {
   unlink(tmp);
   if (symlink(want, tmp) != 0 || rename(tmp, link) != 0)
     fprintf(stderr, "lp: static.psarc not linked to %s: %s\n", want, strerror(errno));
-}
-
-// game/.rearmed/steam.env: KEY=VALUE lines, the four the copy records only (as the Mac launcher: the file never
-// chooses the Steam layer's folder or keeps the stored credentials), each unless set already. Lines of any
-// length: RS_STEAM_DLC lists every owned DLC and every AppID the song archives carry.
-static void steam_env_defaults(const char *game) {
-  char p[PATH_MAX], *line = NULL;
-  size_t cap = 0;
-  snprintf(p, sizeof p, "%s/.rearmed/steam.env", game);
-  FILE *f = fopen(p, "r");
-  if (!f) return;
-  while (getline(&line, &cap, f) > 0) {
-    line[strcspn(line, "\r\n")] = 0;
-    char *eq = strchr(line, '=');
-    if (!eq || !eq[1]) continue;
-    *eq = 0;
-    if (strcmp(line, "RS_STEAM_DLC") && strcmp(line, "RS_STEAM_OWNED") && strcmp(line, "RS_STEAM_LANGUAGE") &&
-        strcmp(line, "RS_STEAM_ID"))
-      continue;
-    setenv(line, eq + 1, 0);
-  }
-  free(line);
-  fclose(f);
 }
 
 // Without Steam's list of accounts (Steam uninstalled), the account whose saves are in the Steam
@@ -357,7 +335,9 @@ static int installed_defaults(void) {
   metal_cache_default();
   mkdir_p(getenv("LP_USER_DIR"));
   mkdir_p(getenv("RS_STEAM_DATA_DIR"));
-  steam_env_defaults(getenv("LP_GAME_DIR"));
+  char steam_env[PATH_MAX];  // the Steam facts the copy recorded (lp_settings.h)
+  snprintf(steam_env, sizeof steam_env, "%s/.rearmed/steam.env", getenv("LP_GAME_DIR"));
+  lp_steam_env_apply(steam_env);
   steam_account_default(getenv("HOME"));
   // stderr to logs/last-run.log (the previous run's kept), unless it goes elsewhere already: an
   // app started from the Finder has no terminal
@@ -473,6 +453,7 @@ int main(int argc, char **argv) {
   if (installed) fprintf(stderr, "lp: installed app, settings and saves in %s\n", getenv("LP_HOME"));
   if (*settings) lp_settings_log(settings, stderr);
   if (*options) lp_options_log(options, stderr);
+  if (installed) lp_steam_env_log(stderr);
   title_logo(getenv("LP_GAME_DIR"));
   lp_mods_init();
 

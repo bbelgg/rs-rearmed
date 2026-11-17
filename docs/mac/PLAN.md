@@ -17,9 +17,11 @@ What the edition does today. What has not been tested is under [Open issues](#op
   screens or Auto Save warning.
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)); 74.9 fps on 75 Hz.
-- **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played. The DLC pack's all show while the
-  CDLC skip is on (new in 1.17.0), and one was found by a search and played to the note highway; with the skip off,
-  those the account owns, which needs a refresh with that account logged in to Steam.
+- **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played. The DLC pack's show for the DLC that
+  count as owned (not released): what a copy or refresh finds from the Steam client, the account's ownership tickets,
+  Steam's package cache and an installed first Rocksmith. The copy's log says what each found. One was found by a
+  search and played to the note highway with its DLC counted as owned, and was not listed without. 1.17.0 showed all
+  of them while the CDLC skip was on.
 - **Two players**: a song with each player on their own input, SWAP CABLE ASSIGNMENT included.
 
 **Sound and input**
@@ -126,6 +128,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 **Not tested or not done yet**
 
+- **Rocksmith 1 DLC found as owned** (not released): no account that owns one has been at hand. The asking of the
+  Steam client, the tickets and the package cache were run against the real Steam with apps the test account does own
+  (the first Rocksmith, the import pack, a DLC of the game: yes for each, no for a DLC it lacks), an installed first
+  Rocksmith only with a made-up appmanifest, and the rest with stand-ins ([TESTING.md](TESTING.md#unattended-runs)).
+  In the game the DLC was named by hand (`RS_STEAM_OWNED`): the song is listed and plays with it, and is not listed
+  without. Not looked at: an account that owns a first Rocksmith DLC and not the first Rocksmith itself, which players
+  of the original reported as losing these songs.
 - **The published installer**: recent releases' hasn't been run, nor a full install from the tag (the last was
   1.6.0's); the install scripts and test installs were.
 - **The installer's update of itself** (new in 1.17.0): run on test copies with made-up releases, in the window too.

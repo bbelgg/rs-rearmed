@@ -218,12 +218,10 @@ static void load_config() {
     // The apps the install found the account owns outside this game's DLC: the first Rocksmith's DLC, which
     // the game asks about for each song of the RS1 compatibility pack (BIsSubscribedApp only: Steam lists
     // them as no DLC of this game and installs nothing for them).
-    app_id_list(opt("RS_STEAM_OWNED", "owned"), &c.owned);
-    // With the built-in CDLC skip on, the game shows every song of that pack, as it shows every archive of dlc/
-    // whatever AppID it carries: the skip's own switch decides, read as the mods read it (RS_MODS_BYPASS, on
-    // unless it starts with 0, n or f; mods_shared.c). Off: the list above alone, as Steam would answer.
-    const char *bypass = getenv("RS_MODS_BYPASS");
-    c.rs1_all = !(bypass && *bypass && strchr("0nNfF", *bypass));
+    // all (opt-in): every app id is one of them, so every song of that pack shows, with the DLC list as it is.
+    v = opt("RS_STEAM_OWNED", "owned");
+    c.owned_all = v == "all";
+    app_id_list(v, &c.owned);
 
     c.data_dir = opt("RS_STEAM_DATA_DIR", "data_dir");
     if (c.data_dir.empty())
@@ -485,10 +483,10 @@ S_EXPORT bool SteamAPI_Init() {
         g_init_counter++;
     }
     shim_stub_init();
-    shim_log("stub SteamAPI_Init: app %u, user %llu (%s), language %s, DLC owned: %s, Rocksmith 1 DLC: %s", c.app_id,
+    shim_log("stub SteamAPI_Init: app %u, user %llu (%s), language %s, DLC owned: %s, other apps owned: %s", c.app_id,
              (unsigned long long)c.steam_id, c.persona.c_str(), c.language.c_str(),
              c.dlc_all ? "all" : std::to_string(c.dlc.size()).c_str(),
-             c.rs1_all || c.dlc_all ? "all" : std::to_string(c.owned.size()).c_str());
+             c.owned_all ? "all" : std::to_string(c.owned.size()).c_str());
     return true;
 }
 

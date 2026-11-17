@@ -73,17 +73,14 @@ An install needs no file. The launcher passes `RS_STEAM_MODE=stub` and `RS_STEAM
 and from `game/.rearmed/steam.env`, which `tools/play-native/gamefiles.py` writes with the copy, these four,
 each unless it is set already (`launchctl setenv`, or the installer's `options.env`):
 
-- `RS_STEAM_DLC` / `dlc`: `installed` (the default: the appmanifest's DLC and 248750), `all` (every app id is
-  owned, so every archive shows up whatever its AppID, and `BIsSubscribedApp` says yes for every app too: the
-  songs `RS_STEAM_OWNED` gates all show), `none`, or a comma-separated list of app ids (only those). The install
-  passes such a list: the installed DLC, 248750 and every AppID the copy's `dlc/` archives carry, so custom
-  songs show up whatever AppID they carry.
+- `RS_STEAM_DLC` / `dlc`: `installed` (the default: the appmanifest's DLC and 248750), `none`, or a
+  comma-separated list of app ids (only those). The install passes such a list: the installed DLC, 248750 and
+  every AppID the copy's `dlc/` archives carry, so custom songs show up whatever AppID they carry. Set by hand it
+  takes the place of that list, which only a test has a use for.
 - `RS_STEAM_OWNED` / `owned`: a comma-separated list of apps the account owns outside this game's DLC, reported
   by `BIsSubscribedApp` only (not `BIsDlcInstalled`, not `GetDLCCount`). The install fills it with the first
-  Rocksmith's DLC the account owns, which the game asks about for each song of the RS1 compatibility pack
-  ([DESIGN.md](../../docs/mac/DESIGN.md#steam)).
-- `RS_MODS_BYPASS` (the built-in CDLC skip's switch, no key in the file): on, as it is unless set to `0`,
-  `BIsSubscribedApp` says yes for every DLC of the first Rocksmith (the app ids above 205190 up to 222140, the
-  last one the game takes for one), so every song of that pack shows. `0`: `RS_STEAM_OWNED` alone.
+  Rocksmith's DLC that count as owned, which the game asks about for each song of the RS1 compatibility pack
+  ([DESIGN.md](../../docs/mac/DESIGN.md#steam)). This is the one key a value set by hand doesn't replace: the
+  launcher adds its AppIDs to the copy's, which a test uses to make one more DLC count.
 - `RS_STEAM_LANGUAGE` / `language`, and `RS_STEAM_ID` / `steam_id`: the account whose license has the game,
   whichever is logged in to Steam later.

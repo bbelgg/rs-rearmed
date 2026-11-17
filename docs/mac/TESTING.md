@@ -21,9 +21,9 @@ game is in the repository.
 | Area | Tests | What they check |
 |---|---|---|
 | Decryption | `steamless.decrypt` (`tools/steamless/test_decrypt.py`) | the key found in a made-up Mach-O, and what is refused; with `RS_DEPOT_GAME` set to a clean Mac depot folder, the real output against the pin |
-| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | shared with Learn & Play: the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game |
+| Game files | `play-native.gamefiles` (`tools/play-native/test_gamefiles.py`) | shared with Learn & Play: the installs' own copy of the game files (`gamefiles.py`) on made-up game folders: what each edition copies, clones and real copies, the space check, resuming, refreshes, the earlier mirror's links, the completeness check; the Mac game's folder (chosen, installed in Steam, Steam's download), the download of the Mac depot with a Steam the test plays, the copy and the refresh of a downloaded game; the first Rocksmith's DLC found as owned, from each place a copy looks and with a stand-in for Valve's library (needs a C compiler), and what the copy says about them |
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | shared with Learn & Play: the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
-| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with Learn & Play: `settings.env` and `options.env`. The launchers' readers (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
+| Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with Learn & Play: `settings.env`, `options.env` and the copy's `steam.env`. The launchers' readers (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with Learn & Play: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
 | Installer update | `installer.update` (`tools/installer/test_update.sh`) | shared with Learn & Play: the installer built with a key made for the test and updated, without its window, from made-up releases (`RS_UPDATE_URL`, `file://`): a signed newer release replaces the app and the new one verifies; a zip changed after signing, another key's or an empty signature, a release without one, a signed installer of another version than the release names, and an app in a folder that can't be written to are refused with the app as it was; the same or an older version is no update. Needs `swiftc`, no game and no network |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with Learn & Play: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
@@ -303,14 +303,17 @@ with `RS_MODS_LOG=1`.
   game folder or a copy, else set `RS_PSARC_KEY_IMAGE` to the game's program), put it in the `dlc/` of the test
   install's game source and refresh the copy: `steam.env`'s `RS_STEAM_DLC` gains the AppID and a search finds
   the song; with the list without it, the search does not.
-- **Rocksmith 1 songs**: with the CDLC skip on (the default) and no `RS_STEAM_OWNED`, one
-  `tools/perf/run.py CONFIG OUT --route-only` run whose config has `"song": "FinalCountdown"` and
-  `"search": "countd"`: the search finds The Final Countdown and the run reaches its note highway
-  (`song: FinalCountdown` in `game.log`). With `RS_MODS_BYPASS=0` the songs follow `RS_STEAM_OWNED`: on a clone of
-  the copy (`cp -cR`), with the Steam folder copied without `crd` and `RS_STEAM_OWNED` set to the AppIDs of
-  `gamefiles.rs1_dlc_apps`, the same search finds the song, and it plays; unset, it is not listed (run before the
-  skip decided, not since). `gamefiles.ask_steam` has been checked against a running Steam only for an account
-  that owns none of them.
+- **Rocksmith 1 songs** (`RS_STEAM_OWNED`): one `tools/perf/run.py CONFIG OUT --route-only` run whose config has
+  `"song": "FinalCountdown"`, `"search": "countd"` and `"env": {"RS_STEAM_OWNED": "206166"}`: the search finds The
+  Final Countdown and the run reaches its note highway (`song: FinalCountdown` in `game.log`); without the AppID
+  the run stops at the search, which doesn't list the song. How a copy finds the owned ones is `Rs1Owned` in
+  `test_gamefiles.py`, and `AskSteam` there runs the asking against a stand-in for Valve's library. Against the
+  real Steam, signed in to the edition's account, with an archive key at hand (`psarc_key.have_key(COPY)`):
+  `gamefiles.rs1_owned(STEAM, DEST, ACCOUNT, print)` into a scratch `DEST` whose `dlc` is a link to the copy's
+  prints what a refresh would, and `gamefiles.ask_steam(STEAM, {221680, 258341, 205190, 206166})`, `rs1_tickets`
+  and `rs1_packages` with the same set answer for apps the account does own. Run that way for an account that owns
+  none of the DLC: 0 of 141, and yes for the game, the import pack and the first Rocksmith. The launchers' adding of
+  the AppIDs set by hand, and their `[steam]` line, are in `test_settings.py`.
 - **Files a mod serves**: `DIR/files_mod.dylib` of `tools/ws7/recomp/test/hooks` in the mods folder serves every
   `.psarc` the game opens through the file provider (`rc_file.h`) and logs `files_mod: serving NAME` for each.
   One `tools/perf/run.py CONFIG OUT --route-only` run with it (the config's `mods` a folder with it beside

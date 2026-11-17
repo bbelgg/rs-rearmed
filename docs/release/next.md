@@ -11,7 +11,9 @@ notes and empties this file. -->
   Reset to Defaults returns everything to the defaults; a change still takes effect at the next start with no reinstall.
   Skip Tuner in the Guitarcade and the frame rate fixes of 1.16.0 are among the built-in mods there.
 - **"Enumerating downloadable content..." stays until the songs are in (Mac).** At the start, and after ENUMERATE,
-  the text in the menu went away while the game was still loading the song archives: for some seconds, longer with
-  a larger library, Learn a Song lacked songs and the menus answered late. The Mac edition now loads each archive
-  before it opens the next, as Learn & Play does: the text ends when the loading does, and the loading itself is
-  several times shorter (147 archives: 0.4 s where it took 3.1 s).
+  the text in the menu went away while the game was still taking in the song archives: Learn a Song lacked songs
+  and the menus answered late, for a few seconds with a hundred archives and longer with thousands. The
+  Mac edition now loads each archive before it opens the next and reads the song lists' entries as fast as the
+  disk gives them, and the text stays until the last song is in. With 2,326 archives the text and the last song
+  now end together, after 27 s; the main menu and the song lists can be used after
+  about five seconds of it. Learn & Play does not have this yet.

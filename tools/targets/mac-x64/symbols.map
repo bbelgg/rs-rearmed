@@ -818,6 +818,7 @@ rsg_efd_utf8string_to_upper                                      0x101306460  sy
 rsg_efd_utf8string_to_lower                                      0x1013064d0  sysv  rsg_efd_utf8string *(rsg_efd_utf8string *)
 efd_snprintf                                                     0x10130b200  sysv  -
 thread_set_priority                                              0x101313170  sysv  -
+asset_loader_thread                                              0x1012856c0  sysv  -  # the AssetLoaderThread's functor (vtable 0x101860400): until its stop byte is set, a pass of the AssetFactoryManager (slot 12, 0x1012822f0: it ends at the first load it finishes) and usleep(10000); then its own slot 3
 MacOSPlatformService_QueryInterface                              0x101313680  sysv  -
 MacOSPlatformService_QueryInterface_const                        0x1013136e0  sysv  -
 autologin                                                        0x101315d70  sysv  -

@@ -235,15 +235,25 @@ What each does:
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours and the RSBypass signature skip.
   - Batched DLC mounting, the faster loading with a large library: the DLC coordinator's update runs its install step,
-    which mounts one archive, for `RS_MODS_BUDGET_MS` a frame (default 50) instead of once. A step is half of a mount:
-    it opens the archive and queues its package, and the update's head, which the game calls once a frame, loads one
-    package a call; the archive's songs are in the lists from then. So the loop calls the head until nothing is left
-    to load before it takes the next step, and the step that finds the list empty, which clears the flag the menu's
-    "Enumerating downloadable content..." follows, is the end of the loading too. (Steps alone emptied the list in a
-    few frames and the packages were then loaded one a frame, with the text gone, songs missing from the lists and the
-    menus slow to answer: 2.7 s for 147 archives.) Learn & Play's loop waits the same way, there because a step
-    taken too early drops an archive ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)); this game's
-    drop none either way ([TESTING.md](TESTING.md#unattended-runs)).
+    which mounts one archive, for `RS_MODS_BUDGET_MS` a frame (default 50) instead of once. A step is a third of what
+    puts an archive's songs in the lists: it opens the archive, asks for its song manifest and queues its package; the
+    update's head, which the game calls once a frame, loads one package a call; and the asset loader thread reads the
+    manifest, which the game takes in on its own thread. The menu's "Enumerating downloadable content..." and the
+    song lists' filling in follow one flag, which the step that finds the list empty clears. So the loop does three
+    things beside the steps:
+    - it calls the head until nothing is left to load before the next step, so a package is loaded before the next
+      archive is opened, several a frame;
+    - while archives are mounted, the loader thread's pause between passes is 0.2 ms, not the game's 10 ms (the
+      thread's loop is replaced; a pass ends at the first file it finishes, so the game's pause reads 85 manifests
+      a second at the most);
+    - if manifests asked for are not yet answered when the list is empty (two mid points count them), the flag is
+      set again and held until they are, or until none has come for 5 s.
+
+    Steps alone left the last two behind: the text went after a few frames, with songs still coming into the lists
+    and the menus slow to answer, 2.7 s for 147 archives; with 2,326 the manifests alone were 15 s behind the last archive. Learn & Play's loop waits for
+    each mount as the first of the three does, there because a step taken too early drops an archive; it has neither
+    of the other two yet ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This game's steps drop
+    none either way ([TESTING.md](TESTING.md#unattended-runs)).
   - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
     descriptors of an app started from Finder. The shared start raises it.
   - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path

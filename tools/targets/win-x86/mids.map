@@ -197,3 +197,7 @@ fps_tuner_hint        0x012c2660  (void *menu@esi) -> skip=0x012c283e  # the tun
 
 # Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 tuner_skip_offer      0x012c2f37  (uint8_t offer@[ebp-0x1d])  # the tuner menu's Skip Tuner button 0x12c2df0 (the Mac's 0x100544a30; button 0xac): the same answer, a local here, at its compare with 0 before the button is added
+
+# Batched DLC mounting (built in on the Mac: tools/ws7/recomp/overrides/mods/mods.c)
+manifest_request      unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055e95e
+manifest_response     unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055bc34

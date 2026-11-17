@@ -25,6 +25,10 @@ dlc_map_root                      0x50    # DLC coordinator: map root node
 dlc_map_begin                     0x58    # DLC coordinator: map begin node
 dlc_map_end                       0x60    # DLC coordinator: map end node
 dlc_map_size                      0x68    # DLC coordinator: map size
+asset_loader_manager              0x8     # asset loader thread's functor (0x1012856c0)
+asset_loader_stop                 0x10    # asset loader thread's functor: u8
+asset_loader_pass_slot            0xc     # AssetFactoryManager vtable (0x101860388): 0x1012822f0
+asset_loader_end_slot             0x3     # asset loader thread's functor vtable
 dlc_package                       0x190   # DLC coordinator: the package its update's head is loading (taken off dlc_package_queue at 0x100a0cc6f, cleared by the head's done callback 0x100a0cc10)
 json_number_refs                  0x8     # number object: int32 refcount
 json_number_value                 0x10    # number object: double value

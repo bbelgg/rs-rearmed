@@ -22,6 +22,7 @@
 
 #include "mods.h"
 #include "rc_hook.h"
+#include "rc_mid.h"
 
 // libc++'s operator new / delete, as the translated code calls them (nodes and bucket arrays are freed by
 // translated code with operator delete)
@@ -79,6 +80,7 @@ static void *keys_thread(void *arg) {
 
 static int before_open_file(rc_ctx *c, void *user);
 static int before_autosave_warning(rc_ctx *c, void *user);
+static void mods_manifest_points(void);
 static int before_is_cable(rc_ctx *c, void *user);
 
 // The launcher has set the environment by now, so the switches are read here (Learn & Play reads its
@@ -91,6 +93,7 @@ __attribute__((constructor)) static void mods_init(void) {
     rs_mods_logf("no Auto Save warning hook point");
   if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL))
     rs_mods_logf("no hook point for Player 2's input mode");
+  mods_manifest_points();
   if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);
@@ -291,35 +294,95 @@ void RC_FN(path_md5)(rc_ctx *c) {
 // marks enumeration done when the list is empty) once per frame; the mod redirected that call to a loop
 // bounded by a frame budget. The step stays translated; the caller is replaced by this native version.
 //
-// A step is half of a mount: it opens the archive and puts its package in a queue (dlc_package_queue). The
-// update's head, which the game calls once a frame, takes one package off the queue (dlc_package), has its files
-// read, and ends it when they are in: the archive's songs are in the lists from then. So steps alone for a frame
-// budget emptied the list of archives in a few frames and cleared the flag, and the packages were then loaded one
-// a frame for as long as the original takes: 147 archives were open for 2.7 s more, a larger library's for longer,
-// with "Enumerating downloadable content..." gone (the menu shows it for as long as the flag is set, 0x1000e07d4),
-// songs missing from the lists and the menus slow to answer. So the loop takes a step only when nothing is left to
-// load, and calls the head until then: a package is loaded before the next archive is opened, in the original's
-// order, several a frame (the 147 in 8 frames, 0.42 s), and the step that clears the flag is the end of all of it.
-// Learn & Play's loop does the same for its own reason (win-x86/shims/win32_overrides.c).
+// The flag is what a player sees of all this: the menu shows "Enumerating downloadable content..." for as long as
+// it is set (0x1000e07d4), and a song list on screen fills itself in every three seconds while it is, and once more
+// when it clears (0x100345b00). But a step is a third of what it takes for an archive's songs to be in the lists:
+//
+//   1. The step opens the archive, asks for its song manifest (an AssetLoadRequest for its .hsan file,
+//      0x10055e740) and puts its package in a queue (dlc_package_queue).
+//   2. The update's head, which the game calls once a frame, takes one package off the queue (dlc_package) and
+//      ends it when its files are in.
+//   3. The asset loader thread reads the manifest, and the ManifestManager's handler (0x10055bc20) takes the
+//      answer on the game's thread: the songs are in the lists from then. The thread's loop is a pass and a pause
+//      of 10 ms, and a pass ends at the first file it finishes: 85 manifests a second at the most.
+//
+// Steps alone for a frame budget emptied the list of archives in a few frames and cleared the flag with the other
+// two still to come, the lists short and the menus slow to answer meanwhile: 147 archives were open for 2.7 s
+// more, and with 2,326 the manifests alone were 15 s behind the last package. So:
+//
+//   - The loop takes a step only when no package is left to load, and calls the head until then: a package is
+//     loaded before the next archive is opened, in the original's order, several a frame.
+//   - While archives are mounted the loader thread's pause is LOADER_BUSY_US (asset_loader_thread below), so the
+//     manifests come in as fast as they are read.
+//   - The step that finds the list empty ends the enumeration for the game (the profile's loading waits for that,
+//     0x10035a6ff). If manifests asked for have not been answered by then, the flag is set again and held until
+//     they have: the text stays, and a song list fills in, to the last song.
+//
+// Learn & Play's loop waits for each mount as the first of these does, for its own reason; the other two are open
+// there (win-x86/shims/win32_overrides.c, docs/windows/PLAN.md).
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
-#define LOAD_STALL_S 5.0  // a package not loaded this long after the last one: the steps go on without it
+#define LOAD_STALL_S 5.0     // nothing loaded or answered for this long: the mounting goes on without waiting
+#define LOADER_BUSY_US 200   // the loader thread's pause between passes while archives are mounted
+#define LOADER_IDLE_US 10000 // and the game's own
 
 // During the install steps an archive in dlc/ counts as owned, whatever AppID it carries: mods_shared.c's hook on
 // steam_dlc_owned, one source with Learn & Play, which rs_mods_mounting tells when the steps run.
 
-// RS_MODS_LOG=1 says what a mounting did once its list is empty and its packages are loaded, in Learn & Play's
-// words: the archives its steps took, the frames and the time. Learn & Play's steps dropped archives when several
-// ran in a frame, until its loop waited for each mount to be finished (win-x86/shims/win32_overrides.c). This
-// game's do not: it lists the same songs after a mounting with the budget as after one at RS_MODS_BUDGET_MS=0, a
-// step a frame as in the original (docs/mac/TESTING.md has the check).
+// RS_MODS_LOG=1 says what a mounting did once its list is empty, its packages are loaded and its manifests are in,
+// in Learn & Play's words: the archives its steps took, the frames and the time. Learn & Play's steps dropped
+// archives when several ran in a frame, until its loop waited for each mount to be finished
+// (win-x86/shims/win32_overrides.c). This game's do not: it lists the same songs after a mounting with the budget
+// as after one at RS_MODS_BUDGET_MS=0, a step a frame as in the original (docs/mac/TESTING.md has the check).
 static struct {
   unsigned steps, frames;
   double t0;
-  uint64_t left;      // what was left to load when it last changed
-  double left_since;  // and when that was
-  int stalled;        // a package did not load: this mounting's steps no longer wait
+  uint64_t left;        // the packages left to load when that last changed
+  double left_since;    // and when that was
+  unsigned asked0, answered0;  // the manifest counts when the mounting began
+  unsigned answered;    // the answers when that last changed
+  double answered_since;
+  double t_mounted;     // when the list was empty and the last package loaded
+  unsigned frames_mounted;  // and the frames until then
+  int holding;          // since then: the flag is held for the manifests
+  int stalled;          // something did not load: this mounting no longer waits
 } g_mount;  // the game thread's
+
+// The manifests asked for and answered since the game started, counted at the two mid points. -1: a point is
+// missing, and nothing waits for manifests.
+static atomic_uint g_manifests_asked, g_manifests_answered;
+static int g_manifest_points = -1;
+static atomic_int g_loader_busy;  // archives are being mounted: read by the loader thread
+
+static void on_manifest_request(rc_mid_frame *f, void *user) {
+  (void)f, (void)user;
+  COUNT(g_manifests_asked);
+}
+static void on_manifest_response(rc_mid_frame *f, void *user) {
+  (void)f, (void)user;
+  COUNT(g_manifests_answered);
+}
+static void mods_manifest_points(void) {
+  int asked = rc_mid_add_name("manifest_request", on_manifest_request, NULL);
+  int answered = rc_mid_add_name("manifest_response", on_manifest_response, NULL);
+  g_manifest_points = asked >= 0 && answered >= 0 ? 0 : -1;
+  if (g_manifest_points < 0) rs_mods_logf("no points for the song manifests: the mounting does not wait for them");
+}
+
+// The asset loader thread's loop (the game's: a pass, 10 ms, until its stop byte is set). A pass of the
+// AssetFactoryManager takes the requests that have come and goes through the loads it has in hand until one is
+// finished, so with the game's pause a hundred files a second is the most it reads, however small. While archives
+// are mounted the pause is LOADER_BUSY_US; at any other time the loop is the game's.
+void RC_FN(asset_loader_thread)(rc_ctx *c) {
+  OV_ARGS_OF(asset_loader_thread, a, c);
+  uint8_t *self = OV_PTR(a, uint8_t);
+  while (!*(volatile uint8_t *)(self + RC_OFF(asset_loader_stop))) {
+    OV_VCALL(RC_LD(uint64_t, self + RC_OFF(asset_loader_manager)), RC_SLOT(asset_loader_pass));
+    usleep(atomic_load_explicit(&g_loader_busy, memory_order_relaxed) ? LOADER_BUSY_US : LOADER_IDLE_US);
+  }
+  OV_VCALL((uint64_t)(uintptr_t)self, RC_SLOT(asset_loader_end));
+  ov_ret_u64(c, 0);
+}
 
 // What is left to load of the archives the steps took: the packages in the queue, and the one the head has. 0 when
 // there is none, and otherwise a number that changes whenever one is done.
@@ -328,6 +391,11 @@ static uint64_t mount_left(const uint8_t *self) {
   const uint64_t *queue = RC_HOST(RC_LD(uint64_t, RC_GA(dlc_package_queue)));  // begin, end
   uint64_t waiting = queue ? (RC_LD(uint64_t, queue + 1) - RC_LD(uint64_t, queue)) / 8 : 0;
   return now || waiting ? (waiting << 1 | (now != 0)) + 1 : 0;
+}
+
+static void mount_stall(const char *what) {
+  g_mount.stalled = 1;
+  rs_mods_logf("DLC: %s in %.0f s, the mounting goes on without waiting", what, LOAD_STALL_S);
 }
 
 // 1 while the steps have to wait for a package to be loaded. One that makes no progress for LOAD_STALL_S is taken
@@ -339,8 +407,20 @@ static int mount_loading(const uint8_t *self) {
   if (left != g_mount.left) g_mount.left = left, g_mount.left_since = t;
   if (!left) return 0;
   if (t - g_mount.left_since < LOAD_STALL_S) return 1;
-  g_mount.stalled = 1;
-  rs_mods_logf("DLC: a package did not load in %.0f s, the mounting goes on without waiting", LOAD_STALL_S);
+  mount_stall("a package did not load");
+  return 0;
+}
+
+// 1 while manifests this mounting asked for have not been answered, with the same patience.
+static int manifests_waiting(void) {
+  if (g_mount.stalled || g_manifest_points < 0) return 0;
+  unsigned answered = atomic_load(&g_manifests_answered);
+  int left = (int)(atomic_load(&g_manifests_asked) - g_mount.asked0) - (int)(answered - g_mount.answered0);
+  double t = elapsed_s();
+  if (answered != g_mount.answered) g_mount.answered = answered, g_mount.answered_since = t;
+  if (left <= 0) return 0;
+  if (t - g_mount.answered_since < LOAD_STALL_S) return 1;
+  mount_stall("a song manifest was not answered");
   return 0;
 }
 
@@ -360,11 +440,19 @@ void RC_FN(dlc_update)(rc_ctx *c) {
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
   int installing = *(volatile uint8_t *)(self + INSTALLING_FLAG);
-  if (installing && !g_mount.frames++) g_mount.t0 = elapsed_s();
+  int batched = installing && rs_mods_cfg.fixes && rs_mods_cfg.budget_s > 0;
+  if (installing && !g_mount.frames++) {
+    g_mount.t0 = elapsed_s();
+    g_mount.asked0 = atomic_load(&g_manifests_asked);
+    g_mount.answered0 = atomic_load(&g_manifests_answered);
+  }
+  atomic_store_explicit(&g_loader_busy, batched, memory_order_relaxed);
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
-  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !installing) {
+  if (!batched) {
     mount_step(self, o);
+  } else if (g_mount.holding) {
+    if (!manifests_waiting()) self[INSTALLING_FLAG] = 0;  // the end the game's step made, now for the menus too
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
@@ -379,10 +467,19 @@ void RC_FN(dlc_update)(rc_ctx *c) {
       if (mount_loading(self)) break;
       if (mount_step(self, o)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < rs_mods_cfg.budget_s);
+    if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+      g_mount.t_mounted = g_mount.answered_since = elapsed_s();
+      g_mount.frames_mounted = g_mount.frames;
+      if (manifests_waiting()) self[INSTALLING_FLAG] = g_mount.holding = 1;
+    }
   }
   if (installing && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
-    rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames,
-                 elapsed_s() - g_mount.t0);
+    double t = elapsed_s();
+    if (g_mount.holding)
+      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s, their songs in the lists %.2f s later",
+                   g_mount.steps, g_mount.frames_mounted, g_mount.t_mounted - g_mount.t0, t - g_mount.t_mounted);
+    else
+      rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames, t - g_mount.t0);
     memset(&g_mount, 0, sizeof g_mount);
   }
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;

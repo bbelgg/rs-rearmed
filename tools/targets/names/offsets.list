@@ -31,6 +31,10 @@ dlc_map_begin             # DLC coordinator: map begin node
 dlc_map_end               # DLC coordinator: map end node
 dlc_map_size              # DLC coordinator: map size
 dlc_package               # DLC coordinator: the package its update's head is loading, null: none
+asset_loader_manager      # asset loader thread's functor: the AssetFactoryManager
+asset_loader_stop         # asset loader thread's functor: u8, set to end the thread
+asset_loader_pass_slot    # AssetFactoryManager vtable: one pass of the loader thread
+asset_loader_end_slot     # asset loader thread's functor vtable: called when the loop ends
 json_number_refs          # number object: int32 refcount
 json_number_value         # number object: double value
 json_number_add_ref_slot  # number object vtable: AddRef

@@ -171,3 +171,6 @@ fps_tuner_instrument  # the tuner's wrong instrument warning: the same
 fps_tuner_hint        # the tuner's first-time hint: the same
 # --- Skip Tuner in the Guitarcade (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 tuner_skip_offer      # the tuner menu's buttons: whether Skip Tuner is offered, where the game acts on it
+# --- Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods.c)
+manifest_request      # the ManifestManager has asked for a mounted archive's song manifest (a .hsan or .hson file)
+manifest_response     # the ManifestManager is handed the answer to one such request, read or failed

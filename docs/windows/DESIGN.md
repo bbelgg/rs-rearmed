@@ -399,9 +399,13 @@ What differs, fix by fix:
     leaves its file open; the update's head, which the game calls once a frame, finishes the mount and closes the file,
     and a step taken before that drops the next archive. So the loop calls the head until the file is closed (the seam
     counts the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac edition's loop waits the
-    same way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`, not matched here): its
-    steps drop nothing, but its "Enumerating downloadable content..." went away before the songs were in. Here the
-    text has always stayed to the end, as the step that clears its flag comes after the last mount.
+    same way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`), and does two things this
+    one does not yet: it shortens the asset loader thread's pause while archives are mounted, and it holds the flag
+    that "Enumerating downloadable content..." follows until every song manifest asked for is in
+    ([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)). Here the flag clears when the last mount is finished.
+    The loader reads the manifests the same way in this game, so with a library of thousands the last songs are
+    expected to come into the lists after the text has gone, as they did on the Mac: not measured, and open
+    ([PLAN.md](PLAN.md#open-issues)).
   - The song path cache wraps the path intern itself, as this build has the Mac game's wrapper around it inlined.
   - The number-table hash is a function of its own here, where the Mac edition replaces the three functions it is
     inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down first.

@@ -26,6 +26,7 @@ void RC_FN(num_intern)(rc_ctx *c);  // JSON number interning (insert/find)
 void RC_FN(num_rehash)(rc_ctx *c);  // JSON number table rehash
 void RC_FN(path_md5)(rc_ctx *c);  // path -> interned path object (MD5 cache)
 void RC_FN(dlc_update)(rc_ctx *c);  // DLC coordinator per-frame update (batched mounting)
+void RC_FN(asset_loader_thread)(rc_ctx *c);  // the asset loader thread's loop (its pause, while archives are mounted)
 void RC_FN(key_down)(rc_ctx *c);  // game keyboard: key down
 void RC_FN(key_up)(rc_ctx *c);  // game keyboard: key up
 void RC_FN(thread_set_priority)(rc_ctx *c);  // thread class SetPriority

@@ -44,9 +44,11 @@ What the edition does today. What has not been tested is under [Open issues](#op
   so a change needs no reinstall ([INSTALL.md](INSTALL.md#settings-and-switches)).
 - **Batched DLC mounting** (new in 1.16.0): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. This game's loop drops no archive: the fault Learn & Play's had was looked for here and not found
-  ([TESTING.md](TESTING.md#unattended-runs)). The loop loads each archive's package before it opens the next (not
-  released), as Learn & Play's does: "Enumerating downloadable content..." stays until every song is in the lists,
-  and the whole mounting of 147 archives takes 0.42 s where it took 3.1 s.
+  ([TESTING.md](TESTING.md#unattended-runs)). "Enumerating downloadable content..." stays until every song is in
+  the lists (not released): the loop loads each archive's package before it opens the next, the asset loader
+  thread does not pause 10 ms between files while archives are mounted, and the flag is held for manifests still
+  to come. With 2,326 archives the text went after 23 s and the last songs came 15 s later; now both are at 27 s,
+  and the main menu and the song lists take keys after about five seconds of it.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): what the game counts in frames is put right by the
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
@@ -131,9 +133,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate**: with a guitar above 60 Hz, alone and with two players. The fixes
   came from a player's report of the Guitarcade's games going round between the tuner and calibration on a 120 Hz
   MacBook Pro; whether this was the cause of that is not known.
-- **Batched DLC mounting**: with a library of thousands (it was compared with a step a frame on 147 archives), and
-  the loop that waits for each package with one (run with 147), a rescan by Enumerate, and a package that does not
-  load (the steps then go on after 5 s, with a line in the log: not seen).
+- **Batched DLC mounting**: a library of thousands still takes long to mount, 27 s for 2,326 archives where 147
+  take half a second: every lookup of a file asks each mounted archive (the game's file system copies and sorts
+  its list of them, then asks one after the other, 0x10015a2e0), so an archive costs about 3 ms at the start and
+  about 20 ms at the end. Not looked into further. Not run: a rescan by Enumerate with the new loop, the song
+  count against a step a frame with a large library, and a package or manifest that does not come (the mounting
+  then goes on after 5 s, with a line in the log; the hold itself was run, with the loader's pause left at the
+  game's and without).
 - **The fixes from the code review of 2026-11-09**: six songs played with a guitar since, with no fault; no long
   session.
 - **Mods**: a file provider that changes what an archive holds; the tuner's reading of a 7-string chart's low B and a

@@ -2,6 +2,7 @@
 """Tests of the measuring tools: frame times, the settings file, the report, the key channel. No game."""
 import contextlib
 import io
+import json
 import os
 import sys
 import unittest
@@ -200,6 +201,70 @@ class StayedUp(unittest.TestCase):
                 self.game(d, ended, ["MainMenu", run.HIGHWAY]).on_highway("it played")
             with self.assertRaisesRegex(run.Stop, "left the note highway while it was traced \\(MainMenu\\)"):
                 self.game(d, FakeGame(), [run.HIGHWAY, "MainMenu"]).on_highway("it was traced")
+
+
+VMMAP = """REGION TYPE                        SIZE    SIZE    SIZE    SIZE    SIZE    SIZE    SIZE    COUNT
+===========                     ======= ========   =====  ======= ======== =========  =======  =======
+IOAccelerator (graphics)         %(gfx)s  %(gfx)s  %(gfx)s      0K      0K      0K      0K       10
+Malloc Small                     %(small)s  %(small)s  %(small)s      0K      0K      0K      0K       20
+===========                     ======= ========   =====  ======= ======== =========  =======  =======
+TOTAL                              1.0G    1.0G    1.0G      0K      0K      0K      0K       30
+
+                                 VIRTUAL RESIDENT    DIRTY  SWAPPED ALLOCATION      BYTES DIRTY+SWAP          REGION
+MALLOC ZONE                         SIZE     SIZE     SIZE     SIZE      COUNT  ALLOCATED  FRAG SIZE  %% FRAG   COUNT
+===========                      =======  =======  =======  =======  =========  =========  =========  ======  ======
+DefaultMallocZone_0x100000000     200.0M   200.0M   200.0M       0K   %(blocks)s    %(small)s      10.0M     10%%      20
+"""
+
+
+class SoakReport(unittest.TestCase):
+    """soak_report.py on a run made up here: a heap that grows by blocks and a footprint that climbs."""
+    def test_a_growing_run_reads_as_one(self):
+        import tempfile
+        import soak_report
+        with tempfile.TemporaryDirectory() as d:
+            t0 = 1000.0
+            samples = [{"t": 5.0 * i, "unix": t0 + 5.0 * i, "cpu": 2.5 * i, "footprint": (1400 + i) * 2 ** 20,
+                        "rss": 1100 * 2 ** 20, "instructions": 0, "gpu": 88, "threads": 42, "front": True,
+                        "screen": "NonStopPlay_Game" if i % 30 else "NonStopPlay_Hub", "helper_cpu": 0.0,
+                        "helper_footprint": 0, "load": 1.5,
+                        **({"fds": 70 + i // 12, "fds_psarc": 19, "cpu_speed_limit": None, "swap_used_mb": 0.0}
+                           if i % 12 == 0 else {})} for i in range(121)]
+            events = [{"t": 0.0, "unix": t0, "what": "log: [rsmods] song: One"},
+                      {"t": 150.0, "unix": t0 + 150, "what": "log: [rsmods] menu: NonStopPlay_Hub"},
+                      {"t": 61.0, "unix": t0 + 61, "what": "vmmap-01.txt took 1.5 s"}]
+            with open(os.path.join(d, "samples.json"), "w") as f:
+                json.dump({"summary": {"cpu_pct": 50.0}, "samples": samples, "events": events, "t0_unix": t0,
+                           "edition": "lp", "path": "bass", "minutes": 10}, f)
+            for name, v in (("01", {"gfx": "430.0M", "small": "100.0M", "blocks": "150000"}),
+                            ("end", {"gfx": "490.0M", "small": "170.0M", "blocks": "380000"})):
+                with open(os.path.join(d, "vmmap-%s.txt" % name), "w") as f:
+                    f.write(VMMAP % v)
+            with open(os.path.join(d, "leaks.txt"), "w") as f:
+                f.write("Process 1: 380000 nodes malloced for 170000 KB\nProcess 1: 1 leak for 32 total leaked bytes.\n")
+            ns = lambda s: int((t0 + s) * 1e9)  # noqa: E731
+            lines = ["W 0 0"]
+            at, k = 0.0, 0
+            while at < 600:
+                # a frame every 1/60 s; one of 300 ms in a song, one of 800 ms at the screen change, one in vmmap
+                step = 0.3 if k == 6000 else 0.8 if abs(at - 150) < 0.01 else 1.4 if abs(at - 60) < 0.01 else 1 / 60
+                lines.append("F %d 1000000 0 0 0" % ns(at))
+                at, k = at + step, k + 1
+            with open(os.path.join(d, "frames.txt"), "w") as f:
+                f.write("\n".join(lines) + "\n")
+            with open(os.path.join(d, "game.log"), "w") as f:
+                f.write("[rsmods] menu: NonStopPlay_Game\nw32: SetWarningMessageHook not implemented (returns 0x0)\n")
+            out = io.StringIO()
+            with contextlib.redirect_stdout(out):
+                self.assertEqual(soak_report.main(["soak_report.py", d]), 0)
+            text = out.getvalue()
+        self.assertIn("slope from minute 0: +12.00 MB/min", text)        # a MB a sample, twelve samples a minute
+        self.assertRegex(text, r"IOAccelerator \(graphics\) +430\.0 +490\.0 +\+60\.0")
+        self.assertRegex(text, r"DefaultMallocZone +100\.0/150000 +170\.0/380000 +\+70\.0 MB, \+230000 blocks")
+        self.assertIn("1 leaks, 0.00 MB", text)
+        self.assertRegex(text, r"frames over 50 ms: 3 \(.*in a song 1")   # the others: a tool's, a screen change's
+        self.assertIn("open files 70..80 (first 70, last 80)", text)
+        self.assertIn("SetWarningMessageHook not implemented (returns N)", text)  # numbers apart, lines are counted
 
 
 def result(edition, cpu, fps=60.0, **manifest):

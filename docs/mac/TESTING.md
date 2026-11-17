@@ -389,6 +389,35 @@ numbers, as the sampler slows the game.
 Results are in [PERFORMANCE.md](PERFORMANCE.md). Not looked at yet: that the venue shows with no guitar played,
 and a run on an external display.
 
+### Long runs
+
+`tools/perf/soak.py CONFIG OUT mac|lp MINUTES guitar|bass` plays Nonstop Play for that long and samples the game,
+for leaks and for what changes over time; `tools/perf/soak_report.py OUT/EDITION` says what the run shows
+([PERFORMANCE.md](PERFORMANCE.md#a-long-run)). `CONFIG` is a measured run's, and so are the checks before it and the
+rule about the screen: the game pauses when another app takes the focus.
+
+- **The way in**, from the main menu: Down three times and Return (NONSTOP PLAY, the fourth entry; the mods log
+  `menu: NonStopPlay_Main`). The page's rows, by Down: START NONSTOP PLAY, SONG LIST EDITOR, PLAY TIME (60 MINUTES),
+  SONG LIST (ALL SONGS), TUNING (E STANDARD), PLAY ORDER (SHUFFLE), ARRANGEMENTS (LEAD + RHYTHM); Left and Right
+  change a row, and the set list is built again after each change ("Building Set List...", a few seconds: 178
+  songs and 303 arrangements become 233 and 479 at ANY TUNING with 147 archives). TUNING's first value, one Left
+  from E STANDARD, is ANY TUNING. ARRANGEMENTS on a guitar path: LEAD, RHYTHM, LEAD + RHYTHM, LEAD + ALT LEAD,
+  RHYTHM + ALT RHYTHM, LEAD + RHYTHM + ALT; on the bass path BASS and BASS + ALT BASS. The path is Path/Input's
+  first row (Ctrl on the main menu, `menu: MissionMenu`): Right to its last value is BASS GUITAR, Esc goes back.
+- **Playing**: Return on START shows the set list (`NonStopPlay_Hub`, which goes on by itself) and the first
+  song's tuner (`NonStopPlay_PreSongTuner`: `fwddelete`, Return, as a song's), then `NonStopPlay_Game`. Every song
+  after it brings the set list and its tuner again. A mission that completes shows MISSION COMPLETE!
+  (`MissionInformationDialog`) between two songs and waits for Return. A new profile has the page at its
+  defaults each time.
+- **What is sampled**: every 5 s the CPU, footprint, RSS, GPU, threads and screen; every minute the open files
+  (the song archives by name); at 1 minute, every 10 and at the end `vmmap --summary` and `footprint`, and at 1
+  minute and the end `leaks`. Those tools stop the game for a second or two (`leaks` for five): the report tells
+  such frames from a screen change's and from ones inside a song. `SOAK_ENV="MallocStackLogging=1"
+  SOAK_TOOLS=heap,mh` adds the allocations' stacks: `leaks` then names each leak's, `heap-*.txt` has the blocks
+  by class and `mh-*.txt` the live blocks by stack, to compare between the first minute and the end.
+- **Run**: thirty minutes of each edition on a copy of a 2,326-archive library (`dlc` of the test home replaced
+  for the run), and ten minutes of Learn & Play after its fix.
+
 ### Shaders of a run
 
 `RS_GL_DUMP_SHADERS=DIR` writes the GLSL a run links, `RS_MSL_LOG=1` logs each program translated at run time

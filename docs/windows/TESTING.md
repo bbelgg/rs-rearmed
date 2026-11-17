@@ -400,6 +400,15 @@ mods, song and window, and one report with a column for each. It is described on
 A build's first play of the song on a screen has a stall or two in the window: the warm-up run is there for it.
 Results are in [PERFORMANCE.md](PERFORMANCE.md).
 
+### Long runs
+
+`tools/perf/soak.py CONFIG OUT lp MINUTES guitar|bass`, as in the Mac edition, whose page has the way through
+Nonstop Play and what is sampled ([Mac testing](../mac/TESTING.md#long-runs)); results are in
+[PERFORMANCE.md](PERFORMANCE.md#a-long-run). Here Path/Input is `lpctrl`, and the library of the run was the Mac
+edition's through songbridge (a link to its `dlc` in the test home's `dlc/`, removed after), 2,250 archives. The
+host's heap is what `leaks`, `heap` and `malloc_history` see: the game's own heap is in the guest window, which
+vmmap shows as `Untagged`.
+
 ### Shaders of a run
 
 `LP_SHADER_LOG=DIR` tells what a run made. `python3 win-x86/shaders/record_programs.py DIR/log.tsv` adds its

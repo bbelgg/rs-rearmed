@@ -51,6 +51,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
   cache's files. With 2,326 archives 1.16.0 showed the text for 24 s and went on loading for 33 s after it (a
   song list opened 3 s after the text had gone had 1,227 of 2,037 matches); now the text and the last song end together
   after 5 to 8 s, and 147 archives take half a second.
+- **FFT setups** (not released): the game made a vDSP FFT setup for each song and freed none, about 1 MB a song
+  for the whole run. One of each size is kept and handed out again (`RS_MODS_FIXES`). Checked for nine minutes over
+  two songs, with a guitar not played.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): what the game counts in frames is put right by the
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
@@ -152,9 +155,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   session.
 - **A long run** (`tools/perf/soak.py`, thirty minutes of Nonstop Play on a 2,326-archive library;
   [PERFORMANCE.md](PERFORMANCE.md#a-long-run)): memory, CPU, frames and threads stayed level. What it showed and
-  is left: the game's own FFT setups, about 1 MB a song that is never freed (the game calls
-  `vDSP_create_fftsetup` for each song and keeps none: a thunk that hands the same setup out again for the same
-  size would end it); each played song's archive stays open, as the game mounts it, 25 more after eight songs,
+  is left: each played song's archive stays open, as the game mounts it, 25 more after eight songs,
   which the raised open-file limit is for; and rearmed-mods writes a `game note` line for every note to the log,
   2 a second here and 40 a second in Learn & Play. Not run: longer than half an hour, a guitar, Song Stems
   making stems for new songs (the helper's CPU stayed at 1% of a core).

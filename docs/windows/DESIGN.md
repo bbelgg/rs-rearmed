@@ -427,7 +427,8 @@ What differs, fix by fix:
     is in a table of known keys in the image, so a custom song is left out even with its archive mounted. With the fix
     every key counts as known (`RS_MODS_BYPASS=0`: the table again). The Mac image has no such table.
   - Not needed here: the keyboard fixes fill the Mac game's table of Cocoa keys, and this game reads DirectInput
-    ([Input](#input)); the thread priority fix works around macOS refusing the Mac game's values, which `LP_QOS` covers.
+    ([Input](#input)); the thread priority fix works around macOS refusing the Mac game's values, which `LP_QOS` covers;
+    and the FFT setups the Mac game leaves behind are Accelerate's, where this game has an FFT of its own.
 - **No intro screens**: the shared hook. This game's tick is a stdcall function with the same states, and its fields are
   in `tools/targets/win-x86/offsets.map`.
 - **Auto Save warning skipped**: the handler runs as it is and only the dialog's call is left out, where the Mac

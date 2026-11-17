@@ -30,6 +30,9 @@ notes and empties this file. -->
   more than a gigabyte, with GPU memory rising beside it. Each frame's are freed with the frame now. The Mac
   edition did not have it. Found by a thirty-minute unattended run of Nonstop Play in both editions, which
   `tools/perf/soak.py` now makes.
+- **The Mac edition no longer leaves 1 MB behind for each song played.** The game makes its note detection's FFT
+  tables anew for every song and never frees them, as the original does: a long session grew by about a megabyte
+  a song. The built-in fixes keep one set and hand it out again (`RS_MODS_FIXES=0` is the game's own way).
 - **New names for mods, in both editions.** Four mid points of the DLC mounting: `manifest_request` and
   `manifest_response` (a mounted archive's song manifest asked for, and answered), `fs_mount` (an archive joins
   the game's file system) and `fs_exists` (the game asks its file system for a file; a hook may answer in its

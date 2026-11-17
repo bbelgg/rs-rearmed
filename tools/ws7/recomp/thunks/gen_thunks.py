@@ -133,6 +133,15 @@ for _name in ("AudioDeviceStart", "AudioDeviceStop"):
         "extern uint32_t rs_audio_real_dev(uint32_t) __attribute__((weak_import));",
         "if (rs_audio_io_id) %s = rs_audio_io_id(%s, %s);" % (p[1], p[0], p[1]),
         "if (rs_audio_real_dev) %s = rs_audio_real_dev(%s);" % (p[0], p[0])]
+# The game makes an FFT setup for each song and destroys none: the built-in fixes keep one of each size and hand it
+# out again (overrides/mods/fftsetup.c). Without them, or with RS_MODS_FIXES=0, the game's own call follows.
+HOOKS["vDSP_create_fftsetup"] = lambda p: [
+    "extern int rs_mods_fftsetup(uint64_t, int32_t, void **) __attribute__((weak_import));",
+    "{ void *kept_; if (rs_mods_fftsetup && rs_mods_fftsetup(%s, %s, &kept_)) { "
+    "c->r[0] = (uint64_t)(uintptr_t)kept_; return; } }" % tuple(p)]
+HOOKS["vDSP_destroy_fftsetup"] = lambda p: [
+    "extern int rs_mods_fftsetup_kept(const void *) __attribute__((weak_import));",
+    "if (rs_mods_fftsetup_kept && rs_mods_fftsetup_kept(%s)) return;" % p[0]]
 # Steam (the stub shim calls back into these natively):
 #   SteamInternal_ContextInit(data): data->pFn(ctx) is a guest function
 #   SteamAPI_RegisterCallback/RegisterCallResult(CCallbackBase *): its 3 virtuals

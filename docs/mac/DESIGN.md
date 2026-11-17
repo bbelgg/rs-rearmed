@@ -230,7 +230,7 @@ edition's log. The sources are in `tools/ws7/recomp/overrides/mods`:
   environment by then.
 - **Each edition's own.** The batched DLC mounting loop, the Auto Save skip, the Direct Connect overlay's file open, the
   path cache, the number hash and the signature skip sit where the two games' code differs. This edition's are in
-  `mods.c`, with two only it needs (the keys and the thread priority): a function named in
+  `mods.c`, with three only it needs (the keys, the thread priority and, in `fftsetup.c`, the FFT setups): a function named in
   `tools/targets/names/overrides/mods.list` is left out of the translation and defined there, and the rest are pre hooks
   on hook points. Learn & Play's, and why each differs: [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
 
@@ -281,7 +281,11 @@ What each does:
     The verifier's other caller keeps the real check.
   - This edition only: the keyboard keys the game's character table lacks and the End key in menus; and worker-thread
     priority, where macOS takes only the two of the game's values that put a thread at the bottom of the scheduler, so a
-    request below the default gets the default.
+    request below the default gets the default; and the FFT setups (not in rs-mac-fixes): the note detection makes a
+    vDSP setup for each song it starts and destroys none, about 1 MB a song for the whole run, as the original does.
+    The game's import thunks for `vDSP_create_fftsetup` and `vDSP_destroy_fftsetup` ask the fix first, which makes
+    one setup of each size, keeps it and hands it out again (a setup is tables for a size, never written after it
+    is made), and leaves a destroy of a kept one undone.
 - **No intro screens** (`RS_MODS_INTRO=0` plays the intro; shared, a pre hook on `boot_intro_update`): the boot service
   ticks the intro movie (logos, legal screens, intro video) in its boot phases 2 and 3 and shows the title only once the
   intro has ended. The movie's model is loaded as usual, but the movie is never started: the tick reports "not busy"

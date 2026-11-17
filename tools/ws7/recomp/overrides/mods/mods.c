@@ -386,6 +386,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
     if ((uint8_t)OV_GUEST(dlc_enum_check, o)) {
       self[RC_OFF(dlc_pending)] = 0;
       self[RC_OFF(dlc_tail_done)] = 0;
+      rs_mods_mount_restarted();
     }
   }
   if (!self[RC_OFF(dlc_tail_done)]) OV_GUEST(dlc_update_tail, o);
@@ -688,6 +689,7 @@ const ov_entry ov_mods_entries[] = {
     {RC_ADDR(num_rehash), "num_rehash", RC_FN(num_rehash)},
     {RC_ADDR(path_md5), "path_md5", RC_FN(path_md5)},
     {RC_ADDR(dlc_update), "dlc_update", RC_FN(dlc_update)},
+    {RC_ADDR(asset_loader_thread), "asset_loader_thread", RC_FN(asset_loader_thread)},
     {RC_ADDR(key_down), "key_down", RC_FN(key_down)},
     {RC_ADDR(key_up), "key_up", RC_FN(key_up)},
     {RC_ADDR(thread_set_priority), "thread_set_priority", RC_FN(thread_set_priority)},

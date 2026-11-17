@@ -119,7 +119,9 @@ with `rc_mid_is_none` (rc_mid.h). Edit groups have no `none`: a group with nothi
 A value's place is a general register (`eax`..`edi`, `rax`..`r15`), `xmm0`-`xmm15`, `st0`-`st7` (a 32-bit
 guest), or memory at a general register plus an offset (`[esp+0x18]`); its type is a hook prototype's (`int`,
 `uint8_t`, `float`, `double`, a pointer, ...). The same name on two targets should have the same values and
-continuations, so one mod reads both.
+continuations, so one mod reads both; the check holds the built-in fixes to that (below), and four points of
+rearmed-mods' Seven-String Guitar differ between the games (`seven_psn2`, `seven_psn2_after`, `seven_s3`,
+`seven_md1`), which that mod reads by target.
 
 Three rules from the Mac's tables. A code address a hook reads at a point (a return address at `[rsp]`, say) is
 where the image is mapped on the Mac, the image address in Learn & Play: compare it with the mapped address (`RC_A`),
@@ -144,5 +146,11 @@ Comments may cite addresses of a game binary as evidence; code may not use them.
 - native code uses a name no list has. It reads the override, seam and app sources (`tools/ws7/recomp/overrides`,
   `app`), the differential tests of `shims/game`, and Learn & Play's own sources (`win-x86/shims`, `win-x86/app`,
   `win-x86/online`);
+- that code names a mid point or an edit group no list has (`rc_mid_add_name("NAME")`, `rc_edit_enable("NAME")`,
+  a table's rows `{"NAME", "value", ...}`), or a value or continuation a target's entry of the point lacks
+  (`rc_mid_value(P, "NAME")`, `rc_mid_cont(P, "NAME")`, where `P` was given a point by name in the same file):
+  the fix would be off when that game runs;
+- an address or an offset is no number, or an `offsets.map` line has more than a name and an offset before its
+  comment;
 - Learn & Play's own sources, built for that game alone, use a name `win-x86` marks `unsupported`: it would not
   compile there.

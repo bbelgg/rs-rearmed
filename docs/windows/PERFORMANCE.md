@@ -85,7 +85,20 @@ ring that carries the guitar's samples from the audio thread to the note detecti
 main routine (0.7 points, the largest fenced function left there), which writes the flags and results the game thread
 reads.
 
-## Shader preparation
+## Results
+
+### Against Rosetta
+
+The original Mac game under Rosetta is the Mac edition's comparison ([Mac](../mac/PERFORMANCE.md#against-rosetta)):
+this edition takes about the CPU the original takes there (51.0% of a core), with a better picture and half the
+audio buffer. This game's own original runs on Windows and was not measured.
+
+### Renderer
+
+Metal only: the D3D9 layer draws through libRSOpenGL's Metal backend, and there is no OpenGL build of this
+edition to compare ([Mac](../mac/PERFORMANCE.md#renderer) has the two renderers side by side).
+
+### Shader preparation
 
 The install compiles the game's Metal shaders, as the Mac's does ([DESIGN.md](DESIGN.md#shader-corpus) has how): the build
 makes a corpus of 281 programs from the user's game files, and the app's `--warm-shaders` compiles it into the system's
@@ -155,7 +168,7 @@ The apps the installer built from 1.4.0's code, on the 75 Hz display at 2560x144
 editions' starts are in the [Mac edition's](../mac/PERFORMANCE.md#start-up-and-first-play). The
 [measured runs](#measured-runs) have replaced its song figures but for the frame rate on that display: 74.9 fps,
 median 13.35-13.39 ms, p99 17.5-17.7 ms, worst 24.2 ms. This edition's start: the title up in 6.9 and 7.3 s and taking
-keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s. Since then (not released) 150 archives
+keys by 10.0-10.4 s, 75 archives mounted in 0.32 s, quit in 0.3-0.5 s. After 1.16.0, 150 archives
 are mounted in 0.44 s with their songs in the lists 0.18 s later, and a library of 2,250, most of it the Mac edition's
 through a mod, in 19 to 20 s where it took 42 ([TESTING.md](TESTING.md#unattended-runs)). In the 1280x720 window (`RS_FULLSCREEN=0`, one
 run) the CPU was what it was full screen, 63.4% of a core against 62.6-63.2 then, with the GPU at 35% against 56-57: the

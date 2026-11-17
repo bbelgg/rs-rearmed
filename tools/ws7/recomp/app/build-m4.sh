@@ -55,7 +55,11 @@ lib=$out/ov/lib
 # bisecting a regression to one module.
 modules=${RC_OV_MODULES:-zlib lua png jpeg efd efd_qi crypto online dsp audio mods hooks}
 : > "$out/skip.txt"
-for m in $modules; do cat "$RC_TARGET_DIR/skip/$m.skip"; done | grep -v '^#' >> "$out/skip.txt"
+for m in $modules; do
+    # (a module without one would be linked beside the translation of what it defines)
+    [ -f "$RC_TARGET_DIR/skip/$m.skip" ] || { echo "no skip file for the override module $m ($RC_TARGET_DIR/skip)" >&2; exit 1; }
+    grep -v '^#' "$RC_TARGET_DIR/skip/$m.skip" >> "$out/skip.txt" || true
+done
 
 export RC_GEN_DIR=$out/gen RC_OBJ_DIR=$out/obj
 echo 100000000-110000000 > "$out/tso-all.txt"

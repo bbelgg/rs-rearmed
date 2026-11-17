@@ -1094,6 +1094,103 @@ class ExternalDrive(Base):
         self.assertFalse(os.path.islink(self.dest))
         self.assertTrue(os.path.isdir(target))
 
+    def test_move_home_leaves_a_copy_that_does_not_record_this_install(self):
+        self.copier().run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "game")
+        os.unlink(os.path.join(target, ".rearmed", "link.json"))  # as another install's own copy, linked to
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        out = io.StringIO()
+        self.copier(progress=gamefiles.Progress(lines=True, stream=out)).run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertTrue(gamefiles.check(target)[0])  # not this install's to remove
+        self.assertIn("is left there (it is not recorded as this install's)", out.getvalue())
+
+    def test_move_home_of_a_folder_that_is_no_copy(self):
+        other = os.path.join(self.ext, "mine")
+        write(os.path.join(other, "notes.txt"), b"mine")
+        os.makedirs(os.path.dirname(self.dest), exist_ok=True)
+        os.symlink(other, self.dest)
+        said = []
+        self.assertIsNone(self.placement("mac", self.src, self.dest, env={"RS_GAME_COPY_DIR": "home"},
+                                         say=said.append))
+        self.assertEqual(os.readlink(self.dest), other)
+        self.assertEqual(os.listdir(other), ["notes.txt"])
+        self.assertIn("not a finished copy", said[0])
+
+    def test_move_home_stopped_between_its_last_steps(self):
+        self.copier().run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "game")
+        shutil.copytree(target, self.dest + ".moving", symlinks=True)  # whole, and then the link went
+        os.unlink(self.dest)
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        self.copier().run()
+        self.assertFalse(os.path.islink(self.dest))
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        self.assertFalse(os.path.exists(os.path.join(self.dest, ".rearmed", "link.json")))
+        self.assertFalse(os.path.lexists(self.dest + ".moving"))
+
+    def test_a_stopped_moves_part_goes_when_the_other_place_is_chosen(self):
+        self.copier().run()
+        write(os.path.join(self.dest + ".moving", "half"), b"x")
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        self.copier().run()
+        self.assertTrue(os.path.islink(self.dest))
+        self.assertFalse(os.path.lexists(self.dest + ".moving"))
+
+    def test_move_home_with_steams_download_gone(self):
+        depot = self.lp_game(os.path.join(self.ext, "depot"))
+        lp_dest = os.path.join(self.tmp, "home", "learn-play", "game")
+        Copier("learn-play", depot, lp_dest, [], self.steam, quiet(), is_running=lambda e: False,
+               placement=self.placement).run()
+        target = os.path.join(self.ext, "RS Re-ARMed", "learn-play", "game")
+        self.assertEqual(os.readlink(lp_dest), target)
+        shutil.rmtree(depot)  # Steam cleared its download
+        os.environ["RS_GAME_COPY_DIR"] = "home"
+        gamefiles.refresh(lp_dest, quiet(), is_running=lambda e: False, placement=self.placement, clone=no_clone)
+        self.assertFalse(os.path.islink(lp_dest))
+        self.assertTrue(gamefiles.check(lp_dest)[0])
+        self.assertFalse(os.path.exists(target))
+        # and the other way needs the game folder: said, and the copy stays
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        out = io.StringIO()
+        gamefiles.refresh(lp_dest, gamefiles.Progress(lines=True, stream=out), is_running=lambda e: False,
+                          placement=self.placement)
+        self.assertFalse(os.path.islink(lp_dest))
+        self.assertIn("needs the game folder", out.getvalue())
+
+    def test_move_to_drive_leaves_an_earlier_copy(self):
+        self.copier(placement=None).run()
+        if not self._clones_here():
+            self.skipTest("no clones on this volume")
+        earlier = os.path.join(self.ext, "RS Re-ARMed", "game")  # this install's, from before: nothing leads to it
+        os.makedirs(os.path.join(earlier, ".rearmed"))
+        gamefiles.write_json(os.path.join(earlier, ".rearmed", "link.json"), {"format": 1, "link": self.dest})
+        write(os.path.join(earlier, "dlc", "mine_m.psarc"), b"put there by hand")
+        os.environ["RS_GAME_COPY_DIR"] = "drive"
+        out = io.StringIO()
+        self.copier(progress=gamefiles.Progress(lines=True, stream=out)).run()
+        self.assertEqual(os.readlink(self.dest), earlier + " 2")
+        self.assertTrue(gamefiles.check(self.dest)[0])
+        with open(os.path.join(earlier, "dlc", "mine_m.psarc"), "rb") as f:
+            self.assertEqual(f.read(), b"put there by hand")
+        self.assertIn("An earlier copy of the game files in %s is left as it is" % earlier, out.getvalue())
+
+    def test_a_copy_whose_link_cannot_be_looked_at_is_anothers(self):
+        t = os.path.join(self.ext, "RS Re-ARMed", "game")
+        os.makedirs(os.path.join(t, ".rearmed"))
+        gamefiles.write_json(os.path.join(t, ".rearmed", "link.json"), {"format": 1, "link": "/Users/other/game"})
+        write(os.path.join(t, "songs.psarc"), b"theirs")
+        real = os.lstat
+
+        def lstat(path, *a, **kw):
+            if path == "/Users/other/game":
+                raise PermissionError(13, "Permission denied", path)
+            return real(path, *a, **kw)
+        with mock.patch.object(gamefiles.os, "lstat", lstat):
+            self.assertEqual(gamefiles._free_name(t, self.dest), t + " 2")
+        self.assertEqual(gamefiles._free_name(t, self.dest), t)  # not there at all: its install is gone
+
     def test_move_to_drive(self):
         self.copier(placement=None).run()  # a real copy at home
         self.extras(self.dest)
@@ -1782,6 +1879,33 @@ class MacGame(SteamSteps):
         self.assertTrue(os.path.isfile(os.path.join(dest, "songs.psarc")))
         self.assertTrue(gamefiles.check(dest)[0])
 
+    def test_a_refresh_without_steams_folder_keeps_the_games_ini(self):
+        self.downloaded()
+        write(os.path.join(self.folder, "Rocksmith.ini"), b"[Audio]\n")
+        dest = self.copy()
+        ini = os.path.join(dest, ".rearmed", "Rocksmith.ini")
+        self.assertTrue(os.path.isfile(ini))
+        shutil.rmtree(self.folder)
+        self.copy(refresh=True)
+        self.assertTrue(os.path.isfile(ini))
+
+    def test_a_download_stopped_part_way_is_unfinished_whatever_its_program(self):
+        self.downloaded(b"not yet filled" * 1000)  # Steam makes every file at its full size first
+        self.assertEqual(self.depot.locate_default(self.steam).status, "different")
+        self.depot.cfg["depot_disk_bytes"] = 10 ** 9  # the whole depot, which the folder is far short of
+        self.assertEqual(self.depot.locate_default(self.steam).status, "unfinished")
+        self.downloaded()
+        self.assertEqual(self.depot.locate_default(self.steam).status, "unfinished")
+
+    def test_no_copy_from_a_folder_steam_is_still_filling(self):
+        self.downloaded()
+        self.log("Downloading depot 221682 (103 files, 10 MB) ...")
+        with self.assertRaises(Failure) as e:
+            self.copy()
+        self.assertIn("Steam is still downloading the game", str(e.exception))
+        self.log('Depot download complete : "%s" (manifest 77)' % self.folder)
+        self.assertTrue(gamefiles.check(self.copy())[0])
+
     def test_dlc_is_fetched_for_a_download_and_not_for_a_game_in_steam(self):
         made = []
 
@@ -1811,7 +1935,8 @@ class MacGame(SteamSteps):
         self.assertEqual((r.returncode, r.stdout.strip()), (0, "download_depot 221680 221682 2035751420671775739"))
         r = subprocess.run(py + ["mac-game", "--locate"], capture_output=True, text=True, env=env)
         self.assertEqual(r.returncode, 1)
-        self.assertIn("error: No Rocksmith2014.app in", r.stdout)
+        self.assertIn("No Rocksmith2014.app in", r.stdout)
+        self.assertNotIn("error:", r.stdout)  # only looked for: not there is an answer, no error of the run
         self.installed()
         r = subprocess.run(py + ["mac-game", "--locate"], capture_output=True, text=True, env=env)
         self.assertEqual(r.stdout.splitlines(), ["game-from library", "game-folder " + os.path.join(

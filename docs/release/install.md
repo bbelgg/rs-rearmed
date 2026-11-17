@@ -19,8 +19,9 @@ installer starts their installation if they are missing.
 4. When it's done, start the game from the window the installer shows. Later, start it from `~/Applications`,
    Launchpad or Spotlight.
 
-Updating from an earlier version: run this installer; your saves are kept. Settings and switches… works once the game has been
-installed by 1.11.0 or later. If you patched the game for another tool (for example RS Companion), install that again
+Updating from an earlier version: run this installer and click **Build & Install**; your saves are kept. Settings and
+switches… needs the game installed by this version: a game installed by 1.11.0 to 1.16.0 takes only the seven built-in
+mods it knew from it, and none of the other switches. If you patched the game for another tool (for example RS Companion), install that again
 afterwards. An earlier version may have left `static.psarc.rearmed` in your Steam game folder; you can delete it.
 
 See the install guides for [the Mac game](https://github.com/bbelgg/rs-rearmed/blob/v{version}/docs/mac/INSTALL.md) and

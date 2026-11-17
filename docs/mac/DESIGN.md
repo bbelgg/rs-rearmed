@@ -66,7 +66,8 @@ connects them to the translated `GameBootstrap` and `GameFrame`. The shell takes
 The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-ARMed.app` bundle by `launch-stub.c`)
 checks the copy is complete (telling a drive that is not connected from an incomplete copy), links `static.psarc` to the
 title logo or the original, keeps the game's `Rocksmith.ini` offline ([Online services](#online-services)), passes the
-built-in mods switched off in `settings.env` (only its nine switches; a value in the environment wins), seeds the
+built-in mods switched off in `settings.env` (only its nine switches) and the other switches set in `options.env` (only
+its 35; a value in the environment wins over either), seeds the
 offline Steam saves once, and starts the game with the network guard inserted (`open -n -a`). Nothing of Steam's is read
 while the game runs, except `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves
 are there.
@@ -223,7 +224,8 @@ edition's log. The sources are in `tools/ws7/recomp/overrides/mods`:
   names the game's functions and fields and looks them up when it runs, so the same file is built into both apps.
   `mods_shared.c` has the switches, the log, the start (`rs_mods_start`: it reads the switches, raises the open-file
   limit and adds the hooks), the intro skip, the song ownership during a mount, what the two batched DLC mountings
-  share (the song manifests, the loader thread's pause, a step's file questions) and Player 2's saved input;
+  share (the song manifests, the loader thread's pause, a step's file questions), Player 2's saved input and Skip Tuner
+  in the Guitarcade;
   `framerate.c` has the frame rate fixes. This edition starts them from a constructor, as the launcher has set the
   environment by then.
 - **Each edition's own.** The batched DLC mounting loop, the Auto Save skip, the Direct Connect overlay's file open, the
@@ -255,16 +257,20 @@ What each does:
       hundred archives mounted, 19 ms with 2,300. Within one mounting, a question the step before had "no" for is
       asked of the archive this step mounted alone, by the game's own call on it (two more mid points, `fs_mount`
       and `fs_exists`); a "yes" goes to the whole file system after all, and at the mounting's end every question
-      is asked of the whole file system once more, a different answer switching this off for the run.
+      is asked of the whole file system once more, a different answer switching this off for the run. A step taken
+      one a frame (`RS_MODS_BUDGET_MS=0`) asks as the game does.
+
+    An enumeration the game starts while the flag is held (ENUMERATE pressed then) ends the hold: its archives are
+    stepped from the next frame, and the manifests still to come are waited for with its own.
 
     Steps alone left packages and manifests behind: the text went with songs still coming into the lists and the
     menus slow to answer, for 2.7 s with 147 archives and for 33 s with 2,326 (1.16.0: the text for 24 s, and a
-    search 6 s after it had 1,227 matches of 2,037). Now the text and the last song end together, after 5 to 8 s
+    song list opened 3 s after it had 1,227 matches of 2,037). Now the text and the last song end together, after 5 to 8 s
     with 2,326. The first of the four is this edition's own (`mods.c`: the packages the game has left to load,
     `dlc_package` and `dlc_package_queue`), and so is the replaced loop of the loader thread; the other three are
     one source with Learn & Play (`mods_shared.c`), whose loop waits for each mount in its own way, there because a
     step taken too early drops an archive ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This
-    game's steps drop none either way ([TESTING.md](TESTING.md#unattended-runs)).
+    game's steps drop none either way (checked in 1.16.0: [TESTING.md](TESTING.md#unattended-runs)).
   - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
     descriptors of an app started from Finder. The shared start raises it.
   - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path
@@ -302,7 +308,9 @@ What each does:
   gives a string that drifts two frames before its hold loses ground, and averages levels and notes one a frame for its
   volume and wrong instrument warnings. A menu panel's hold takes at least 1/15 s off its timer each frame. The hooks
   put each right by the frame's own time (`framerate.h` has the arithmetic), and only for a frame shorter than a 60 Hz
-  one (under 14.5 ms): at 60 Hz and below the game runs as it always has.
+  one (under 14.5 ms): at a steady 60 Hz and below the game runs as it always has. (A 60 Hz game's short frame after a
+  late one keeps its checks and takes its steps by its own time.) Above 100 frames a second calibration's average covers
+  the buffer's 100 samples, less than the second it covers at 60 Hz.
 - **Skip Tuner in the Guitarcade** (`RS_MODS_GUITARCADE_SKIP=0` is the original; shared: a hook at the mid point
   `tuner_skip_offer`, with each game's place in its `mids.map`). Where the tuner menu sets its buttons up, it offers
   Skip Tuner unless the stage its `OnComplete` names is `Guitarcade_Game`: that one test kept the button from a
@@ -354,13 +362,15 @@ What each does:
     `rc_hook_add` with a game address keeps working; `rc_target()` returns `mac-x64`.
   - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables (`tools/targets/mac-x64/edits.map`
     and `mids.map`) have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar (618 edits and 122
-    mid points), and `plain_packages`, its Plain Packages (2 edits and a mid point). Eight more mid points, `fps_*`, are
-    the built-in frame rate fixes'. Learn & Play has 735 edits: many of this game's six-string loops are unrolled, so
+    mid points), and `plain_packages`, its Plain Packages (2 edits and a mid point). Thirteen more mid points are the
+    built-in fixes': the eight `fps_*` of the frame rate fixes, `tuner_skip_offer` of Skip Tuner in the Guitarcade,
+    and `manifest_request`, `manifest_response`, `fs_mount` and `fs_exists` of the batched DLC mounting. Learn & Play has 735 edits: many of this game's six-string loops are unrolled, so
     where Learn & Play's edits lengthen a loop, 29 mid points of this edition's own (`none` in Learn & Play) do the
     extra strings. The 34 points only Learn & Play needs are `none` here.
   - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The game's file imports (`open`,
-    `read`, `stat`, `fopen`, `opendir` and the rest) are bound to the runtime's `rc_file_*`, which ask the mod's
-    provider first; the same interface as Learn & Play's.
+    `close`, `read`, `fstat`, `stat`, `fopen`, `opendir`, `readdir`, `closedir`: every one it has that reads a file or
+    a folder) are bound to the runtime's `rc_file_*`, which ask the mod's provider first; the same interface as Learn &
+    Play's. The build says so if the game imports another (`gen_thunks.py`).
   - **Drawing.** The overlay API (`shims/include/rs_overlay.h`) works on both renderers; a mod that changes a
     game texture uses the render API (`shims/include/rs_render.h`, Metal alone). Both: [METAL.md](METAL.md).
 

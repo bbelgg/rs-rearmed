@@ -73,6 +73,10 @@ void rs_mods_start(void);
 //   rs_mods_mount_waiting()          is 0: the manifests are in, or none has come for 5 s.
 //   rs_mods_mount_end()              last, in the update that found the flag set and leaves it clear: the log's
 //                                    lines, and the mounting's state is gone.
+//   rs_mods_mount_restarted()        when the game started an enumeration in this update (its check said so): one
+//                                    that comes while the flag is held ends the hold, and its archives are stepped
+//                                    from the next update on, as a mounting of their own.
+// rs_mods_mount_loading is the Mac loop's; Learn & Play's waits on the archives its Win32 seam counts open.
 int rs_mods_mount_frame(int installing);
 void rs_mods_mounting(int on);
 void rs_mods_mount_took(void);
@@ -81,6 +85,7 @@ int rs_mods_mount_listed(void);
 int rs_mods_mount_holding(void);
 int rs_mods_mount_waiting(void);
 void rs_mods_mount_end(void);
+void rs_mods_mount_restarted(void);
 // The asset loader thread's pause between two passes, in microseconds: short while archives are mounted in the loop,
 // the game's 10 ms at any other time. For each edition's replacement of the thread's loop (asset_loader_thread).
 unsigned rs_mods_loader_pause_us(void);

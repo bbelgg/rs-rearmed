@@ -317,7 +317,24 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
     def fenced_call(self, t):
         """A relaxed function (a CALLS_OK one: relax_ok) calls fenced code: the call gets the function's exit
         fence before it and its entry fence after it (relaxed.py)."""
-        return self.relaxed and t not in RELAXED
+        return self.relaxed and not self.relaxed_callee(t)
+
+    def relaxed_callee(self, t):
+        """True if the function at t is translated relaxed: listed, and not left fenced by function() for a mid
+        point in it or for what relax_ok refuses. A listed function that stays fenced is fenced code to its
+        callers. Cached; a nested discovery, as is_noreturn's."""
+        if t not in RELAXED:
+            return False
+        cache = self.__dict__.setdefault("_relaxed_cache", {})
+        if t not in cache:
+            saved = (self.tables, self.noret)
+            try:
+                seen, _ = self.discover(t)
+                cache[t] = not any(a in self.mids for a in seen) and not self.relax_ok(t, seen)
+            except Unsupported:
+                cache[t] = False     # a stub
+            self.tables, self.noret = saved
+        return cache[t]
 
     def relax_exit(self):
         return "RC_RELAX_EXIT(); " if self.relaxed else ""
@@ -416,9 +433,9 @@ class Translator(IntMixin, SseMixin, JumpTableMixin, CallsMixin, InnerMixin):
         return True
 
     def call_internal(self, t, tail=False):
-        """In a relaxed function a call or tail call leaves it (relax_ok admits only other relaxed
-        functions, which fence themselves): nothing is needed around it, except the exit fence before
-        a tail call, which ends this function."""
+        """In a relaxed function a call of another relaxed function needs nothing around it (the callee
+        fences itself); a call of fenced code (fenced_call) gets the exit fence before it and the entry
+        fence after it; a tail call, which ends this function, the exit fence before it."""
         self.callees.add(t)
         s = "SPILL_CALL(); F_%x(c); FILL_CALL();" % t
         if self.fenced_call(t) and not tail:

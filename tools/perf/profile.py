@@ -23,9 +23,13 @@ XPATH = '/trace-toc/run[@number="1"]/data/table[@schema="time-profile"]'
 
 def export(trace):
     out = os.path.join(os.path.dirname(os.path.abspath(trace)), "time-profile.xml")
-    if not os.path.exists(out):
-        subprocess.run(["xcrun", "xctrace", "export", "--input", trace, "--xpath", XPATH, "--output", out],
+    # made under another name and renamed: an export that was stopped leaves no half file to be read next time;
+    # and made again when the trace is newer (another trace recorded into the same folder)
+    if not os.path.exists(out) or os.path.getmtime(out) < os.path.getmtime(trace):
+        part = out + ".part"
+        subprocess.run(["xcrun", "xctrace", "export", "--input", trace, "--xpath", XPATH, "--output", part],
                        check=True, stdout=subprocess.DEVNULL)
+        os.replace(part, out)
     return out
 
 
@@ -71,7 +75,7 @@ def samples(xml):
         tid = th.find("tid")
         yield (int(t.text), tid.get("fmt") if tid is not None else th.get("fmt"), int(w.text) if w is not None else 0,
                [frame(f) for f in bt.findall("frame")])
-        # the elements stay alive in `seen`; only the row's own list of children goes
+        # (the elements stay alive in `seen`, which later rows refer to by id)
 
 
 def summarise(rows):
@@ -124,7 +128,8 @@ def main():
     print("%.1f s, %d threads, %.1f%% of a core in all" % (seconds, len(threads), whole / seconds / 1e7))
 
     def line(f, w, total):
-        return "  %5.1f%%  %5.2f  %s  [%s]" % (w / total * 100, w / seconds / 1e7, f[0], f[1])
+        # (a thread whose samples carry no weight has a total of 0)
+        return "  %5.1f%%  %5.2f  %s  [%s]" % (w / total * 100 if total else 0.0, w / seconds / 1e7, f[0], f[1])
 
     for tid in order[:a.threads]:
         th = threads[tid]

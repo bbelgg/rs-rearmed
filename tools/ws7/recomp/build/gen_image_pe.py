@@ -78,7 +78,9 @@ def _init(img, funcs, resume, flag_callees, data_code, wrappers, prefix="", inli
     _tr.set_inner(*(inner or ({}, {})))
     _tr.thunk_prefix = prefix + "I_"
     _tr.inline_interlocked = inline_interlocked
-    _tr.keep_calls = set(hooks)  # a hook point is always called: its hooks run around the call
+    # always called, never translated in place (stack_check): a hook point, whose hooks run around the call, and a
+    # function an override module defines or wraps
+    _tr.keep_calls = set(hooks)
     _tr.resume = resume
     _tr.flag_callees = flag_callees
     _tr.set_data_code(data_code)
@@ -305,7 +307,7 @@ def main():
                   for e in d.get("edits", [])}, {m[0]: (m[1], m[2], m[3]) for m in d.get("mids", [])})
     placed, table_errors = set(), []
     with mp.Pool(args.jobs, _init, (args.image, starts, resume, flag_callees, data_code, wrappers, P,
-                                    bool(args.target), inner, hooks)) as pool:
+                                    bool(args.target), inner, set(hooks) | skip | wrap)) as pool:
         done = 0
         for res in pool.imap(_work, batches):
             for a, st, reason, n, text, cs, us, info, ins in res:

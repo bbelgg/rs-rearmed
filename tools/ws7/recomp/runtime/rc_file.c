@@ -60,7 +60,7 @@ int rc_file_provide(const rc_file_provider *p) {
 
 static int nprov(void) { return __atomic_load_n(&rc_file_nproviders, __ATOMIC_ACQUIRE); }
 
-// path made absolute (not resolved: no link is followed and no "." or ".." removed)
+// path made absolute (not resolved: no link is followed, and no "." or ".." or doubled "/" removed)
 static const char *absolute(const char *path, char *buf, size_t n) {
   if (path[0] == '/') return path;
   char cwd[PATH_MAX];
@@ -182,6 +182,7 @@ static ssize_t vf_pread(vfile *v, void *buf, size_t n, int64_t off) {
     int64_t r = v->p->read(v->p->user, v->file, (char *)buf + got, n - got, off + (int64_t)got);
     if (r < 0) { errno = EIO; return -1; }
     if (r == 0) break;
+    if ((uint64_t)r > n - got) r = (int64_t)(n - got);  // a provider that says more than was asked for
     got += (size_t)r;
   }
   return (ssize_t)got;
@@ -238,13 +239,13 @@ static int vf_stat(const char *abs, rc_file_info *info) {
     const rc_file_provider *p = &providers[i];
     *info = (rc_file_info){0, 0};
     if (p->stat) {
-      if (p->stat(p->user, abs, info)) return 1;
+      if (p->stat(p->user, abs, info) && info->size >= 0) return 1;
       continue;
     }
     void *file = p->open(p->user, abs, info);
     if (!file) continue;
     p->close(p->user, file);
-    return 1;
+    if (info->size >= 0) return 1;  // as vf_open: a file of no size is not served
   }
   return 0;
 }
@@ -278,6 +279,9 @@ FILE *rc_file_fopen(const char *path, const char *mode) {
     return 0;
   }
   f->_file = (short)fd;  // fileno: the game asks fstat for the size of some files it opened with fopen
+  // A file's buffer, not the placeholder's: stdio sizes a stream's buffer by its descriptor (/dev/null: 64 KB) and
+  // fills it anew after every fseek of a funopen stream, so a seek and a short read cost the provider 64 KB.
+  setvbuf(f, 0, _IOFBF, 4096);
   return f;
 }
 
@@ -296,7 +300,7 @@ static void dir_add(void *ctx, const char *name) {
   vdir *v = ctx;
   if (!name || !*name || strchr(name, '/') || strlen(name) >= sizeof v->ent.d_name) return;
   for (int i = 0; i < v->nadd; i++)
-    if (!strcmp(v->add[i], name)) return;
+    if (!strcasecmp(v->add[i], name)) return;
   if (v->nadd == v->cap) {
     int cap = v->cap ? v->cap * 2 : 16;
     char **a = realloc(v->add, (size_t)cap * sizeof *a);
@@ -365,8 +369,10 @@ struct dirent *rc_file_readdir(DIR *d) {
       for (int i = 0; i < n && !hidden; i++)
         hidden = providers[i].hide && providers[i].hide(providers[i].user, v->path, e->d_name);
     if (hidden) continue;
-    for (int i = 0; i < v->nadd; i++)  // a name the folder has is listed once
-      if (v->add[i] && !strcmp(v->add[i], e->d_name)) {
+    // A name the folder has is listed once, letter case apart: neither game's folders tell names apart by case
+    // (Learn & Play's are Windows', the Mac's a volume without case), and one archive listed twice is mounted twice.
+    for (int i = 0; i < v->nadd; i++)
+      if (v->add[i] && !strcasecmp(v->add[i], e->d_name)) {
         free(v->add[i]);
         v->add[i] = 0;
       }
@@ -387,7 +393,7 @@ struct dirent *rc_file_readdir(DIR *d) {
 }
 
 int rc_file_closedir(DIR *d) {
-  vdir *v = dir_of(d, 1);
+  vdir *v = nprov() ? dir_of(d, 1) : 0;
   if (v) {
     for (int i = 0; i < v->nadd; i++) free(v->add[i]);
     free(v->add);

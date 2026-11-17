@@ -80,7 +80,7 @@ the stack check: [recompiler](../recompiler/README.md#the-32-bit-front-end-windo
 
 ## Per-game tables
 
-`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,063 of the 1,263 symbols read, an
+`tools/targets/win-x86` has the Learn & Play image's names (`symbols.map`: 1,064 of the 1,265 symbols read, an
 `unsupported` line with the reason for the rest: inlined, folded or specialised by LTCG, or no counterpart),
 `offsets.map`, `edits.map`, `mids.map` and `relaxed.map`, and in its `target.toml` the pins (the depot, manifest, exe
 and DLL hashes, build figures). The build uses them for the hook points, what a mod asks for by name, and the built-in
@@ -346,7 +346,7 @@ download jobs fail at once on the calling thread, as on the Mac: the manager's q
 name lookup but a literal loopback address (`win-x86/shims/win32_net.c`; `select` with no timeout waits 100 ms and finds
 nothing ready, as with one), and `ShellExecuteA` opens nothing. No host socket call is linked into the binary (`nm -u`
 shows no `socket`, `connect` or `getaddrinfo`), so without mods the Mac edition's network guard is not loaded, and has
-nothing to guard. A mod is native code and could make a socket, so at its start, once `settings.env` is read, the app
+nothing to guard. A mod is native code and could make a socket, so at its start, once `settings.env` and `options.env` are read, the app
 looks whether it has mods to load and, if so, starts itself again with `libnetguard.dylib` inserted (`mods_guard` in
 `lp_main.c`; from its own `Contents/MacOS`, as dyld inserts only at a start): the same library with the same rules as
 the Mac edition always runs with. Without the guard no mods load.
@@ -384,7 +384,7 @@ editions; this section says what differs here, and why.
 How a fix gets into this app:
 
 - **The shared ones** (`tools/ws7/recomp/overrides/mods`: `mods_shared.c`, `framerate.c`) are built into it as a mod is
-  built. `lp_mods_init()` starts them from `lp_main.c`, once `settings.env` is in the environment, where the Mac edition
+  built. `lp_mods_init()` starts them from `lp_main.c`, once `settings.env` and `options.env` are in the environment, where the Mac edition
   starts them from a constructor.
 - **This edition's own** are in `win-x86/shims/win32_overrides.c`, written against the 32-bit runtime. A function named
   in `tools/targets/names/overrides/win32.list` is left out of the translation and defined there; one marked `wrap`
@@ -399,8 +399,10 @@ What differs, fix by fix:
     - This game's loop has to wait for each mount. An install step starts mounting one archive and leaves its file
       open; the update's head, which the game calls once a frame, finishes the mount and closes the file, and a step
       taken before that drops the next archive. So the loop calls the head until the file is closed (the seam counts
-      the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac edition's loop waits the same
-      way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`, not matched here).
+      the open song archives of `dlc/`, `win32_kfile.c`) before the next step; an archive still open a second after
+      its step is taken to be one the game keeps open, and the steps go on, with a line in the log. The Mac edition's
+      loop waits the same way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`, not
+      matched here), for 5 s.
     - The rest is one source (`mods_shared.c`; the [Mac design](../mac/DESIGN.md#built-in-fixes-and-mods) says what
       each is for): while archives are mounted the asset loader thread's pause between passes is 0.2 ms, not the
       game's 10 ms; the flag that "Enumerating downloadable content..." follows is held until every song manifest
@@ -481,8 +483,9 @@ What differs, fix by fix:
       reads its one value, and a change to it goes nowhere.
   - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`): the Mac edition's two groups,
     `seven_string` (735 edits and 127 mid points: the game's arrays for six strings grown to eight) and `plain_packages`
-    (2 edits and a mid point on the song file's decrypt), and the eight `fps_*` mid points of the built-in frame rate
-    fixes. The 29 points only the Mac needs are `none` here.
+    (2 edits and a mid point on the song file's decrypt), and the built-in fixes' thirteen mid points, as on the Mac:
+    the eight `fps_*`, `tuner_skip_offer`, and `manifest_request`, `manifest_response`, `fs_mount` and `fs_exists`.
+    The 29 points only the Mac needs are `none` here.
   - **Files** (`rc_file_provide`, `rc_file.h`): the same interface as the Mac edition's. The Win32 seam's opens for
     reading, reads, seeks, sizes, attributes, finds and mapped views (`win32_kfile.c`, `win32_ksync.c`) go through the
     runtime's `rc_file_*`, which ask the mod's provider first. The provider sees host paths, after the seam's mapping of
@@ -528,15 +531,14 @@ editions and the parts both share). Neither touches the Mac game install or its 
    `Contents/MacOS` has `rs2014_lp`, `libRSOpenGL.dylib` and `libnetguard.dylib`, `Contents/Resources` the game image
    (`lp_game.exe`), the DLL images, the shader corpus and the game's icon. It sets no environment; `lp_main.c` takes its
    folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods switched off
-   from `settings.env` there (`lp_settings.c`, the Mac launcher's rules: only those nine switches, and a value in the
-   environment wins), read before `mods_guard`, so the start again with the network guard keeps them.
+   and the other switches set from `settings.env` and `options.env` there (`lp_settings.c`, the Mac launcher's rules:
+   only their nine and 35 keys, and a value in the environment wins), read before `mods_guard`, so the start again with
+   the network guard keeps them.
 8. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link.
 9. **The shaders** (`tools/play-native/warm-shaders.sh`, the Mac edition's): the installed app's `--warm-shaders`
    ([Shader corpus](#shader-corpus)).
 
-`tools/play-native/learn-play.sh` runs all of it in a terminal; `RS Re-ARMed Installer.app` runs the same
-commands with its own steps and its Refresh Game Files button runs the installed `gamefiles.py refresh`. Its
-Settings and switches… sheet, with Learn & Play chosen, writes `learn-play/settings.env` and
-`learn-play/options.env`, as it writes the Mac edition's
-([Mac DESIGN](../mac/DESIGN.md#installer-and-build)). Neither touches the Mac game install or its saves.
+The installer's Refresh Game Files button runs the installed `gamefiles.py refresh`, and its Settings and switches…
+sheet, with Learn & Play chosen, writes `learn-play/settings.env` and `learn-play/options.env`, as it writes the Mac
+edition's ([Mac design](../mac/DESIGN.md#installer-and-build)).

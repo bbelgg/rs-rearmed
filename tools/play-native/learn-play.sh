@@ -67,7 +67,9 @@ fi
 lpi() { python3 -I "$lp" "$@"; }
 if [[ ${1:-} == --refresh ]]; then
     echo "== Refreshing the game files of RS Re-ARMed Learn & Play"
-    python3 -I "$here/gamefiles.py" dlc-fetch "${LP_HOME:-$HOME/Library/Application Support/RS Re-ARMed/learn-play}/dlc-fetched.json"
+    # New DLC first. Never fails the refresh, as in install.sh: what is missing comes with a later one.
+    [[ ${RS_DLC_FETCH:-1} == 0 ]] || python3 -I "$here/gamefiles.py" dlc-fetch --wait 30 \
+        "${LP_HOME:-$HOME/Library/Application Support/RS Re-ARMed/learn-play}/dlc-fetched.json" || true
     lpi game-refresh
     exit
 fi
@@ -123,9 +125,10 @@ fi
 echo "game: $game"
 
 # The DLC this Steam account owns: each a depot of its own, fetched the same way (nothing if it owns none).
-if [[ -z ${LP_GAME_DIR:-} ]]; then
+# Never fails the install, as in install.sh: what is missing comes with a later --refresh. RS_DLC_FETCH=0 skips it.
+if [[ -z ${LP_GAME_DIR:-} && ${RS_DLC_FETCH:-1} != 0 ]]; then
     echo "== Your DLC"
-    python3 -I "$here/gamefiles.py" dlc-fetch "${LP_HOME:-$HOME/Library/Application Support/RS Re-ARMed/learn-play}/dlc-fetched.json"
+    python3 -I "$here/gamefiles.py" dlc-fetch "${LP_HOME:-$HOME/Library/Application Support/RS Re-ARMed/learn-play}/dlc-fetched.json" || true
 fi
 
 echo "== The app's own copy of the game files"

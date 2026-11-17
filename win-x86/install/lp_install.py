@@ -899,6 +899,9 @@ def main(argv=None):
     except Failure as e:
         progress.say("error: %s" % e)
         return e.code
+    except OSError as e:  # a drive that went away during the copy or a move, as gamefiles.py says it
+        progress.say("error: %s" % e)
+        return 1
     return 0
 
 

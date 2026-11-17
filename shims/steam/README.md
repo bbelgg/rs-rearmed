@@ -71,7 +71,7 @@ then `steam_shim.ini` beside the library. For an installed Mac game the first is
 
 An install needs no file. The launcher passes `RS_STEAM_MODE=stub` and `RS_STEAM_DATA_DIR` (`…/RS Re-ARMed/steam`),
 and from `game/.rearmed/steam.env`, which `tools/play-native/gamefiles.py` writes with the copy, these four,
-each unless it is set already (`launchctl setenv`):
+each unless it is set already (`launchctl setenv`, or the installer's `options.env`):
 
 - `RS_STEAM_DLC` / `dlc`: `installed` (the default: the appmanifest's DLC and 248750), `all` (every app id is
   owned, so every archive shows up whatever its AppID, and `BIsSubscribedApp` says yes for every app too: the

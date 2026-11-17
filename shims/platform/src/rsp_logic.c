@@ -16,7 +16,8 @@ int rsp_is_fullscreen_toggle(uint16_t ch, uint64_t flags) {
   if (ch == 'F' && (flags & (RSP_MOD_COMMAND | RSP_MOD_SHIFT)) == (RSP_MOD_COMMAND | RSP_MOD_SHIFT)) return 1;
   // Not in the original: macOS's own Control-Command-F too, the key Learn & Play's View menu has
   // (lp_window.m), so both editions take both keys.
-  return ch == 'f' && (flags & (RSP_MOD_COMMAND | RSP_MOD_CONTROL)) == (RSP_MOD_COMMAND | RSP_MOD_CONTROL);
+  // (either case: with Caps Lock on the key reads F with no Shift)
+  return (ch == 'f' || ch == 'F') && (flags & (RSP_MOD_COMMAND | RSP_MOD_CONTROL)) == (RSP_MOD_COMMAND | RSP_MOD_CONTROL);
 }
 
 int rsp_mouse_coord(double v) {

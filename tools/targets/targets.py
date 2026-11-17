@@ -115,7 +115,10 @@ class Target:
                                   % (where, " ".join(CONVENTIONS)))
             if p[0] in self.symbols or p[0] in self.unsupported:
                 raise TargetError("%s: %s defined twice" % (where, p[0]))
-            self.symbols[p[0]] = (int(p[1], 16), p[2], p[3] if len(p) > 3 else "-")
+            try:
+                self.symbols[p[0]] = (int(p[1], 16), p[2], p[3] if len(p) > 3 else "-")
+            except ValueError:
+                raise TargetError("%s: %s: %r is not an address" % (where, p[0], p[1]))
 
     def _read_offsets(self):
         for where, p in self._lines("offsets.map"):
@@ -126,7 +129,13 @@ class Target:
                 continue
             if p[0] in self.offsets or p[0] in self.symbols or p[0] in self.unsupported:
                 raise TargetError("%s: %s defined twice" % (where, p[0]))
-            self.offsets[p[0]] = int(p[1], 0)
+            if len(p) > 2:
+                raise TargetError("%s: %s: expected NAME OFFSET, and a comment after # (%s)"
+                                  % (where, p[0], " ".join(p[2:])))
+            try:
+                self.offsets[p[0]] = int(p[1], 0)
+            except ValueError:
+                raise TargetError("%s: %s: %r is not an offset" % (where, p[0], p[1]))
 
     def _read_drops(self):
         for where, p in self._lines("drops.map"):
@@ -624,8 +633,12 @@ def gen(tid, outdir, base=HERE):
     os.makedirs(os.path.join(outdir, "skip"), exist_ok=True)
     write_if_changed(os.path.join(outdir, "rc_target_names.h"), gen_header(t))
     write_if_changed(os.path.join(outdir, "rc_target.c"), gen_runtime_c(t, lists))
-    for mod, text in gen_skip(t, lists, wraps).items():
+    skips = gen_skip(t, lists, wraps)
+    for mod, text in skips.items():
         write_if_changed(os.path.join(outdir, "skip", mod + ".skip"), text)
+    for f in os.listdir(os.path.join(outdir, "skip")):  # a module this target has no skip file for any more
+        if f.endswith(".skip") and f[:-len(".skip")] not in skips:
+            os.unlink(os.path.join(outdir, "skip", f))
     write_if_changed(os.path.join(outdir, "target"), t.id + "\n")
     return t
 
@@ -635,6 +648,9 @@ def main(argv):
     tid = os.environ.get("RC_TARGET") or DEFAULT_TARGET
     if "--target" in args:
         i = args.index("--target")
+        if i + 1 >= len(args):
+            print("--target takes a target's id", file=sys.stderr)
+            return 64
         tid = args[i + 1]
         del args[i:i + 2]
     if not args:

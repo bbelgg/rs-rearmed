@@ -24,8 +24,9 @@
 # With Metal it then compiles the game's Metal shaders (tools/play-native/warm-shaders.sh: a few
 # minutes the first time; RS_WARM_SHADERS=0 skips it). With OpenGL there is nothing to prepare (a
 # later switch to Metal compiles them as the game uses them, or run warm-shaders.sh then).
-# Re-run it after a new build to update the game. Saves in steam/ are kept. Never touches the
-# install or the real Steam folder. RS_NATIVE_HOME / RS_NATIVE_LAUNCHER override the two paths.
+# Re-run it after a new build to update the game. Saves in steam/ are kept. Never touches the game
+# installed in Steam; for a game from Steam's download it has Steam fetch the account's DLC into Steam's
+# download folder (RS_DLC_FETCH=0: not). RS_NATIVE_HOME / RS_NATIVE_LAUNCHER override the two paths.
 #
 #        tools/play-native/install.sh --learn-play [HARVEST]
 # The Windows game (Learn & Play) instead, for a Mac without the Mac game: tools/play-native/learn-play.sh

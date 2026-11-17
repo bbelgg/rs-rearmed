@@ -73,10 +73,14 @@ def files_in(d, exts):
 
 
 def hook_tables_hash():
-    """The tables that say which of the game's functions are hook points (gen_image_pe.py --target)."""
+    """The tables the translation is made from (gen_image_pe.py --target): which of the game's functions are hook
+    points and relaxed ones, and the edits and mid points, which the generated code holds by their places in
+    names/edits.list and names/mids.list (xlat/inner.py). A change to one that kept the translated code would
+    leave a new point without its call, or an old one calling another's hooks."""
     tables = os.path.join(ROOT, "tools", "targets")
-    return tree_hash([os.path.join(tables, "names", "hooks.list"), os.path.join(tables, TARGET, "symbols.map"),
-                      os.path.join(tables, TARGET, "relaxed.map")])
+    return tree_hash([os.path.join(tables, "names", n + ".list") for n in ("hooks", "relaxed", "edits", "mids")] +
+                     [os.path.join(tables, TARGET, n + ".map") for n in ("symbols", "relaxed", "edits", "mids")] +
+                     [os.path.join(tables, "targets.py")])
 
 
 def translator_hash():

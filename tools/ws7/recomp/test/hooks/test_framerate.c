@@ -77,6 +77,20 @@ int main(void) {
     int n = gate_passes(1.0 / hz, 10);
     CHECK(n >= 594 && n <= 606, "%d Hz: %d calls in 10 s", hz, n);
   }
+  {  // a 60 Hz game that is late with a frame makes the next one short: both calls are the game's own
+    rs_fr_slot s = {0};
+    int n = 0, frames = 0;
+    for (int i = 0; i < 600; i++) {
+      int k = i % 10;
+      float dt = k == 3 ? 0.022f : k == 4 ? 0.011f : (i & 1 ? 0.017f : 0.016f);
+      n += rs_fr_gate(&s, dt), frames++;
+    }
+    CHECK(n == frames, "60 Hz with late frames: %d of %d calls", n, frames);
+  }
+  for (int fps = 68; fps <= 74; fps++) {  // where 14 and 15 ms frames mix (up to 66 every frame reads 15 ms or more)
+    int n = gate_passes(1.0 / fps, 10);
+    CHECK(n >= 598 && n <= 615, "%d fps: %d calls in 10 s", fps, n);
+  }
   {  // at 120 Hz it is every other call, not a burst and a gap
     rs_fr_slot s = {0};
     int run = 0, worst = 0;

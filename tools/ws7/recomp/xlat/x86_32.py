@@ -373,6 +373,8 @@ class Translator32(X87Mixin, core.Translator):
                     r = self.insn(t + a.size + b.size)
                     if b.mnemonic == "jne" and r.mnemonic == "ret" and not r.operands:
                         g = a.operands[1].mem.disp & M32
+                    if any(x in self.edits or x in self.mids for x in (t, t + a.size, t + a.size + b.size)):
+                        g = None    # the tables change the function: its calls reach what they made of it
             except Unsupported:
                 g = None
             self._stack_checks[t] = None if t in self.keep_calls else g

@@ -36,7 +36,7 @@ $(OUT):
 $(OUT)/libwinaudio.a: $(SRC:%=$(OUT)/%.o) $(OUT)/rs_audio_host.o $(OUT)/rs_audio_input.o
 	rm -f $@ && ar rcs $@ $^
 
-RT := rc32_mem rc32_teb rc32_image rc32_seh
+RT := rc32_mem rc32_teb rc32_image rc32_seh rc_file  # (rc_file: win32_ksync.c closes files through it)
 $(OUT)/rt_%.o: $(runtime)/%.c | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/test_audio: tests/test_audio.c $(OUT)/libwinaudio.a $(OUT)/win32_guestobj.o $(OUT)/win32_ksync.o \

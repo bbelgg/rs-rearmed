@@ -15,7 +15,8 @@
 #define SIZE 300000
 
 static char dir[1024], served[1100], real[1100], other[2][1100];  // other: two more served files, not counted
-static int opens, closes, fail_reads;
+static int opens, closes, fail_reads, say_more;
+static uint64_t max_ask;
 static uint8_t pat(int64_t i) { return (uint8_t)(i * 13 + 5); }
 static void *p_open(void *user, const char *path, rc_file_info *info) {
   for (int k = 0; k < 2; k++)
@@ -31,9 +32,10 @@ static void *p_open(void *user, const char *path, rc_file_info *info) {
 static int64_t p_read(void *user, void *file, void *buf, uint64_t n, int64_t off) {
   CHECK((file == served || file == other[0] || file == other[1]) && off >= 0 && off + (int64_t)n <= SIZE);
   if (fail_reads) return -1;
+  if (n > max_ask) max_ask = n;
   if (n > 1000) n = 1000;
   for (uint64_t k = 0; k < n; k++) ((uint8_t *)buf)[k] = pat(off + (int64_t)k);
-  return (int64_t)n;
+  return (int64_t)n + (say_more ? 5 : 0);
 }
 static void p_close(void *user, void *file) { closes += file == served; }
 static int p_stat(void *user, const char *path, rc_file_info *info) {
@@ -46,6 +48,8 @@ static void p_list(void *user, const char *d, rc_file_add add, void *ctx) {
   add(ctx, "served.bin");
   add(ctx, "served.bin");  // twice: listed once
   add(ctx, "real.bin");    // the folder has it: listed once
+  add(ctx, "REAL.BIN");    // and in another letter case
+  add(ctx, "Served.Bin");
   add(ctx, "a/b");         // not a name
 }
 static int p_hide(void *user, const char *d, const char *name) { return !strcmp(d, dir) && !strcmp(name, "hidden.bin"); }
@@ -138,6 +142,10 @@ int main(void) {
   fail_reads = 1;
   CHECK(rc_file_read(d2, buf, 3) < 0 && errno == EIO);
   fail_reads = 0;
+  say_more = 1;  // a provider that says it read more than it was asked for
+  CHECK(rc_file_lseek(d2, 100, SEEK_SET) == 100 && rc_file_read(d2, buf, 3) == 3 && ok_pat(buf, 3, 100));
+  CHECK(rc_file_lseek(d2, 0, SEEK_CUR) == 103);
+  say_more = 0;
   CHECK(!rc_file_close(d2) && closes == 1);
   // the number is the system's again: a file opened on it is not the served one
   int r = rc_file_open(real, O_RDONLY);
@@ -154,7 +162,9 @@ int main(void) {
   CHECK(fread(buf, 1, SIZE, f) == SIZE && ok_pat(buf, SIZE, 0) && fread(buf, 1, 1, f) == 0 && feof(f));
   rewind(f);
   CHECK(!fseek(f, 250000, SEEK_SET) && fread(buf, 1, 4096, f) == 4096 && ok_pat(buf, 4096, 250000) && ftell(f) == 254096);
+  max_ask = 0;
   CHECK(!fseek(f, -96, SEEK_CUR) && fgetc(f) == pat(254000));
+  CHECK(max_ask && max_ask <= 4096);  // a seek and a byte: a file's buffer, not the placeholder's 64 KB
   CHECK(!fclose(f) && closes == 2);
   CHECK(rc_file_fopen(served, "wb") != 0 && opens == 2);  // writing: the system's (it makes the file)
   CHECK(!unlink(served));

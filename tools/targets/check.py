@@ -74,6 +74,48 @@ def source_uses(root=ROOT, patterns=None):
     return syms, offs, hooks
 
 
+MID_ADD = re.compile(r"(?:\b(\w+)\s*=[^;=]*?)?\brc_mid_add_name\(\s*\"(\w+)\"")
+MID_READ = re.compile(r"\brc_mid_(value|cont)\(\s*(\w+)\s*,\s*\"(\w+)\"")
+MID_ROW = re.compile(r"\{\s*\"(\w+)\"\s*((?:,\s*(?:NULL|\"\w+\")\s*)+)\}")
+EDIT_USE = re.compile(r"\brc_edit_enable\(\s*\"(\w+)\"")
+
+
+def inner_uses(root=ROOT, patterns=None):
+    """What the native sources name of the edits and mid points (rc_mid.h): (points, reads, groups).
+    points {name: [file:line]} from rc_mid_add_name("NAME", ...) and from a table's rows {"NAME", "value" or NULL,
+    ...}; reads [(where, point, kind, name)] with kind "value", "cont" or "either" (a table's row), from
+    rc_mid_value(P, "NAME") and rc_mid_cont(P, "NAME") where P is the variable a rc_mid_add_name("POINT") in the
+    same file was assigned to, and from the rows; groups {name: [file:line]} from rc_edit_enable("NAME")."""
+    points, reads, groups = {}, [], {}
+    files = set()
+    for pat in patterns if patterns is not None else SOURCES + [p for v in TARGET_SOURCES.values() for p in v]:
+        files.update(glob.glob(os.path.join(root, pat), recursive=True))
+    for path in sorted(files):
+        rel = os.path.relpath(path, root)
+        with open(path, errors="replace") as f:
+            lines = [ln.split("//", 1)[0] for ln in f.readlines()]
+        if not any("rc_mid_" in ln or "rc_edit_enable" in ln for ln in lines):
+            continue
+        var = {}
+        for i, code in enumerate(lines, 1):
+            where = "%s:%d" % (rel, i)
+            for m in MID_ADD.finditer(code):
+                points.setdefault(m.group(2), []).append(where)
+                if m.group(1):
+                    var[m.group(1)] = m.group(2)
+            for m in EDIT_USE.finditer(code):
+                groups.setdefault(m.group(1), []).append(where)
+        for i, code in enumerate(lines, 1):
+            where = "%s:%d" % (rel, i)
+            for m in MID_READ.finditer(code):
+                if m.group(2) in var:
+                    reads.append((where, var[m.group(2)], m.group(1), m.group(3)))
+            for m in MID_ROW.finditer(code):
+                points.setdefault(m.group(1), []).append(where)
+                reads += [(where, m.group(1), "either", n) for n in re.findall(r'"(\w+)"', m.group(2))]
+    return points, reads, groups
+
+
 def check(base=targets.HERE, root=ROOT, scan_sources=True):
     """Returns a list of error strings."""
     errs = []
@@ -81,7 +123,7 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
         lists = targets.name_lists(base)
         tids = targets.target_ids(base)
         tgts = [targets.Target(t, base) for t in tids]
-    except targets.TargetError as e:
+    except (targets.TargetError, ValueError) as e:
         return [str(e)]
     if not tids:
         errs.append("no targets in %s" % base)
@@ -149,6 +191,24 @@ def check(base=targets.HERE, root=ROOT, scan_sources=True):
         for n, where in sorted(hooks.items()):
             if n not in lists.get("hooks", []):
                 errs.append("%s: hook point %s is not in names/hooks.list" % (where[0], n))
+        # the mid points, their values and continuations, and the edit groups the built-in code names: a name the
+        # tables lack is a fix that is off when the game runs, in the one edition whose table lacks it
+        points, reads, groups = inner_uses(root)
+        for n, where in sorted(points.items()):
+            if n not in lists.get("mids", []):
+                errs.append("%s: mid point %s is not in names/mids.list" % (where[0], n))
+        for n, where in sorted(groups.items()):
+            if n not in lists.get("edits", []):
+                errs.append("%s: edit group %s is not in names/edits.list" % (where[0], n))
+        for t in tgts:
+            for where, point, kind, n in reads:
+                if point not in t.mids:
+                    continue  # not in this game (none, unsupported), or not a point at all (said above)
+                vals, conts = set(v[1] for v in t.mids[point][1]), set(c[0] for c in t.mids[point][2])
+                if n not in (vals if kind == "value" else conts if kind == "cont" else vals | conts):
+                    errs.append("%s: target %s: mid point %s has no %s %s (%s/mids.map)" % (
+                        where, t.id, point, "value or continuation" if kind == "either" else
+                        "value" if kind == "value" else "continuation", n, t.id))
         for t in tgts:
             syms, offs, _ = source_uses(root, TARGET_SOURCES.get(t.id, []))
             for n, where in sorted(list(syms.items()) + list(offs.items())):

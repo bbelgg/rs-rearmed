@@ -74,7 +74,7 @@ static kind parse(char *line, int seen[NKEYS], const char **k, const char **v) {
 // A toggle other than 0 or 1 is ignored; any other key takes any non-empty value. The line is trimmed in
 // place, as the Mac launcher trims its own, so the log reads the same; a switch logs as KEY=value.
 static kind parse_opt(char *line, int seen[NOKEYS], size_t *klen, const char **v) {
-  line[strcspn(line, "\r\n")] = 0;
+  line[strcspn(line, "\n")] = 0;  // (a line's end alone: the trim below takes a CR before it, as the Mac launcher does)
   char *s = line;
   while (*s && isspace((unsigned char)*s)) s++;
   if (s != line) memmove(line, s, strlen(s) + 1);

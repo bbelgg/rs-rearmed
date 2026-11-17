@@ -1,4 +1,4 @@
-// RS_FPS=N (not in the original; a test switch), in both editions: the game starts a frame every 1/N s on a clock
+// RS_FPS=N (not in the original; the installer's Frame rate), in both editions: the game starts a frame every 1/N s on a clock
 // of ours instead of at the display's refresh, and its frames are not held for the display (vsync off), so it can
 // be run at another rate than the display's (e.g. 120 on a 60 Hz screen). 0 or unset: the display's rate.
 //
@@ -12,10 +12,13 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-// The rate a value of RS_FPS asks for: 1 to 1000, else 0.
+// The rate a value of RS_FPS asks for: a whole number from 1 to 1000, else 0 (a number with something after it,
+// "1e3" or "60.5", is not one: its start alone would be another rate than the one asked for).
 static inline int rsp_fps_value(const char *e) {
-  int v = e && *e ? atoi(e) : 0;
-  return v < 0 || v > 1000 ? 0 : v;
+  if (!e || !*e) return 0;
+  char *end;
+  long v = strtol(e, &end, 10);
+  return *end || v < 1 || v > 1000 ? 0 : (int)v;
 }
 
 // RS_FPS, as the process started with it.

@@ -97,7 +97,7 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
 - **Settings and switches…**: the button on the Renderer row, or the app menu's item through `app_menu`. The
   checkboxes, popups, fields and the sheet's buttons are plain AX elements; Save writes `settings.env` and
   `options.env` in the test home's `RS Re-ARMed/` or `RS Re-ARMed/learn-play/`, and Reset to Defaults with Save
-  removes them. Advanced starts collapsed behind Show advanced options.
+  removes them. Advanced starts collapsed behind Show advanced options, unless one of its switches is set.
 - **Skip on Preparing shaders**: the step is 16 s on Learn & Play, so put a `sleep` at the top of the build
   folder's copy of `warm-shaders.sh`; Build Again takes under a minute and leaves it there. The box says the
   shaders are not prepared. A finished run, then Build Again and Skip, is the case to try.
@@ -109,6 +109,7 @@ Every message of the box can be seen without touching Steam, with stand-ins:
 | `RS_STEAM_DIR=<folder>` | Steam's folder, with `logs/connection_log.txt`, `logs/console_log.txt` and `config/loginusers.vdf` written by hand: a `[Logged On, 4, 7] [U:1:43] ...` line signs in, a new account number is another account |
 | `LP_STEAM_EXE=<script>` | Steam's launcher. The script writes to `console_log.txt` what Steam would (`Downloading depot 221683 (103 files, 5363 MB) ...`, `Depot download failed : missing license for depot (No subscription) `, `Depot download complete : "..." (manifest 1) `) and clones the clean depot into `steamapps/content/app_221680/`. When the path doesn't exist, Steam isn't installed |
 | `LP_STEAM_PROCESS=<name>` | the process that counts as Steam: a small compiled program under that name (a copy of `/bin/sleep` is killed by macOS). Have it running before Build & Install: with it not running, the DLC step opens the real Steam by its bundle identifier, which `LP_STEAM_EXE` doesn't stand in for |
+| `RS_GAME_PROCESS=<name>` | the process that counts as the game running, so a copy or refresh in a test isn't refused because the real game runs |
 | `RS_XCODE_SELECT=<script>` | fails `-p` until a file is there: Apple's tools missing and arriving |
 | `RS_XCODEBUILD=<script>` | with `RS_XCODE_SELECT` printing a path in a `.app`: Xcode not set up. Exit 69 until a file is there. Stop before the run goes on: with the real Steam the next step would fetch DLC |
 | `RS_MAC_TARGET=<target.toml>` | the Mac edition's figures for its download ([Mac testing](../mac/TESTING.md#installer-tests)): a made-up program's `exe_size` and `exe_sha256`, or a huge `depot_disk_bytes` for no room |
@@ -187,7 +188,9 @@ LP_GAME_DIR=<game folder> LP_USER_DIR=<test user folder> RS_STEAM_DATA_DIR=<test
 - `@text` waits until `text` appears in the log (at most `LP_INPUT_WAIT` seconds, default 120). `@callback 1101`
   (the Steam stats callback, logged with `RS_STEAM_LOG=1`) means the title screen takes keys; `@DLC:` (with
   `RS_MODS_LOG=1`, the `[rs-mods] DLC: N archives mounted in F frames, T s` line) is the end of the DLC mounting,
-  after the profile has loaded: every archive is mounted and every song is in the lists by then.
+  after the profile has loaded: every archive is mounted and every song is in the lists by then. Another `DLC:`
+  line can come first when something went wrong (a wait given up, archives not mounted, a file question answered
+  wrong): `@archives mounted in` waits for the end's own line.
 
 The script's log lines carry the seconds since it started and the wall time, to match them with snapshots. The
 verified script, from the title to the note highway (title, profile, Learn a Song, the song, Play Song, Skip
@@ -304,7 +307,8 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   ([Mac testing](../mac/TESTING.md#unattended-runs)): `[rs-mods] DLC: N archives mounted in F frames, T s`, with
   `, their songs in the lists S s later` when the song manifests came after the last archive, and `DLC: A of the
   steps' Q file questions asked of the step's archive alone` (1,490 of 1,500 with 150 archives, 22,490 of 22,500
-  with 2,250: all but the first step's). Here alone: `[rs-mods] DLC: N archives were not mounted` comes before
+  with 2,250: all but the first step's). Here alone: `[rs-mods] DLC: an archive was still open 1 s after its step`
+  says the loop gave up waiting for a mount, and `[rs-mods] DLC: N archives were not mounted` comes before
   them when a step dropped its archive (the seam counts each open of a song archive).
   - A large library: the test home's `dlc/` with a link to the Mac edition's `dlc/` folder in it, and a mod that
     serves those archives (150 of this game's and 2,100 of the Mac's: 2,250). No song comes later: at the line, go

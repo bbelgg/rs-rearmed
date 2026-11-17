@@ -51,8 +51,9 @@ known-issues.md's "Not tested yet" entry when a player could meet it.
 Learn & Play's run uses the game's own input script ([Windows testing](../windows/TESTING.md#unattended-runs)) and
 needs a test build and a test user folder. The Mac edition has no input script of its own, so its run takes a route
 command from you ([Mac testing](../mac/TESTING.md#game-runs)); without one, play it by hand to the highway and
-say so in the commit. Either way the pass line is "the game reached the highway and stayed up", and the last
-snapshot is what shows it.
+say so in the commit. Either way the pass line is "the game reached the highway and stayed up" (the Mac's route
+command, `tools/perf/run.py --route-only`, fails when the game has ended or left the highway by the end of its
+wait, as Learn & Play's run does), and the last snapshot is what shows it.
 
 ### The installer of a release
 

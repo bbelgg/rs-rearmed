@@ -5,11 +5,16 @@ Under RC_MO_TSO every guest load is followed by `dmb ishld` and every guest stor
 time of the Wwise effect kernels below. A function listed here is emitted with plain accesses
 (RC_LDR/RC_STR, runtime/rc_int.h) and fences at its boundary instead:
 
-  * RC_RELAX_ENTER (dmb ishst) at entry and after every call it makes: stores before the function
-    (or before the call returned) are ordered before its first store;
-  * RC_RELAX_EXIT (dmb ishld) at every return, tail call and before every call: its loads are
-    ordered before everything that follows. Its stores are ordered before later stores by those
-    stores' own fences (every fenced store has one in front, every relaxed function at entry).
+  * RC_RELAX_ENTER (dmb ishst) at entry, and after every call it makes of fenced code: stores before the
+    function (or before the call returned) are ordered before its first store;
+  * RC_RELAX_EXIT (dmb ishld) at every return, and before every call or tail call it makes of fenced code
+    (the 64-bit front end before every tail call): its loads are ordered before everything that follows. Its
+    stores are ordered before later stores by those stores' own fences (every fenced store has one in front,
+    every relaxed function at entry).
+
+A call of another relaxed function, or of one of PURE_IMPORTS, has no fence around it: the two run as one
+block. A listed function that stays fenced (one relax_ok refuses, or one with a mid point in it) is fenced
+code to its callers (Translator.relaxed_callee).
 
 Seen from other threads the function then behaves like one block: its accesses keep x86 order
 against everything before and after it, only their order among themselves is weakened. That is

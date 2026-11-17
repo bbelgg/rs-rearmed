@@ -165,6 +165,23 @@ class Keys(unittest.TestCase):
         self.assertEqual(set(launch_keys()) & set(launch_options()), set())
 
 
+class Used(unittest.TestCase):
+    """The readers are called where the game starts: the tests below run the readers themselves."""
+
+    def test_the_launcher_reads_and_passes_both_files(self):
+        src = read(LAUNCH)
+        self.assertRegex(src, r'(?m)^settings_env "\$HOME_DIR/settings\.env"$')
+        self.assertRegex(src, r'(?m)^options_env "\$HOME_DIR/options\.env"$')
+        # the game's start: one command, with both files' pairs before its log's name
+        self.assertRegex(src, r'(?s)\$\{settings_args\[@\]\+"\$\{settings_args\[@\]\}"\}[^\n]*\\\n'
+                              r'\s*\$\{options_args\[@\]\+"\$\{options_args\[@\]\}"\} \\\n\s*--stdout ')
+
+    def test_learn_and_play_reads_both_files_before_the_mods_guard(self):
+        src = read(os.path.join(LP_DIR, "lp_main.c"))
+        at = [src.index(s) for s in ("lp_settings_apply(settings)", "lp_options_apply(options)", "mods_guard(argv)")]
+        self.assertEqual(at, sorted(at))
+
+
 class Readers(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -219,7 +236,7 @@ class Readers(unittest.TestCase):
         self.assertEqual(self.run_both(None), ["RS_NETGUARD=unset"])
 
     def test_installer_file(self):
-        out = self.run_both("# Written by the installer (Built-in Mods…)\n# more words\n\nRS_MODS_INTRO=0\nRS_REARMED=0\n")
+        out = self.run_both("# Written by the installer (Settings and switches…)\n# more words\n\nRS_MODS_INTRO=0\nRS_REARMED=0\n")
         self.assertEqual(out, ["RS_MODS_INTRO=0", "RS_REARMED=0",
                                "[settings] RS_MODS_INTRO=0", "[settings] RS_REARMED=0", "RS_NETGUARD=unset"])
 
@@ -293,6 +310,12 @@ class Readers(unittest.TestCase):
                                "[options] ignored: RS_FPS RS_WINDOW_ANY_SHAPE=1",
                                "[options] RS_AUDIO_RT=0",
                                "RS_NETGUARD=unset"])
+
+    def test_options_a_carriage_return_inside_a_line(self):
+        # (only a line's end is one: run_both says the two readers take the same value)
+        out = self.run_both(None, "RS_STEAM_PERSONA=ab\rcd\r\nRS_FPS=60\r\n")
+        self.assertIn("RS_FPS=60", out)
+        self.assertIn("[options] RS_FPS=60", out)
 
     def test_options_environment_wins(self):
         out = self.run_both(None, "RS_AUDIO_FRAMES=128\nRS_METAL_MSAA=2\n", {"RS_AUDIO_FRAMES": "512"})

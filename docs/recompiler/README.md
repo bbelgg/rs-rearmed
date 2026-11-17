@@ -43,9 +43,9 @@ uses are in [tools/targets/README.md](../../tools/targets/README.md).
   (`runtime/rc_abi.h`, `overrides/rc_ov.h`): the Mac's override modules, the seam and the app, Learn & Play's
   built-in fixes (`win-x86/shims/win32_overrides.c`), and the differential tests (`shims/game/harness`,
   `shims/game/test`), which name the originals they run through mac-x64's tables.
-- **Every target has a line for every name**: 1,263 symbols and 383 offsets. `unsupported REASON` says the game
-  has no counterpart. `win-x86` has 200 symbols and 24 offsets marked that way (inlined by LTCG, Mac-only, not
-  needed, or not proved), and the other 1,063 and 359 are read from the Windows code; `mac-x64` has 19 and 23,
+- **Every target has a line for every name**: 1,265 symbols and 390 offsets. `unsupported REASON` says the game
+  has no counterpart. `win-x86` has 201 symbols and 25 offsets marked that way (inlined by LTCG, Mac-only, not
+  needed, or not proved), and the other 1,064 and 365 are read from the Windows code; `mac-x64` has 19 and 23,
   what only Learn & Play's code has or needs.
 - **A name means the same thing in every target that has it**, since a mod built once reads both. What the two
   games have in different forms has a name for each: Learn & Play's path table lock is `path_table_cs`, a
@@ -107,8 +107,11 @@ what a mod asks for by name, and for its built-in fixes.
   (`thunks/gen_thunks.py`: `FILE_FUNCS`; a served `FILE` is `funopen`'s, with the placeholder as its
   `fileno`), Learn & Play in its Win32 seam (`win32_kfile.c`, `win32_ksync.c`). Each is the system's
   function for a file no provider serves, and without a provider costs a test of a counter. Not offered:
-  writing, a folder that does not exist. `RS_FILE_LOG=1` logs each served open and each listing a provider
-  added to.
+  writing, a folder that does not exist, and on the Mac what goes by a file function other than the twelve
+  bound ones (the game imports no other; `gen_thunks.py` says so at the build if one does). A name a provider
+  adds to a folder is listed once whatever its letter case, a served `FILE` is buffered as a file is (4 KB),
+  and a provider's `close` runs with no lock of the runtime's or the seam's held. `RS_FILE_LOG=1` logs each
+  served open and each listing a provider added to.
 - **Native code on the guest's own context** (the overrides): `OV_ARGS_OF(name, a, c)` reads by the name's
   convention, `OV_ARGS_CC(a, c, cc)` is the same for a helper that serves several functions, and neither compiles
   for a `custom` function: those are read by hand. `ov32_ret` and `ov32_ret_f` end an override.
@@ -190,7 +193,8 @@ also an override is `N_<addr>` in the override module, and the hooks run around 
 - **The stack check in place.** A call of a function that is `cmp ecx, [cookie]; jne fail; ret`, MSVC's
   `__security_check_cookie`, is translated as that compare, with the call itself in the branch for a wrong
   cookie; the return address still goes below `esp`, as the call would have left it. The game calls it
-  from 11,054 places. A hook point is never translated this way (`Translator32.keep_calls`).
+  from 11,054 places. A hook point, a function an override module defines or wraps, and one the tables edit
+  or put a mid point in are never translated this way (`Translator32.keep_calls`, `stack_check`).
 - The direction flag, `pushad`/`popad`, `pushfd`/`popfd` (bits outside the modelled ones are carried, so
   the CPUID-availability toggle works; `popfd` with TF raises a single-step exception), `enter`/`leave`,
   the `loop` family, `rdtsc`, `xlat`, segment-register reads as flat selectors.
@@ -221,8 +225,9 @@ functions of the Wwise thread and the note detection, and the helpers they call,
 are. A relaxed function here can call only other relaxed ones, unless its `relaxed.map` entry is marked
 `+calls`: then it may call fenced code directly too (the C runtime's `memcpy`, its `pow`), and each such
 call gets the function's exit fence before it and its entry fence after it, so the function is one block to
-other threads between its calls. Indirect calls and calls of imports stay refused. Either front end reads
-the mark; only this target has one.
+other threads between its calls. A listed function that stays fenced (one the check refuses, or one with a
+mid point in it) is fenced code to its callers too. Indirect calls and calls of imports stay refused. Either
+front end reads the mark; only this target has one.
 
 ### x87 and MMX
 

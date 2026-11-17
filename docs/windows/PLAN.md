@@ -55,7 +55,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
-- **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the Mac edition's test switch, with its rule and clock
+- **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the installer's Frame rate, with the Mac edition's rule and clock
   (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
 - **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
   and the start, the intro skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are
@@ -143,10 +143,18 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Game files**: the Game files choice and the move of the copy, by hand on this edition; a download from the real
   Steam since the download code moved into `gamefiles.py`.
 - **Batched DLC mounting**: not run with the new code: a library of thousands of this game's own archives (the
-  large one here is mostly the Mac edition's, through a mod), Enumerate with new archives to mount,
-  `RS_MODS_BUDGET_MS=0`, an archive in `dlc/` that brings a shader's hash file (the step's question then goes to
-  the whole file system; none exists to try), and a mount or manifest that does not come (the mounting then goes on
-  after 5 s, with a line in the log: the shared source's test has the manifest's case, no game run has either).
+  large one here is mostly the Mac edition's, through a mod), Enumerate with new archives to mount, an enumeration
+  started while the flag is held for manifests (in the shared source's test only), `RS_MODS_BUDGET_MS=0`, an
+  archive in `dlc/` that brings a shader's hash file (the step's question then goes to the whole file system; none
+  exists to try), a mount that is not finished (the steps then go on after 1 s, with a line in the log) and a
+  manifest that does not come (the mounting then goes on after 5 s, with a line in the log: the shared source's
+  test has that case, no game run has either).
+- **A mount that takes more than a second**: this loop then takes its steps without waiting, and a step taken
+  before a mount is finished drops its archive, as the loop before 1.14.1 did for every one (the log then has
+  `DLC: N archives were not mounted`, after the line that says the wait was given up). It waits on the count of
+  open song archives, not on the step's own file, so an archive another part of the game closes meanwhile ends the
+  wait early. Neither was seen with 2,250 archives; the Mac's rule (5 s, on what the game has left to load) needs
+  this game's `dlc_package` matched.
 - **Auto Save**: the skip with a Real Tone cable or a Microphone profile. The title screen's own call of the dialog is
   read from the code, not seen in a run: the title's tick can show the warning for 4 s when a flag is set; what sets it
   isn't known, so whether a player can reach it isn't either. If so, the skip needs the tick wrapped too, to clear its
@@ -165,6 +173,12 @@ edition" is described there. What has not been tested is under [Open issues](#op
   a guest path that starts with `/` is a host path only inside the game's own folders, and `HeapAlloc` clears a block it
   uses again): four songs played with a guitar since, in Learn a Song, with no fault; no long session, where the reused
   blocks matter. What the shared code got from the same review is in the [Mac plan](../mac/PLAN.md#open-issues).
+- **The code review of 2026-11-17** (not released): as in the [Mac plan](../mac/PLAN.md#open-issues), which lists
+  what it left for both editions; its fixes passed the suites and were not built into this game or played. This
+  edition's own: a provider's close now runs outside the handle table's lock, a provider is not asked about a file
+  opened for writing, Learn & Play's audio suite links again (it had not since 1.14.0, and no release's checks
+  selected it), and the translation is made again when the edits or mid points change. A build by hand with
+  `LP_TRANSLATE=0` still takes `game/obj` as it is, whatever changed in the tables.
 - **Mods**: a file provider that changes what an archive holds; the note the game hears and the song lists' names,
   both played on the Mac only; a mod's hook on the tone change (the game ran on the wrapped function with rearmed-mods
   loaded); Song Stems with its own helper (it was played with a stand-in for it); the colors in other modes (they were

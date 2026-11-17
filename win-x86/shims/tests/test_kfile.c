@@ -64,8 +64,10 @@ static char root[1024];
 static char served_dir[1100], served_path[1200];
 static int served_open, served_closed;
 static uint8_t pat(int64_t i) { return (uint8_t)(i * 7 + 3); }
+static int serve_any;
 static void *sv_open(void *user, const char *path, rc_file_info *info) {
-  if (strcmp(path, served_path)) return 0;
+  const char *base = strrchr(path, '/');
+  if (strcmp(path, served_path) && !(serve_any && base && !strcmp(base, "/served_p.psarc"))) return 0;
   *info = (rc_file_info){SERVED_SIZE, 1000000000};
   served_open++;
   return served_path;
@@ -75,7 +77,22 @@ static int64_t sv_read(void *user, void *file, void *buf, uint64_t n, int64_t of
   for (uint64_t k = 0; k < n; k++) ((uint8_t *)buf)[k] = pat(off + (int64_t)k);
   return (int64_t)n;
 }
-static void sv_close(void *user, void *file) { served_closed++; }
+extern pthread_mutex_t w32_hlock;
+static int close_checks_lock, close_saw_lock_free;
+static void *try_lock(void *arg) {
+  int *got = arg;
+  *got = !pthread_mutex_trylock(&w32_hlock);
+  if (*got) pthread_mutex_unlock(&w32_hlock);
+  return 0;
+}
+static void sv_close(void *user, void *file) {
+  served_closed++;
+  if (close_checks_lock) {  // from another thread: this one could take the (recursive) lock again anyway
+    pthread_t t;
+    pthread_create(&t, 0, try_lock, &close_saw_lock_free);
+    pthread_join(t, 0);
+  }
+}
 static void sv_list(void *user, const char *dir, rc_file_add add, void *ctx) {
   if (!strcmp(dir, served_dir)) add(ctx, "served_p.psarc");
 }
@@ -277,8 +294,23 @@ int main(void) {
   CHECK(served_closed == opens - 1);  // the view still has it
   CHECK(call(c, "UnmapViewOfFile", 1, &view));
   CHECK(served_closed == opens && served_open == opens);
+  // a provider's close runs with the handle table free: another thread's handles are not held up by it
+  uint32_t lf = call(c, "CreateFileA", 7, scf);
+  CHECK(lf != INVALID);
+  close_checks_lock = 1;
+  CHECK(call(c, "CloseHandle", 1, &lf) && close_saw_lock_free == 1);
+  close_checks_lock = 0;
+  opens = served_open;
   uint32_t wcf[7] = {sa[0], 0x40000000u, 0, 0, 3, 0x80, 0};  // for writing: not the provider's
   CHECK(call(c, "CreateFileA", 7, wcf) == INVALID && served_open == opens);
+  // nor is the provider asked about it: one that answers for the name wherever it is (the user folder's copy,
+  // where a write goes) sees no open, and a file made there is new
+  serve_any = 1;
+  uint32_t ccf[7] = {sa[0], 0x40000000u, 0, 0, 4, 0x80, 0};  // OPEN_ALWAYS
+  uint32_t wh = call(c, "CreateFileA", 7, ccf);
+  CHECK(wh != INVALID && served_open == opens && *w32_teb(c, RC32_TEB_LASTERR) == 0);  // not ALREADY_EXISTS
+  CHECK(call(c, "CloseHandle", 1, &wh));
+  serve_any = 0;
   sa[0] = gstr("C:\\Rocksmith2014\\dlc\\hidden_p.psarc");  // hidden from the find, still a file
   CHECK(call(c, "GetFileAttributesA", 1, sa) != INVALID);
 

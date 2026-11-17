@@ -415,6 +415,8 @@ static void test_logic(void) {
   CHECK(rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND | RSP_MOD_SHIFT | RSP_MOD_CONTROL), "+Ctrl");
   CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND | RSP_MOD_SHIFT), "lower f");
   CHECK(rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND | RSP_MOD_CONTROL), "Cmd+Ctrl+F, macOS's own");
+  CHECK(rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND | RSP_MOD_CONTROL), "Cmd+Ctrl+F with Caps Lock on");
+  CHECK(!rsp_is_fullscreen_toggle('F', RSP_MOD_COMMAND), "Cmd+F with Caps Lock on is not it");
   CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_COMMAND), "Cmd+F is not it");
   CHECK(!rsp_is_fullscreen_toggle('f', RSP_MOD_CONTROL), "Ctrl+F is not it");
 
@@ -699,6 +701,8 @@ static void test_renderer_startup(void) {
 // --- RS_FPS (rsp_fps.h: both editions') ----------------------------------------
 static void test_fps(void) {
   CHECK(rsp_fps_value(NULL) == 0 && rsp_fps_value("") == 0 && rsp_fps_value("0") == 0, "unset or 0: the display");
+  CHECK(rsp_fps_value("1e3") == 0 && rsp_fps_value("60.5") == 0 && rsp_fps_value("120fps") == 0, "a whole number only");
+  CHECK(rsp_fps_value("99999999999999999999") == 0 && rsp_fps_value("-60") == 0, "out of range");
   CHECK(rsp_fps_value("120") == 120 && rsp_fps_value("1") == 1 && rsp_fps_value("1000") == 1000, "a rate");
   CHECK(rsp_fps_value("1001") == 0 && rsp_fps_value("-60") == 0 && rsp_fps_value("fast") == 0, "out of range");
 

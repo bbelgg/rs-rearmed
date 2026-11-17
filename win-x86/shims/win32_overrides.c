@@ -310,7 +310,7 @@ void RC_FN(asset_loader_thread)(rc_ctx *c) {
 static struct {
   int level;
   double waiting_since;
-  unsigned dropped;
+  unsigned dropped, gave_up;
 } lp_mount = {.level = -1};  // the game thread's
 
 // One install step. 1 when it took an archive: the step that finds the list empty clears the flag and mounts none.
@@ -330,6 +330,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
   volatile uint8_t *flag = g8(self + RC_OFF(dlc_installing));
   int installing = *flag;
   int batched = rs_mods_mount_frame(installing);
+  if (!installing) lp_mount.level = -1, lp_mount.dropped = lp_mount.gave_up = 0;  // (a mounting that ended elsewhere)
   rc32_call(c, RC_ADDR(dlc_update_head), 0, 0, self, 0, 0);
   if (!batched) {
     mount_step(c, self);
@@ -353,7 +354,11 @@ void RC_FN(dlc_update)(rc_ctx *c) {
           // what the head waits for is another thread's
           if (atomic_load(&w32_dlc_archives_open) > lp_mount.level) usleep(50);
         }
-        if (atomic_load(&w32_dlc_archives_open) > lp_mount.level && now_s() - lp_mount.waiting_since < 1.0) break;
+        if (atomic_load(&w32_dlc_archives_open) > lp_mount.level) {
+          if (now_s() - lp_mount.waiting_since < 1.0) break;
+          if (!lp_mount.gave_up++)  // (once a mounting: with it, a "not mounted" line below has its likely cause)
+            rs_mods_logf("DLC: an archive was still open 1 s after its step: the steps go on without waiting for it");
+        }
         lp_mount.level = -1;
       }
       int before = atomic_load(&w32_dlc_archives_open);
@@ -370,7 +375,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
     if (lp_mount.dropped) rs_mods_logf("DLC: %u archives were not mounted", lp_mount.dropped);
     rs_mods_mount_end();
     log_counts();
-    lp_mount.level = -1, lp_mount.dropped = 0;
+    lp_mount.level = -1, lp_mount.dropped = lp_mount.gave_up = 0;
   }
   if (!*g8(self + RC_OFF(dlc_first_done))) *g8(self + RC_OFF(dlc_first_done)) = 1;
   if (*g8(self + RC_OFF(dlc_check_on)) && *g8(self + RC_OFF(dlc_pending))) {
@@ -378,6 +383,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
     if ((uint8_t)rc32_call(c, RC_ADDR(dlc_enum_check), 0, 0, 0, 0, 0)) {
       *g8(self + RC_OFF(dlc_pending)) = 0;
       *g8(self + RC_OFF(dlc_tail_done)) = 0;
+      rs_mods_mount_restarted();
     }
   }
   if (!*g8(self + RC_OFF(dlc_tail_done))) rc32_call(c, RC_ADDR(dlc_update_tail), &self, 1, 0, 0, 0);

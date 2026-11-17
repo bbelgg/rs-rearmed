@@ -40,7 +40,8 @@ case $edition in
     rel_no_game_run
     rm -rf "$out"; mkdir -p "$out/snap"
     script=${RS_SMOKE_LP_SCRIPT:-@callback 1101,3:24,10:24,20:24,32:24,44:24,62:75,68:24}
-    steps=$(tr ',' '\n' <<< "$script" | grep -vc '^@')
+    # (the keys the game will log: an empty item, as after a last comma, is none)
+    steps=$(tr ',' '\n' <<< "$script" | grep -Ec '^[[:space:]]*[0-9.]+:[0-9a-fA-F]+[[:space:]]*$')
     log="$out/log.txt"
     RS_STEAM_LOG=1 LP_INPUT_SCRIPT=$script RS_GL_SNAPSHOT_DIR="$out/snap" RS_GL_SNAPSHOT_SECS=10 \
         "$exe" 2> "$log" > /dev/null &

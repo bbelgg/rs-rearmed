@@ -407,14 +407,24 @@ class Game:
         audio threads idle). -> the trace's path. tools/perf/profile.py reads it."""
         trace = os.path.join(self.out, "game.trace")
         self.say()
-        r = subprocess.run(["xcrun", "xctrace", "record", "--template", "Time Profiler", "--attach", str(self.p.pid),
-                            "--time-limit", "%ds" % seconds, "--output", trace, "--no-prompt"],
-                           capture_output=True, text=True)
+        try:
+            r = subprocess.run(["xcrun", "xctrace", "record", "--template", "Time Profiler", "--attach",
+                                str(self.p.pid), "--time-limit", "%ds" % seconds, "--output", trace, "--no-prompt"],
+                               capture_output=True, text=True, timeout=seconds + 120)
+        except subprocess.TimeoutExpired:
+            raise Stop("xctrace did not end %d s after its %d s" % (120, seconds))
         if not os.path.exists(trace):
             raise Stop("xctrace made no trace: %s" % (r.stderr.strip() or r.stdout.strip())[-300:])
-        if self.screens()[-1] != HIGHWAY:
-            raise Stop("the game left the note highway while it was traced (%s)" % self.screens()[-1])
+        self.on_highway("it was traced")
         return trace
+
+    def on_highway(self, while_what):
+        """The game is up and still on the note highway (a game that ended there keeps the highway as its log's
+        last screen)."""
+        if not self.alive():
+            raise Stop("the game ended while %s (%s)" % (while_what, self.log_path))
+        if self.screens()[-1] != HIGHWAY:
+            raise Stop("the game left the note highway while %s (%s)" % (while_what, self.screens()[-1]))
 
     def quit(self):
         if self.p is None or not self.alive():
@@ -456,6 +466,7 @@ def one_run(cfg, name, out, kind, force, snapshots, trace_seconds=0):
             result.update(m)
         else:
             time.sleep(snapshots * 2 + 2)
+            g.on_highway("it played")  # --route-only is a release's game run: reached, and stayed up
     except Stop as err:
         result["error"] = str(err)
     finally:

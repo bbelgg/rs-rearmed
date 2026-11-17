@@ -63,10 +63,10 @@ static void on_miss(rc_mid_frame *f, void *user) {
 // A check the game makes each frame: the ones a 60 Hz game would not have made return at once
 static void on_gate(rc_mid_frame *f, void *user) {
   intptr_t k = (intptr_t)user;
-  float dt = frame_dt();
-  if (!g_pt[k].on || !rs_fr_fast(dt)) return;
+  if (!g_pt[k].on) return;
+  // (every frame, the slow ones too: the rule is rs_fr_gate's alone, which the test runs)
   rs_fr_slot *s = rs_fr_slot_of(&g_pt[k].slots, (const void *)(uintptr_t)rc_mid_get(f, g_pt[k].who));
-  if (!rs_fr_gate(s, dt)) f->go = g_pt[k].cont;
+  if (!rs_fr_gate(s, frame_dt())) f->go = g_pt[k].cont;
 }
 
 int rs_framerate_init(void) {

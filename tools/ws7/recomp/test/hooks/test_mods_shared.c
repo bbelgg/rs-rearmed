@@ -1130,6 +1130,118 @@ static void file_questions(void) {
   rs_mods_reload_config();
 }
 
+// A mounting that does not go by the book: an enumeration the game starts while the flag is held, a flag cleared
+// outside the update, steps one a frame, a mounting whose steps ask nothing, and a question asked before the
+// step's mount.
+static void mounting_edges(void) {
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  uint8_t *unnamed = response_named("", 1);
+  // The game starts an enumeration while the flag is held for manifests: the hold ends, the new archives are
+  // stepped as a mounting of their own, and the manifests still to come are waited for with it.
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  rs_mods_mounting(1);
+  manifest_asked();
+  manifest_asked();
+  rs_mods_mounting(0);
+  rs_mods_mount_took();
+  CHECK_EQ(rs_mods_mount_listed(), 1);
+  CHECK(rs_mods_mount_holding());
+  log_start();
+  rs_mods_mount_restarted();
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: a new enumeration with 2 song manifests of the last one still to come\n"));
+  CHECK(strstr(logged, "[rs-mods] DLC: 1 archives mounted in 1 frames, "));
+  CHECK(!rs_mods_mount_holding());
+  CHECK_EQ(frame(), 1);  // the next update: steps again
+  step("data", fs_arch[0], 3);
+  CHECK(asks_answered);
+  CHECK_EQ(whole_asks, 3);  // a first step: nothing is known from the mounting before
+  manifest_answered(unnamed);
+  CHECK_EQ(rs_mods_mount_listed(), 1);  // one of the two is still to come
+  manifest_answered(unnamed);
+  CHECK(!rs_mods_mount_waiting());
+  ends_quietly();
+  log_start();
+  rs_mods_mount_restarted();  // with no hold: nothing
+  log_stop();
+  CHECK(!*logged);
+  // The flag cleared by something else than the update that found it set: the next mounting starts clean.
+  CHECK_EQ(frame(), 1);
+  rs_mods_mounting(1);
+  manifest_asked();
+  rs_mods_mounting(0);
+  rs_mods_mount_took();
+  CHECK_EQ(rs_mods_mount_listed(), 1);
+  log_start();
+  CHECK_EQ(rs_mods_mount_frame(0), 0);
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: the mounting ended outside its update, after 1 archives in 1 frames\n"));
+  CHECK(!rs_mods_mount_holding());
+  manifest_answered(unnamed);
+  CHECK_EQ(frame(), 1);
+  CHECK(!rs_mods_mount_holding());
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  log_start();
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(STARTS(logged, "[rs-mods] DLC: 0 archives mounted in 1 frames, "));
+  // A step a frame (a budget of 0): the questions are the game's own, as with the fixes off; so is a step with
+  // nothing being installed.
+  fs_reset();
+  rs_mods_cfg.budget_s = 0;
+  CHECK_EQ(frame(), 0);
+  step("data", fs_arch[0], 3);
+  step("data", fs_arch[1], 3);
+  CHECK(!asks_answered);
+  CHECK_EQ(arch_asks[0] + arch_asks[1], 0);
+  ends_quietly();
+  rs_mods_reload_config();
+  CHECK_EQ(rs_mods_mount_frame(0), 0);
+  step("data", fs_arch[0], 3);
+  CHECK(!asks_answered);
+  // A mounting whose steps asked nothing checks nothing at its end: the answers kept are an earlier mounting's.
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 3);
+  step("data", fs_arch[1], 3);
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  ends_quietly();
+  int asked = whole_asks;
+  whole_has = QUESTION[0];  // (a file that came since)
+  CHECK_EQ(frame(), 1);
+  step(0, 0, 0);
+  log_start();
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  rs_mods_mount_end();
+  log_stop();
+  CHECK_EQ(whole_asks, asked);
+  CHECK(!strstr(logged, "is there, and a step was told"));
+  // A question a step asked before its mount is not known for the step after: the archive it then mounted may
+  // have the file.
+  fs_reset();
+  CHECK_EQ(frame(), 1);
+  step("data", fs_arch[0], 1);
+  rs_mods_mounting(1);
+  CHECK(!asks(QUESTION[0]));
+  arch_has[1] = "shaders/generated/a.sha1";
+  whole_has = QUESTION[0];
+  mounts("data", fs_arch[1]);
+  rs_mods_mounting(0);
+  rs_mods_mount_took();
+  step("data", fs_arch[2], 1);
+  CHECK(step_found[0]);  // the whole file system's answer, not the third archive's alone
+  log_start();
+  CHECK_EQ(rs_mods_mount_listed(), 0);
+  rs_mods_mount_end();
+  log_stop();
+  CHECK(!strstr(logged, "is there, and a step was told"));
+  no_switches();
+  rs_mods_reload_config();
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -1170,6 +1282,7 @@ int main(void) {
   saved_input();
   skip_tuner();
   manifests();
+  mounting_edges();
   file_questions();
   printf("mods_shared: ok (%s)\n", rc_guest_ptr_size == 4 ? "32-bit guest" : "64-bit guest");
   return 0;

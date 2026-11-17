@@ -52,6 +52,10 @@ EXTRA_VARIADIC = {"open": ["int"], "openat": ["int"], "fcntl": ["long"], "ioctl"
 # Play's Win32 seam calls the same ones (win-x86/shims/win32_kfile.c).
 FILE_FUNCS = {n: "rc_file_" + n for n in ("open", "close", "read", "pread", "lseek", "fstat", "dup", "stat",
                                            "fopen", "opendir", "readdir", "closedir")}
+# What reads a file or a folder and has no function there: an image that imports one of these goes past a mod's
+# file provider with it, and the build says so (the game of today imports none).
+FILE_UNROUTED = ("lstat", "access", "faccessat", "openat", "fstatat", "readdir_r", "scandir", "rewinddir", "seekdir",
+                 "telldir", "fdopen", "freopen", "dup2", "mmap", "realpath", "getattrlist")
 
 # --- hooks that rewrite callback-carrying structs ------------------------------------
 HOOKS = {
@@ -572,6 +576,12 @@ class Gen:
                 self.entries.append(row)
                 continue
             cat, reason, body = self.plan(slot, sym, row["dylib"])
+            base = (sym[1:] if sym.startswith("_") else sym).split("$")[0]
+            if base in FILE_FUNCS and cat == "universal":  # fn_expr binds the typed and variadic thunks alone
+                sys.exit("[gen_thunks] %s is a file function (rc_file.h) and has no typed thunk: %s" % (sym, reason))
+            if base in FILE_UNROUTED:
+                sys.stderr.write("[gen_thunks] warning: the image imports %s, which a mod's file provider "
+                                 "(rc_file.h) does not answer\n" % sym)
             if cat not in ("universal", "cxx", "local"):
                 body = UNWIND_GUARD + body
             row.update(category=cat, reason=reason)

@@ -14,20 +14,25 @@
 //     rc_file_provide(&p);
 //   }
 //
-// Paths are the host's, absolute, as the game's open resolved them (Learn & Play: after the Win32 seam's mapping of
-// C:\Rocksmith2014 and its case-insensitive lookup; a name no file has keeps the case the game gave). open is asked
-// before the system for every file opened for reading alone, so a provider can also answer for a file that exists;
-// it returns 0 for every path it does not serve, and quickly: it is asked for every such open while a provider is
-// registered. Without a provider nothing here costs more than a test of a counter.
+// Paths are the host's, absolute, in the game's own spelling: a relative one has the working directory before it,
+// and no link is followed and no "." or ".." or doubled "/" removed (Learn & Play: after the Win32 seam's mapping
+// of C:\Rocksmith2014 and its case-insensitive lookup; a name no file has keeps the case the game gave). open is
+// asked before the system for every file opened for reading alone, so a provider can also answer for a file that
+// exists; it returns 0 for every path it does not serve, and quickly: it is asked for every such open while a
+// provider is registered, and, by a provider without stat, for every question of a file's size or date too (Learn
+// & Play asks one for each file it opens for reading and each entry of a folder it lists). Without a provider
+// nothing here costs more than a test of a counter.
 //
 // A file has a fixed size and date from its open to its close (*info, filled by open). read is positional and may
 // be called from several threads at once, also for one file; it returns the bytes read, 0 at or past the end, and
 // less than 0 for an error (the game sees EIO). list adds the names a folder lacks: the folder must exist, and a
-// name it really has is listed once. hide leaves a real entry out of the listing (the file itself still opens). The
-// first provider that answers wins, in the order they registered.
+// name it really has, in any letter case, is listed once. hide leaves a real entry out of the listing (the file
+// itself still opens). The first provider that answers wins, in the order they registered.
 //
-// What the game is not offered through a provider: writing, a folder that does not exist, and (Mac) a FILE opened
-// in a mode other than "r" or "rb".
+// What the game is not offered through a provider: writing, a folder that does not exist, and on the Mac a FILE
+// opened in a mode other than "r" or "rb" and what goes by a call other than open, close, read, pread, lseek,
+// fstat, dup, stat, fopen, opendir, readdir and closedir (the game's file imports that are bound to these:
+// thunks/gen_thunks.py, which says at the build when the game imports another).
 #ifndef RC_FILE_H
 #define RC_FILE_H
 

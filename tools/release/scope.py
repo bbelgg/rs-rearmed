@@ -102,7 +102,8 @@ RULES = {
     "tools/loadscreen/": NOTHING,
 
     # The installer and the install scripts.
-    "tools/installer/": rule(BOTH, installer=True),
+    # (its Settings and switches sheet has the launchers' keys: test_settings.py reads all three)
+    "tools/installer/": rule(BOTH, suites=["settings"], installer=True),
     "tools/play-native/": rule(BOTH, suites=["gamefiles", "cache_overlay", "settings"], installer=True),
     # (Learn & Play's installer gets its game from Steam with gamefiles.py's code)
     "tools/play-native/gamefiles.py": rule(BOTH, suites=["gamefiles", "lp.install"], installer=True),
@@ -128,6 +129,11 @@ RULES = {
     "tools/targets/": rule(BOTH, build=BOTH, run=BOTH, suites=["targets", "hooks"]),
     "tools/targets/mac-x64/": rule([MAC], build=[MAC], run=[MAC], suites=["targets", "hooks", "inner64"]),
     "tools/targets/win-x86/": rule([LP], build=[LP], run=[LP], suites=["targets", "hooks", "inner32"]),
+    # (each game's figures are also its installer's: the depot Steam is asked for and the build that is accepted)
+    "tools/targets/mac-x64/target.toml": rule([MAC], build=[MAC], run=[MAC],
+                                              suites=["targets", "hooks", "inner64", "gamefiles"], installer=True),
+    "tools/targets/win-x86/target.toml": rule([LP], build=[LP], run=[LP],
+                                              suites=["targets", "hooks", "inner32", "lp.install"], installer=True),
     # (what Learn & Play's built-in fixes replace: its translation's skip file is made of it)
     "tools/targets/names/overrides/win32.list": rule([LP], build=[LP], run=[LP], suites=["targets", "lp.install"]),
     "tools/metal/": rule(BOTH, run=BOTH, suites=["ct.msl", "lp.shaders"]),
@@ -135,8 +141,10 @@ RULES = {
     "shims/coreaudio/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.audio", "lp.audio"]),
     # (Learn & Play's Present paces its frames on the shell's clock: include/rsp_fps.h)
     "shims/platform/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.platform", "lp.screen", "lp.d3d9"]),
-    "shims/include/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.shims", "ct.opengl", "ct.platform"]),
-    "tools/ws8/netguard/": rule(BOTH, build=[LP], run=[MAC], suites=["netguard"]),
+    # (rs_overlay.h and rs_render.h are a mod's headers: the hooks tests compile with them)
+    "shims/include/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.shims", "ct.opengl", "ct.platform", "hooks"]),
+    # (the Mac game has it on every launch, Learn & Play whenever it loads a mod: win-x86/app/lp_main.c)
+    "tools/ws8/netguard/": rule(BOTH, build=[LP], run=BOTH, suites=["netguard"]),
     # (Learn & Play's Steam face compiles the Mac layer's state and answers: win-x86/shims/steam/Makefile)
     "shims/steam/src/": rule(BOTH, build=BOTH, run=BOTH, suites=["steam", "lp.steam"]),
 
@@ -163,6 +171,11 @@ RULES = {
     # (the built-in fixes name the game through the tables, and tools/targets/check.py reads them)
     "win-x86/shims/win32_overrides.c": rule([LP], build=[LP], run=[LP], suites=["targets", "lp.shims"]),
     "win-x86/shims/tests/": rule(suites=["lp.shims"]),
+    # (the handle table, the guest objects and the frame: every shim suite of Learn & Play compiles them)
+    **{"win-x86/shims/" + f: rule([LP], build=[LP], run=[LP],
+                                  suites=["lp.shims", "lp.audio", "lp.steam", "lp.online", "lp.d3d9"])
+       for f in ("win32_ksync.c", "win32_guestobj.c", "win32_guestobj.h", "win32_frame.c", "win32_handles.h",
+                 "win32_shims.h")},
     "win-x86/online/": rule([LP], build=[LP], run=[LP], suites=["lp.online"]),
     # (settings: the test compiles lp_settings.c beside the Mac launcher's reader)
     "win-x86/app/": rule([LP], build=[LP], run=[LP], suites=["lp.screen", "settings"]),

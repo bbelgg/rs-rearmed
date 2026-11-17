@@ -49,16 +49,17 @@ What the edition does today. What has not been tested is under [Open issues](#op
   before it opens the next, the asset loader thread does not pause 10 ms between files while archives are mounted,
   the flag is held for manifests still to come, and a step no longer asks every mounted archive for the shader
   cache's files. With 2,326 archives 1.16.0 showed the text for 24 s and went on loading for 33 s after it (a
-  search 6 s after the text had gone found 1,227 of 2,037 matches); now the text and the last song end together
+  song list opened 3 s after the text had gone had 1,227 of 2,037 matches); now the text and the last song end together
   after 5 to 8 s, and 147 archives take half a second.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): what the game counts in frames is put right by the
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
-- **A fixed frame rate** (new in 1.16.0): the rule and clock of `RS_FPS=N`, this edition's test switch, are one
+- **A fixed frame rate** (new in 1.16.0): the rule and clock of `RS_FPS=N`, the installer's Frame rate, are one
   source that Learn & Play uses too (`shims/platform/include/rsp_fps.h`); this edition runs as before.
 - **Shared with Learn & Play** (new in 1.16.0): the switches, the log and the start of the built-in fixes, the intro
-  skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are one source for both
+  skip, the song ownership during a mount, Player 2's saved input, the frame rate fixes, and what the batched DLC
+  mounting does around its steps (not released), are one source for both
   editions (`overrides/mods/mods_shared.c`, `framerate.c`), and Learn & Play's own fixes name the game through the
   tables as these do. One thing changes for this edition's player: the shared hook for Player 2's saved input frees
   the name's text when the game had to allocate it (a name longer than about 15 characters), which this edition's own
@@ -136,7 +137,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
   came from a player's report of the Guitarcade's games going round between the tuner and calibration on a 120 Hz
   MacBook Pro; whether this was the cause of that is not known.
 - **Batched DLC mounting**: not run with the new loop: Enumerate with new archives to mount (a rescan with none
-  was: `147 archives mounted in 3 frames, 0.18 s`), the song count against a step a frame with a large library, an
+  was: `147 archives mounted in 3 frames, 0.18 s`), an enumeration started while the flag is held for manifests
+  (the hold then ends and the new archives are stepped: in the shared source's test only), the song count against
+  a step a frame (`RS_MODS_BUDGET_MS=0`; the same with 147 archives in 1.16.0, not compared since, nor with a
+  large library), an
   archive in `dlc/` that brings a shader's hash file (the step's question then goes to
   the whole file system; none exists to try), and a package or manifest that does not come (the mounting then goes
   on after 5 s, with a line in the log; the hold itself was run, with the loader's pause left at the game's and
@@ -146,6 +150,24 @@ What the edition does today. What has not been tested is under [Open issues](#op
   song manifest, 2 to 3 ms an archive on the game's thread, and each file opened asks the archives mounted before it.
 - **The fixes from the code review of 2026-11-09**: six songs played with a guitar since, with no fault; no long
   session.
+- **The code review of 2026-11-17** (everything since the one before; not released): its fixes passed the suites
+  and were not built into a game or played, in either edition. What it found and left:
+  - The frame rate fixes' hooks have no test of their own (their arithmetic has), and three of their points return
+    from a function at its start when a 60 Hz game would not have made the call: what else those functions do each
+    call, and what a tuner's miss past the third takes off its hold, has not been read in the game.
+  - Batched DLC mounting: the archive a step mounted is asked its file questions by the pointer taken at the mount
+    call, with no reference held (a mount that fails and still asks has not been met); an answer to a request made
+    before a mounting ends its hold one manifest early; a request to clear the coordinator's map that comes while
+    the flag is held is dropped, as one is during any enumeration.
+  - Files a mod serves: a provider gets paths in the game's spelling (a doubled `/` or a `.` is not removed, and one
+    file spelled two ways has two identities); one thread closing a served file while another reads it is a use
+    after free where the system gives an error.
+  - The installer: with no saved choice it preselects Learn & Play whenever the Mac game is not installed in Steam,
+    which no longer means the player has no Mac game; Settings and switches… has not been opened since the two
+    newest built-in mods joined it, and no game has run with those in `settings.env`. A copy stopped before its
+    manifest was written and then moved to the drive lands there as real copies, not clones.
+  - `RS_FPS` with `RS_RENDER_THREAD=0` only turns vsync off. The seam's unit test
+    (`tools/ws7/recomp/app/test/build.sh`) is in no suite of `tools/release/scope.py`.
 - **Mods**: a file provider that changes what an archive holds; the tuner's reading of a 7-string chart's low B and a
   seven-row chord diagram; the colors in other modes (they were checked in one song); the stuck tone that the tone
   change hook is for, a rare bug that has not been met.

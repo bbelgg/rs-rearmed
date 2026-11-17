@@ -274,8 +274,14 @@ final class BuildRunner {
     func appendLog(_ text: String) {
         let line = text.hasSuffix("\n") ? text : text + "\n"
         log += line
-        if let data = line.data(using: .utf8) {
-            logFileHandle?.write(data)
+        guard let data = line.data(using: .utf8) else { return }
+        if let handle = logFileHandle {
+            handle.write(data)
+        } else if !isRunning, let url = logFileURL, let handle = try? FileHandle(forWritingTo: url) {
+            // after the run: where everything is and how to uninstall are the kept log's last lines too
+            handle.seekToEndOfFile()
+            handle.write(data)
+            try? handle.close()
         }
     }
 
@@ -342,6 +348,13 @@ final class BuildRunner {
     func closeLogFile() {
         try? logFileHandle?.close()
         logFileHandle = nil
+    }
+
+    // The run ended at the player's word: Stop, or Cancel in one of its questions.
+    var stoppedByUser: Bool {
+        if stopRequested || failure is CancellationError { return true }
+        if case InstallerError.userCancelled? = failure as? InstallerError { return true }
+        return false
     }
 
     @discardableResult
@@ -526,6 +539,7 @@ final class BuildRunner {
                 stepTitle = title
                 stepFraction = 0
                 stepDetail = ""
+                lastError = ""  // the reason a step gives is its own, not an earlier step's
                 progressLog.reset()
                 stepStart = Date()
                 progress = Double(i) / Double(steps.count)
@@ -541,7 +555,7 @@ final class BuildRunner {
         } catch {
             failed = true
             failure = stopRequested ? InstallerError.userCancelled : error
-            appendLog(stopRequested ? "\nStopped." : "\n✗ FAILED: \(error.localizedDescription)")
+            appendLog(stoppedByUser ? "\nStopped." : "\n✗ FAILED: \(error.localizedDescription)")
         }
 
         setGuide("", "", "")
@@ -1063,7 +1077,7 @@ enum Steps {
         // The copy's tool of an install from before the choice keeps the copy where it is.
         if r.gameCopyPlace == "home", gameCopyElsewhere(r.game) != nil {
             r.appendLog("The game files are still on the other drive: this install is from before they could be "
-                + "moved. Click Install to move them.")
+                + "moved. Click Build & Install to move them.")
         }
     }
 
@@ -1889,7 +1903,7 @@ class InstallerWindow: NSWindow {
             : runner.isFinished ? (!lp ? "✓ Installed: ~/Applications/RS Re-ARMed.app"
                                    : runner.lpStopped.isEmpty ? "✓ Installed: ~/Applications/RS Re-ARMed Learn & Play.app"
                                    : "Stopped before the code image (\(runner.lpStopped))")
-            : runner.failure is InstallerError && runner.stopRequested ? "Stopped. Build & Install goes on from here."
+            : runner.failed && runner.stoppedByUser ? "Stopped. Build & Install goes on from here."
             : runner.failed ? (runner.refreshOnly ? "✗ Refresh failed (see the log)" : "✗ Build failed (see the log)")
             : "Ready"
         if runner.isRunning && !runner.stepDetail.isEmpty {
@@ -1909,7 +1923,7 @@ class InstallerWindow: NSWindow {
         startButton.title = canSkip ? "Skip" : runner.isFinished ? "Build Again" : "Build & Install"
         updateGuide()
         // Once a run has ended: Close at the edge, Return on what the box offers (Start the Game, Try Again).
-        let ended = !runner.isRunning && result != nil
+        let ended = !runner.isRunning && (result != nil || runner.failed || runner.isFinished)
         closeButton.isHidden = !ended
         if startBesideClose.isActive != ended {
             startAtEdge.isActive = !ended
@@ -2285,7 +2299,7 @@ func fullMatch(_ pattern: String) -> ((String) -> Bool) {
 }
 let optionSpecs: [OptionSpec] = [
     OptionSpec(key: "RS_AUDIO_FRAMES", title: "Output device buffer", detail: "Frames per callback; 0 leaves the device's. Default 256.",
-               kind: .text(check: intRange(0, 4096), hint: "256"), editions: "both", group: "Audio and guitar input", advanced: false),
+               kind: .text(check: intRange(0, 8192), hint: "256"), editions: "both", group: "Audio and guitar input", advanced: false),
     OptionSpec(key: "RS_LATENCY_BUFFER", title: "Latency buffer", detail: "The game's output buffer in steps of 256 frames, 1-16. Empty: the game's saved choice.",
                kind: .text(check: intRange(1, 16), hint: "1-16"), editions: "mac", group: "Audio and guitar input", advanced: false),
     OptionSpec(key: "RS_AUDIO_RT", title: "Real-time audio thread", detail: "The audio thread runs in the device's workgroup. Off: as the original.",
@@ -2332,7 +2346,7 @@ let optionSpecs: [OptionSpec] = [
                kind: .choice([("Default (the game's setting)", ""), ("Window", "0"), ("Full screen", "1")]), editions: "lp", group: "Picture", advanced: false),
     OptionSpec(key: "RS_D3D9_DISPLAY", title: "Desktop size", detail: "As in 1920x1080. Empty: the screen's.",
                kind: .text(check: fullMatch("^[0-9]+x[0-9]+$"), hint: "1920x1080"), editions: "lp", group: "Picture", advanced: true),
-    OptionSpec(key: "RS_STEAM_DLC", title: "Owned songs", detail: "AppIDs like 248750,258341. Empty: your DLC and every AppID in the copy.",
+    OptionSpec(key: "RS_STEAM_DLC", title: "Owned songs", detail: "all, or AppIDs like 248750,258341. Empty: your DLC and every AppID in the copy.",
                kind: .text(check: nil, hint: "AppIDs"), editions: "both", group: "Songs and Steam account", advanced: true),
     OptionSpec(key: "RS_STEAM_OWNED", title: "First Rocksmith DLC owned", detail: "AppIDs, kept by a copy or refresh that asked Steam. Empty: the copy's.",
                kind: .text(check: nil, hint: "AppIDs"), editions: "both", group: "Songs and Steam account", advanced: true),
@@ -2340,7 +2354,7 @@ let optionSpecs: [OptionSpec] = [
                kind: .text(check: nil, hint: "english"), editions: "both", group: "Songs and Steam account", advanced: true),
     OptionSpec(key: "RS_STEAM_ID", title: "Steam account", detail: "The account whose saves and profiles play. Empty: the copy's.",
                kind: .text(check: fullMatch("^[0-9]+$"), hint: "SteamID64"), editions: "both", group: "Songs and Steam account", advanced: true),
-    OptionSpec(key: "RS_STEAM_PERSONA", title: "Player name", detail: "Empty: the copy's.",
+    OptionSpec(key: "RS_STEAM_PERSONA", title: "Player name", detail: "Empty: the name of the account Steam last logged in, else Player.",
                kind: .text(check: nil, hint: "Player"), editions: "both", group: "Songs and Steam account", advanced: true),
     OptionSpec(key: "RS_MODS_BUDGET_MS", title: "DLC mounting budget", detail: "Ms per frame for mounting archives; 0 mounts one a frame. Default 50.",
                kind: .text(check: intRange(0, 1000), hint: "50"), editions: "both", group: "Startup and logging", advanced: false),
@@ -2360,6 +2374,7 @@ let optionSpecs: [OptionSpec] = [
 func readOptions(_ game: String) -> [String: String] {
     guard let text = try? String(contentsOfFile: optionsFile(game), encoding: .utf8) else { return [:] }
     let keys = Set(optionSpecs.map { $0.key })
+    let toggles = Set(optionSpecs.filter { if case .toggle = $0.kind { return true } else { return false } }.map { $0.key })
     var seen = Set<String>(), out: [String: String] = [:]
     for raw in text.components(separatedBy: "\n") {
         let line = raw.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -2367,10 +2382,27 @@ func readOptions(_ game: String) -> [String: String] {
         let key = String(line[..<eq]).trimmingCharacters(in: .whitespaces)
         let value = String(line[line.index(after: eq)...]).trimmingCharacters(in: .whitespaces)
         guard keys.contains(key), !value.isEmpty, !seen.contains(key) else { continue }
+        // A toggle is 0 or 1 to the launchers, which ignore any other value: so does the page, or saving it
+        // would turn a line that did nothing into "off".
+        if toggles.contains(key), value != "0", value != "1" { continue }
         seen.insert(key)
         out[key] = value
     }
     return out
+}
+
+// Whether the game installed on this Mac reads options.env (and settings.env's newest switches): the reader is part
+// of the installed app, the launcher's script or Learn & Play's program, and the ones up to 1.16.0 have none. nil:
+// no game is installed.
+func installedGameReadsOptions(_ game: String) -> Bool? {
+    if game == "learnplay" {
+        guard let exe = Bundle(path: lpApp)?.executablePath,
+              let data = try? Data(contentsOf: URL(fileURLWithPath: exe), options: .alwaysMapped) else { return nil }
+        return data.range(of: Data("/options.env".utf8)) != nil
+    }
+    guard let script = try? String(contentsOfFile: launcherApp + "/Contents/Resources/launch.sh", encoding: .utf8)
+    else { return nil }
+    return script.contains("options.env")
 }
 
 // The installer writes the whole file: the options set to something other than their default, or no file.
@@ -2527,7 +2559,16 @@ final class OptionsSheet: NSObject {
                             + "effects, and problems with other values are not supported: Reset to Defaults before "
                             + "reporting one.", size: 12)
         stack.addArrangedSubview(warning)
-        stack.setCustomSpacing(16, after: warning)
+        if installedGameReadsOptions(game) == false {
+            stack.setCustomSpacing(6, after: warning)
+            let old = label("The game installed on this Mac is from before this page: it takes only the first "
+                            + "seven built-in mods from it. Build & Install once, and everything here takes effect.",
+                            size: 12, color: .systemOrange)
+            stack.addArrangedSubview(old)
+            stack.setCustomSpacing(16, after: old)
+        } else {
+            stack.setCustomSpacing(16, after: warning)
+        }
 
         stack.addArrangedSubview(header("Built-in mods"))
         stack.setCustomSpacing(8, after: stack.arrangedSubviews.last!)
@@ -2690,11 +2731,19 @@ final class OptionsSheet: NSObject {
                 rows[i].field?.stringValue = v ?? ""
             }
         }
+        // An advanced option that is set is in effect: it is not left out of sight.
+        if rows.contains(where: { $0.spec.advanced && opts[$0.spec.key] != nil }) { showAdvanced() }
+    }
+
+    private func showAdvanced() {
+        guard advancedToggle.state != .on else { return }
+        advancedToggle.state = .on
+        toggleAdvanced()
     }
 
     // What the page says now: the mods switched off, the options set to other than their defaults, and the
     // first key whose field fails its check, if any.
-    private func current() -> (modsOff: Set<String>, opts: [String: String], bad: String?) {
+    private func current(unchecked: Bool = false) -> (modsOff: Set<String>, opts: [String: String], bad: String?) {
         let modsOff = Set(modChecks.filter { $0.box.state == .off }.map { $0.key })
         var opts: [String: String] = [:]
         for r in rows {
@@ -2708,7 +2757,7 @@ final class OptionsSheet: NSObject {
             case .text(let check, _):
                 let v = (r.field?.stringValue ?? "").trimmingCharacters(in: .whitespaces)
                 if v.isEmpty { continue }
-                if let check = check, !check(v) { return (modsOff, opts, r.spec.key) }
+                if !unchecked, let check = check, !check(v) { return (modsOff, opts, r.spec.key) }
                 opts[r.spec.key] = v
             }
         }
@@ -2743,7 +2792,19 @@ final class OptionsSheet: NSObject {
 
     @objc func imported() {
         let other = game == "learnplay" ? "mac" : "learnplay"
-        show(modsSwitchedOff(other), readOptions(other))
+        guard FileManager.default.fileExists(atPath: settingsFile(other))
+            || FileManager.default.fileExists(atPath: optionsFile(other)) else {
+            _ = showAlert(title: "Nothing to import",
+                          message: "\(other == "mac" ? gameMac : gameLP) has no settings of its own: everything "
+                              + "there is at its default. This page is left as it is.",
+                          buttons: ["OK"])
+            return
+        }
+        // What only this game has stays as the page has it: the other game's files never hold those.
+        var opts = readOptions(other)
+        let mine = current(unchecked: true).opts
+        for spec in optionSpecs where spec.editions != "both" { opts[spec.key] = mine[spec.key] }
+        show(modsSwitchedOff(other), opts)
     }
 
     @objc func cleared() { show([], [:]) }
@@ -2753,6 +2814,7 @@ final class OptionsSheet: NSObject {
     @objc func saved() {
         let cur = current()
         if let bad = cur.bad, let spec = optionSpecs.first(where: { $0.key == bad }) {
+            if spec.advanced { showAdvanced() }
             _ = showAlert(title: "That \(spec.title.lowercased()) isn't valid",
                           message: "\(bad): \(spec.detail)",
                           buttons: ["OK"])

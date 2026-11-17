@@ -187,11 +187,20 @@ static void k_SetStdHandle(rc_ctx *c) { w32_ret(c, 1, 2); }
 int w32_handle_close(uint32_t h) {
   pthread_mutex_lock(&w32_hlock);
   w32_obj *o = h >= HBASE && !(h & 3) && slot_of(h) < MAXH ? slot_obj[slot_of(h)] : 0;
+  w32_obj *last = 0;
   if (o) {
     slot_obj[slot_of(h)] = 0;
-    if (--o->refs == 0) obj_free(o);
+    if (--o->refs == 0) {
+      // A file, a find or a mapping closes outside the lock: its close may be a mod's (rc_file.h: a provider's
+      // close), which can take as long as it likes and take locks of its own, and every handle of every thread
+      // goes through this lock. Nothing leads to the object now. (A thread's stays inside: thread_main looks at
+      // it under the lock.)
+      if (o->type == H_FILE || o->type == H_FIND || o->type == H_MAPPING) last = o;
+      else obj_free(o);
+    }
   }
   pthread_mutex_unlock(&w32_hlock);
+  if (last) obj_free(last);
   return o != 0;
 }
 static void k_CloseHandle(rc_ctx *c) {
@@ -207,10 +216,11 @@ static void k_CloseHandle(rc_ctx *c) {
   if (trace && traced < 6) {
     w32_obj *fo = w32_handle_get(h, H_FILE);
     if (fo && fo->u.file.dlc == 2) {
-      uint32_t sp = (uint32_t)c->r[4];
+      uint32_t sp = (uint32_t)c->r[4], top;
+      memcpy(&top, RC32_H((uint32_t)c->fs + RC32_TEB_STACKBASE), 4);  // the words the stack has, and no more
       char line[2048];
       int n = snprintf(line, sizeof line, "w32: dlc archive closed on thread %p, stack:", (void *)pthread_self());
-      for (uint32_t k = 0; k < 400 && n < (int)sizeof line - 12; k++) {
+      for (uint32_t k = 0; k < 400 && sp + 4 * k + 4 <= top && n < (int)sizeof line - 12; k++) {
         uint32_t v;
         memcpy(&v, RC32_H(sp + 4 * k), 4);
         if (v >= 0xf81000u && v < 0x1c36becu) n += snprintf(line + n, sizeof line - (size_t)n, " %x", v);

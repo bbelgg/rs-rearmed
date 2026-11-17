@@ -748,8 +748,22 @@ def _usable(base, probe_src, clone, need_clone):
     return ok
 
 
-def _free_name(target, dest):
-    """TARGET, or "TARGET 2", ...: the first that is empty, or a copy whose link is DEST or leads elsewhere now."""
+def _link_gone(link, t):
+    """The link LINK a copy T records is not there any more, or leads elsewhere now. One that cannot be looked at
+    (another user's) is taken as there."""
+    try:
+        st = os.lstat(link)
+    except FileNotFoundError:
+        return True
+    except OSError:
+        return False
+    return not stat.S_ISLNK(st.st_mode) or os.path.realpath(link) != os.path.realpath(t)
+
+
+def _free_name(target, dest, empty=False, say=None):
+    """TARGET, or "TARGET 2", ...: the first that is empty, or a copy whose link is DEST or leads elsewhere now.
+    EMPTY: only one that is empty (a move replaces what is there, and an earlier copy may hold songs put in its
+    dlc by hand, so it is passed over, and said)."""
     for i in range(1, 100):
         t = target if i == 1 else "%s %d" % (target, i)
         if not os.path.lexists(t):
@@ -759,9 +773,12 @@ def _free_name(target, dest):
         if not os.listdir(t):
             return t
         link = (read_json(os.path.join(t, META, LINK_INFO)) or {}).get("link")
-        if link and (os.path.abspath(link) == dest or not os.path.islink(link)
-                     or os.path.realpath(link) != os.path.realpath(t)):
-            return t  # an earlier copy of this install, or one whose install is gone: refreshed into place
+        if link and (os.path.abspath(link) == dest or _link_gone(link, t)):
+            if not empty:
+                return t  # an earlier copy of this install, or one whose install is gone: refreshed into place
+            if say:
+                say("An earlier copy of the game files in %s is left as it is: remove it if nothing in it is "
+                    "needed (songs put in its dlc folder by hand)." % t)
     raise Failure("no free folder name for the copy next to %s" % target)
 
 
@@ -883,13 +900,17 @@ def _move(old, new, clone, device, free, progress):
 
 
 def _discard(old, dest, say):
-    """The copy OLD that DEST led to, removed with the RS Re-ARMed folders it leaves empty; left when another
-    install's link is recorded in it."""
+    """The copy OLD that DEST led to, removed with the RS Re-ARMed folders it leaves empty. Only a copy that
+    records DEST as its link is this install's to remove: one that records another link, or none (a copy at
+    another install's own place, a folder linked by hand), is left."""
     link = (read_json(os.path.join(old, META, LINK_INFO)) or {}).get("link")
-    if link and os.path.abspath(link) != dest:
-        say("The old copy in %s is left there (another install's)." % old)
+    if not link or os.path.abspath(link) != dest:
+        say("The old copy in %s is left there (%s)." % (old, "another install's" if link else
+                                                         "it is not recorded as this install's"))
         return
     shutil.rmtree(old)
+    if os.path.isdir(old + MOVING):
+        shutil.rmtree(old + MOVING)  # a stopped move's
     d = os.path.dirname(old)
     while os.path.basename(d) in (FOLDER, os.path.dirname(edition_path("learn-play"))):
         try:
@@ -916,7 +937,7 @@ def _move_home(dest, clone, device, free, progress):
 def _move_to_drive(dest, target, clone, device, free, progress):
     """The copy at DEST, in TARGET on the game's drive, with DEST a link to it."""
     if os.path.isdir(target):
-        shutil.rmtree(target)  # empty, or an earlier copy of this install that nothing leads to (_free_name)
+        os.rmdir(target)  # empty (_free_name)
     n = _move(dest, target, clone, device, free, progress)
     os.rename(target + MOVING, target)
     write_json(os.path.join(target, META, LINK_INFO), {"format": FORMAT, "link": dest})
@@ -945,10 +966,22 @@ def place(edition, source, dest, clone=None, device=_device, say=None, env=None,
             shutil.rmtree(dest + MOVED)
         else:
             os.rename(dest + MOVED, dest)
+    if os.path.isdir(dest + MOVING):  # a move home that stopped
+        if os.path.lexists(dest):
+            shutil.rmtree(dest + MOVING)  # before it was whole: the copy on the drive is still the one in use
+        else:  # between its two last steps (_move_home): whole, and DEST's link already gone
+            os.rename(dest + MOVING, dest)
+            info = os.path.join(dest, META, LINK_INFO)
+            if os.path.exists(info):
+                os.unlink(info)
     if os.path.islink(dest):
         if os.path.exists(dest):
             if choice == CHOICE_HOME:
-                _move_home(dest, clone, device, free, progress)
+                if os.path.isfile(os.path.join(dest, META, SOURCE_INFO)):
+                    _move_home(dest, clone, device, free, progress)
+                else:
+                    say("%s leads to %s, which is not a finished copy of the game files (no %s/%s): it stays "
+                        "there." % (dest, os.path.realpath(dest), META, SOURCE_INFO))
             return None  # a copy on another drive already: it stays there, unless asked home
         connected, why = missing_copy(dest)
         if not connected:
@@ -961,7 +994,7 @@ def place(edition, source, dest, clone=None, device=_device, say=None, env=None,
         target = _drive_target(edition, src, dest, clone, device, say)
         if not target:
             return None
-        target = _free_name(target, dest)
+        target = _free_name(target, dest, empty=True, say=say)
         _move_to_drive(dest, target, clone, device, free, progress)
         return target
     if choice == CHOICE_HOME:
@@ -1174,7 +1207,8 @@ class Copier:
         for rel in previous:
             p = os.path.join(self.dest, rel)
             top = rel.split(os.sep)[0]
-            if top == META or (top != "dlc" and not self.source_away) or rel in files or not os.path.isfile(p):
+            if (top == META and rel != os.path.join(META, "Rocksmith.ini")) or (
+                    top != "dlc" and not self.source_away) or rel in files or not os.path.isfile(p):
                 continue
             src = old.get(rel, {}).get("src")
             if src is None or any(src.startswith(d + os.sep) for d in away):
@@ -1240,6 +1274,12 @@ class Copier:
         if self.edition == "mac" and not depot_source(self.source) \
                 and steam_is_updating(find_appmanifest(self.source, self.steam)):
             raise Failure("Steam is updating or downloading the game: let it finish, then run this again")
+        # A depot folder has its files at full size from the start of a download: one Steam is still filling
+        # would replace the copy's good files with unfilled ones.
+        if depot_source(self.source) and not self.source_away and download_running(
+                self.steam, os.path.basename(os.path.abspath(self.source))[len("depot_"):]):
+            raise Failure("Steam is still downloading the game into %s: let it finish, then run this again"
+                          % self.source)
         os.makedirs(self.dest, exist_ok=True)
         meta = os.path.join(self.dest, META)
         if os.path.islink(meta):
@@ -2169,8 +2209,7 @@ class Depot:
         best = min(found, key=lambda loc: rank[loc.status])
         if best.status == "missing":
             return self.locate(self.dir(steam))
-        if best.status in ("ok", "different") and (self.unfinished(steam)
-                                                   or (best.status == "ok" and self.short(best.folder))):
+        if best.status in ("ok", "different") and (self.unfinished(steam) or self.short(best.folder)):
             best.status = "unfinished"
         return best
 
@@ -2705,8 +2744,13 @@ def refresh(dest, progress=None, **kw):
             dlc = dlc + [d for d in steam_dlc_folders(info["steam"]) if d not in dlc]
         # Steam may clear its download folder: the copy is what counts, and new DLC can still reach it.
         kw.setdefault("source_away", not os.path.isdir(info["source"]))
-        if kw["source_away"]:
+        # Without the game folder nothing is placed anew. A copy on the game's drive can still come home: that
+        # move takes the copy's own files (place).
+        if kw["source_away"] and not os.path.islink(dest):
             kw["placement"] = None
+            if os.environ.get(COPY_DIR_ENV, "").strip().lower() == CHOICE_DRIVE and progress:
+                progress.say("The game files stay in %s: moving them to the game's drive needs the game folder "
+                             "(%s), which isn't there now. Run the installer for that." % (dest, info["source"]))
     return Copier(info["edition"], info["source"], dest, dlc, info.get("steam"), progress, **kw).run()
 
 
@@ -2808,7 +2852,10 @@ def main(argv=None):
                 content = redirect(steam, a.folder, download_notes("mac")[0])
                 print("Steam's downloads now go to %s (%s links there)" % (os.path.realpath(content), content))
     except Failure as e:
-        progress.say("error: %s" % e)
+        # Only looking (mac-game --locate): "not there" is an answer, as Learn & Play's game-locate gives it,
+        # and no error of the run that asked.
+        looked = a.cmd == "mac-game" and a.locate and e.code == 1
+        progress.say(str(e) if looked else "error: %s" % e)
         return e.code
     except OSError as e:
         progress.say("error: %s" % e)

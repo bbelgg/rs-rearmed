@@ -17,10 +17,10 @@
 #     the language), the free 248750 that custom songs carry and every AppID the copy's dlc/ archives
 #     carry (recorded there too: custom songs show whatever AppID they carry) count as owned, and so does
 #     the first Rocksmith's DLC the account owns (RS_STEAM_OWNED, recorded there at a refresh); set
-#     RS_STEAM_DLC=all with launchctl setenv to own every AppID. The Steam account (its saves and profiles) is the one the copy
-#     recorded there too (RS_STEAM_ID: the account whose license has the Mac game), so logging in to Steam
-#     with another account (e.g. one for Learn & Play) changes nothing here; RS_STEAM_ID with launchctl
-#     setenv picks another. Without Steam's loginusers.vdf (Steam uninstalled) the account
+#     RS_STEAM_DLC=all (options.env, or launchctl setenv) to own every AppID. The Steam account (its saves and
+#     profiles) is the one the copy recorded there too (RS_STEAM_ID: the account whose license has the Mac game),
+#     so logging in to Steam with another account (e.g. one for Learn & Play) changes nothing here; RS_STEAM_ID
+#     the same way picks another. Without Steam's loginusers.vdf (Steam uninstalled) the account
 #     is the one whose saves are in $HOME_DIR/steam;
 #   - libnetguard refuses every non-local connection and logs to $HOME_DIR/logs/netguard.log;
 #   - the renderer: $HOME_DIR/renderer (metal or opengl; see below).

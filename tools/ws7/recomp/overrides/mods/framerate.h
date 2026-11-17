@@ -14,8 +14,9 @@
 //   * A hold of a menu panel takes at least 1/15 s off its timer every frame, whatever the frame's time.
 //
 // Each is put right at a mid point (rc_mid.h; framerate.c has the hooks), by the frame's own time, and only for a
-// frame shorter than a 60 Hz one: at 60 Hz and below the game runs as it always has. RS_MODS_FRAME_RATE=0 leaves
-// every rate to the game.
+// frame shorter than a 60 Hz one (14.5 ms): at a steady 60 Hz and below the game runs as it always has. (A 60 Hz
+// game's short frame after a late one keeps its checks, and takes its steps by its own time.) RS_MODS_FRAME_RATE=0
+// leaves every rate to the game.
 //
 // What is here is the arithmetic, apart from the game, for the hooks and their test.
 #ifndef RS_FRAMERATE_H
@@ -49,10 +50,14 @@ typedef struct {
   float t;
 } rs_fr_slot;
 
-// Whether a 60 Hz game would have made this call: every call at 60 Hz and below, one in each 1/60 s above
+// Whether a 60 Hz game would have made this call: every call at 60 Hz and below, one in each 1/60 s above. A frame
+// of 60 Hz or longer always passes and leaves what it had over 1/60 s to the next: a 60 Hz game that is late with one
+// frame makes the next one short (11 ms after 22), and that frame's call is the game's own too.
 static inline int rs_fr_gate(rs_fr_slot *s, float dt) {
   if (!rs_fr_fast(dt)) {
-    s->t = 0;
+    s->t += dt - RS_FR_REF_DT;
+    if (s->t < 0) s->t = 0;
+    if (s->t > RS_FR_REF_DT) s->t = RS_FR_REF_DT;
     return 1;
   }
   s->t += dt;

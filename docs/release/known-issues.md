@@ -19,8 +19,10 @@ into the notes as it stands. -->
   `Channel` in `guitar-input.ini` makes an interface one entry, which leaves room.
 - Stopped partway, calibration still counts as run, so the level saved before it comes back until you run it to the end.
 - **Not played yet:** the frame rate fixes, which make calibration and the tuner run above 60 Hz as they do at 60 Hz,
-  have not been played with a guitar on a display faster than 60 Hz, in either edition. `RS_MODS_FRAME_RATE=0` turns
-  them off.
+  have not been played with a guitar on a display faster than 60 Hz, in either edition, and their hooks have no test
+  of their own (the arithmetic has). Above 100 frames a second calibration's average covers less than the second it
+  covers at 60 Hz. Settings and switches… in the installer turns them off (Calibration and the tuner the same at any
+  frame rate), as does `RS_MODS_FRAME_RATE=0`.
 - Not tested yet with this release: the Mac game downloaded by Steam when it isn't installed there (checked with a
   stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
   the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game
@@ -31,7 +33,12 @@ into the notes as it stands. -->
   Learn & Play, the music category (Game Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone
   profile with the Auto Save skip, unplugging an interface while the game runs, a Guitarcade game played with a guitar
   after Skip Tuner (the button and its warning were pressed in a run of each edition, and the game started), a whole
-  install that ends with the new lines about custom songs, and in Multiplayer a cable with an interface, two
+  install that ends with the new lines about custom songs, ENUMERATE with new archives to mount, a step a frame
+  (`RS_MODS_BUDGET_MS=0`) with the new mounting, a large library of Learn & Play's own archives (its 2,250 were
+  mostly the Mac edition's, through a mod), an archive that brings a shader's hash file, Settings and switches… since
+  the two newest built-in mods and Learn & Play's Frame rate joined it, a game started with those in its files, the
+  fixes of the code review of 2026-11-17 in a game (the suites ran; neither edition was built or played on them), and
+  in Multiplayer a cable with an interface, two
   interfaces, the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is
   found. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.

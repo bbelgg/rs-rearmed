@@ -180,6 +180,28 @@ class Keys(unittest.TestCase):
         self.assertEqual((p.signals, p.killed), ([signal.SIGTERM], True))
 
 
+class StayedUp(unittest.TestCase):
+    """A run that reached the highway counts only if the game is still up and on it (--route-only is a release's
+    game run, and a game that ended keeps the highway as its log's last screen)."""
+    def game(self, d, p, screens):
+        g = run.Game.__new__(run.Game)
+        g.p, g.log_path = p, os.path.join(d, "game.log")
+        with open(g.log_path, "w") as f:
+            f.write("".join("menu: %s\n" % s for s in screens))
+        return g
+
+    def test_up_and_on_the_highway(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as d:
+            self.game(d, FakeGame(), ["MainMenu", run.HIGHWAY]).on_highway("it played")
+            ended = FakeGame()
+            ended.ended = True
+            with self.assertRaisesRegex(run.Stop, "the game ended while it played"):
+                self.game(d, ended, ["MainMenu", run.HIGHWAY]).on_highway("it played")
+            with self.assertRaisesRegex(run.Stop, "left the note highway while it was traced \\(MainMenu\\)"):
+                self.game(d, FakeGame(), [run.HIGHWAY, "MainMenu"]).on_highway("it was traced")
+
+
 def result(edition, cpu, fps=60.0, **manifest):
     m = {"edition": edition, "ini": {"Renderer": {"Fullscreen": "1", "VisualQuality": "2"}}, "env": {"RS_METAL_MSAA": "4", "RS_STEMS_CACHE": "/mac"},
          "mods": {"librsmods.dylib": "aa"}, "displays": [{"name": "Built-in", "main": True, "resolution": "1470 x 956"}],

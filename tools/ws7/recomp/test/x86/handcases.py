@@ -159,11 +159,13 @@ CASES = [
         ret
     """),
     # --- /GS: the call of __security_check_cookie is translated in place (Translator32.stack_check): the
-    # right cookie goes on, a wrong one makes the call, whose failure path here sets eax ---
+    # right cookie goes on, with the return address below esp as the call leaves it, and a wrong one makes the
+    # call, whose failure path here sets eax ---
     ("stack_check", """
         mov eax, 1
         mov ecx, dword ptr [stack_cookie]
         call stack_check_fn
+        mov edx, dword ptr [esp - 4]
         mov ecx, 5
         call stack_check_fn
         add eax, 16

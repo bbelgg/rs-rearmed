@@ -343,6 +343,92 @@ class Sources(unittest.TestCase):
         self.assertNotIn("path_table_lock", own)       # the Mac's lock: Learn & Play's is path_table_cs
 
 
+class InnerSources(Tree, unittest.TestCase):
+    """The mid points, their values and continuations, and the edit groups the built-in code names."""
+
+    def setUp(self):
+        Tree.setUp(self)
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two 0x401010 cdecl -\n"
+                                          "frame 0x401020 thiscall -\nglob 0x500000 data int\n")
+        self.write("mac-x64/target.toml", 'id = "mac-x64"\nfront_end = "x"\nabi = "sysv64"\n')
+        self.write("win-x86/target.toml", 'id = "win-x86"\nfront_end = "x"\nabi = "win32"\n')
+        self.write("names/mids.list", "pick\ngate\n")
+        self.write("names/edits.list", "wide\n")
+        self.write("mac-x64/mids.map", "pick 0x1008 (int n@rsi) -> done=0x100c\ngate 0x1004 (int who@rdi) -> skip=0x100e\n")
+        self.write("win-x86/mids.map", "pick 0x401008 (int n@esi) -> done=0x40100c\ngate unsupported not here\n")
+        self.write("mac-x64/edits.map", "wide 0x1002 2:00000000 +1=07\n")
+        self.write("win-x86/edits.map", "wide unsupported not here\n")
+        self.src = "tools/ws7/recomp/overrides/mods/x.c"
+
+    def errs(self):
+        return [e for e in check.check(self.base, root=self.base) if self.src in e]
+
+    def test_names_the_tables_have_pass(self):
+        self.write(self.src, 'void f(void) {\n  int p = rc_mid_add_name("pick", on, 0);\n'
+                             '  v = rc_mid_value(p, "n"), c = rc_mid_cont(p, "done");\n  rc_edit_enable("wide", 1);\n}\n'
+                             'static const struct { const char *name, *value, *cont; } t[] = {\n'
+                             '    {"gate", "who", "skip"},\n    {"pick", NULL, "done"},\n};\n')
+        self.assertEqual(self.errs(), [])
+
+    def test_a_point_or_group_no_list_has(self):
+        self.write(self.src, 'void f(void) { rc_mid_add_name("pik", on, 0); rc_edit_enable("wyde", 1); }\n')
+        e = "\n".join(self.errs())
+        self.assertIn("x.c:1: mid point pik is not in names/mids.list", e)
+        self.assertIn("x.c:1: edit group wyde is not in names/edits.list", e)
+
+    def test_a_value_or_continuation_one_target_lacks(self):
+        self.write(self.src, 'void f(void) {\n  int p = cond ? -1 : rc_mid_add_name("pick", on, 0);\n'
+                             '  v = rc_mid_value(p, "n");\n  c = rc_mid_cont(p, "done");\n}\n')
+        self.assertEqual(self.errs(), [])
+        self.write("win-x86/mids.map", "pick 0x401008 (int count@esi) -> end=0x40100c\ngate unsupported not here\n")
+        e = "\n".join(self.errs())
+        self.assertIn("x.c:3: target win-x86: mid point pick has no value n", e)
+        self.assertIn("x.c:4: target win-x86: mid point pick has no continuation done", e)
+        self.assertNotIn("mac-x64", e)
+        # a value is no continuation, and a table's row may name either
+        self.write("win-x86/mids.map", "pick 0x401008 (int n@esi) -> done=0x40100c\ngate unsupported not here\n")
+        self.write(self.src, 'void f(void) {\n  int p = rc_mid_add_name("pick", on, 0);\n  c = rc_mid_cont(p, "n");\n}\n'
+                             'static const struct { const char *name, *value; } t[] = {{"gate", "whom"}};\n')
+        e = "\n".join(self.errs())
+        self.assertIn("x.c:3: target mac-x64: mid point pick has no continuation n", e)
+        self.assertIn("x.c:5: target mac-x64: mid point gate has no value or continuation whom", e)
+        self.assertNotIn("target win-x86: mid point gate", e)  # not a point of that game
+
+    def test_the_built_in_fixes_are_read(self):
+        points, reads, groups = check.inner_uses()
+        for n in ("fps_calib_window", "fps_tuner_miss", "tuner_skip_offer", "manifest_response", "fs_mount", "fs_exists"):
+            self.assertIn(n, points)
+        self.assertIn(("fps_tuner_miss", "either", "grace"), [r[1:] for r in reads])
+        self.assertIn(("fs_exists", "cont", "answered"), [r[1:] for r in reads])
+        self.assertIn(("tuner_skip_offer", "value", "offer"), [r[1:] for r in reads])
+
+
+class BadNumbers(Tree, unittest.TestCase):
+    def errs(self):
+        return check.check(self.base, root=self.base)
+
+    def test_an_address_or_offset_that_is_no_number_is_said_with_its_line(self):
+        self.write("win-x86/symbols.map", "f_one 0x40100g cdecl -\n")
+        self.assertIn("win-x86/symbols.map:1: f_one: '0x40100g' is not an address", "\n".join(self.errs()))
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two 0x401010 cdecl -\n"
+                                          "frame 0x401020 thiscall -\nglob 0x500000 data int\n")
+        self.write("win-x86/offsets.map", "fld 010\n")
+        self.assertIn("win-x86/offsets.map:1: fld: '010' is not an offset", "\n".join(self.errs()))
+        self.write("win-x86/offsets.map", "fld 0x10 0x14  a comment that lost its mark\n")
+        self.assertIn("win-x86/offsets.map:1: fld: expected NAME OFFSET", "\n".join(self.errs()))
+
+    def test_a_skip_file_no_longer_made_goes(self):
+        self.write("win-x86/symbols.map", "f_one 0x401000 cdecl -\nf_two 0x401010 cdecl -\n"
+                                          "frame 0x401020 thiscall -\nglob 0x500000 data int\n")
+        out = os.path.join(self.base, "out")
+        targets.gen("win-x86", out, self.base)
+        self.assertTrue(os.path.isfile(os.path.join(out, "skip", "m.skip")))
+        os.unlink(os.path.join(self.base, "names", "overrides", "m.list"))
+        targets.gen("win-x86", out, self.base)
+        self.assertFalse(os.path.exists(os.path.join(out, "skip", "m.skip")))
+        self.assertTrue(os.path.isfile(os.path.join(out, "skip", "hooks.skip")))
+
+
 class TargetSources(Tree, unittest.TestCase):
     """Code built for one target alone (check.TARGET_SOURCES): a name it uses has to be in that target."""
 

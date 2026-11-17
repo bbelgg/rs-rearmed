@@ -170,8 +170,10 @@ and a refresh after that needs neither the image nor the game folder.
   `DIR/learn-play/game`.
 - **Refresh** after new DLC: **Refresh Game Files** in the installer, or
   `tools/play-native/learn-play.sh --refresh`. It has Steam fetch the DLC bought since, copies new and changed
-  files, removes what the sources no longer have, and touches nothing else. If Steam's download is gone it
-  changes nothing and says so.
+  files, removes what the sources no longer have, and touches nothing else (`RS_DLC_FETCH=0` skips the fetch,
+  and one that fails does not stop the refresh). With Steam's download gone the copy keeps the game's files and
+  still takes new DLC, and a copy on Steam's drive can still be moved home; while Steam is still downloading
+  the game nothing is copied.
 - **Stopped copies** continue on the next run. `game/.rearmed/manifest.json`, written last, marks a copy
   complete; until then the app asks for a refresh and quits.
 
@@ -300,16 +302,22 @@ been played in this edition yet.
 ## Settings and switches
 
 Every `RS_*` switch below is set in the installer (**Settings and switches…**), except `RS_MODS_PATH` (only
-with `launchctl setenv` or `open --env`) and the diagnostics-only switches in [TESTING.md](TESTING.md#diagnostics).
+with `launchctl setenv` or `open --env`) and the other diagnostics switches in [TESTING.md](TESTING.md#diagnostics).
 The installer writes the built-in mods to `settings.env` and every other switch to `options.env` in
 `~/Library/Application Support/RS Re-ARMed/learn-play/`, which the app reads at every start; without the files
 everything is the game's own setting. By hand they are lines of `KEY=0` or `KEY=1` for the built-in mods and
-`KEY=value` for the rest: other lines are ignored, and the top of `logs/last-run.log` says what was used. The
-Mac edition has its own files, read the same way.
+the other on/off switches, and `KEY=value` for the rest: other lines are ignored (a switch only the Mac edition
+has is passed on and does nothing), and the top of `logs/last-run.log` says what was used. The Mac edition has
+its own files, read the same way.
 
 ```
 RS_MODS_INTRO=0
 RS_REARMED=0
+```
+
+```
+RS_METAL_MSAA=2
+RS_AUDIO_FRAMES=128
 ```
 
 Every switch is an environment variable, and the app reads its own: there is no launcher between. Start the app
@@ -320,24 +328,29 @@ with `open --env`, or set the switch for the login session with `launchctl seten
 open -n --env RS_FULLSCREEN=0 "$HOME/Applications/RS Re-ARMed Learn & Play.app"
 ```
 
+The installer's Settings and switches… names every switch set with `launchctl setenv`, since it wins over the
+page, and its Clear overrides… unsets them after asking.
+
 Each row is a switch set away from its default, and what that does. Everything is compiled into the app.
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed (Settings and switches…) |
-| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit (Settings and switches…) |
-| `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame, as the game does |
-| `RS_MODS_INTRO=0` | on | the intro screens play (Settings and switches…) |
-| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select (Settings and switches…) |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files); Settings and switches…) |
-| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only (Settings and switches…) |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo); Settings and switches…); set for the build, no logo is made |
-| `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz (Settings and switches…) |
-| `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original (Settings and switches…) |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed |
+| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit |
+| `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
+| `RS_MODS_INTRO=0` | on | the intro screens play |
+| `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME ([Game files](#game-files)) |
+| `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
+| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
+| `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
+| `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_LOG=1` | off | log what the built-in fixes apply to `logs/last-run.log` |
-| `RS_STEAM_DLC=all`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_DLC=all`, `none`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_ID=N` | the account whose license has the game | the Steam account the game plays as ([Game files](#game-files)) |
 | `RS_STEAM_LANGUAGE=NAME` | the Mac game's in Steam, else English | the game's language, as Steam names it (`german`; [Game files](#game-files)) |
+| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_PERSONA=NAME` | the name of the account Steam last logged in, else `Player` | the player name the game gets from Steam |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
 | `RS_METAL_RETINA=1` | off | render every pixel of a Retina screen, about 4x the GPU work (otherwise the game renders in points and each frame is scaled up to the screen's pixels) |
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
@@ -345,7 +358,8 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
 | `RS_WINDOW_ANY_SHAPE=0` | on | 16:9 with bars, as on Windows, and a resized window keeps the game's resolution ([Window modes](#window-modes)) |
 | `RS_FULLSCREEN=1\|0` | the game's setting | force full screen, or a window |
-| `RS_FPS=N` | the display's rate | a fixed frame rate, with vsync off |
+| `RS_D3D9_DISPLAY=WxH` | the screen's size | the desktop size the game sees |
+| `RS_FPS=N` | the display's rate | a fixed frame rate, a whole number from 1 to 1000, with vsync off |
 | `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames; 0 leaves the device's ([Audio latency](#audio-latency)) |
 | `RS_AUDIO_RT=0` | on | the audio thread is not a real-time thread |
 | `RS_AUDIO_INPUT_TRIM=0` | on | stale guitar audio is not dropped |
@@ -353,8 +367,9 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](../mac/INSTALL.md#guitar-input) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
-| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods (Settings and switches… too); another folder of mods, or one library (`launchctl setenv` or `open --env` only) |
-| `LP_HOME=DIR` | `~/Library/Application Support/RS Re-ARMed/learn-play` | another folder for settings, saves and logs |
+| `RS_STEAM_LOG=1`, `RS_FILE_LOG=1` | off | log the offline Steam layer's calls, and the files a mod serves, to `logs/last-run.log` |
+| `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library (`launchctl setenv` or `open --env` only) |
+| `LP_HOME=DIR` | `~/Library/Application Support/RS Re-ARMed/learn-play` | another folder for settings, saves and logs; the installer's Settings and switches… writes to the default folder only |
 | `LP_GAME_DIR=DIR` | the folder in `game-dir` | another game folder (any folder with the game; the copy check is skipped) |
 
 Without a switch: the offline Steam layer and the Uplay sign-in prompt skipped, as in the Mac edition, and the

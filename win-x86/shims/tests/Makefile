@@ -11,19 +11,19 @@ CFLAGS   := -O2 -Wall -Wextra -Wno-unused-parameter -Wno-missing-field-initializ
             -I$(runtime) -I..
 
 RT := rc32_mem rc32_teb rc32_image rc32_seh rc_file
-$(OUT)/rt_%.o: $(runtime)/%.c | $(OUT)
+$(OUT)/rt_%.o: $(runtime)/%.c $(runtime)/rc_file.h | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
-$(OUT)/win32_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h | $(OUT)
+$(OUT)/win32_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h $(runtime)/rc_file.h | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/win32_guestobj.o: ../win32_guestobj.c ../win32_guestobj.h | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/test_ksync: test_ksync.c $(OUT)/win32_ksync.o $(OUT)/win32_guestobj.o $(RT:%=$(OUT)/rt_%.o)
 	$(CC) $(CFLAGS) $^ -o $@
-$(OUT)/asan_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h | $(OUT)
+$(OUT)/asan_ksync.o: ../win32_ksync.c ../win32_handles.h ../win32_shims.h $(runtime)/rc_file.h | $(OUT)
 	$(CC) $(CFLAGS) -fsanitize=address -g -w -c $< -o $@
 $(OUT)/test_close: test_close.c $(OUT)/asan_ksync.o $(OUT)/win32_guestobj.o $(RT:%=$(OUT)/rt_%.o)
 	$(CC) $(CFLAGS) -fsanitize=address -g $^ -o $@
-$(OUT)/win32_kfile.o: ../win32_kfile.c ../win32_handles.h ../win32_shims.h | $(OUT)
+$(OUT)/win32_kfile.o: ../win32_kfile.c ../win32_handles.h ../win32_shims.h $(runtime)/rc_file.h | $(OUT)
 	$(CC) $(CFLAGS) -w -c $< -o $@
 $(OUT)/test_kfile: test_kfile.c test_kfile_stubs.c $(OUT)/win32_kfile.o $(OUT)/win32_ksync.o $(OUT)/win32_guestobj.o $(RT:%=$(OUT)/rt_%.o)
 	$(CC) $(CFLAGS) $^ -o $@

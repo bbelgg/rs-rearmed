@@ -26,8 +26,8 @@ game is in the repository.
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with Learn & Play: `settings.env` and `options.env`. The launchers' readers (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with Learn & Play: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with Learn & Play: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
-| Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | shared with Learn & Play: every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names, Learn & Play's own only names `win-x86` has |
-| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with Learn & Play: one mod dylib in the 64-bit and the 32-bit runtime, for each convention (`test_hooks64`, `test_hooks32`): what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks. `test_files`: the files a mod serves (`rc_file.h`) as descriptors, as a `FILE` and in a folder's listing. `test_framerate`: the arithmetic of the frame rate fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times from 30 to 360 Hz. `test_shared64`, `test_shared32` (`test_mods_shared.c`): the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`), as one object beside each runtime: the switches, the log lines and the start, and each fix's hook against a game of the test's own, called by that runtime's convention. It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
+| Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | shared with Learn & Play: every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names, Learn & Play's own only names `win-x86` has; the mid points, values, continuations and edit groups the built-in fixes name are in each target's table |
+| Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with Learn & Play: one mod dylib in the 64-bit and the 32-bit runtime, for each convention (`test_hooks64`, `test_hooks32`): what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks. `test_files`: the files a mod serves (`rc_file.h`) as descriptors, as a `FILE` and in a folder's listing. `test_framerate`: the arithmetic of the frame rate fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times from 30 to 360 Hz. `test_shared64`, `test_shared32` (`test_mods_shared.c`): the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`), as one object beside each runtime: the switches, the log lines and the start, each fix's hook against a game of the test's own, called by that runtime's convention, and the batched DLC mounting's shared part: the manifests' counts, hold and log lines, a manifest that never comes, the file questions step by step with each safeguard, the check at the mounting's end, and a mounting that does not go by the book (an enumeration during the hold, a flag cleared elsewhere, a step a frame). The frame rate fixes' hooks are not in it. It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
 | Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | [The recompiler](#the-recompiler) |
 | Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with Learn & Play: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
@@ -84,7 +84,8 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
 - **Cases**: a fresh build and install, Skip during Preparing shaders, an update after a simulated renderer
   fallback (the popup shows OpenGL), quitting mid-build, the download of a release's source, and the Settings
   and switches sheet (the switches a `settings.env` and `options.env` have shown set, Save writing the files
-  into the test home, Reset to Defaults and Save removing them, Advanced collapsed at first).
+  into the test home, Reset to Defaults and Save removing them, Advanced collapsed at first unless one of its
+  switches is set, and the orange line for a game installed before the page's files were read).
 - **A whole first install**, for a home of its own: link `<home>/Library/Application Support/Steam/steamapps/
   common/Rocksmith2014` to the clean depot, start the app with `-Game mac` from outside the repository (it takes
   the current folder's repository if there is one), and click Build & Install: the only click until the run
@@ -106,8 +107,8 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
 - **The window as a run leaves it**, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed` or `update` in
   the app's environment shows the box of a finished install (Start the Game, Show in Finder), of a failed step
   (Try Again, Show Log File), or the title row's button for a newer release. Close (Escape) is at the bottom
-  right once a run has ended, with Build Again beside it. Looked at in the three previews, not yet after a real
-  run.
+  right once a run has ended, stopped ones too, with Build Again (Build & Install after a run that did not
+  finish) beside it. Looked at in the three previews, not yet after a real run.
 - **The standalone installer's check of its download**: `tools/installer/build.sh` prints `source digest:` and
   builds it in, and the app logs `The source is the one this installer was made from` before it runs anything.
   An archive of another commit in `RS_SOURCE_URL` must stop it at Downloading source. Not yet tried through the
@@ -180,7 +181,7 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
 |---|---|---|
 | Title (TitleScreen) | Return | up about 8 s after the start with the intro skip, about 31 s without. Give it 6-8 s after it appears: a Return in the fade-in is lost, and Esc there opens EXIT GAME |
 | Profile list (ProfileSelect) | Return | `fwddelete` here deletes the profile. With no profile, Return starts the first-time screens (Down to New profile, Return, a name, Return, then "Have you played Rocksmith before?"). With rearmed-mods' `ForceProfileLoad` the game goes to the main menu by itself |
-| Main menu (MainMenu) | Return on LEARN A SONG | up about 25 s after the profile with a few DLC archives, about 85 s with 2,400; no key is taken while the DLC is enumerated, and a Return sooner is lost. The list: LEARN A SONG, ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, EXIT GAME. ENUMERATE and EXIT GAME are the overlay's: without it (`RS_MODS_OVERLAY=0`) there is no ENUMERATE, and SHOP and UPLAY follow TONE DESIGNER |
+| Main menu (MainMenu) | Return on LEARN A SONG | up about 25 s after the profile with a few DLC archives; a large library's mounting takes 5 to 8 s (2,326 archives; the time to the menu has not been taken since the mounting got faster), and a Return during it can be lost: wait for the `[rs-mods] DLC:` line. The list: LEARN A SONG, ENUMERATE, SESSION MODE, NONSTOP PLAY, LESSONS, GUITARCADE, MULTIPLAYER, TONE DESIGNER, EXIT GAME. ENUMERATE and EXIT GAME are the overlay's: without it (`RS_MODS_OVERLAY=0`) there is no ENUMERATE, and SHOP and UPLAY follow TONE DESIGNER |
 | Song list (LearnASong_Songs) | `/`, the letters, Down, Return | `/` opens the search (Shift in Learn & Play), Tab opens SORT BY. The open box says how many songs match: with nothing typed, how many the list has (`263 Matches`). Letters 1.5 s apart; a key down and up in one frame is lost for text. Return with no match leaves the box open |
 | Song page (LearnASong_SongOptions) | Return on Play Song | |
 | Tuner (LearnASong_PreSongTuner) | `fwddelete`, then Return | up 15-30 s after Play Song. `fwddelete` is Skip Tuner, Return answers "Yes, continue without tuning" about 5 s later. Return on the tuner itself starts Calibration, which waits for a guitar (Esc cancels) |
@@ -249,7 +250,8 @@ with `RS_MODS_LOG=1`.
   the manifests came later than the last archive the line ends `, their songs in the lists S s later`, F and T
   being the frames and the time to the last archive. A second line, `DLC: A of the steps' Q file questions asked
   of the step's archive alone`, says how many of the steps' questions about the shader cache did not go to every
-  mounted archive: all but those of the first step (1,460 of 1,470 with 147 archives, 23,210 of 23,240 with 2,326);
+  mounted archive: all but those of the first step (1,460 of 1,470 with 147 archives), and of any step that mounted
+  nothing or something the fix cannot answer for (with 2,326 the line read 23,210 of 23,240);
   a line `DLC: PATH is there, and a step was told it was not` would say that an answer was wrong. Three checks of
   the end:
   - Nothing is left open: count the archives the game has open a few times a second from the start,
@@ -264,8 +266,9 @@ with `RS_MODS_LOG=1`.
     where 1.16.0's line came after 23.9 s with 1,946 archives still open, the last of them for 33 s more.
 
   A step that took an archive and mounted nothing would lose its songs, so compare the song list of a start with
-  the budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original. The two counts were the same
-  with 147 archives in `dlc/`, in 1.16.0; not compared since, nor with a large library.
+  the budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original, its file questions the game's
+  own too. The two counts were the same with 147 archives in `dlc/`, in 1.16.0; not compared since, nor with a
+  large library.
 - **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
   REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
   shows which one the launcher linked.
@@ -346,7 +349,8 @@ What is the same in every run, in both editions:
 - **The Mac**: on mains power, Low Power Mode off, no heat limit, a load under 3, no other game and no build, the
   built-in screen as the main display. A run refuses otherwise (`--force` runs and says so in its result), and
   waits between runs until the load is down. Leave the Mac alone during a run: the game pauses when another app
-  takes the focus (`menu: LearnASong_Pause`), and such a run is left out of the report.
+  takes the focus (`menu: LearnASong_Pause`), and such a run is left out of the report, as is one during which
+  other processes took more than three cores' worth of load.
 - **The settings file**: full screen at the screen's size in points, `VisualQuality=2` (High) with post effects,
   shadows, the high-res scope, depth of field and per-pixel lighting on, `MsaaSamples=4`, `LatencyBuffer=1`,
   `EnableMicrophone=0`. Full screen is `Fullscreen=2` in this edition's file and `1` in Learn & Play's.
@@ -365,8 +369,8 @@ What is the same in every run, in both editions:
 - **The song**: Cherub Rock by the search (`/` here, Shift in Learn & Play, then `cher` and Down until the log
   says `song: CherubRock`), Play Song, Skip Tuner and its "continue". The window is 150 s from 45 s after
   `menu: LearnASong_Game`. Cherub Rock is DLC in this edition: its archive has to be in the test home's `dlc/`.
-  With a few thousand archives there the main menu takes no key for about 20 s after it comes up, so a key
-  there is pressed again until the screen changes.
+  With a few thousand archives there the mounting takes 5 to 8 s after the main menu comes up, and a key during
+  it can be lost, so a key there is pressed again until the screen changes.
 
 What is measured over the window, into `OUT/<edition>-<n>/result.json` with what the run was (the commit, the
 executable's and the mods' hashes, the settings, the display): when frames went on the screen
@@ -437,7 +441,9 @@ Not applicable: the Mac edition's game is not packed. See
 ## Diagnostics
 
 Logs are in `<home>/logs/`: `last-run.log`, `previous-run.log`, `netguard.log`, `seed.log`. Set switches for
-the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switches)). All off unless set.
+the launcher with `launchctl setenv` ([INSTALL.md](INSTALL.md#settings-and-switches)); the four logs
+(`RS_MODS_LOG`, `RS_AUDIO_LOG`, `RS_STEAM_LOG`, `RS_FILE_LOG`) are also in the installer's Settings and
+switches…, under Advanced. All off unless set.
 
 | Switch | What |
 |---|---|
@@ -495,4 +501,5 @@ in [Tests in the repository](#tests-in-the-repository) and Learn & Play's; a new
 The Mac edition's run for a release is `tools/release/smoke.sh --mac`, which takes its route from
 `RS_SMOKE_MAC_CMD`: a command that plays to the note highway and exits 0 (it gets `RS_SMOKE_OUT`, the folder for
 its log and snapshots), such as `tools/perf/run.py CONFIG "$RS_SMOKE_OUT" --editions mac --route-only`
-([Measured runs](#measured-runs)). Without one, play it by hand to the highway and say so in the release commit.
+([Measured runs](#measured-runs)), which fails when the game has ended or left the highway twelve seconds after
+it got there. Without one, play it by hand to the highway and say so in the release commit.

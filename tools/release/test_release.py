@@ -61,8 +61,22 @@ class Scope(unittest.TestCase):
 
     def test_the_installer_needs_no_game(self):
         s = scope.scope(["tools/installer/RSReARMedInstaller.swift"])
-        self.assertEqual((s["build"], s["run"], s["suites"]), ([], [], []))
+        self.assertEqual((s["build"], s["run"], s["suites"]), ([], [], ["settings"]))  # the sheet's keys
         self.assertTrue(s["installer"])
+
+    def test_a_games_figures_are_its_installers_too(self):
+        s = scope.scope(["tools/targets/mac-x64/target.toml"])
+        self.assertIn("gamefiles", s["suites"])
+        self.assertTrue(s["installer"])
+        s = scope.scope(["tools/targets/win-x86/target.toml"])
+        self.assertIn("lp.install", s["suites"])
+        self.assertTrue(s["installer"])
+
+    def test_what_every_shim_suite_compiles_selects_them_all(self):
+        s = scope.scope(["win-x86/shims/win32_ksync.c"])["suites"]
+        for suite in ("lp.shims", "lp.audio", "lp.steam", "lp.online", "lp.d3d9"):
+            self.assertIn(suite, s)
+        self.assertEqual(scope.scope(["tools/ws8/netguard/netguard.c"])["run"], ["mac", "lp"])
 
     def test_a_file_no_rule_knows_is_everything(self):
         s = scope.scope(["somewhere/new.c"])

@@ -310,8 +310,10 @@ static uint32_t create_file(rc_ctx *c, const char *win, uint32_t access, uint32_
   case 4: of |= O_CREAT; break;            // OPEN_ALWAYS
   case 5: of |= O_TRUNC; break;            // TRUNCATE_EXISTING
   }
+  // What is there: a file a mod serves counts for an open that reads alone, as rc_file_open takes it; one that
+  // writes or creates is the system's, and no provider is asked about it.
   struct stat st;
-  int existed = rc_file_stat(host, &st) == 0;
+  int existed = (writes || creates ? stat(host, &st) : rc_file_stat(host, &st)) == 0;
   if (existed && S_ISDIR(st.st_mode)) {
     if (!(flags & 0x02000000u)) {  // FILE_FLAG_BACKUP_SEMANTICS opens a directory
       w32_set_error(c, W32_ERROR_ACCESS_DENIED);

@@ -286,10 +286,14 @@ with `RS_MODS_LOG=1`.
   game folder or a copy, else set `RS_PSARC_KEY_IMAGE` to the game's program), put it in the `dlc/` of the test
   install's game source and refresh the copy: `steam.env`'s `RS_STEAM_DLC` gains the AppID and a search finds
   the song; with the list without it, the search does not.
-- **Rocksmith 1 songs** (`RS_STEAM_OWNED`): on a clone of the copy (`cp -cR`), with the Steam folder copied
-  without `crd` and `RS_STEAM_OWNED` set to the AppIDs of `gamefiles.rs1_dlc_apps`, a search for "countd" finds
-  The Final Countdown, and it plays; unset, it is not listed. `gamefiles.ask_steam` has been checked against a
-  running Steam only for an account that owns none of them.
+- **Rocksmith 1 songs**: with the CDLC skip on (the default) and no `RS_STEAM_OWNED`, one
+  `tools/perf/run.py CONFIG OUT --route-only` run whose config has `"song": "FinalCountdown"` and
+  `"search": "countd"`: the search finds The Final Countdown and the run reaches its note highway
+  (`song: FinalCountdown` in `game.log`). With `RS_MODS_BYPASS=0` the songs follow `RS_STEAM_OWNED`: on a clone of
+  the copy (`cp -cR`), with the Steam folder copied without `crd` and `RS_STEAM_OWNED` set to the AppIDs of
+  `gamefiles.rs1_dlc_apps`, the same search finds the song, and it plays; unset, it is not listed (run before the
+  skip decided, not since). `gamefiles.ask_steam` has been checked against a running Steam only for an account
+  that owns none of them.
 - **Files a mod serves**: `DIR/files_mod.dylib` of `tools/ws7/recomp/test/hooks` in the mods folder serves every
   `.psarc` the game opens through the file provider (`rc_file.h`) and logs `files_mod: serving NAME` for each.
   One `tools/perf/run.py CONFIG OUT --route-only` run with it (the config's `mods` a folder with it beside

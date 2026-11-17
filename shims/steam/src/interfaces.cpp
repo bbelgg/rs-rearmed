@@ -449,8 +449,18 @@ static bool owned(AppId_t app) {
     return app == c.app_id || c.dlc_all || c.dlc.count(app);
 }
 
-// What the account owns, this game's or not: the DLC above and RS_STEAM_OWNED.
-static bool subscribed(AppId_t app) { return owned(app) || shim_config().owned.count(app); }
+// The DLC of the first Rocksmith (205190): the ids after its own, up to the last one the game takes for one
+// (its DLC update asks BIsSubscribedApp for each id of its DLC metadata at or below 222140, and shows a song of
+// the RS1 compatibility pack only for a yes). The first Rocksmith itself is not among them.
+static const AppId_t kRs1AppId = 205190, kRs1DlcLast = 222140;
+static bool rs1_dlc(AppId_t app) { return app > kRs1AppId && app <= kRs1DlcLast; }
+
+// What the account owns, this game's or not: the DLC above, RS_STEAM_OWNED, and with the CDLC skip on every
+// DLC of the first Rocksmith.
+static bool subscribed(AppId_t app) {
+    const ShimConfig &c = shim_config();
+    return owned(app) || c.owned.count(app) || (c.rs1_all && rs1_dlc(app));
+}
 
 class Apps {
 public:

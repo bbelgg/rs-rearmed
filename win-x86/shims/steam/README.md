@@ -56,6 +56,8 @@ sets before the game starts (`win-x86/app/lp_main.c`):
   `RS_STEAM_DLC` (the installed DLC, 248750 and every AppID the copy's `dlc/` archives carry),
   `RS_STEAM_OWNED` (the first Rocksmith's DLC the account owns, for the RS1 compatibility pack's songs;
   `BIsSubscribedApp` only), `RS_STEAM_LANGUAGE` and `RS_STEAM_ID` (the account whose license has Learn & Play).
+- `RS_MODS_BYPASS`, from the installer's `settings.env`: unless it is `0`, `BIsSubscribedApp` says yes for every
+  DLC of the first Rocksmith, as the Mac layer does ([its README](../../../shims/steam/README.md)).
 - Without Steam's `loginusers.vdf` (Steam uninstalled), `RS_STEAM_ID` is the one account with saves in the data
   folder.
 

@@ -300,11 +300,14 @@ Nothing is downloaded by the game, and Steam's folders are read only when you pr
    by naming that folder (it is there even with no DLC), the game has them at its next start, whatever AppID
    they carry, and no refresh removes a song you put there. Songs in the Steam game's `dlc` folder work too: a
    copy or a refresh brings them over.
-4. **Songs of the first Rocksmith.** They are all in one archive that comes with the game
-   (`rs1compatibilitydlc`), and the game shows each only when your account owns the first Rocksmith's DLC it
-   came from. Nothing on disk says that, so a copy or refresh asks the Steam client, which must be running with
-   the account RS Re-ARMed plays as. The answer is kept (`RS_STEAM_OWNED` in `steam.env`), so Steam can be
-   closed afterwards.
+4. **Songs of the first Rocksmith.** Its DLC songs are all in one archive that comes with the game
+   (`rs1compatibilitydlc`), and they all show while the built-in CDLC skip is on, as it is unless you switched
+   it off ([Settings and switches](#settings-and-switches)). With the skip off the game shows each only when
+   your account owns the first Rocksmith's DLC it came from, as the original does. Nothing on disk says that,
+   so a copy or refresh asks the Steam client, which must be running with the account RS Re-ARMed plays as. The
+   answer is kept (`RS_STEAM_OWNED` in `steam.env`), so Steam can be closed afterwards. The songs of the first
+   Rocksmith's disc are another archive (`rs1compatibilitydisc`), there when your account owns the import
+   pack.
 5. **New songs.** While you play, **ENUMERATE** in the main menu takes new archives from the game folder's `dlc`
    (and finds ones put straight into `game/dlc`) with no restart. DLC bought since, and changed or removed
    songs, need a refresh.
@@ -494,7 +497,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed, and of the first Rocksmith's DLC songs only those your account owns ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit, and the note detection's FFT setups kept between songs (without it the game leaves about 1 MB behind for each song) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
@@ -508,7 +511,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_STEAM_DLC=all`, `none`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_ID=N` | the account whose license has the game | the Steam account the game plays as ([Game files](#game-files)) |
 | `RS_STEAM_LANGUAGE=NAME` | Steam's, else English | the game's language, as Steam names it (`german`; [Game files](#game-files)) |
-| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned with `RS_MODS_BYPASS=0`: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_PERSONA=NAME` | the name of the account Steam last logged in, else `Player` | the player name the game gets from Steam |
 | `RS_GL_BACKEND=gl`, or `metal` | the `renderer` file | the [renderer](#renderer), whatever the file says |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
@@ -609,7 +612,7 @@ connected, the game already running, macOS not letting it read the files) and th
 | `warm-shaders: failed ...` or `timed out` | Not fatal: the game compiles its shaders as it first uses them. Run `tools/play-native/warm-shaders.sh` to try again. |
 | The game now starts with OpenGL, `renderer-fallback.txt` | Metal ended abnormally twice in a row ([Renderer](#renderer)). Write `metal` into `renderer` to try again; if it keeps crashing, open an issue with `last-run.log` and `previous-run.log`. |
 | Launcher: "libnetguard.dylib is missing" | Run the last command of step 4, then step 6. The game never starts without the network guard. |
-| Rocksmith 1 DLC songs you own are missing, or the refresh says "Rocksmith 1 DLC: not checked" | Only Steam knows which of them you own, and a refresh can ask it only while the account RS Re-ARMed plays as is logged in: log in to that account in Steam, then **Refresh Game Files** (or `install.sh --refresh-game`). The answer is kept, so Steam can be closed afterwards. |
+| Rocksmith 1 DLC songs are missing | They all show while custom songs (CDLC) are on in Settings and switches…: switch that on. With it off the game shows only those Steam says you own, and a refresh can ask Steam only while the account RS Re-ARMed plays as is logged in: log in to that account in Steam, then **Refresh Game Files** (or `install.sh --refresh-game`). The answer is kept, so Steam can be closed afterwards. |
 | Songs or profiles missing after switching Steam accounts | **Refresh Game Files** (or `install.sh --refresh-game`): it records the account whose license has the Mac game in `game/.rearmed/steam.env`, and the launcher uses it whoever is logged in to Steam. Set `RS_STEAM_ID` to choose another ([Game files](#game-files)). |
 | No guitar sound | Check the INPUT setting in the game (Real Tone cable, microphone, DIRECT CONNECT) and that macOS allowed microphone access. |
 | The game crashes | Open an issue with `last-run.log` and `previous-run.log`. |

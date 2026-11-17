@@ -152,11 +152,16 @@ int main() {
     EXPECT(vcall<bool>(apps, 6, (uint32_t)258345) == dlc_all);
     EXPECT(!vcall<bool>(apps, 7, (uint32_t)221680));               // the base game is no DLC
     if (dlc_list) EXPECT(vcall<bool>(apps, 6, (uint32_t)258341));  // BIsSubscribedApp
-    if (getenv("RS_STEAM_OWNED")) {                                // owned, but no DLC of this game
-        EXPECT(vcall<bool>(apps, 6, (uint32_t)206166));
-        EXPECT(!vcall<bool>(apps, 7, (uint32_t)206166));
-        EXPECT(!vcall<bool>(apps, 6, (uint32_t)206167) || dlc_all);
-    }
+    // The first Rocksmith's DLC (the Makefile runs this with RS_MODS_BYPASS=0 too): all of it with the CDLC skip
+    // on, else RS_STEAM_OWNED alone; owned, but no DLC of this game.
+    const char *bypass_env = getenv("RS_MODS_BYPASS");
+    bool rs1_all = !(bypass_env && *bypass_env == '0');
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)206166) == (rs1_all || dlc_all || getenv("RS_STEAM_OWNED") != nullptr));
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)206167) == (rs1_all || dlc_all));
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)222140) == (rs1_all || dlc_all));  // the last id the game takes for one
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)222141) == dlc_all);
+    EXPECT(vcall<bool>(apps, 6, (uint32_t)205190) == dlc_all);               // the first Rocksmith itself
+    EXPECT(vcall<bool>(apps, 7, (uint32_t)206166) == dlc_all);               // BIsDlcInstalled
     if (dlc_list) {
         EXPECT(vcall<int>(apps, 10) == 2);                             // GetDLCCount
         uint32_t dlc_id = 0;

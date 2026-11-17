@@ -64,4 +64,3 @@ into the notes as it stands. -->
   DLC has both kinds.
 - Two crashes have been seen once each and not reproduced.
 - It uses more memory than the Mac edition (1.5 GB against 1.2 GB) and more CPU (about 10 points of a core in a song).
-- Rocksmith 1 DLC songs have not been played in this edition yet: the test account owns none.

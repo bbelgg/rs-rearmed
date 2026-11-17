@@ -145,6 +145,14 @@ int main(void) {
   CHECK(vcall(apps, 6, 1, (uint32_t[]){12345}) == 0);
   CHECK(vcall(apps, 6, 1, (uint32_t[]){206166}) == 1);  // RS_STEAM_OWNED: owned, but no DLC of this game
   CHECK(vcall(apps, 7, 1, (uint32_t[]){206166}) == 0);
+  // The rest of the first Rocksmith's DLC: with the CDLC skip on (the Makefile runs this with RS_MODS_BYPASS=0 too)
+  const char *bypass = getenv("RS_MODS_BYPASS");
+  int rs1_all = !(bypass && *bypass == '0');
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){206167}) == rs1_all);
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){222140}) == rs1_all);  // the last id the game takes for one
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){222141}) == 0);
+  CHECK(vcall(apps, 6, 1, (uint32_t[]){205190}) == 0);        // the first Rocksmith itself
+  CHECK(vcall(apps, 7, 1, (uint32_t[]){206167}) == 0);
   CHECK(vcall(apps, 7, 1, (uint32_t[]){221680}) == 0);  // BIsDlcInstalled: not the base app
   CHECK(vcall(apps, 10, 0, 0) == 2);
   uint32_t out = w32_galloc(16);

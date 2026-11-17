@@ -176,6 +176,16 @@ through Valve's library, gone before the game starts). The answer goes into `RS_
 Steam layer reports through `BIsSubscribedApp` only: as with real Steam, these are no DLC of this game.
 `.rearmed/rs1-owned.json` keeps it for a refresh with Steam closed or on another account.
 
+That answer decides only with the CDLC skip off (`RS_MODS_BYPASS=0`). With the skip on, the default, the Steam layer
+says yes to `BIsSubscribedApp` for every DLC of the first Rocksmith (the app ids above 205190 up to 222140, the last
+one the game's own loop takes for one), and every song of the pack shows. That is a decision, not something the
+game or RSBypass was found to do: the original game with RSBypass was reported to list these songs for an account
+Steam says owns none, the game's code shows no way to that but Steam's yes, and the editions are to list them
+too. The rule is in the Steam layer and not a hook beside the mount's (below), because Learn & Play calls
+`BIsSubscribedApp` inline and has no function to hook; the layer reads the mods' switch from the environment as
+the mods do. The first Rocksmith itself (205190), which the game asks about for the disc pack, is not answered
+this way.
+
 ## Online services
 
 The game never reaches the network. Three layers see to it: the offline Steam layer ([Steam](#steam)), the online stub

@@ -17,8 +17,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
   screens or Auto Save warning.
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)); 74.9 fps on 75 Hz.
-- **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played; the DLC pack's need a refresh with
-  the owning account logged in to Steam.
+- **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played. The DLC pack's all show while the
+  CDLC skip is on (not released), and one was found by a search and played to the note highway; with the skip off,
+  those the account owns, which needs a refresh with that account logged in to Steam.
 - **Two players**: a song with each player on their own input, SWAP CABLE ASSIGNMENT included.
 
 **Sound and input**

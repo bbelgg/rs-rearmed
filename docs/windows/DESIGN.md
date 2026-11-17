@@ -319,8 +319,9 @@ games share, without `crd`. It never loads Valve's library. The game does not us
 `steam32_dll_blocked()` names the Ubisoft and Valve libraries a `LoadLibrary` must refuse. See
 [win-x86/shims/steam/README.md](../../win-x86/shims/steam/README.md).
 
-Custom songs show whatever AppID they carry, and the songs of `rs1compatibilitydlc` show for the first Rocksmith's DLC
-the account owns, by the Mac edition's means: the install's `gamefiles.py` writes `RS_STEAM_DLC` and `RS_STEAM_OWNED` to
+Custom songs show whatever AppID they carry, and the songs of `rs1compatibilitydlc` all show while the CDLC skip is on
+(with `RS_MODS_BYPASS=0`, those of the first Rocksmith's DLC the account owns), by the Mac edition's means
+([Mac design](../mac/DESIGN.md#steam)): the install's `gamefiles.py` writes `RS_STEAM_DLC` and `RS_STEAM_OWNED` to
 `game/.rearmed/steam.env` at each copy and refresh, and the face answers from them (`GetDLCCount`, `BGetDLCDataByIndex`
 and `BIsDlcInstalled` for the first, `BIsSubscribedApp` alone for the second). This game also keeps a song out of its
 list when it doesn't know the song's key, which a built-in fix answers

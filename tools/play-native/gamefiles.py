@@ -58,7 +58,8 @@ and the Learn & Play app put in the game's environment unless already set: the D
 and the language, from Steam's appmanifest (the offline Steam layer reads Steam's folder for them otherwise),
 with the AppIDs the copy's dlc/ archives carry, so custom songs show whatever AppID they carry;
 and, for Learn & Play, the DLC the account's ownership ticket lists; RS_STEAM_OWNED, the first Rocksmith's DLC the
-account owns, asked of the Steam client when that account is logged in (rs1-owned.json keeps the answer); and
+account owns, asked of the Steam client when that account is logged in (rs1-owned.json keeps the answer; the
+game goes by it only with the CDLC skip off, RS_MODS_BYPASS=0: with the skip on every song of them shows); and
 RS_STEAM_ID, the Steam account the edition
 plays as: the account whose Steam license has the edition's
 depot, so another account logged in to Steam later doesn't change the saves, profiles and songs. RS_STEAM_ID
@@ -1646,6 +1647,10 @@ def steam_account_name(steam, account):
 # when the edition's account is the one logged in: the answers go into steam.env's RS_STEAM_OWNED, for the offline
 # Steam layer, and .rearmed/rs1-owned.json keeps them for a refresh with Steam closed or on another account. The
 # asking is a process of its own, gone before the game starts: the game itself never talks to Steam.
+#
+# The Steam layer goes by the answer only with the built-in CDLC skip off (RS_MODS_BYPASS=0). With the skip on,
+# as it is unless the player switched it off, it says yes for every DLC of the first Rocksmith and every song
+# of the pack shows (shims/steam/src/interfaces.cpp), so what is said here names the switch.
 
 RS1_PACK = "rs1compatibilitydlc_"
 RS1_OWNED = "rs1-owned.json"
@@ -1752,11 +1757,13 @@ def rs1_owned(steam, dest, account, say=lambda text: None):
         answer = ask_steam(steam, apps)
         if answer and answer["account"] == account:
             write_json(path, {"format": FORMAT, "account": account, "apps": sorted(answer["apps"])})
-            say("Rocksmith 1 DLC: this account owns %d of the %d the game knows." % (len(answer["apps"]), len(apps)))
+            say("Rocksmith 1 DLC: Steam says this account owns %d of the %d the game knows. The game shows all %d "
+                "unless custom songs (CDLC) are switched off." % (len(answer["apps"]), len(apps), len(apps)))
             return sorted(answer["apps"])
     if known is None:
-        say("Rocksmith 1 DLC: not checked. To play the ones %s owns, have that account logged in to Steam and "
-            "refresh the game files." % steam_account_name(steam, account))
+        say("Rocksmith 1 DLC: Steam was not asked which of them %s owns. The game shows all %d unless custom songs "
+            "(CDLC) are switched off; for that case, have that account logged in to Steam and refresh the game "
+            "files." % (steam_account_name(steam, account), len(apps)))
         return []
     return sorted(known & apps)
 

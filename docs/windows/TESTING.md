@@ -342,8 +342,9 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   `gamefiles.Copier("learn-play", SRC, DEST, dlc_from=[]).run()`, from a clone of the game folder without its
   `.rearmed/`, so `steam.env` and `Update/patcharchives.psarc` come from the real code path; then one run per
   check, each from the title.
-- **Rocksmith 1 songs** (`RS_STEAM_OWNED`): not run on Learn & Play yet, the test account owns none of them. The
-  face's answer is covered by `test_steam32`.
+- **Rocksmith 1 songs**: as on the Mac, the same config and route: the search finds The Final Countdown and the
+  run reaches its note highway. `RS_MODS_BYPASS=0` with `RS_STEAM_OWNED` has not been run on Learn & Play, the test
+  account owns none of them; the face's answer both ways is covered by `test_steam32`.
 - **Files a mod serves**: as on the Mac, with the same dylib.
 - **Mods**: `DIR/probe_mod.dylib` in `<LP_HOME>/mods/` and a script to the note highway, with
   `RC_HOOK_TRACE=game_frame,camera_set_frustum,too_many_inputs,si_open`. The log has `[rc] mod loaded:

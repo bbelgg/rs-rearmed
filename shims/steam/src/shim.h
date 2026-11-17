@@ -60,6 +60,7 @@ struct ShimConfig {
     std::set<AppId_t> dlc;     // stub mode: DLC reported as owned (installed DLC by default)
     bool dlc_all = false;      // stub mode: every app id is owned (RS_STEAM_DLC=all)
     std::set<AppId_t> owned;   // stub mode: apps the account owns besides that, not this game's DLC (RS_STEAM_OWNED)
+    bool rs1_all = true;       // stub mode: every DLC of the first Rocksmith counts as owned (RS_MODS_BYPASS not off)
     bool log = false;
 };
 

@@ -25,7 +25,8 @@ mode = auto
 
 # Apps the account owns besides that, as a comma-separated list: asked about, but no
 # DLC of this game (the first Rocksmith's DLC, for the RS1 compatibility pack's
-# songs).                                                       [RS_STEAM_OWNED]
+# songs). Every DLC of the first Rocksmith counts as owned without it while the
+# built-in CDLC skip is on (RS_MODS_BYPASS, on unless 0).       [RS_STEAM_OWNED]
 #owned = 206166
 
 # Stub-mode Steam Cloud / stats root: <data_dir>/<account id>/<app id>/{remote,local,stats.txt}

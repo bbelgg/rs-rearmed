@@ -335,7 +335,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 
 | Switch | Default | What |
 |---|---|---|
-| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, and custom songs are not listed |
+| `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: the song-file signature check and the list of known song keys work as in the original, custom songs are not listed, and of the first Rocksmith's DLC songs only those your account owns ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours this game has, off: faster loading with large libraries (the batched DLC mounting, the song path cache and the number-table hash) and a higher open-file limit |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
@@ -349,7 +349,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_STEAM_DLC=all`, `none`, or a list of AppIDs | your DLC, and the AppID of every archive in the copy's `dlc/` | the songs the game counts as owned ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_ID=N` | the account whose license has the game | the Steam account the game plays as ([Game files](#game-files)) |
 | `RS_STEAM_LANGUAGE=NAME` | the Mac game's in Steam, else English | the game's language, as Steam names it (`german`; [Game files](#game-files)) |
-| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
+| `RS_STEAM_OWNED=LIST` | what a refresh recorded | the AppIDs outside this game's DLC that count as owned with `RS_MODS_BYPASS=0`: the first Rocksmith's DLC, for its songs ([How the game finds DLC](#how-the-game-finds-dlc)) |
 | `RS_STEAM_PERSONA=NAME` | the name of the account Steam last logged in, else `Player` | the player name the game gets from Steam |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
 | `RS_METAL_RETINA=1` | off | render every pixel of a Retina screen, about 4x the GPU work (otherwise the game renders in points and each frame is scaled up to the screen's pixels) |

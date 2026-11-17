@@ -8,7 +8,8 @@
 
 // Run-time switches (environment, read by rs_mods_start and rs_mods_reload_config):
 //   RS_MODS_BYPASS=0   RSBypass off: the .sng signature check is enforced, and an archive's AppID is asked of the
-//                      game's DLC list during a mount too (default on)
+//                      game's DLC list during a mount too (default on). The offline Steam layer reads it as well:
+//                      on, every DLC of the first Rocksmith counts as owned (shims/steam/src/interfaces.cpp)
 //   RS_MODS_FIXES=0    rsmacfixes off: the path-MD5 cache, batched DLC mounting, the number-table hash, the
 //                      open-file limit, and the Mac's keyboard keys and thread priority; every overridden
 //                      function then behaves exactly like the original (default on)

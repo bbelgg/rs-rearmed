@@ -199,6 +199,7 @@ class Rs1Owned(Base):
         self.assertEqual(self.owned(), [206166])
         self.assertEqual(self.asked, [{206166, 222041}])
         self.assertIn("owns 1 of the 2", self.said[0])
+        self.assertIn("shows all 2", self.said[0])
 
     def test_steam_env_keeps_them_apart_from_the_dlc(self):
         env = gamefiles.steam_env(None, archive_apps={999999}, owned=[222041, 206166])
@@ -218,7 +219,8 @@ class Rs1Owned(Base):
     def test_an_answer_for_another_account_is_not_used(self):
         self.answer = {"account": 777, "apps": [206166, 222041]}
         self.assertEqual(self.owned(), [])
-        self.assertIn("not checked", self.said[0])
+        self.assertIn("was not asked", self.said[0])
+        self.assertIn("shows all 2", self.said[0])
 
     def test_steam_with_no_answer_keeps_what_was_known(self):
         self.owned()

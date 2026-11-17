@@ -82,5 +82,8 @@ each unless it is set already (`launchctl setenv`, or the installer's `options.e
   by `BIsSubscribedApp` only (not `BIsDlcInstalled`, not `GetDLCCount`). The install fills it with the first
   Rocksmith's DLC the account owns, which the game asks about for each song of the RS1 compatibility pack
   ([DESIGN.md](../../docs/mac/DESIGN.md#steam)).
+- `RS_MODS_BYPASS` (the built-in CDLC skip's switch, no key in the file): on, as it is unless set to `0`,
+  `BIsSubscribedApp` says yes for every DLC of the first Rocksmith (the app ids above 205190 up to 222140, the
+  last one the game takes for one), so every song of that pack shows. `0`: `RS_STEAM_OWNED` alone.
 - `RS_STEAM_LANGUAGE` / `language`, and `RS_STEAM_ID` / `steam_id`: the account whose license has the game,
   whichever is logged in to Steam later.

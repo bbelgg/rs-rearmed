@@ -2210,7 +2210,7 @@ struct BuiltInMod {
 }
 let builtInMods: [BuiltInMod] = [
     BuiltInMod(key: "RS_MODS_BYPASS", title: "Custom songs (CDLC)",
-               detail: "Songs without the game's signature load, as with RSBypass. Off: custom songs are not listed."),
+               detail: "Songs without the game's signature load, as with RSBypass, and every Rocksmith 1 DLC song shows. Off: custom songs are not listed, and of the Rocksmith 1 DLC songs only those Steam says you own."),
     BuiltInMod(key: "RS_MODS_FIXES", title: "Faster loading and other fixes (rs-mac-fixes)",
                detail: "Large song libraries load faster; more keyboard keys, the End key in menus, more open files.",
                lpDetail: "Large song libraries load faster; more open files."),

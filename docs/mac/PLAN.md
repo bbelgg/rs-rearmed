@@ -72,6 +72,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
 **Installer and game files**
 
 - **Installer**: the GUI installer decrypts the game statically (no Rosetta, no launch of the game).
+- **The installer updates itself** (not released): a newer release is offered at the installer's start, and Update
+  Now replaces the installer with that release's once its signature checks out
+  ([DESIGN.md](DESIGN.md#installer-and-build)). The game is rebuilt only when the user clicks Build & Install.
 - **Where the game files are kept**: for a game on another drive the installer's Game files choice keeps the copy on
   that drive as clones or on this Mac as a real copy, and an install or a refresh moves a copy that is in the other
   place (`place()` in `gamefiles.py`, shared with Learn & Play).
@@ -125,6 +128,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 - **The published installer**: recent releases' hasn't been run, nor a full install from the tag (the last was
   1.6.0's); the install scripts and test installs were.
+- **The installer's update of itself** (not released): run on test copies with made-up releases, in the window too.
+  Not yet on a copy macOS approved at its first start (it may run from a read-only place, or be guarded against
+  being replaced; both end at the release's page), nor against a real release, which needs the first one that is
+  signed ([TESTING.md](TESTING.md#installer-tests)).
 - **Game files**: a move of an installed copy back to the game's drive, by hand. For a game Steam downloads: the
   download from the real Steam, the installer's window on that route, and a game run from such a copy
   ([TESTING.md](TESTING.md#installer-tests)).

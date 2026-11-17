@@ -25,6 +25,7 @@ game is in the repository.
 | Menu overlay | `play-native.cache_overlay` (`tools/play-native/test_cache_overlay.py`) | shared with Learn & Play: the menu edits (DIRECT CONNECT, the INPUT slider's fourth value, ENUMERATE, the notice), the psarc and 7z readers and writers on made-up archives, the overlay made, and left out for a cache that has the entries. With the game's `cache.psarc` (`RS_TEST_CACHE`, or the installs' copies) also the real files; skipped without one |
 | Built-in mod settings | `play-native.settings` (`tools/play-native/test_settings.py`) | shared with Learn & Play: `settings.env` and `options.env`. The launchers' readers (macOS's `/bin/bash`) and Learn & Play's (`win-x86/app/lp_settings.c`, compiled by the test) read the same made-up files and must set and log the same; the launcher's `--env` pairs; the same keys in both and in the installer |
 | Measuring tools | `perf.tools` (`tools/perf/test_perf.py`) | shared with Learn & Play: the frame-time statistics, the settings file's pins and the report of [measured runs](#measured-runs), on made-up data |
+| Installer update | `installer.update` (`tools/installer/test_update.sh`) | shared with Learn & Play: the installer built with a key made for the test and updated, without its window, from made-up releases (`RS_UPDATE_URL`, `file://`): a signed newer release replaces the app and the new one verifies; a zip changed after signing, another key's or an empty signature, a release without one, a signed installer of another version than the release names, and an app in a folder that can't be written to are refused with the app as it was; the same or an older version is no update. Needs `swiftc`, no game and no network |
 | Release tools | `release.tools` (`tools/release/test_release.py`) | shared with Learn & Play: the rules that say what a change calls for (every file of the repository has one), and a release's edits and notes on a made-up tree ([Release checks](#release-checks)) |
 | Per-game tables | `targets.check` (`tools/targets/test_targets.py`); also `python3 tools/targets/check.py` | shared with Learn & Play: every name resolves in every target or is `unsupported`; no stale entries; native code uses only listed names, Learn & Play's own only names `win-x86` has; the mid points, values, continuations and edit groups the built-in fixes name are in each target's table |
 | Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with Learn & Play: one mod dylib in the 64-bit and the 32-bit runtime, for each convention (`test_hooks64`, `test_hooks32`): what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks. `test_files`: the files a mod serves (`rc_file.h`) as descriptors, as a `FILE` and in a folder's listing. `test_framerate`: the arithmetic of the frame rate fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times from 30 to 360 Hz. `test_fftsetup`: this edition's FFT setups (`overrides/mods/fftsetup.c`): one of each size made and handed out again, also to eight threads at once, a kept one known as such, and the game's own call with the fixes off. `test_shared64`, `test_shared32` (`test_mods_shared.c`): the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`), as one object beside each runtime: the switches, the log lines and the start, each fix's hook against a game of the test's own, called by that runtime's convention, and the batched DLC mounting's shared part: the manifests' counts, hold and log lines, a manifest that never comes, the file questions step by step with each safeguard, the check at the mounting's end, and a mounting that does not go by the book (an enumeration during the hold, a flag cleared elsewhere, a step a frame). The frame rate fixes' hooks are not in it. It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
@@ -70,8 +71,9 @@ differential test is in [Windows testing](../windows/TESTING.md#the-recompiler).
 
 ## Installer tests
 
-The installer app has no automated test; `steamless.decrypt`, `play-native.gamefiles`, `play-native.settings`
-and `play-native.cache_overlay` cover what it runs. The app is checked by hand, end to end, with a test home:
+The installer app's window has no automated test; `steamless.decrypt`, `play-native.gamefiles`,
+`play-native.settings` and `play-native.cache_overlay` cover what it runs, and `installer.update` the app
+replacing itself. The app is checked by hand, end to end, with a test home:
 
 ```bash
 HOME=/path/to/test-home "tools/installer/RS Re-ARMed Installer.app/Contents/MacOS/RS Re-ARMed Installer"
@@ -104,11 +106,26 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
   shows what an install from it copies. With the real Steam, the rules of the Windows page hold. Not yet run:
   the download itself from the real Steam through this code, the installer's window on this route (Finding the
   Mac game, Downloading your DLC), and a game started from such a copy.
-- **The window as a run leaves it**, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed` or `update` in
-  the app's environment shows the box of a finished install (Start the Game, Show in Finder), of a failed step
-  (Try Again, Show Log File), or the title row's button for a newer release. Close (Escape) is at the bottom
+- **The window as a run leaves it**, with nothing run: `RS_INSTALLER_PREVIEW=installed`, `failed`, `update` or
+  `updated` in the app's environment shows the box of a finished install (Start the Game, Show in Finder), of a
+  failed step (Try Again, Show Log File), the title row's button for a newer release (which has no installer to
+  take, so its offer is the page), or the box of an installer that has just replaced an older one. Close (Escape) is at the bottom
   right once a run has ended, stopped ones too, with Build Again (Build & Install after a run that did not
   finish) beside it. Looked at in the three previews, not yet after a real run.
+- **The installer replacing itself, in its window**: `RS_TEST_KEEP=1 tools/installer/test_update.sh` keeps its
+  scratch folder, with the installer built with the test's key (`tree/tools/installer`) and a release in each
+  `r-*` folder. Those releases are the same program with another version written on it, so for the window build
+  a second copy of `tree` with another `VERSION`, zip it (`ditto -c -k --norsrc --noextattr --keepParent`), sign
+  the zip with `test.key` (`swift tools/release/sign.swift sign`) and write a `feed.json` like the `r-*` ones.
+  Then, with a copy of the first app outside any checkout:
+  `open --env RS_UPDATE_URL=file://<folder>/feed.json "<copy>/RS Re-ARMed Installer.app"`. The offer names both
+  versions and shows the release's text; Update Now puts the new app in the copy's place and opens it, and its
+  box above the log says "This installer is now v…" with what it replaced. The buttons answer to System Events
+  (`click button "Update Now" of window 1`), and the box's texts are in `groups of window 1`. Run this way on
+  2026-11-17. Not yet run: a copy macOS itself approved at its first start (downloaded with a browser, opened
+  through Privacy & Security), where macOS may run it from a read-only place (the offer then says to move it)
+  or guard the app against being replaced (the update then stops with macOS's reason and the installer as it
+  was); and the download from GitHub itself, which needs a release that has a signature.
 - **The standalone installer's check of its download**: `tools/installer/build.sh` prints `source digest:` and
   builds it in, and the app logs `The source is the one this installer was made from` before it runs anything.
   An archive of another commit in `RS_SOURCE_URL` must stop it at Downloading source. Not yet tried through the

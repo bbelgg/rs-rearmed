@@ -383,9 +383,11 @@ only with the network guard in the process, which logs to `logs/netguard.log`. H
 
 ## Update and uninstall
 
-- **Update**: with the installer, download the new release and run it. By hand, pull and run `learn-play.sh`
-  again. The game image and the translated code are reused, and only what changed is rebuilt. Your saves are
-  kept; the game files are refreshed.
+- **Update**: open the installer. It offers a newer release at its start, and **Update Now** replaces the
+  installer with that release's, as in the [Mac edition](../mac/INSTALL.md#update-and-uninstall) (one installer
+  serves both games). Then choose Learn & Play and click **Build & Install**: the game stays as it is until you
+  do. By hand, pull and run `learn-play.sh` again. The game image and the translated code are reused, and only
+  what changed is rebuilt. Your saves are kept; the game files are refreshed.
 - **New DLC**: a [refresh](#game-files).
 - **Uninstall**: delete the app and `~/Library/Application Support/RS Re-ARMed/learn-play` (back up
   `steam/` first to keep your progress); that removes the copy of the game files too, unless the game is on

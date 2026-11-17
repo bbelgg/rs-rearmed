@@ -24,9 +24,9 @@ the release turns it into `(new in 1.13.0)`. [install.md](install.md) is the not
 | 3. Game runs | `tools/release/smoke.sh --mac`, `--lp` | one run to the note highway, for the editions step 1 names |
 | 4. The edits | `tools/release/bump.py 1.13.0` | `VERSION`, the issue template, the plans' marks, `next.md` emptied; the notes and a commit message draft |
 | 5. The commit | by hand | `Release 1.13.0: …`, finished from the draft |
-| 6. The installer | `RS_LP_SEED=… tools/release/package.sh` | the installer with the seed, zipped, with its SHA-256 |
+| 6. The installer | `RS_LP_SEED=… RS_UPDATE_KEY=… tools/release/package.sh` | the installer with the seed, zipped, with its SHA-256 and its signature |
 | 7. Ready? | `tools/release/publish.sh 1.13.0` | every check of the tree, the history, the notes and the zip; sends nothing |
-| 8. Publish | `tools/release/publish.sh 1.13.0 --yes` | the tag, the push, a draft release, the upload compared by download, then published |
+| 8. Publish | `tools/release/publish.sh 1.13.0 --yes` | the tag, the push, a draft release with the zip and its signature, the upload compared by download, then published |
 
 Step 4 edits the tree. Everything else the steps write (logs, `checks.json`, the notes, the commit message draft,
 the zip) goes to `build/release` (`$RS_RELEASE_OUT`), which git ignores. Steps 2, 3 and 6 build or run, so they
@@ -62,10 +62,27 @@ step 8. To try it before, start it with `RS_SOURCE_URL` set to an archive of the
 (`git archive --format=tar.gz --prefix=rs-rearmed-1.13.0/ HEAD`), in a test home
 ([Mac testing](../mac/TESTING.md#installer-tests)). This is an extra, for a release that changes the installer.
 
+### The update signature
+
+An installed installer replaces itself with a newer release's only when that release's zip carries the
+maintainer's signature: `package.sh` signs the zip with the private key `RS_UPDATE_KEY` names
+(`tools/release/sign.swift`, Ed25519) and writes `RS.Re-ARMed.Installer.app.zip.sig`, and `publish.sh` uploads it
+beside the zip and checks both by download. The public half is `updatePublicKey` in the installer's source. A file
+the installer downloads is not marked as a download, so macOS asks nothing when the new one opens: the signature
+is the check there is. `tools/installer/test_update.sh` runs the whole update on made-up releases with a key of
+its own; to see the window do it before a release is public, see
+[Mac testing](../mac/TESTING.md#installer-tests).
+
+A release without the `.sig`, or signed with another key, is still a release: the installers in use say so and
+open its page. So a lost key costs every user one download by hand: make a new one
+(`swift tools/release/sign.swift keygen FILE`), put its public half in `updatePublicKey`, and say in the notes
+that this release is fetched from the page. A key someone else may have is replaced the same way, at once; the
+installers already out keep trusting the old one, for what GitHub serves them as this project's newest release.
+
 ### If publishing stops half way
 
 `publish.sh` creates the release as a draft and publishes it only when the uploaded zip downloads with the
-SHA-256 `package.sh` wrote. If it stops after the push, `publish.sh 1.13.0 --yes --resume` goes on from the tag
+SHA-256 `package.sh` wrote and the uploaded signature verifies on it. If it stops after the push, `publish.sh 1.13.0 --yes --resume` goes on from the tag
 that is there. A zip rebuilt later has another checksum: publish the one that was checked.
 
 ## Rules that hold
@@ -73,5 +90,8 @@ that is there. A zip rebuilt later has another checksum: publish the one that wa
 - Ask the maintainer before step 8 ([AGENTS.md](../../AGENTS.md)): it is the only step that changes anything remote.
 - The seed is never in git; `package.sh` takes it from `RS_LP_SEED` and refuses to build a release's installer
   without it ([Shipping the seed](../../win-x86/unpack/README.md#shipping-the-seed)).
+- The update key is never in git either, nor in a log or a message: `package.sh` takes its path from
+  `RS_UPDATE_KEY` and refuses to go on without it, or with a key other than the one the installer trusts
+  ([The update signature](#the-update-signature)). Only a release's zip is signed with it.
 - What gets pushed is `main` as it should read: one commit per piece of work, the repository's identity, UTC, and
   no home paths or machine names. `publish.sh` checks the last three and lists the commits for the first.

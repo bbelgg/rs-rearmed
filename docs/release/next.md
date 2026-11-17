@@ -5,6 +5,14 @@ change, in the words the release notes will use: the bold lead says what is now 
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
 
+- **The installer updates itself.** When a newer release is out, the installer says so at its start, with what
+  is new, and Update Now replaces the installer with the new one and opens it: no visit to the Releases page and no
+  unzipping. Before, the button opened the download page. The
+  new installer is taken only when it carries this project's signature, and it is the release's own file; an
+  installer built in a checkout, or one macOS runs from a read-only place, opens the page as before. The game is
+  not changed by this: click Build & Install in the new installer when you want the new version, for each game
+  you have. This starts with the installers of this release; get this one from the page as before. Only the
+  installer goes online for this; the game still never does.
 - **The installer sets the switches.** Settings and switches… replaces Built-in Mods… and offers the switches of
   the install guides' Settings and switches (all but `RS_MODS_PATH`, the Mac's `RS_GL_BACKEND` and `RS_NATIVE_HOME`,
   Learn & Play's `LP_` ones, and the diagnostics): the built-in mods plus audio, picture, songs and logging, with

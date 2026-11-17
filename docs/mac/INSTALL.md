@@ -102,7 +102,9 @@ ends the run; what is done is kept, and Build & Install goes on from there.
   edition's (what only this edition has stays), and Reset to Defaults returns everything to the defaults.
 - Quitting the installer while it works stops the build (it asks first); Build & Install starts it again.
   The log of every run is kept in `~/Library/Logs/RS Re-ARMed Installer/`.
-- A newer release shows as a button in the title row, which opens its download page.
+- A newer release is offered when the installer opens, with what is new in it, and stays as a button in the
+  title row. **Update Now** replaces the installer with the new one and opens it; the game is not changed until
+  you click Build & Install there ([Update and uninstall](#update-and-uninstall)).
 
 When a run ends, the box above the log says how: **Start the Game** and **Show in Finder**, or **Try Again** and
 **Show Log File** when a step didn't work. The log's last lines say where everything is, with the folder for
@@ -554,8 +556,14 @@ for the original game that change its files may work as before: a modified `cach
 
 ## Update and uninstall
 
-- **Update**: with the installer, download the new release and run it. By hand, pull, repeat steps 4 and 5
-  and run `install.sh` again. Your saves are kept; the game files are refreshed.
+- **Update**: open the installer. It asks GitHub for the newest release at every start (the installer does; the
+  game never goes online), and offers a newer one: **Update Now** downloads that release's installer, checks
+  that it carries RS Re-ARMed's signature, puts it in this one's place and opens it. Then click
+  **Build & Install**, for each game you have installed: an installer builds its own version, so the game
+  stays as it is until you do. Your saves are kept; the game files are refreshed. The installer of
+  1.16.0 or earlier, one built in a checkout, or one macOS runs from a read-only place (move it to another
+  folder in Finder first) opens the release's page instead: download the new installer there and run it. By
+  hand, pull, repeat steps 4 and 5 and run `install.sh` again.
 - **New DLC or custom songs, a Steam update**: a [refresh](#game-files).
 - **Uninstall**: delete `~/Applications/RS Re-ARMed.app` and `~/Library/Application Support/RS Re-ARMed`
   (back up `steam/` first to keep your progress; the folder also holds Learn & Play's `learn-play/`, if you

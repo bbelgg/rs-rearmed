@@ -76,6 +76,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 - **Installer**: the Mac edition's GUI installer, which has Steam download the pinned Windows build and the
   account's DLC.
+- **The installer updates itself** (not released): as the Mac edition, the same app.
 - **Where the game files are kept**: as the Mac edition, by the same code.
 - **The download code is shared with the Mac edition**: the Steam steps, the room check, the link to another disk,
   Steam's log and the wait are in `tools/play-native/gamefiles.py`, where the Mac game uses them when it isn't
@@ -144,6 +145,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 - **The published installer**: recent releases' hasn't been run, nor a full install from the tag; the install scripts
   and test installs were.
+- **The installer's update of itself** (not released): as the Mac edition
+  ([Mac plan](../mac/PLAN.md#open-issues)).
 - **Game files**: the Game files choice and the move of the copy, by hand on this edition; a download from the real
   Steam since the download code moved into `gamefiles.py`.
 - **Batched DLC mounting**: not run with the new code: a library of thousands of this game's own archives (the

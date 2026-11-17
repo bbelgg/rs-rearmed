@@ -4,12 +4,12 @@
 #   tools/release/publish.sh 1.13.0 --yes    do it
 # Ask the maintainer before --yes (AGENTS.md: any push, tag or release). It needs, from the steps before it:
 #   the release commit at HEAD of main ("Release 1.13.0: ..."), a clean tree, VERSION saying 1.13.0
-#   OUT/notes-1.13.0.md (bump.py), OUT/RS.Re-ARMed.Installer.app.zip and OUT/package.txt (package.sh)
+#   OUT/notes-1.13.0.md (bump.py), OUT/RS.Re-ARMed.Installer.app.zip, its .sig and OUT/package.txt (package.sh)
 # With --yes, in this order, stopping at the first thing that fails:
 #   1. the annotated tag v1.13.0, in UTC
 #   2. push main, then the tag
-#   3. a draft release with the notes and the zip
-#   4. the zip downloaded again and compared with package.txt's SHA-256
+#   3. a draft release with the notes, the zip and the zip's signature
+#   4. both downloaded again: the zip compared with package.txt's SHA-256, the signature checked on it
 #   5. the draft published as the latest release
 # A stop after 2 leaves the tag pushed and no release: run it again with --resume, which skips what is done.
 set -euo pipefail
@@ -29,6 +29,7 @@ done
 tag="v$version"
 notes="$rel_out/notes-$version.md"
 zip="$rel_out/$rel_zip_name"
+sig="$rel_out/$rel_sig_name"
 g() { git -C "$rel_root" "$@"; }
 bad=0
 no() { echo "NO   $*"; bad=1; }
@@ -50,6 +51,12 @@ if [[ -s $zip && -s $rel_out/package.txt ]]; then
         || no "the zip was not made at HEAD with a clean tree: run package.sh again"
 else
     no "no zip or package.txt in $rel_out (package.sh)"
+fi
+# Without it no installed installer takes this release as an update (they would send their users to the page).
+if [[ -s $zip && -s $sig ]] && rel_signed "$zip" "$sig"; then
+    ok "the zip is signed with the key the installer trusts"
+else
+    no "no signature of the zip by the installer's key at $sig (package.sh with RS_UPDATE_KEY)"
 fi
 have_tag=0
 if g rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
@@ -92,15 +99,18 @@ g push origin main
 g push origin "$tag"
 if gh release view "$tag" >/dev/null 2>&1; then
     [[ $resume == 1 ]] || rel_die "a release for $tag exists already"
-    gh release upload "$tag" "$zip" --clobber
+    gh release upload "$tag" "$zip" "$sig" --clobber
 else
-    gh release create "$tag" --draft --verify-tag --title "RS Re-ARMed $version" --notes-file "$notes" "$zip"
+    gh release create "$tag" --draft --verify-tag --title "RS Re-ARMed $version" --notes-file "$notes" "$zip" "$sig"
 fi
 back=$(mktemp -d "${TMPDIR:-/tmp}/rs-release.XXXXXX")
-gh release download "$tag" --pattern "$rel_zip_name" --dir "$back"
+gh release download "$tag" --pattern "$rel_zip_name" --pattern "$rel_sig_name" --dir "$back"
 got=$(shasum -a 256 "$back/$rel_zip_name" | cut -d' ' -f1)
+signed=0
+rel_signed "$back/$rel_zip_name" "$back/$rel_sig_name" && signed=1
 rm -rf "$back"
 [[ $got == "$sha" ]] || rel_die "the uploaded zip is $got, not $sha: the release stays a draft"
+[[ $signed == 1 ]] || rel_die "the uploaded signature does not verify on the uploaded zip: the release stays a draft"
 gh release edit "$tag" --draft=false --latest
 echo "published: $(gh release view "$tag" --json url --jq .url)"
-echo "sha256 $sha (confirmed by download)"
+echo "sha256 $sha (confirmed by download, with its signature)"

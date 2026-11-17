@@ -53,8 +53,9 @@ Start `tools/release/check.py` in the background, then:
 
 ## 5. Package and the stop
 
-- `RS_LP_SEED=<the seed> tools/release/package.sh`. The seed's place is the maintainer's; ask if it isn't in the
-  environment or your notes. Never copy it into the tree.
+- `RS_LP_SEED=<the seed> RS_UPDATE_KEY=<the update key> tools/release/package.sh`. The seed's and the key's
+  places are the maintainer's; ask if they aren't in the environment or your notes. Never copy either into the
+  tree, and never print the key or sign anything but a release's zip with it.
 - `tools/release/publish.sh X.Y.Z` (no `--yes`): every line must be `ok`.
 - **Stop and ask.** Show: the version, the commits to be pushed, the notes, the checks made and not made, the
   zip's size and SHA-256. Publishing needs the maintainer's yes in this conversation, for this version; an
@@ -70,4 +71,4 @@ Start `tools/release/check.py` in the background, then:
 
 - Push, tag or publish without that yes. Push a `backup/*` or `release/*` branch.
 - Weaken the network guard or the offline layers to get a check through.
-- Put the seed, game files, logs with game content, home paths or machine names into the tree or a commit.
+- Put the seed, the update key, game files, logs with game content, home paths or machine names into the tree or a commit.

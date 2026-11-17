@@ -412,6 +412,15 @@ choose the game ─┬─ Rocksmith 2014 for Mac → the game in Steam, else Ste
   that the installer and both launchers have the same keys. The standalone installer builds only a download that is,
   file for file, the source it was made from: `build.sh` builds in a digest of the source, and the app works it out over
   what it unpacked before anything runs.
+- **The installer replaces itself, never the game.** At its start the app asks GitHub for the newest release (the
+  one network question it asks unbidden; the game asks none). Update Now downloads that release's zip and the zip's
+  signature, and only when the signature is the maintainer's (Ed25519, the public key built in; `tools/release`
+  signs) is the zip unpacked. The app in it has to be this app at the version the release names, so a signed
+  installer of an earlier release is not taken as a newer one, and whole (`codesign --verify`). Then the bundle is
+  swapped by two renames on its own volume, put back if the second fails, and the new one is opened once the old
+  process has gone. Since an installer builds exactly the source it was made from, the game changes only when the
+  user clicks Build & Install in the new one. A copy in a checkout, in a folder it can't write to, or run by
+  macOS from a read-only place does not try: its offer is the release's page.
 - **The game from Steam's console** (`tools/play-native/gamefiles.py`, shared with Learn & Play). Neither edition needs
   its game installed in Steam. `mac-game` takes, in this order, the folder the user names, the game installed in a Steam
   library (the appmanifest says "installed"), and Steam's download of depot 221682, which it starts when the game is

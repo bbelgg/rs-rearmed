@@ -18,6 +18,7 @@ ctest names are tests of the root CMake build ([Mac testing](../mac/TESTING.md#t
 | Menu overlay | `python3 tools/play-native/test_cache_overlay.py` (also ctest `play-native.cache_overlay`) | shared with the Mac edition: the menu edits, the psarc and 7z readers and writers, the overlay made from a cache and left out when the cache has the entries; with a real `cache.psarc` (`RS_TEST_CACHE=<depot folder>/cache.psarc`, or the installs' copies) also the real files |
 | Built-in mod settings | `python3 tools/play-native/test_settings.py` (also ctest `play-native.settings`) | shared with the Mac edition: `settings.env` and `options.env`. This app's reader (`win-x86/app/lp_settings.c`, compiled by the test) and the Mac launchers' readers read the same made-up files and must set and log the same; the same keys in both and in the installer |
 | Measuring tools | `python3 tools/perf/test_perf.py` (also ctest `perf.tools`) | shared with the Mac edition: frame-time statistics, the settings file's pins, the report ([Measured runs](#measured-runs)) |
+| Installer update | `tools/installer/test_update.sh` (also ctest `installer.update`) | shared with the Mac edition: the installer app replacing itself with a signed newer release, and what it refuses ([Mac testing](../mac/TESTING.md#tests-in-the-repository)) |
 | Release tools | `python3 tools/release/test_release.py` (also ctest `release.tools`) | shared with the Mac edition: what a change calls for, and a release's edits and notes |
 | Per-game tables | `python3 tools/targets/check.py` (ctest `targets.check` runs `test_targets.py`) | shared with the Mac edition: every name in `mac-x64` and `win-x86`, and every hook point's prototype against the Mac's; the names this edition's own code uses (`win32_overrides.c`) are in `win-x86`, none `unsupported` there |
 | Hook points and mods | `make -C tools/ws7/recomp/test/hooks test OUT=DIR` (also ctest `recomp.hooks`) | shared with the Mac edition, whose page lists the cases ([Mac testing](../mac/TESTING.md#tests-in-the-repository)): `test_hooks32` and `test_shared32` are this edition's runtime, `test_hooks64` and `test_shared64` the Mac's; it also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
@@ -63,9 +64,9 @@ The app build's checks, the seam unit test and the translation's determinism are
 Besides the unit tests above, the install is checked by running `tools/play-native/learn-play.sh` with a
 test build folder (`RS_BUILD_DIR`) and a test app path (`LP_NATIVE_APP`); the app then still uses
 `~/Library/Application Support/RS Re-ARMed/learn-play` unless it is started with `LP_HOME`. The installer
-app has no automated test; its preferences go to the real user's defaults even with a test `HOME`, and what
-is the same for both games (the previews of a run's end, the check of the download, a test home on another
-disk) is in [Mac testing](../mac/TESTING.md#installer-tests).
+app's window has no automated test; its preferences go to the real user's defaults even with a test `HOME`, and
+what is the same for both games (the previews of a run's end, the installer replacing itself, the check of the
+download, a test home on another disk) is in [Mac testing](../mac/TESTING.md#installer-tests).
 
 ### The installer app
 
@@ -82,7 +83,9 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
 - `RS_SOURCE_URL`: a `git archive --prefix=rs-rearmed/` of the commit under test, for the tag that isn't
   published yet. Delete `.installer-version` in the source folder to make it unpack a new one. It has to be the
   commit the app was built at: the app checks the download against the digest `build.sh` built in.
-- `RS_INSTALLER_PREVIEW=installed|failed|update`: the window as such a run leaves it, with nothing run
+- `RS_INSTALLER_PREVIEW=installed|failed|update|updated`: the window as such a run leaves it, with nothing run
+  ([Mac testing](../mac/TESTING.md#installer-tests)).
+- `RS_UPDATE_URL`: the answer to "which release is the newest", for a test of the installer replacing itself
   ([Mac testing](../mac/TESTING.md#installer-tests)).
 - `-BuildFolder`: typing into the field does not work from the background (`app_click` then `app_type` is
   refused), so the folder comes as a launch argument. Starting a run writes it to the real defaults: note

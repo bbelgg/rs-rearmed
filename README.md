@@ -138,7 +138,7 @@ Put custom songs in the app's own `dlc` folder, `~/Library/Application Support/R
 For DLC bought since the install, click **Refresh Game Files** in the installer.
 
 **How do I update or uninstall?**
-To update, run the new installer; your saves are kept. To uninstall, delete the app and the folder above, after
+To update, open the installer: it offers a newer release and replaces itself with it, and Build & Install then updates the game; your saves are kept. To uninstall, delete the app and the folder above, after
 backing up `steam/` if you want your progress: [Mac](docs/mac/INSTALL.md#update-and-uninstall),
 [Learn & Play](docs/windows/INSTALL.md#update-and-uninstall).
 

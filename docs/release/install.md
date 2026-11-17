@@ -19,7 +19,8 @@ installer starts their installation if they are missing.
 4. When it's done, start the game from the window the installer shows. Later, start it from `~/Applications`,
    Launchpad or Spotlight.
 
-Updating from an earlier version: run this installer and click **Build & Install**; your saves are kept. Settings and
+Updating from an earlier version: if the installer you have offers **Update Now** when you open it, take that;
+otherwise download this one and open it. Then click **Build & Install**; your saves are kept. Settings and
 switches… needs the game installed by this version: a game installed by 1.11.0 to 1.16.0 takes only the seven built-in
 mods it knew from it, and none of the other switches. If you patched the game for another tool (for example RS Companion), install that again
 afterwards. An earlier version may have left `static.psarc.rearmed` in your Steam game folder; you can delete it.

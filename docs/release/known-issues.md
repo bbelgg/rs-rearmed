@@ -23,7 +23,7 @@ into the notes as it stands. -->
   of their own (the arithmetic has). Above 100 frames a second calibration's average covers less than the second it
   covers at 60 Hz. Settings and switches… in the installer turns them off (Calibration and the tuner the same at any
   frame rate), as does `RS_MODS_FRAME_RATE=0`.
-- Not tested yet with this release: the Mac game downloaded by Steam when it isn't installed there (checked with a
+- Not tested yet with this release: the installer replacing itself on a copy that was downloaded with a browser (tried on test copies; if Update Now stops, the installer is as it was and its message offers the download page), the Mac game downloaded by Steam when it isn't installed there (checked with a
   stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
   the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game
   files back to the game's drive, the Game files choice in Learn & Play, a run of the installer app for Learn & Play,

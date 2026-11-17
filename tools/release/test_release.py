@@ -61,8 +61,10 @@ class Scope(unittest.TestCase):
 
     def test_the_installer_needs_no_game(self):
         s = scope.scope(["tools/installer/RSReARMedInstaller.swift"])
-        self.assertEqual((s["build"], s["run"], s["suites"]), ([], [], ["settings"]))  # the sheet's keys
+        # (the sheet's keys, and the installer replacing itself)
+        self.assertEqual((s["build"], s["run"], s["suites"]), ([], [], ["settings", "update"]))
         self.assertTrue(s["installer"])
+        self.assertEqual(scope.scope(["tools/release/sign.swift"])["suites"], ["release", "update"])
 
     def test_a_games_figures_are_its_installers_too(self):
         s = scope.scope(["tools/targets/mac-x64/target.toml"])

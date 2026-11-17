@@ -170,6 +170,9 @@ One release covers both editions; the steps and their scripts (`tools/release`) 
   directory or test suite gets its rule there.
 - A release that changed anything of [what the mods of other projects use](#what-they-hold-us-to) is checked against
   them before it is published, and the maintainer hears the result with the rest of what the release checked.
+- A release's installer is signed with the maintainer's update key (`RS_UPDATE_KEY`), which the installers in use
+  check before they replace themselves with it. Like the seed it is never in the repository; never print it, and
+  sign nothing but a release's zip with it ([docs/release/README.md](docs/release/README.md#the-update-signature)).
 - Publishing (`tools/release/publish.sh … --yes`) is the remote change to ask about, every time.
 
 ## Building

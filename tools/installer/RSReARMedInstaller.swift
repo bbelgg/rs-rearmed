@@ -10,6 +10,7 @@
 // optionally cleans up afterwards.
 
 import AppKit
+import CryptoKit
 
 let repoWebURL = "https://github.com/bbelgg/rs-rearmed"
 // RS_SOURCE_URL: another archive (a test of the standalone path before the release is published).
@@ -20,7 +21,17 @@ func sourceArchiveURL(_ tag: String) -> String {
 // path. tools/installer/build.sh runs this same line (it reads it from here) over `git archive HEAD` and
 // builds the result in as rsSourceDigest; downloadSource runs it over what it downloaded.
 let sourceDigestCommand = #"export LC_ALL=C; { find . -type l -exec sh -c 'printf "%s -> %s\n" "$1" "$(readlink "$1")"' _ {} \; | sort; find . -type f -print0 | sort -z | xargs -0 shasum -a 256; } | shasum -a 256 | cut -d' ' -f1"#
+// The newest release, asked at every start. RS_UPDATE_URL: another answer to that question (a test of the update
+// before a release is published); the installer it names is checked against updatePublicKey all the same.
 let releasesURL = "https://api.github.com/repos/bbelgg/rs-rearmed/releases/latest"
+// A release's installer and its signature, by their names on the Releases page (tools/release/package.sh).
+let updateZipName = "RS.Re-ARMed.Installer.app.zip"
+let updateSigName = updateZipName + ".sig"
+let installerBundleID = "io.github.bbelgg.rs-rearmed.installer"  // build.sh's CFBundleIdentifier
+// Whose signature a newer installer has to carry before this one replaces itself with it: the public half of the
+// maintainer's key (tools/release/sign.swift), in one line, which tools/installer/test_update.sh replaces in the
+// copy it builds.
+let updatePublicKey = "PquA+2nIGSvLrGRK4l8NFAaYxfXMTSZ6nUdvVJdJQgc="
 // No spaces: the recompiler's build scripts pass lists of paths as space-separated strings.
 let buildFolderName = "rs-rearmed-build"
 let oldBuildFolderName = "RS Re-ARMed Build"  // 1.0.0-1.0.2; a saved path ending in it gets the new name
@@ -1244,7 +1255,8 @@ class InstallerWindow: NSWindow {
     let showLogButton = NSButton(title: "Show Log File", target: nil, action: nil)
     let closeButton = NSButton(title: "Close", target: nil, action: nil)
     let updateButton = NSButton(title: "", target: nil, action: nil)
-    var updateURL = ""
+    var update: Update?
+    var selfUpdating = false  // while this copy replaces itself: no build starts, and the app stays
     // How the last run ended, in the box above the log until the next one starts: what the alerts said before,
     // in the window, with what to do next as its buttons and Close beside Build Again.
     struct RunResult {
@@ -1323,7 +1335,7 @@ class InstallerWindow: NSWindow {
         updateButton.bezelStyle = .inline
         updateButton.isHidden = true
         updateButton.target = self
-        updateButton.action = #selector(openUpdate)
+        updateButton.action = #selector(offerUpdate)
         updateButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(updateButton)
 
@@ -1817,16 +1829,96 @@ class InstallerWindow: NSWindow {
 
     @objc func closeInstaller() { performClose(nil) }
 
-    @objc func openUpdate() {
-        if let url = URL(string: updateURL) { NSWorkspace.shared.open(url) }
+    // A newer release than this installer: a button in the title row that offers it.
+    func showUpdate(_ u: Update) {
+        update = u
+        updateButton.title = "Version \(u.version) is available: get it"
+        updateButton.toolTip = "You are running v\(rsVersion)."
+        updateButton.isHidden = false
     }
 
-    // A newer release than this installer: a button in the title row that opens its page.
-    func showUpdate(tag: String, url: String) {
-        updateURL = url
-        updateButton.title = "Version \(tag.hasPrefix("v") ? String(tag.dropFirst()) : tag) is available: get it"
-        updateButton.toolTip = "You are running v\(rsVersion). Opens the download page of \(tag)."
-        updateButton.isHidden = false
+    // The offer: this installer replaced by the new one, when it can check and replace itself; else the release's
+    // page, as before. The game is not touched either way.
+    @objc func offerUpdate() {
+        guard let u = update, !selfUpdating else { return }
+        let alert = NSAlert()
+        alert.alertStyle = .informational
+        alert.messageText = "Version \(u.version) is available"
+        let have = "You are running v\(rsVersion), and this installer installs v\(rsVersion)."
+        let blocked = u.zip.isEmpty ? "" : selfUpdateBlocked(inRepo: runner.embeddedInRepo)
+        if let why = blocked {
+            alert.informativeText = why.isEmpty ? have : have + "\n\n" + why
+            alert.addButton(withTitle: "Open Download Page")
+            alert.addButton(withTitle: "Later")
+        } else {
+            alert.informativeText = have + "\n\nUpdate Now replaces this installer with v\(u.version) and opens it. "
+                + "The game stays as it is until you click Build & Install there."
+            alert.addButton(withTitle: "Update Now")
+            alert.addButton(withTitle: "Later")
+            alert.addButton(withTitle: "Open Download Page")
+        }
+        // What the release says of itself, without the part every release has.
+        let notes = (u.notes.components(separatedBy: "\n## Install").first ?? "")
+            .replacingOccurrences(of: "\r\n", with: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        if !notes.isEmpty {
+            let scroll = NSScrollView(frame: NSRect(x: 0, y: 0, width: 460, height: 200))
+            scroll.hasVerticalScroller = true
+            scroll.borderType = .bezelBorder
+            let text = NSTextView(frame: NSRect(origin: .zero, size: scroll.contentSize))
+            text.isEditable = false
+            text.autoresizingMask = [.width]
+            text.textContainerInset = NSSize(width: 4, height: 6)
+            text.font = .systemFont(ofSize: 11)
+            text.string = notes
+            scroll.documentView = text
+            alert.accessoryView = scroll
+        }
+        let index = alert.runModal().rawValue - NSApplication.ModalResponse.alertFirstButtonReturn.rawValue
+        let choice = index >= 0 && index < alert.buttons.count ? alert.buttons[index].title : "Later"
+        if choice == "Open Download Page", let url = URL(string: u.page) { NSWorkspace.shared.open(url) }
+        if choice == "Update Now" { updateInstaller(u) }
+    }
+
+    private func updateInstaller(_ u: Update) {
+        if runner.isRunning {
+            _ = showAlert(title: "A build is running",
+                          message: "The installer can replace itself once the build has ended or been stopped.",
+                          buttons: ["OK"])
+            return
+        }
+        selfUpdating = true
+        updateButton.title = "Getting version \(u.version)…"
+        updateButton.isEnabled = false
+        updateUI()
+        let path = Bundle.main.bundlePath
+        Task {
+            let done = await Task.detached { Result { try installUpdate(u, over: path) } }.value
+            selfUpdating = false
+            switch done {
+            case .success(let work):
+                openUpdated(path, work: work)
+                NSApp.terminate(nil)
+            case .failure(let error):
+                showUpdate(u)
+                updateButton.isEnabled = true
+                updateUI()
+                let choice = showAlert(
+                    title: "The installer was not updated",
+                    message: error.localizedDescription + "\n\nThis installer is as it was. Version \(u.version) is "
+                        + "also on the download page.",
+                    buttons: ["Open Download Page", "Close"])
+                if choice == "Open Download Page", let url = URL(string: u.page) { NSWorkspace.shared.open(url) }
+            }
+        }
+    }
+
+    // Opened by the installer that replaced itself with this one: said in the box above the log, where a run's end
+    // is said. What to do next is the user's.
+    func showUpdated(from: String) {
+        result = RunResult(good: true, title: "This installer is now v\(rsVersion)",
+                           text: "It replaced v\(from). The game on this Mac is as it was: Build & Install builds and "
+                               + "installs v\(rsVersion).")
+        updateUI()
     }
 
     private func boxColor(_ c: NSColor) {
@@ -1919,7 +2011,7 @@ class InstallerWindow: NSWindow {
         }
         // While the shaders are prepared the button skips that (optional) step.
         let canSkip = runner.isRunning && runner.stepTitle == "Preparing shaders" && !runner.shadersSkipped
-        startButton.isEnabled = !runner.isRunning || canSkip
+        startButton.isEnabled = (!runner.isRunning || canSkip) && !selfUpdating
         startButton.title = canSkip ? "Skip" : runner.isFinished ? "Build Again" : "Build & Install"
         updateGuide()
         // Once a run has ended: Close at the edge, Return on what the box offers (Start the Game, Try Again).
@@ -1932,7 +2024,7 @@ class InstallerWindow: NSWindow {
         let boxDefault = ended && !(result?.primary.isEmpty ?? true)
         guideAction.keyEquivalent = boxDefault ? "\r" : ""
         startButton.keyEquivalent = boxDefault ? "" : "\r"
-        refreshButton.isHidden = runner.isRunning || !gameCopyExists(selectedGame)
+        refreshButton.isHidden = runner.isRunning || selfUpdating || !gameCopyExists(selectedGame)
         gamePopup.isEnabled = !runner.isRunning
         browseButton.isEnabled = !runner.isRunning
         gameDirField.isEditable = !runner.isRunning
@@ -2172,7 +2264,10 @@ class InstallerWindow: NSWindow {
             runner.stepTitle = "Building the game"
             runner.lastError = "The build stopped: no space left on the disk."
         case "update":
-            showUpdate(tag: "v99.0.0", url: repoWebURL + "/releases")
+            showUpdate(Update(tag: "v99.0.0", page: repoWebURL + "/releases"))
+            return
+        case "updated":
+            showUpdated(from: "1.0.0")
             return
         default:
             return
@@ -2842,28 +2937,216 @@ final class OptionsSheet: NSObject {
     }
 }
 
-// MARK: - Update check
+// MARK: - Update check and self-update
 
-func checkForUpdate() async -> (tag: String, url: String)? {
-    guard let url = URL(string: releasesURL) else { return nil }
-    var request = URLRequest(url: url, timeoutInterval: 10)
-    request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
-    guard let (data, response) = try? await URLSession.shared.data(for: request),
-          let http = response as? HTTPURLResponse, http.statusCode == 200 else { return nil }
-    guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+// A release newer than this installer.
+struct Update {
+    var tag: String    // "v1.17.0"
+    var page: String   // the release's page
+    var notes = ""     // the release's text
+    var zip = ""       // its installer and that file's signature; "": the release has none this copy can check
+    var sig = ""
+    var version: String { tag.hasPrefix("v") ? String(tag.dropFirst()) : tag }
+}
+
+struct UpdateError: LocalizedError {
+    let what: String
+    init(_ what: String) { self.what = what }
+    var errorDescription: String? { what }
+}
+
+func versionIsNewer(_ a: String, than b: String) -> Bool {
+    let x = a.split(separator: ".").compactMap { Int($0) }
+    let y = b.split(separator: ".").compactMap { Int($0) }
+    for i in 0..<max(x.count, y.count) {
+        let l = i < x.count ? x[i] : 0
+        let r = i < y.count ? y[i] : 0
+        if l != r { return l > r }
+    }
+    return false
+}
+
+// One answer from the network (a file, in a test), whole, or nil. It waits: not for the main thread of the window.
+func fetchData(_ address: String, timeout: TimeInterval, limit: Int, accept: String? = nil) -> Data? {
+    guard let url = URL(string: address) else { return nil }
+    var request = URLRequest(url: url, timeoutInterval: timeout)
+    if let accept = accept { request.setValue(accept, forHTTPHeaderField: "Accept") }
+    final class Box: @unchecked Sendable { var data: Data? }
+    let box = Box()
+    let done = DispatchSemaphore(value: 0)
+    URLSession.shared.dataTask(with: request) { data, response, error in
+        let status = (response as? HTTPURLResponse)?.statusCode ?? 200  // a file has none
+        if error == nil, status == 200, let data = data, data.count <= limit { box.data = data }
+        done.signal()
+    }.resume()
+    done.wait()
+    return box.data
+}
+
+// The newest release, when it is newer than this installer.
+func latestRelease() -> Update? {
+    let testFeed = ProcessInfo.processInfo.environment["RS_UPDATE_URL"]
+    guard let data = fetchData(testFeed ?? releasesURL, timeout: 10, limit: 4 << 20, accept: "application/vnd.github+json"),
+          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
           let tag = json["tag_name"] as? String,
           let htmlURL = json["html_url"] as? String else { return nil }
-    let remote = tag.hasPrefix("v") ? String(tag.dropFirst()) : tag
-    guard remote != rsVersion else { return nil }
-    let remoteParts = remote.split(separator: ".").compactMap { Int($0) }
-    let localParts = rsVersion.split(separator: ".").compactMap { Int($0) }
-    for i in 0..<max(remoteParts.count, localParts.count) {
-        let r = i < remoteParts.count ? remoteParts[i] : 0
-        let l = i < localParts.count ? localParts[i] : 0
-        if r > l { return (tag, htmlURL) }
-        if r < l { return nil }
+    // The page and the files are this project's own (a test's feed names its own).
+    let ours = { (url: String) in testFeed != nil || url.hasPrefix(repoWebURL + "/releases/") }
+    var update = Update(tag: tag, page: ours(htmlURL) ? htmlURL : repoWebURL + "/releases",
+                        notes: json["body"] as? String ?? "")
+    guard versionIsNewer(update.version, than: rsVersion) else { return nil }
+    var files: [String: String] = [:]
+    for asset in json["assets"] as? [[String: Any]] ?? [] {
+        if let name = asset["name"] as? String, let url = asset["browser_download_url"] as? String, ours(url) {
+            files[name] = url
+        }
+    }
+    if let zip = files[updateZipName], let sig = files[updateSigName] {
+        update.zip = zip
+        update.sig = sig
+    }
+    return update
+}
+
+func checkForUpdate() async -> Update? {
+    await Task.detached { latestRelease() }.value
+}
+
+// Is SIGNATURE (a .sig file's bytes) the maintainer's signature of ZIP?
+func updateSignatureIsGood(_ zip: Data, _ signature: Data) -> Bool {
+    guard let key = Data(base64Encoded: updatePublicKey),
+          let publicKey = try? Curve25519.Signing.PublicKey(rawRepresentation: key),
+          let text = String(data: signature, encoding: .utf8),
+          let sig = Data(base64Encoded: text.trimmingCharacters(in: .whitespacesAndNewlines)) else { return false }
+    return publicKey.isValidSignature(sig, for: zip)
+}
+
+// Why this copy cannot replace itself (nil: it can). The release's page is the way then.
+func selfUpdateBlocked(inRepo: Bool) -> String? {
+    let path = Bundle.main.bundlePath
+    if inRepo {
+        return "This copy was built in a checkout of the source and follows it: update the checkout and build it again."
+    }
+    if !path.hasSuffix(".app") { return "This copy is not running as an app." }
+    // An app that has not been moved since it was unpacked can be run by macOS from a read-only copy elsewhere.
+    if path.contains("/AppTranslocation/") {
+        return "macOS is running this copy from a read-only place, as it can with an app that has not been moved since "
+            + "it was unpacked. Move RS Re-ARMed Installer to another folder in Finder (Applications, say) and open it "
+            + "again, or get the new one from the download page."
+    }
+    let fm = FileManager.default
+    if !fm.isWritableFile(atPath: path) || !fm.isWritableFile(atPath: (path as NSString).deletingLastPathComponent) {
+        return "This copy is in a folder that cannot be written to. Get the new one from the download page."
     }
     return nil
+}
+
+// A tool of macOS's, run to its end: its status, and what it printed.
+func runTool(_ tool: String, _ arguments: [String]) -> (status: Int32, output: String) {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: tool)
+    p.arguments = arguments
+    let out = Pipe()
+    p.standardOutput = out
+    p.standardError = out
+    guard (try? p.run()) != nil else { return (-1, "\(tool) did not start") }
+    let data = out.fileHandleForReading.readDataToEndOfFile()
+    p.waitUntilExit()
+    return (p.terminationStatus, (String(data: data, encoding: .utf8) ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+}
+
+// The update itself: the release's installer downloaded, checked, and put where this one is. Returns the folder
+// that holds the bundle it replaced, for whoever opens the new one to remove. When it throws, this copy is as it
+// was. It waits for the network: not for the main thread of the window.
+func installUpdate(_ update: Update, over bundlePath: String) throws -> String {
+    guard !update.zip.isEmpty else {
+        throw UpdateError("Version \(update.version) has no installer on its page that this copy can check.")
+    }
+    guard let zip = fetchData(update.zip, timeout: 120, limit: 64 << 20),
+          let sig = fetchData(update.sig, timeout: 30, limit: 4096) else {
+        throw UpdateError("The download failed. Check that this Mac is on the internet.")
+    }
+    // Before anything of it is unpacked or run. A download is not marked as one, so macOS asks nothing about it:
+    // this is the check there is.
+    guard updateSignatureIsGood(zip, sig) else {
+        throw UpdateError("What was downloaded does not carry RS Re-ARMed's signature. Nothing of it was opened.")
+    }
+    let fm = FileManager.default
+    let bundle = URL(fileURLWithPath: bundlePath)
+    // On the bundle's own volume, so that the swap is two renames.
+    let work = try fm.url(for: .itemReplacementDirectory, in: .userDomainMask, appropriateFor: bundle, create: true)
+    var keepWork = false
+    defer { if !keepWork { try? fm.removeItem(at: work) } }
+
+    let archive = work.appendingPathComponent(updateZipName)
+    try zip.write(to: archive)
+    let unpacked = work.appendingPathComponent("new")
+    let ditto = runTool("/usr/bin/ditto", ["-x", "-k", archive.path, unpacked.path])
+    guard ditto.status == 0 else { throw UpdateError("The download could not be unpacked: \(ditto.output)") }
+    // The signature says the zip is the maintainer's, not which release it is: an installer of an earlier release
+    // offered as a newer one is refused here.
+    let new = unpacked.appendingPathComponent("RS Re-ARMed Installer.app")
+    let info = NSDictionary(contentsOf: new.appendingPathComponent("Contents/Info.plist"))
+    guard info?["CFBundleIdentifier"] as? String == installerBundleID,
+          info?["CFBundleShortVersionString"] as? String == update.version else {
+        throw UpdateError("What was downloaded is not version \(update.version) of RS Re-ARMed Installer.")
+    }
+    let signed = runTool("/usr/bin/codesign", ["--verify", "--strict", new.path])
+    guard signed.status == 0 else { throw UpdateError("The downloaded app is damaged: \(signed.output)") }
+
+    let old = work.appendingPathComponent("replaced.app")
+    do {
+        try fm.moveItem(at: bundle, to: old)
+    } catch {
+        throw UpdateError("macOS did not let this copy be replaced (\(error.localizedDescription)).")
+    }
+    do {
+        try fm.moveItem(at: new, to: bundle)
+    } catch {
+        if (try? fm.moveItem(at: old, to: bundle)) == nil {
+            keepWork = true
+            throw UpdateError("The new installer could not be put in place (\(error.localizedDescription)), and this "
+                + "one could not be put back: it is at \(old.path).")
+        }
+        throw UpdateError("The new installer could not be put in place (\(error.localizedDescription)).")
+    }
+    keepWork = true
+    return work.path
+}
+
+// The new installer, opened once this one has gone (a second copy would only bring the first to the front). It is
+// told what it replaced, and the folder with the old bundle goes.
+func openUpdated(_ bundlePath: String, work: String) {
+    let p = Process()
+    p.executableURL = URL(fileURLWithPath: "/bin/sh")
+    p.arguments = ["-c", #"""
+        while kill -0 "$1" 2>/dev/null; do sleep 0.2; done
+        [ -n "$3" ] && rm -rf "$3"
+        exec /usr/bin/open "$2" --args -UpdatedFrom "$4"
+        """#, "sh", String(ProcessInfo.processInfo.processIdentifier), bundlePath, work, rsVersion]
+    try? p.run()
+}
+
+// --update-now: the update without the window, for tools/installer/test_update.sh. 0: this copy is the new
+// release's now (it is not opened); 3: nothing newer; 1: refused, with the reason.
+func updateNow() -> Int32 {
+    guard let update = latestRelease() else {
+        print("no newer release")
+        return 3
+    }
+    if let why = selfUpdateBlocked(inRepo: detectRepoRoot() != nil) {
+        print("refused: \(why)")
+        return 1
+    }
+    do {
+        let work = try installUpdate(update, over: Bundle.main.bundlePath)
+        try? FileManager.default.removeItem(atPath: work)
+        print("updated to \(update.version)")
+        return 0
+    } catch {
+        print("refused: \(error.localizedDescription)")
+        return 1
+    }
 }
 
 // MARK: - App delegate & entry point
@@ -2887,26 +3170,22 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         window.delegate = self
         window.makeKeyAndOrderFront(nil)
 
-        // RS_INSTALLER_PREVIEW=installed|failed|update: the window as it is after such a run, with nothing run
+        // RS_INSTALLER_PREVIEW=installed|failed|update|updated: the window as it is after such a run, with nothing run
         // (docs/mac/TESTING.md, Installer tests). No update check then.
         if let preview = ProcessInfo.processInfo.environment["RS_INSTALLER_PREVIEW"] {
             window.preview(preview)
             return
         }
+        // What this installer replaced, when it was opened by the one that updated itself (openUpdated).
+        if let from = UserDefaults.standard.string(forKey: "UpdatedFrom"), versionIsNewer(rsVersion, than: from) {
+            window.showUpdated(from: from)
+        }
         Task {
             if let update = await checkForUpdate() {
                 // Asked once, since this installer builds its own version, not the newest; and it stays in the
                 // window's title row for whoever chose Later.
-                window.showUpdate(tag: update.tag, url: update.url)
-                let choice = showAlert(
-                    title: "Update Available",
-                    message: "A newer version (\(update.tag)) is available. You are running v\(rsVersion), and "
-                        + "this installer installs v\(rsVersion).",
-                    buttons: ["Open Download Page", "Later"]
-                )
-                if choice == "Open Download Page", let url = URL(string: update.url) {
-                    NSWorkspace.shared.open(url)
-                }
+                window.showUpdate(update)
+                window.offerUpdate()
             }
         }
     }
@@ -2916,6 +3195,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     // Quitting mid-build stops the running command too: an orphaned warm-up (the game's executable)
     // would keep the launcher and install.sh saying "Rocksmith 2014 is already running".
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
+        if window?.selfUpdating == true { return .terminateCancel }  // seconds, and the bundle is being moved
         guard let runner = window?.runner, runner.isRunning else { return .terminateNow }
         guard confirmQuit() else { return .terminateCancel }
         runner.stopCurrentCommand()
@@ -2924,6 +3204,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
 
     // Closing the window quits, so it asks first too: a closed window can't be got back.
     func windowShouldClose(_ sender: NSWindow) -> Bool {
+        if window?.selfUpdating == true { return false }
         guard let runner = window?.runner, runner.isRunning else { return true }
         guard confirmQuit() else { return false }
         runner.stopCurrentCommand()
@@ -2974,6 +3255,7 @@ func makeMainMenu() -> NSMenu {
     return main
 }
 
+if CommandLine.arguments.contains("--update-now") { exit(updateNow()) }
 if let i = CommandLine.arguments.firstIndex(of: "--parse-progress"), i + 1 < CommandLine.arguments.count {
     let a = CommandLine.arguments
     exit(parseProgressFile(a[i + 1], step: i + 2 < a.count ? a[i + 2] : "Preparing shaders"))

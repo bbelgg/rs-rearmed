@@ -36,6 +36,7 @@ SUITES = {
     "gamefiles":     ("the game-file copy", "cmd", "{py} tools/play-native/test_gamefiles.py"),
     "cache_overlay": ("the menu overlay", "cmd", "{py} tools/play-native/test_cache_overlay.py"),
     "settings":      ("settings.env", "cmd", "{py} tools/play-native/test_settings.py"),
+    "update":        ("the installer replacing itself with a newer release", "cmd", "tools/installer/test_update.sh"),
     "decrypt":       ("the Mac image's decryption", "cmd", "{py} tools/steamless/test_decrypt.py"),
     "targets":       ("the per-game tables", "cmd",
                       "{py} tools/targets/check.py && {py} tools/targets/test_targets.py"),
@@ -103,7 +104,9 @@ RULES = {
 
     # The installer and the install scripts.
     # (its Settings and switches sheet has the launchers' keys: test_settings.py reads all three)
-    "tools/installer/": rule(BOTH, suites=["settings"], installer=True),
+    "tools/installer/": rule(BOTH, suites=["settings", "update"], installer=True),
+    # (what signs a release's installer, and what an installed one checks it with)
+    "tools/release/sign.swift": rule(suites=["release", "update"]),
     "tools/play-native/": rule(BOTH, suites=["gamefiles", "cache_overlay", "settings"], installer=True),
     # (Learn & Play's installer gets its game from Steam with gamefiles.py's code)
     "tools/play-native/gamefiles.py": rule(BOTH, suites=["gamefiles", "lp.install"], installer=True),

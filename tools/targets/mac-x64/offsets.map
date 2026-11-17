@@ -25,6 +25,7 @@ dlc_map_root                      0x50    # DLC coordinator: map root node
 dlc_map_begin                     0x58    # DLC coordinator: map begin node
 dlc_map_end                       0x60    # DLC coordinator: map end node
 dlc_map_size                      0x68    # DLC coordinator: map size
+dlc_package                       0x190   # DLC coordinator: the package its update's head is loading (taken off dlc_package_queue at 0x100a0cc6f, cleared by the head's done callback 0x100a0cc10)
 json_number_refs                  0x8     # number object: int32 refcount
 json_number_value                 0x10    # number object: double value
 json_number_add_ref_slot          0x0     # number object vtable: AddRef

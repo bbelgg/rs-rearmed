@@ -10,3 +10,8 @@ notes and empties this file. -->
   and the rest under Advanced. The page starts at what the installed app has, imports the other edition's, and
   Reset to Defaults returns everything to the defaults; a change still takes effect at the next start with no reinstall.
   Skip Tuner in the Guitarcade and the frame rate fixes of 1.16.0 are among the built-in mods there.
+- **"Enumerating downloadable content..." stays until the songs are in (Mac).** At the start, and after ENUMERATE,
+  the text in the menu went away while the game was still loading the song archives: for some seconds, longer with
+  a larger library, Learn a Song lacked songs and the menus answered late. The Mac edition now loads each archive
+  before it opens the next, as Learn & Play does: the text ends when the loading does, and the loading itself is
+  several times shorter (147 archives: 0.4 s where it took 3.1 s).

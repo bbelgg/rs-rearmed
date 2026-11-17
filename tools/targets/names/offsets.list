@@ -30,6 +30,7 @@ dlc_map_root              # DLC coordinator: map root node
 dlc_map_begin             # DLC coordinator: map begin node
 dlc_map_end               # DLC coordinator: map end node
 dlc_map_size              # DLC coordinator: map size
+dlc_package               # DLC coordinator: the package its update's head is loading, null: none
 json_number_refs          # number object: int32 refcount
 json_number_value         # number object: double value
 json_number_add_ref_slot  # number object vtable: AddRef

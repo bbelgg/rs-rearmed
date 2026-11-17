@@ -60,6 +60,7 @@ dlc_update_head                                                  0x01446570  thi
 dlc_install_step                                                 0x01449580  custom    void(void *coord)
 dlc_enum_check                                                   0x014493a0  custom    bool(void *coord)
 dlc_update_tail                                                  0x01449660  stdcall   void(void *coord)
+dlc_package_queue                                                unsupported  not matched: this game's mounting loop waits for the archive's file to be closed instead, which its Win32 seam counts (win32_overrides.c)
 std_tree_destroy                                                 0x00f964a0  thiscall  void(void *tree, void *root)
 json_number_table                                                0x1ee14c8  data      void *  # a Dinkumware hash_map here
 json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply

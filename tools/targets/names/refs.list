@@ -14,6 +14,7 @@ dlc_update_head          # first call of the DLC coordinator's update
 dlc_install_step         # mounts one pending archive, or clears the installing flag
 dlc_enum_check           # DLC coordinator check (clears the pending flags when true)
 dlc_update_tail          # DLC coordinator follow-up
+dlc_package_queue        # the packages of mounted archives that wait for the update's head: a pointer to their vector
 std_tree_destroy         # std::map node destruction
 json_number_table        # global table of JSON number values
 json_number_table_lock   # its recursive mutex

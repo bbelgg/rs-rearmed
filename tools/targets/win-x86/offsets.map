@@ -29,6 +29,7 @@ dlc_map_root                      0x34    # DLC coordinator: map root node
 dlc_map_begin                     0x38    # DLC coordinator: map begin node
 dlc_map_end                       0x3c    # DLC coordinator: map end node
 dlc_map_size                      0x40    # DLC coordinator: map size
+dlc_package                       unsupported  not matched: this game's mounting loop waits for the archive's file to be closed instead, which its Win32 seam counts (win32_overrides.c)
 json_number_refs                  0x4     # number object: int32 refcount
 json_number_value                 0x8     # number object: double value
 json_number_add_ref_slot          0x0     # number object vtable: AddRef (read in num_intern, 0x14000b6)

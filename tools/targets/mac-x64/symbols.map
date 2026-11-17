@@ -905,6 +905,7 @@ GRCameraDebug_class_info                                         0x1018dff00  da
 GRCameraScripted_class_info                                      0x1018e0368  data  efd::ClassInfo
 GRCameraService_class_info                                       0x1018e07a0  data  efd::ClassInfo
 IGRCameraImpl_class_info                                         0x1018e0ba8  data  efd::ClassInfo
+dlc_package_queue                                                0x1018e0fb8  data  void *  # a pointer to a vector of packages (begin, end, capacity): a mount adds one, dlc_update_head alone takes one a call (0x10008a880, the last)
 DatabaseCommandQueue_class_info                                  0x1018e0fe8  data  efd::ClassInfo
 DatabaseMessageSystem_class_info                                 0x1018e1c00  data  efd::ClassInfo
 DatabaseService_class_info                                       0x1018e2008  data  efd::ClassInfo

@@ -398,8 +398,10 @@ What differs, fix by fix:
   - Batched DLC mounting: this game's loop has to wait for each mount. An install step starts mounting one archive and
     leaves its file open; the update's head, which the game calls once a frame, finishes the mount and closes the file,
     and a step taken before that drops the next archive. So the loop calls the head until the file is closed (the seam
-    counts the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac game's steps need no such
-    wait.
+    counts the open song archives of `dlc/`, `win32_ksync.c`) before the next step. The Mac edition's loop waits the
+    same way, on what the game itself has left to load (`dlc_package`, `dlc_package_queue`, not matched here): its
+    steps drop nothing, but its "Enumerating downloadable content..." went away before the songs were in. Here the
+    text has always stayed to the end, as the step that clears its flag comes after the last mount.
   - The song path cache wraps the path intern itself, as this build has the Mac game's wrapper around it inlined.
   - The number-table hash is a function of its own here, where the Mac edition replaces the three functions it is
     inlined into. This table masks the hash rather than taking a prime modulus, so the bits are mixed down first.

@@ -235,10 +235,15 @@ What each does:
 
 - **Built-in fixes** (`RS_MODS_FIXES`, `RS_MODS_BYPASS`): the rs-mac-fixes behaviours and the RSBypass signature skip.
   - Batched DLC mounting, the faster loading with a large library: the DLC coordinator's update runs its install step,
-    which mounts one archive, for `RS_MODS_BUDGET_MS` a frame (default 50) instead of once. This game's steps need no
-    wait between them: its song list is the same with the budget as with a step a frame
-    ([TESTING.md](TESTING.md#unattended-runs)). Learn & Play's loop has to wait for each mount to be finished, or
-    archives are dropped ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)).
+    which mounts one archive, for `RS_MODS_BUDGET_MS` a frame (default 50) instead of once. A step is half of a mount:
+    it opens the archive and queues its package, and the update's head, which the game calls once a frame, loads one
+    package a call; the archive's songs are in the lists from then. So the loop calls the head until nothing is left
+    to load before it takes the next step, and the step that finds the list empty, which clears the flag the menu's
+    "Enumerating downloadable content..." follows, is the end of the loading too. (Steps alone emptied the list in a
+    few frames and the packages were then loaded one a frame, with the text gone, songs missing from the lists and the
+    menus slow to answer: 2.7 s for 147 archives.) Learn & Play's loop waits the same way, there because a step
+    taken too early drops an archive ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)); this game's
+    drop none either way ([TESTING.md](TESTING.md#unattended-runs)).
   - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
     descriptors of an app started from Finder. The shared start raises it.
   - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path

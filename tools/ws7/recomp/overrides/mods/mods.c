@@ -290,28 +290,68 @@ void RC_FN(path_md5)(rc_ctx *c) {
 // coordinator. It calls the install step F_100a0d7e0 (mounts one pending archive, or clears flag +0xa and
 // marks enumeration done when the list is empty) once per frame; the mod redirected that call to a loop
 // bounded by a frame budget. The step stays translated; the caller is replaced by this native version.
+//
+// A step is half of a mount: it opens the archive and puts its package in a queue (dlc_package_queue). The
+// update's head, which the game calls once a frame, takes one package off the queue (dlc_package), has its files
+// read, and ends it when they are in: the archive's songs are in the lists from then. So steps alone for a frame
+// budget emptied the list of archives in a few frames and cleared the flag, and the packages were then loaded one
+// a frame for as long as the original takes: 147 archives were open for 2.7 s more, a larger library's for longer,
+// with "Enumerating downloadable content..." gone (the menu shows it for as long as the flag is set, 0x1000e07d4),
+// songs missing from the lists and the menus slow to answer. So the loop takes a step only when nothing is left to
+// load, and calls the head until then: a package is loaded before the next archive is opened, in the original's
+// order, several a frame (the 147 in 8 frames, 0.42 s), and the step that clears the flag is the end of all of it.
+// Learn & Play's loop does the same for its own reason (win-x86/shims/win32_overrides.c).
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
+#define LOAD_STALL_S 5.0  // a package not loaded this long after the last one: the steps go on without it
 
 // During the install steps an archive in dlc/ counts as owned, whatever AppID it carries: mods_shared.c's hook on
 // steam_dlc_owned, one source with Learn & Play, which rs_mods_mounting tells when the steps run.
 
-// RS_MODS_LOG=1 says what a mounting did once its list is empty, in Learn & Play's words: the archives its steps
-// took, the frames and the time. Learn & Play's steps dropped archives when several ran in a frame, until its loop
-// waited for each mount to be finished (win-x86/shims/win32_overrides.c). This game's do not: it lists the same
-// songs after a mounting with the budget as after one at RS_MODS_BUDGET_MS=0, a step a frame as in the original
-// (docs/mac/TESTING.md has the check).
+// RS_MODS_LOG=1 says what a mounting did once its list is empty and its packages are loaded, in Learn & Play's
+// words: the archives its steps took, the frames and the time. Learn & Play's steps dropped archives when several
+// ran in a frame, until its loop waited for each mount to be finished (win-x86/shims/win32_overrides.c). This
+// game's do not: it lists the same songs after a mounting with the budget as after one at RS_MODS_BUDGET_MS=0, a
+// step a frame as in the original (docs/mac/TESTING.md has the check).
 static struct {
   unsigned steps, frames;
   double t0;
-} g_mount;  // the game thread's, when logging
+  uint64_t left;      // what was left to load when it last changed
+  double left_since;  // and when that was
+  int stalled;        // a package did not load: this mounting's steps no longer wait
+} g_mount;  // the game thread's
+
+// What is left to load of the archives the steps took: the packages in the queue, and the one the head has. 0 when
+// there is none, and otherwise a number that changes whenever one is done.
+static uint64_t mount_left(const uint8_t *self) {
+  uint64_t now = RC_LD(uint64_t, self + RC_OFF(dlc_package));
+  const uint64_t *queue = RC_HOST(RC_LD(uint64_t, RC_GA(dlc_package_queue)));  // begin, end
+  uint64_t waiting = queue ? (RC_LD(uint64_t, queue + 1) - RC_LD(uint64_t, queue)) / 8 : 0;
+  return now || waiting ? (waiting << 1 | (now != 0)) + 1 : 0;
+}
+
+// 1 while the steps have to wait for a package to be loaded. One that makes no progress for LOAD_STALL_S is taken
+// to be none of this mounting's, and the rest of the steps go on as they did before the loop waited.
+static int mount_loading(const uint8_t *self) {
+  if (g_mount.stalled) return 0;
+  uint64_t left = mount_left(self);
+  double t = elapsed_s();
+  if (left != g_mount.left) g_mount.left = left, g_mount.left_since = t;
+  if (!left) return 0;
+  if (t - g_mount.left_since < LOAD_STALL_S) return 1;
+  g_mount.stalled = 1;
+  rs_mods_logf("DLC: a package did not load in %.0f s, the mounting goes on without waiting", LOAD_STALL_S);
+  return 0;
+}
 
 // One install step. 1 when it took an archive: the step that finds the list empty clears the flag and installs
 // nothing.
 static int mount_step(uint8_t *self, uint64_t o) {
+  rs_mods_mounting(1);
   OV_GUEST(dlc_install_step, o);
+  rs_mods_mounting(0);
   if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) return 0;
-  if (rs_mods_cfg.log) g_mount.steps++;
+  g_mount.steps++;
   return 1;
 }
 
@@ -319,23 +359,28 @@ void RC_FN(dlc_update)(rc_ctx *c) {
   OV_ARGS_OF(dlc_update, a, c);
   uint8_t *self = OV_PTR(a, uint8_t);
   uint64_t o = (uint64_t)(uintptr_t)self;
-  if (rs_mods_cfg.log && !g_mount.steps) g_mount.t0 = elapsed_s();
+  int installing = *(volatile uint8_t *)(self + INSTALLING_FLAG);
+  if (installing && !g_mount.frames++) g_mount.t0 = elapsed_s();
   OV_GUEST(dlc_update_head, o);
   // --- the patched call (0x100a0d742) ---
-  rs_mods_mounting(1);
-  unsigned steps = g_mount.steps;
-  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+  if (!rs_mods_cfg.fixes || rs_mods_cfg.budget_s <= 0 || !installing) {
     mount_step(self, o);
   } else {
     COUNT(g_frames);
     double t0 = elapsed_s();
     do {
+      // The head again for the package of the step before, until it is loaded (a call or two each, as run). One
+      // that is not by the end of the budget is waited for in the next frame, without a step.
+      while (mount_loading(self) && elapsed_s() - t0 < rs_mods_cfg.budget_s) {
+        uint64_t left = mount_left(self);
+        OV_GUEST(dlc_update_head, o);
+        if (mount_left(self) == left) usleep(50);
+      }
+      if (mount_loading(self)) break;
       if (mount_step(self, o)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < rs_mods_cfg.budget_s);
   }
-  rs_mods_mounting(0);
-  if (g_mount.steps != steps) g_mount.frames++;
-  if (g_mount.steps && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+  if (installing && !*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
     rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames,
                  elapsed_s() - g_mount.t0);
     memset(&g_mount, 0, sizeof g_mount);

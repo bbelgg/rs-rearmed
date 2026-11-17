@@ -46,7 +46,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
   `learn-play/options.env` (not released) before anything reads a switch, and logs what it used at the top of
   `last-run.log`, as the Mac launcher does.
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
-  mounted. The Mac edition's loop needs no wait.
+  mounted. The Mac edition's loop waits the same way (not released), for its "Enumerating downloadable content..."
+  to stay until the songs are in; this edition's text already did.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.

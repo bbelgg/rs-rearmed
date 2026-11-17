@@ -244,10 +244,16 @@ with `RS_MODS_LOG=1`.
   down return:8 return:8 down return:15 fwddelete:6 return:25"` (the first key has to change the screen, hence
   Space and Esc). Not run: the switch off, and a game played after a skip.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log has `[rs-mods] DLC: N archives mounted in F frames,
-  T s` once the profile has loaded, which is the end of the mounting. A step that took an archive and mounted
-  nothing would lose its songs, so compare the song list of a start with the budget with one at
-  `RS_MODS_BUDGET_MS=0`, a step a frame as in the original: the search box of the song list says how many songs
-  there are. The two counts were the same with 147 archives in `dlc/`; not run with a library of thousands.
+  T s` once the profile has loaded, which is the end of the mounting: every archive's package is loaded by then,
+  and the menu's "Enumerating downloadable content..." goes with it. To see that nothing is left, count the
+  archives the game has open a few times a second from the start: `lsof -p PID | grep -c '/dlc/.*\.psarc'` is 0
+  by the time the line is in the log (147 archives: the line after 8 frames and 0.42 s, none open; before the
+  loop waited for the packages, the line after 0.40 s with 138 open, and the last closed 2.7 s later). A step
+  that took an archive and mounted nothing would lose its songs, so compare the song list of a start with the
+  budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original: the search box of the song list
+  says how many songs there are. The two counts were the same with 147 archives in `dlc/`, before the loop
+  waited for the packages; since then only a search has been compared with the earlier build's (`che`, 5 matches
+  in both). Not run with a library of thousands.
 - **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
   REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
   shows which one the launcher linked.

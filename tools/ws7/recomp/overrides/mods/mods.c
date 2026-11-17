@@ -80,6 +80,7 @@ static void *keys_thread(void *arg) {
 static int before_open_file(rc_ctx *c, void *user);
 static int before_autosave_warning(rc_ctx *c, void *user);
 static int before_is_cable(rc_ctx *c, void *user);
+static void after_game_frame(rc_ctx *c, void *user);
 
 // The launcher has set the environment by now, so the switches are read here (Learn & Play reads its
 // settings.env in main, and starts from there: lp_mods_init).
@@ -91,6 +92,8 @@ __attribute__((constructor)) static void mods_init(void) {
     rs_mods_logf("no Auto Save warning hook point");
   if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL))
     rs_mods_logf("no hook point for Player 2's input mode");
+  if (rc_hook_add_name("game_frame", NULL, after_game_frame, NULL))
+    rs_mods_logf("no frame hook point for the wheel fix");
   rs_menu_options_start();  // menu_options.c: RS Re-ARMed's options in Adv Display Settings
   if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
@@ -159,6 +162,52 @@ static void key_event(rc_ctx *c, uint32_t down) {
 }
 void RC_FN(key_down)(rc_ctx *c) { key_event(c, 1); }
 void RC_FN(key_up)(rc_ctx *c) { key_event(c, 0); }
+
+// ------------------------------------------------------------------------------------------------
+// Mouse wheel (the lists ignore it: F_101135940 is the mouse device's wheel setter). The setter stores
+// the delta only in the device's per-frame state vector (at +0x118: one 0x60-byte state each, the wheel
+// at +0x18), while the menus read the wheel at mouse +0x78 every frame (0x100b9509b, through the
+// input-action callback as "mouse kind 3"). The button setter next to it writes both places, which is
+// why clicks work and the wheel does not. The override does what the original does and adds the delta
+// to mouse +0x78; a game_frame hook clears the field after the frame, so the steps the shell's flush
+// posted move the lists once (one unit is one row; the shell posts one wheel event a step, as Learn &
+// Play's game takes them). input_sink still takes the wheel event, so a mod hooking it sees the wheel
+// on both editions. With RS_MODS_FIXES=0 the original's store alone, as before.
+// ------------------------------------------------------------------------------------------------
+static uint8_t *g_wheel_mouse;  // the device the last wheel event named, until the frame clears its field
+
+static void wheel_store_vec(uint8_t *mouse, int32_t delta) {
+  // The original's broadcast: every per-frame state's wheel field gets the delta.
+  uint64_t begin = RC_LD(uint64_t, mouse + RC_OFF(mouse_state_vec));
+  uint64_t end = RC_LD(uint64_t, mouse + RC_OFF(mouse_state_end));
+  uint64_t diff = end - begin;
+  if (!diff) return;
+  uint64_t n = diff / (uint64_t)RC_OFF(mouse_state_size);  // the element count
+  for (uint64_t i = 0; i < n; i++)
+    RC_ST(int64_t, begin + i * (uint64_t)RC_OFF(mouse_state_size) + (uint64_t)RC_OFF(mouse_state_wheel),
+          (int64_t)delta);
+}
+
+void RC_FN(mouse_wheel)(rc_ctx *c) {
+  OV_ARGS_OF(mouse_wheel, a, c);
+  uint8_t *mouse = OV_PTR(a, uint8_t);
+  int32_t delta = OV_I32(a);
+  if (mouse) wheel_store_vec(mouse, delta);
+  if (mouse && rs_mods_cfg.fixes) {
+    RC_ST(int32_t, mouse + RC_OFF(mouse_wheel_axis),
+          RC_LD(int32_t, mouse + RC_OFF(mouse_wheel_axis)) + delta);
+    g_wheel_mouse = mouse;
+  }
+  ov_ret_void(c);
+}
+
+static void after_game_frame(rc_ctx *c, void *user) {
+  (void)c;
+  (void)user;
+  if (!rs_mods_cfg.fixes || !g_wheel_mouse) return;
+  RC_ST(int32_t, g_wheel_mouse + RC_OFF(mouse_wheel_axis), 0);
+  g_wheel_mouse = NULL;
+}
 
 // ------------------------------------------------------------------------------------------------
 // Thread priority (rsmacfixes my_setschedparam): F_101313170 = the engine thread class's SetPriority(this,
@@ -693,6 +742,7 @@ const ov_entry ov_mods_entries[] = {
     {RC_ADDR(asset_loader_thread), "asset_loader_thread", RC_FN(asset_loader_thread)},
     {RC_ADDR(key_down), "key_down", RC_FN(key_down)},
     {RC_ADDR(key_up), "key_up", RC_FN(key_up)},
+    {RC_ADDR(mouse_wheel), "mouse_wheel", RC_FN(mouse_wheel)},
     {RC_ADDR(thread_set_priority), "thread_set_priority", RC_FN(thread_set_priority)},
     {RC_ADDR(sng_verify), "sng_verify", RC_FN(sng_verify)},
 };

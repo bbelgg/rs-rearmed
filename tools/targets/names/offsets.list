@@ -14,6 +14,11 @@ game_config_vsync     # config block: u32 vsync
 
 # mods (overrides/mods/mods.c)
 input_sink_full_char      # input_sink's frame (frame pointer relative): the full character
+mouse_wheel_axis          # mouse device: the wheel the menus read each frame (input_sink's setter never writes it)
+mouse_state_vec           # mouse device: the per-frame state vector the wheel setter writes (its begin)
+mouse_state_end           # mouse device: the per-frame state vector's end
+mouse_state_wheel         # a per-frame state: the wheel field the setter broadcasts
+mouse_state_size          # a per-frame state's size
 thread_priority_index     # engine thread: int32 priority index
 thread_pthread            # engine thread: pthread_t
 path_obj_refs             # interned path object: int refcount

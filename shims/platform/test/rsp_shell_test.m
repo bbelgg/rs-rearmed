@@ -328,6 +328,27 @@ static void run_tests(rsp_shell *sh) {
     CHECK(r[6].code == 6 && r[6].a == 1 && r[6].b == 1, "scroll up %d", r[6].a);
     CHECK(r[7].code == 6 && r[7].a == 0 && r[7].b == 1, "scroll down %d", r[7].a);
   }
+  // Trackpad (precise, pixel-unit) ticks, as Learn & Play takes them: pixels
+  // accumulate into scroll steps, one wheel event each (rsp_scroll_steps).
+  // 10 px posts nothing, 15 more makes one step up, then -50 px is two down.
+  base = atomic_load(&g_nrec);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, 10);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, 15);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, -50);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  got = collect(base, 3);
+  CHECK(got == 3, "trackpad scroll: %d events", got);
+  if (got == 3) {
+    rec *r = g_rec + base;
+    CHECK(r[0].code == 6 && r[0].a == 1 && r[0].b == 1, "trackpad step up %d", r[0].a);
+    CHECK(r[1].code == 6 && r[1].a == 0 && r[1].b == 1, "trackpad step down %d", r[1].a);
+    CHECK(r[2].code == 6 && r[2].a == 0 && r[2].b == 1, "trackpad step down 2 %d", r[2].a);
+  }
   CHECK(v->lastInputTime > 0, "input refreshes lastInputTime");
 
   // --- Cmd+Shift+F. Windowed from launch, CurrentSetting is still {fs 1, 0x0}

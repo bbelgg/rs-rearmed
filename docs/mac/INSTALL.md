@@ -521,7 +521,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | Switch | Default | What |
 |---|---|---|
 | `RS_MODS_BYPASS=0` | on | the CDLC signature skip, a rewrite of [RSBypass](https://github.com/aik002/RSBypass), off: custom songs are not listed |
-| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit, and the note detection's FFT setups kept between songs (without it the game leaves about 1 MB behind for each song) |
+| `RS_MODS_FIXES=0` | on | the [rs-mac-fixes](https://github.com/glebb/rs-mac-fixes) behaviours off: more keyboard keys, the End key in menus, faster loading with large libraries, higher priority for worker threads, a higher open-file limit, lists scrolling with the wheel and the trackpad, and the note detection's FFT setups kept between songs (without it the game leaves about 1 MB behind for each song) |
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |

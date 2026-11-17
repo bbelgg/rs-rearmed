@@ -30,6 +30,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
   than under Rosetta; every channel in the input list, input channel and gain, calibration that can boost.
 - **Output**: follows the system's default.
 - **Game Mode**: the app's category is music, so macOS leaves Game Mode off, which made a plug-in host crackle.
+- **Trackpad scrolling** (not in a release yet; checked in game runs 2026-11-24): lists scroll with
+  the trackpad, as on Learn & Play, and with a mouse wheel, which did nothing before. The shell posts one
+  wheel event a step (`rsp_scroll_step`), and a built-in fix gives the game's own wheel route the store it
+  misses (the mouse setter beside `key_down`), so both editions move the same number of rows for the same
+  swipe. The trackpad's steps accumulate `scrollingDeltaY` at 25 px a step, capped at 8 a single event with
+  the excess dropped, and a new gesture starts clean; a wheel notch is one step. The runs showed inertia that stops, the same movement with the pointer off the list, one
+  row a wheel notch, nothing moving in the Tone Designer or in a song, and the Guitarcade's lists scrolling.
 
 **Picture**
 

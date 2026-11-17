@@ -13,6 +13,11 @@ service_manager_state             0x20    # ServiceManager: u32 state (the Run l
 service_manager_quit              unsupported  Mac-only: the shell's request flag; here WM_QUIT goes straight to the manager's slot 21 (0x149edb6)
 game_config_vsync                 unsupported  not located: no code here reads the field as vsync; only the Mac shell needs it
 input_sink_full_char              unsupported  Mac-only: a slot of the Mac input_sink's frame
+mouse_wheel_axis                  unsupported  Mac-only: the wheel the Mac menus read; Learn & Play's device keeps its wheel at +0x64, filled from DirectInput
+mouse_state_vec                   unsupported  Mac-only: the Mac mouse device's per-frame state vector
+mouse_state_end                   unsupported  Mac-only: the Mac mouse device's per-frame state vector's end
+mouse_state_wheel                 unsupported  Mac-only: a Mac mouse state: the wheel field
+mouse_state_size                  unsupported  Mac-only: a Mac mouse state's size
 thread_priority_index             0x14    # engine thread: int32 priority index (read at the inlined sites, 0x106b4eb, 0x163cc0e)
 thread_pthread                    unsupported  Mac-only (pthread_t); the Windows thread handle is +0x20, read at the inlined sites of thread_set_priority
 path_obj_refs                     0x1c    # interned path object: int refcount

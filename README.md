@@ -92,6 +92,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ✅ the same renderer; the upscaled picture not checked |
 | A render scale, 50-100%, for less GPU work (the installer's Render scale, under Advanced) | ✅ | ✅ 50% is fine |
 | The picture switches in the game's own menu (OPTIONS → ADV DISPLAY SETTINGS) | ✅ | ❌ not yet |
+| Scrolling lists with the trackpad and the mouse wheel | ✅ | ✅ the same rows for the same swipe |
 | A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; ⚠️ full screen on such a screen | ✅ a window of any shape, full screen on a MacBook's screen; ⚠️ an ultrawide screen |
 | Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer; not compared with them off |
 | A performance overlay (Apple's Metal HUD) and low-latency presentation | ✅ | ⚠️ the same code, not yet tried |

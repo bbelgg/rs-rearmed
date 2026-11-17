@@ -243,6 +243,19 @@ int rsp_mouse_coord(double v);
 // -[OpenGLView scrollWheel:] 0x100185080: a = deltaY > 0; nothing if deltaY == 0
 // (as float). Returns 1 and sets *a if an event is posted.
 int rsp_scroll_event(double delta_y, int *a);
+// Not in the original: precise (trackpad) scrolling for scrollWheel:. A trackpad
+// reports its movement in scrollingDeltaY, in pixels, which Learn & Play's host
+// reads (lp_window.m) and this shell's line above does not. Accumulate pixels in
+// *accum and report whole scroll steps (the shell posts one wheel event each, and
+// Learn & Play's host one notch each): returns the step count, capped at
+// RSP_SCROLL_MAX_STEPS a call, sets *a (1 up, 0 down) when it is nonzero, and keeps
+// the sub-step remainder in *accum. A step is about a list row, so a swipe moves
+// the list by rows, not by ticks; the excess past the cap is dropped, so a swipe
+// cut short leaves nothing for the next one. Callers zero *accum when a gesture
+// begins (NSEventPhaseBegan).
+#define RSP_SCROLL_PIXELS_PER_STEP 25.0
+#define RSP_SCROLL_MAX_STEPS 8
+int rsp_scroll_steps(double scrolling_delta_y, double *accum, int *a);
 // -[MainController awakeFromNib] 0x100185760: aspect ratio from the engine width:
 // w16 = the first multiple of 16 >= w, ratio = w16 : (w16 * 9) / 16.
 void rsp_aspect_from_width(int w, int *ax, int *ay);

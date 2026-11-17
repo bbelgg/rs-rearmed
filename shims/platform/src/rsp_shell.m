@@ -43,6 +43,16 @@ static atomic_int rsp_quitting;
 static atomic_int rsp_boot_deferred;
 enum { RSP_SAFE_LOAD_MAX_SECONDS = 600 };
 
+// Not in the original: sub-step trackpad pixels carried between scrollWheel:
+// events (rsp_scroll_steps). One view per process, like rsp_g_mtl above.
+static double rsp_scroll_accum;
+
+// Not in the original: one scroll step, as the game's wheel route takes it. The
+// wheel event still goes in as the original posts it, and the built-in wheel fix
+// (the mouse device's setter in the mods) moves the lists from it, one row a
+// step, as Learn & Play's game does from its own wheel events.
+static void rsp_scroll_step(int a) { rsp_post_input(RSP_EV_SCROLL, a, 1); }
+
 // ===========================================================================
 @implementation AppDelegate
 @synthesize window;
@@ -599,8 +609,18 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 - (void)scrollWheel:(NSEvent *)e {  // 0x100185080
   if (!controller) return;
   lastInputTime = [controller renderTime];
+  if ([e hasPreciseScrollingDeltas]) {
+    // Not in the original: take the trackpad's movement from scrollingDeltaY,
+    // as Learn & Play's host does, in whole steps (rsp_scroll_steps). A new
+    // gesture starts clean: momentum cut short leaves nothing for the next one.
+    if ([e phase] == NSEventPhaseBegan) rsp_scroll_accum = 0;
+    int a = 0;
+    int steps = rsp_scroll_steps([e scrollingDeltaY], &rsp_scroll_accum, &a);
+    for (int i = 0; i < steps; i++) rsp_scroll_step(a);
+    return;
+  }
   int a;
-  if (rsp_scroll_event([e deltaY], &a)) rsp_post_input(RSP_EV_SCROLL, a, 1);
+  if (rsp_scroll_event([e deltaY], &a)) rsp_scroll_step(a);
 }
 
 - (void)startAnimation {  // 0x100185110

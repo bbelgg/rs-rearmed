@@ -448,6 +448,22 @@ static void test_logic(void) {
   CHECK(rsp_scroll_event(-3, &a) && a == 0, "down");
   CHECK(rsp_scroll_event(NAN, &a) && a == 0, "NaN posts 0");
 
+  double acc = 0;
+  a = -1;
+  CHECK(rsp_scroll_steps(12, &acc, &a) == 0 && acc == 12 && a == -1, "precise: sub-step carries, %g", acc);
+  CHECK(rsp_scroll_steps(13, &acc, &a) == 1 && a == 1 && acc == 0, "precise: two ticks make a step up");
+  CHECK(rsp_scroll_steps(-60, &acc, &a) == 2 && a == 0 && acc == -10, "precise: 60 px down is 2 steps, %g", acc);
+  CHECK(rsp_scroll_steps(4, &acc, &a) == 0 && acc == -6, "precise: reversing cancels the remainder, %g", acc);
+  CHECK(rsp_scroll_steps(NAN, &acc, &a) == 0 && acc == -6, "precise: NaN ignored, remainder kept");
+  CHECK(rsp_scroll_steps(131, &acc, &a) == 5 && a == 1 && acc == 0, "precise: 125 net px is 5 steps, %g", acc);
+  CHECK(rsp_scroll_steps(-1, &acc, &a) == 0 && acc == -1, "precise: a 1 px tick alone posts nothing yet");
+  double acc2 = 0;
+  CHECK(rsp_scroll_steps(10000, &acc2, &a) == RSP_SCROLL_MAX_STEPS && a == 1 && acc2 == 0,
+        "precise: a huge event is capped at %d, the excess dropped, %g", RSP_SCROLL_MAX_STEPS, acc2);
+  CHECK(rsp_scroll_steps(0, &acc2, &a) == 0 && acc2 == 0, "precise: nothing left for later events, %g", acc2);
+  CHECK(rsp_scroll_steps(-10000, &acc2, &a) == RSP_SCROLL_MAX_STEPS && a == 0 && acc2 == 0,
+        "precise: capped the other way too, %g", acc2);
+
   int ax, ay;
   rsp_aspect_from_width(1280, &ax, &ay);
   CHECK(ax == 1280 && ay == 720, "1280");

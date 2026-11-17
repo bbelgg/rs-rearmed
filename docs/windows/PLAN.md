@@ -21,7 +21,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   and 1.5 GB, about the CPU of the original under Rosetta and more than the Mac edition's 42-43% and 1.2 GB
   ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The title is up in about 7 s. Guest memory doesn't grow
   over songs in a row.
-- **Rocksmith 1 songs**: by the Mac edition's rule: the DLC pack's all show while the CDLC skip is on (not released),
+- **Rocksmith 1 songs**: by the Mac edition's rule: the DLC pack's all show while the CDLC skip is on (new in 1.17.0),
   and one was found by a search and played to the note highway.
 - **Two players**: a song with each player on their own input, as the Mac edition.
 
@@ -44,14 +44,14 @@ edition" is described there. What has not been tested is under [Open issues](#op
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))
 
 - **Switched off in the installer**: as the Mac edition; `lp_settings.c` reads `learn-play/settings.env` and
-  `learn-play/options.env` (not released) before anything reads a switch, and logs what it used at the top of
+  `learn-play/options.env` (new in 1.17.0) before anything reads a switch, and logs what it used at the top of
   `last-run.log`, as the Mac launcher does.
-- **Memory in a long session** (not released): the game no longer grows by about 5 MB a minute while a song
+- **Memory in a long session** (new in 1.17.0): the game no longer grows by about 5 MB a minute while a song
   plays. Present empties an autorelease pool of the game thread's each frame; before, the Metal backend's render
   encoders and replaced buffers stayed for the whole run ([PERFORMANCE.md](PERFORMANCE.md#a-long-run)).
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
   mounted. "Enumerating downloadable content..." stays until every song is in the lists, and a large library
-  mounts in half the time (not released), as in the Mac edition and from its source: the asset loader thread does
+  mounts in half the time (new in 1.17.0), as in the Mac edition and from its source: the asset loader thread does
   not pause 10 ms between files while archives are mounted, the flag is held for manifests still to come, and a
   step no longer asks every mounted archive for the shader cache's files. With 2,250 archives, 2,100 of them the
   Mac edition's through a mod, the text showed for 42 s and a search right after it found 1,494 of 1,977 matches;
@@ -64,7 +64,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
   and the start, the intro skip, the song ownership during a mount, Player 2's saved input and the frame rate fixes are
   the Mac's source (`overrides/mods/mods_shared.c`, `framerate.c`; DESIGN.md says what stays this port's own and why),
-  and so is what the batched DLC mounting does around its steps (not released).
+  and so is what the batched DLC mounting does around its steps (new in 1.17.0).
   For Player 2's saved input this game's `input_bind` is a hook point, the Mac's call with its second argument folded
   away, and the shared hook frees the name's text, which this port's own version left behind as the Mac's did.
 - **By name** (new in 1.16.0): `win32_overrides.c` names every function, global and field of the game through
@@ -76,7 +76,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 - **Installer**: the Mac edition's GUI installer, which has Steam download the pinned Windows build and the
   account's DLC.
-- **The installer updates itself** (not released): as the Mac edition, the same app.
+- **The installer updates itself** (new in 1.17.0): as the Mac edition, the same app.
 - **Where the game files are kept**: as the Mac edition, by the same code.
 - **The download code is shared with the Mac edition**: the Steam steps, the room check, the link to another disk,
   Steam's log and the wait are in `tools/play-native/gamefiles.py`, where the Mac game uses them when it isn't
@@ -145,7 +145,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 - **The published installer**: recent releases' hasn't been run, nor a full install from the tag; the install scripts
   and test installs were.
-- **The installer's update of itself** (not released): as the Mac edition
+- **The installer's update of itself** (new in 1.17.0): as the Mac edition
   ([Mac plan](../mac/PLAN.md#open-issues)).
 - **Game files**: the Game files choice and the move of the copy, by hand on this edition; a download from the real
   Steam since the download code moved into `gamefiles.py`.
@@ -182,13 +182,13 @@ edition" is described there. What has not been tested is under [Open issues](#op
   blocks matter. What the shared code got from the same review is in the [Mac plan](../mac/PLAN.md#open-issues).
 - **A long run** (thirty minutes of Nonstop Play, as the [Mac plan](../mac/PLAN.md#open-issues)'s;
   [PERFORMANCE.md](PERFORMANCE.md#a-long-run)): it found the leak of every release so far, 5 MB a minute in a song,
-  fixed (not released) and checked for ten minutes, not yet for thirty. Left: a song's start stops the picture for
+  fixed (new in 1.17.0) and checked for ten minutes, not yet for thirty. Left: a song's start stops the picture for
   2.2 s where the Mac edition's takes 0.8 s (most of this library is served by a mod as it is opened; not
   measured apart); four frames over 50 ms inside songs in half an hour, the longest 657 ms in the first song
   (the Mac edition had none); the guest window's memory rose 22 MB in 29 minutes over eight songs, which is the
   game's own heap and was not looked into; rearmed-mods logs 40 `game note` lines a second here, 2.7 MB of log
   in half an hour.
-- **The code review of 2026-11-17** (not released): as in the [Mac plan](../mac/PLAN.md#open-issues), which lists
+- **The code review of 2026-11-17** (new in 1.17.0): as in the [Mac plan](../mac/PLAN.md#open-issues), which lists
   what it left for both editions; its fixes passed the suites, and this game was relinked on them and run once
   to the note highway with the three mod libraries loaded (`150 archives mounted in 8 frames, 0.47 s, their songs
   in the lists 0.21 s later`, 1,490 of the 1,500 file questions alone, as before them), not played with a guitar.

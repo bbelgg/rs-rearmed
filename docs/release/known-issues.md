@@ -23,24 +23,27 @@ into the notes as it stands. -->
   of their own (the arithmetic has). Above 100 frames a second calibration's average covers less than the second it
   covers at 60 Hz. Settings and switches… in the installer turns them off (Calibration and the tuner the same at any
   frame rate), as does `RS_MODS_FRAME_RATE=0`.
-- Not tested yet with this release: the installer replacing itself on a copy that was downloaded with a browser (tried on test copies; if Update Now stops, the installer is as it was and its message offers the download page), the Mac game downloaded by Steam when it isn't installed there (checked with a
-  stand-in for Steam and with a download made earlier, not yet by a download through the installer; if it stops, install
-  the game in Steam and run the installer again, and please open an issue with the installer's log), moving the game
-  files back to the game's drive, the Game files choice in Learn & Play, a run of the installer app for Learn & Play,
-  a build from scratch, a mod serving files in the Mac edition on this code (Learn & Play's was played with 2250
-  archives), the Mac edition's tuner on a 7-string chart's low B and a seven-row chord diagram, full screen on a 16:10
-  or ultrawide screen in the Mac edition, an ultrawide screen in Learn & Play, full screen on a second display in
-  Learn & Play, the music category (Game Mode off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone
-  profile with the Auto Save skip, unplugging an interface while the game runs, a Guitarcade game played with a guitar
-  after Skip Tuner (the button and its warning were pressed in a run of each edition, and the game started), a whole
-  install that ends with the new lines about custom songs, ENUMERATE with new archives to mount, a step a frame
-  (`RS_MODS_BUDGET_MS=0`) with the new mounting, a large library of Learn & Play's own archives (its 2,250 were
-  mostly the Mac edition's, through a mod), an archive that brings a shader's hash file, Settings and switches… since
-  the two newest built-in mods and Learn & Play's Frame rate joined it, a game started with those in its files, the
-  fixes of the code review of 2026-11-17 beyond one run of each edition to the note highway (not played with a
-  guitar, and the installer app with them was not run), and in Multiplayer a cable with an interface, two
-  interfaces, the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is
-  found. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+- Not tested yet with this release: the installer replacing itself on a copy that was downloaded with a browser (tried
+  on test copies; if Update Now stops, the installer is as it was and its message offers the download page), the Mac
+  game downloaded by Steam when it isn't installed there (checked with a stand-in for Steam and with a download made
+  earlier, not yet by a download through the installer; if it stops, install the game in Steam and run the installer
+  again, and please open an issue with the installer's log), moving the game files back to the game's drive, the Game
+  files choice in Learn & Play, a run of the installer app for Learn & Play, a build from scratch, a mod serving files
+  in the Mac edition on this code (Learn & Play's was played with 2250 archives), the Mac edition's tuner on a
+  7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac edition,
+  an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game Mode
+  off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an
+  interface while the game runs, a Guitarcade game played with a guitar after Skip Tuner (the button and its warning
+  were pressed in a run of each edition, and the game started), a whole install that ends with the new lines about
+  custom songs, ENUMERATE with new archives to mount, a step a frame (`RS_MODS_BUDGET_MS=0`) with the new mounting, a
+  large library of Learn & Play's own archives (its 2,250 were mostly the Mac edition's, through a mod), an archive
+  that brings a shader's hash file, Settings and switches… since the two newest built-in mods and Learn & Play's Frame
+  rate joined it, a game started with those in its files, the fixes of the code review of 2026-11-17 beyond runs of
+  each edition to the note highway (not played with a guitar, and the installer app with them was not run), the two
+  memory fixes over a long session (each was run for ten minutes, where the growth had shown in thirty), the first
+  Rocksmith's DLC songs with custom songs switched off, and in Multiplayer a cable with an interface, two interfaces,
+  the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is found. The
+  stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**

@@ -18,7 +18,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)); 74.9 fps on 75 Hz.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played. The DLC pack's all show while the
-  CDLC skip is on (not released), and one was found by a search and played to the note highway; with the skip off,
+  CDLC skip is on (new in 1.17.0), and one was found by a search and played to the note highway; with the skip off,
   those the account owns, which needs a refresh with that account logged in to Steam.
 - **Two players**: a song with each player on their own input, SWAP CABLE ASSIGNMENT included.
 
@@ -41,18 +41,18 @@ What the edition does today. What has not been tested is under [Open issues](#op
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 
 - **Switched off in the installer**: **Settings and switches…** writes `settings.env` (the built-in mods
-  switched off) and `options.env` (every other switch) (not released), which the launcher reads at every start,
+  switched off) and `options.env` (every other switch) (new in 1.17.0), which the launcher reads at every start,
   so a change needs no reinstall ([INSTALL.md](INSTALL.md#settings-and-switches)).
 - **Batched DLC mounting** (new in 1.16.0): the log says what a mounting did (`RS_MODS_LOG=1`), in Learn & Play's
   words. This game's loop drops no archive: the fault Learn & Play's had was looked for here and not found
   ([TESTING.md](TESTING.md#unattended-runs)). "Enumerating downloadable content..." stays until every song is in
-  the lists, and a large library mounts several times faster (not released): the loop loads each archive's package
+  the lists, and a large library mounts several times faster (new in 1.17.0): the loop loads each archive's package
   before it opens the next, the asset loader thread does not pause 10 ms between files while archives are mounted,
   the flag is held for manifests still to come, and a step no longer asks every mounted archive for the shader
   cache's files. With 2,326 archives 1.16.0 showed the text for 24 s and went on loading for 33 s after it (a
   song list opened 3 s after the text had gone had 1,227 of 2,037 matches); now the text and the last song end together
   after 5 to 8 s, and 147 archives take half a second.
-- **FFT setups** (not released): the game made a vDSP FFT setup for each song and freed none, about 1 MB a song
+- **FFT setups** (new in 1.17.0): the game made a vDSP FFT setup for each song and freed none, about 1 MB a song
   for the whole run. One of each size is kept and handed out again (`RS_MODS_FIXES`). Checked for nine minutes over
   two songs, with a guitar not played.
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): what the game counts in frames is put right by the
@@ -63,7 +63,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   source that Learn & Play uses too (`shims/platform/include/rsp_fps.h`); this edition runs as before.
 - **Shared with Learn & Play** (new in 1.16.0): the switches, the log and the start of the built-in fixes, the intro
   skip, the song ownership during a mount, Player 2's saved input, the frame rate fixes, and what the batched DLC
-  mounting does around its steps (not released), are one source for both
+  mounting does around its steps (new in 1.17.0), are one source for both
   editions (`overrides/mods/mods_shared.c`, `framerate.c`), and Learn & Play's own fixes name the game through the
   tables as these do. One thing changes for this edition's player: the shared hook for Player 2's saved input frees
   the name's text when the game had to allocate it (a name longer than about 15 characters), which this edition's own
@@ -72,7 +72,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 **Installer and game files**
 
 - **Installer**: the GUI installer decrypts the game statically (no Rosetta, no launch of the game).
-- **The installer updates itself** (not released): a newer release is offered at the installer's start, and Update
+- **The installer updates itself** (new in 1.17.0): a newer release is offered at the installer's start, and Update
   Now replaces the installer with that release's once its signature checks out
   ([DESIGN.md](DESIGN.md#installer-and-build)). The game is rebuilt only when the user clicks Build & Install.
 - **Where the game files are kept**: for a game on another drive the installer's Game files choice keeps the copy on
@@ -128,7 +128,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 - **The published installer**: recent releases' hasn't been run, nor a full install from the tag (the last was
   1.6.0's); the install scripts and test installs were.
-- **The installer's update of itself** (not released): run on test copies with made-up releases, in the window too.
+- **The installer's update of itself** (new in 1.17.0): run on test copies with made-up releases, in the window too.
   Not yet on a copy macOS approved at its first start (it may run from a read-only place, or be guarded against
   being replaced; both end at the release's page), nor against a real release, which needs the first one that is
   signed ([TESTING.md](TESTING.md#installer-tests)).
@@ -167,7 +167,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   which the raised open-file limit is for; and rearmed-mods writes a `game note` line for every note to the log,
   2 a second here and 40 a second in Learn & Play. Not run: longer than half an hour, a guitar, Song Stems
   making stems for new songs (the helper's CPU stayed at 1% of a core).
-- **The code review of 2026-11-17** (everything since the one before; not released): its fixes passed the suites,
+- **The code review of 2026-11-17** (everything since the one before; new in 1.17.0): its fixes passed the suites,
   and each edition was built on them and run once to the note highway with rearmed-mods, RS Companion and
   songbridge loaded (this one: `147 archives mounted in 6 frames, 0.32 s, their songs in the lists 0.10 s later`,
   1,460 of the 1,470 file questions alone, as before them). Not played with a guitar; the installer app with its

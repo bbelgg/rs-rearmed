@@ -174,7 +174,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   uses again): four songs played with a guitar since, in Learn a Song, with no fault; no long session, where the reused
   blocks matter. What the shared code got from the same review is in the [Mac plan](../mac/PLAN.md#open-issues).
 - **The code review of 2026-11-17** (not released): as in the [Mac plan](../mac/PLAN.md#open-issues), which lists
-  what it left for both editions; its fixes passed the suites and were not built into this game or played. This
+  what it left for both editions; its fixes passed the suites, and this game was relinked on them and run once
+  to the note highway with the three mod libraries loaded (`150 archives mounted in 8 frames, 0.47 s, their songs
+  in the lists 0.21 s later`, 1,490 of the 1,500 file questions alone, as before them), not played with a guitar.
+  The changed translator makes the same code for this game, file for file. This
   edition's own: a provider's close now runs outside the handle table's lock, a provider is not asked about a file
   opened for writing, Learn & Play's audio suite links again (it had not since 1.14.0, and no release's checks
   selected it), and the translation is made again when the edits or mid points change. A build by hand with

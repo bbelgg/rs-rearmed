@@ -37,8 +37,8 @@ into the notes as it stands. -->
   (`RS_MODS_BUDGET_MS=0`) with the new mounting, a large library of Learn & Play's own archives (its 2,250 were
   mostly the Mac edition's, through a mod), an archive that brings a shader's hash file, Settings and switches… since
   the two newest built-in mods and Learn & Play's Frame rate joined it, a game started with those in its files, the
-  fixes of the code review of 2026-11-17 in a game (the suites ran; neither edition was built or played on them), and
-  in Multiplayer a cable with an interface, two
+  fixes of the code review of 2026-11-17 beyond one run of each edition to the note highway (not played with a
+  guitar, and the installer app with them was not run), and in Multiplayer a cable with an interface, two
   interfaces, the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is
   found. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.

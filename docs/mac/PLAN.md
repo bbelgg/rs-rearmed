@@ -150,8 +150,12 @@ What the edition does today. What has not been tested is under [Open issues](#op
   song manifest, 2 to 3 ms an archive on the game's thread, and each file opened asks the archives mounted before it.
 - **The fixes from the code review of 2026-11-09**: six songs played with a guitar since, with no fault; no long
   session.
-- **The code review of 2026-11-17** (everything since the one before; not released): its fixes passed the suites
-  and were not built into a game or played, in either edition. What it found and left:
+- **The code review of 2026-11-17** (everything since the one before; not released): its fixes passed the suites,
+  and each edition was built on them and run once to the note highway with rearmed-mods, RS Companion and
+  songbridge loaded (this one: `147 archives mounted in 6 frames, 0.32 s, their songs in the lists 0.10 s later`,
+  1,460 of the 1,470 file questions alone, as before them). Not played with a guitar; the installer app with its
+  fixes was type-checked and not run, and no copy was moved or downloaded with the real Steam. What it found and
+  left:
   - The frame rate fixes' hooks have no test of their own (their arithmetic has), and three of their points return
     from a function at its start when a 60 Hz game would not have made the call: what else those functions do each
     call, and what a tuner's miss past the third takes off its hold, has not been read in the game.

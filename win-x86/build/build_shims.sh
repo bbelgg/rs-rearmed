@@ -16,6 +16,7 @@ shims=$root/win-x86/shims
 obj=${OBJ_DIR:?set OBJ_DIR}
 gl_inc=${LP_GL_INC:-$root/shims/opengl/src}
 mkdir -p "$obj/shims"
+obj=$(cd "$obj" && pwd)  # the Steam face is made by make -C: a relative folder would be another one there
 # the game's names for the built-in fixes (win32_overrides.c, through runtime/rc_abi.h): rc_target_names.h
 tgt=${RC_TARGET_DIR:-$obj/target}
 [ -n "${RC_TARGET_DIR:-}" ] || "${LP_PY:-python3}" -I "$root/tools/targets/targets.py" gen --target win-x86 "$tgt" >/dev/null

@@ -500,6 +500,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
 | `RS_WINDOW_ANY_SHAPE=0` | on | a window keeps 16:9, as in the original ([Window modes](#window-modes)) |
+| `RS_SCROLL_ARROWS=0` | on | each scroll step presses the arrow keys the lists answer; off: the wheel events only |
 | `RS_FPS=N` | the display's rate | a fixed frame rate, with vsync off |
 | `RS_GL_MTENGINE=1` | off | Apple's multithreaded GL engine (OpenGL only) |
 | `RS_AUDIO_FRAMES=N` | 256 | the output device's buffer, in frames; 0 leaves the device's ([Audio latency](#audio-latency)) |

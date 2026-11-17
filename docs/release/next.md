@@ -10,3 +10,5 @@ notes and empties this file. -->
   and the rest under Advanced. The page starts at what the installed app has, imports the other edition's, and
   Reset to Defaults returns everything to the defaults; a change still takes effect at the next start with no reinstall.
   Skip Tuner in the Guitarcade and the frame rate fixes of 1.16.0 are among the built-in mods there.
+
+- **Scrolling lists with the trackpad.** Lists scroll with the trackpad, as on Learn & Play — and with a mouse wheel, which did nothing before either. Each step presses the arrow keys the lists answer; `RS_SCROLL_ARROWS=0` posts wheel events only. (Mac only.)

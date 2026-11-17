@@ -30,6 +30,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   through Direct Connect; every channel in the input list, input channel and gain, calibration that can boost.
 - **Output**: follows the system's default.
 - **Game Mode**: the app's category is music, as the Mac edition.
+- **Trackpad scrolling**: lists scroll with a trackpad here, and always have. The Mac edition now scrolls too.
 
 **Picture**
 

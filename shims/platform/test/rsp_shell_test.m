@@ -311,9 +311,9 @@ static void run_tests(rsp_shell *sh) {
   ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, -2);
   [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
   CFRelease(ce);
-  got = collect(base, 8);
-  CHECK(got == 8, "mouse: %d events", got);
-  if (got == 8) {
+  got = collect(base, 12);
+  CHECK(got == 12, "mouse: %d events", got);
+  if (got == 12) {
     rec *r = g_rec + base;
     CHECK(r[0].code == 5 && r[0].a == 0, "left down");
     CHECK(r[1].code == 4 && r[1].a == 0, "left up");
@@ -322,8 +322,43 @@ static void run_tests(rsp_shell *sh) {
     CHECK(r[4].code == 3 && r[4].a == 100 && r[4].b == 201, "move %d,%d", r[4].a, r[4].b);
     CHECK(r[5].code == 3 && r[5].a == -3 && r[5].b == 720, "drag %d,%d", r[5].a, r[5].b);
     CHECK(r[6].code == 6 && r[6].a == 1 && r[6].b == 1, "scroll up %d", r[6].a);
-    CHECK(r[7].code == 6 && r[7].a == 0 && r[7].b == 1, "scroll down %d", r[7].a);
+    CHECK(r[7].code == 1 && r[7].a == 126 && r[7].b == 0xF700, "scroll up presses Up");
+    CHECK(r[8].code == 2 && r[8].a == 126, "scroll up releases Up");
+    CHECK(r[9].code == 6 && r[9].a == 0 && r[9].b == 1, "scroll down %d", r[9].a);
+    CHECK(r[10].code == 1 && r[10].a == 125 && r[10].b == 0xF701, "scroll down presses Down");
+    CHECK(r[11].code == 2 && r[11].a == 125, "scroll down releases Down");
   }
+  // Trackpad (precise, pixel-unit) ticks, as Learn & Play takes them: pixels
+  // accumulate into scroll steps, each a wheel event and an arrow press.
+  // 10 px posts nothing, 15 more makes one step up, then -50 px is two down.
+  base = atomic_load(&g_nrec);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, 10);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, 15);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitPixel, 1, -50);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  got = collect(base, 9);
+  CHECK(got == 9, "trackpad scroll: %d events", got);
+  if (got == 9) {
+    rec *r = g_rec + base;
+    CHECK(r[0].code == 6 && r[0].a == 1 && r[0].b == 1, "trackpad step up %d", r[0].a);
+    CHECK(r[1].code == 1 && r[1].a == 126 && r[1].b == 0xF700, "trackpad up presses Up");
+    CHECK(r[3].code == 6 && r[3].a == 0 && r[3].b == 1, "trackpad step down %d", r[3].a);
+    CHECK(r[4].code == 1 && r[4].a == 125 && r[4].b == 0xF701, "trackpad down presses Down");
+    CHECK(r[6].code == 6 && r[6].a == 0 && r[6].b == 1, "trackpad step down 2 %d", r[6].a);
+  }
+  // RS_SCROLL_ARROWS=0: the wheel event only, no arrow press.
+  setenv("RS_SCROLL_ARROWS", "0", 1);
+  base = atomic_load(&g_nrec);
+  ce = CGEventCreateScrollWheelEvent(NULL, kCGScrollEventUnitLine, 1, 3);
+  [v scrollWheel:[NSEvent eventWithCGEvent:ce]];
+  CFRelease(ce);
+  CHECK(collect(base, 3) == 1 && g_rec[base].code == 6, "scroll arrows off: wheel only");
+  unsetenv("RS_SCROLL_ARROWS");
   CHECK(v->lastInputTime > 0, "input refreshes lastInputTime");
 
   // --- Cmd+Shift+F. Windowed from launch, CurrentSetting is still {fs 1, 0x0}

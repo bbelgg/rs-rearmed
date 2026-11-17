@@ -2316,6 +2316,8 @@ let optionSpecs: [OptionSpec] = [
                kind: .text(check: intRange(1, 1000), hint: "60"), editions: "both", group: "Picture", advanced: false),
     OptionSpec(key: "RS_WINDOW_ANY_SHAPE", title: "Window takes any shape", detail: "Off: 16:9 with bars, as on Windows.",
                kind: .toggle(defaultOn: true), editions: "both", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_SCROLL_ARROWS", title: "Trackpad scrolling", detail: "Lists scroll with the trackpad and wheel. Off: wheel events only, as in the original.",
+               kind: .toggle(defaultOn: true), editions: "mac", group: "Picture", advanced: true),
     OptionSpec(key: "RS_GL_MTENGINE", title: "Multithreaded GL engine", detail: "OpenGL only, off by default. On: Apple's multithreaded engine.",
                kind: .toggle(defaultOn: false), editions: "mac", group: "Picture", advanced: true),
     OptionSpec(key: "RS_METAL_RETINA", title: "Full Retina resolution", detail: "Renders every pixel, about 4x the GPU work. Off: scaled up with MetalFX.",

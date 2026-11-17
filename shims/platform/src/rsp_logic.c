@@ -35,6 +35,25 @@ int rsp_scroll_event(double dy, int *a) {
   return 1;
 }
 
+int rsp_scroll_steps(double dy, double *accum, int *a) {
+  if (!accum || !isfinite(dy)) return 0;
+  double total = *accum + dy;
+  if (!isfinite(total)) {
+    *accum = 0;
+    return 0;
+  }
+  if (total > 10000.0) total = 10000.0;
+  if (total < -10000.0) total = -10000.0;
+  int steps = (int)(total / RSP_SCROLL_PIXELS_PER_STEP);  // truncates toward zero
+  if (!steps) {
+    *accum = total;
+    return 0;
+  }
+  *a = steps > 0;
+  *accum = total - steps * RSP_SCROLL_PIXELS_PER_STEP;
+  return steps > 0 ? steps : -steps;
+}
+
 void rsp_aspect_from_width(int w, int *ax, int *ay) {
   int v = w;
   while (v & 0xf) v++;

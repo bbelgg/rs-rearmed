@@ -27,6 +27,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
   than under Rosetta; every channel in the input list, input channel and gain, calibration that can boost.
 - **Output**: follows the system's default.
 - **Game Mode**: the app's category is music, so macOS leaves Game Mode off, which made a plug-in host crackle.
+- **Trackpad scrolling** (not in a release yet; checked in a game run 2026-11-09): lists scroll with the
+  trackpad, as on Learn & Play. Each scroll step presses the arrow key the lists answer (`rsp_scroll_step`;
+  `RS_SCROLL_ARROWS=0` posts wheel events only). The trackpad's steps accumulate `scrollingDeltaY` at 25 px
+  a step; a wheel notch is one step.
 
 **Picture**
 

@@ -43,6 +43,28 @@ static atomic_int rsp_quitting;
 static atomic_int rsp_boot_deferred;
 enum { RSP_SAFE_LOAD_MAX_SECONDS = 600 };
 
+// Not in the original: sub-step trackpad pixels carried between scrollWheel:
+// events (rsp_scroll_steps). One view per process, like rsp_g_mtl above.
+static double rsp_scroll_accum;
+
+// Not in the original: one scroll step, as the game can use it. The wheel event
+// still goes in as the original posts it, but the Mac game's lists ignore wheel
+// events (they reach input_sink and nothing moves; a mouse wheel does no
+// better), where Learn & Play's lists scroll. The list does answer the arrow
+// keys, so a step also presses one unless RS_SCROLL_ARROWS=0: Up (key code 126,
+// char 0xF700) or Down (125, 0xF701), posted as keyDown:/keyUp: post a real
+// press. Learn & Play needs no switch: its game scrolls from the wheel events.
+static int rsp_scroll_arrows(void) {
+  const char *e = getenv("RS_SCROLL_ARROWS");
+  return !(e && *e && strchr("0nNfF", e[0]));
+}
+static void rsp_scroll_step(int a) {
+  rsp_post_input(RSP_EV_SCROLL, a, 1);
+  if (!rsp_scroll_arrows()) return;
+  rsp_post_input(RSP_EV_KEYDOWN, a ? 126 : 125, a ? 0xF700 : 0xF701);
+  rsp_post_input(RSP_EV_KEYUP, a ? 126 : 125, a ? 0xF700 : 0xF701);
+}
+
 // ===========================================================================
 @implementation AppDelegate
 @synthesize window;
@@ -599,8 +621,16 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 - (void)scrollWheel:(NSEvent *)e {  // 0x100185080
   if (!controller) return;
   lastInputTime = [controller renderTime];
+  if ([e hasPreciseScrollingDeltas]) {
+    // Not in the original: take the trackpad's movement from scrollingDeltaY,
+    // as Learn & Play's host does, in whole steps (rsp_scroll_steps).
+    int a = 0;
+    int steps = rsp_scroll_steps([e scrollingDeltaY], &rsp_scroll_accum, &a);
+    for (int i = 0; i < steps; i++) rsp_scroll_step(a);
+    return;
+  }
   int a;
-  if (rsp_scroll_event([e deltaY], &a)) rsp_post_input(RSP_EV_SCROLL, a, 1);
+  if (rsp_scroll_event([e deltaY], &a)) rsp_scroll_step(a);
 }
 
 - (void)startAnimation {  // 0x100185110

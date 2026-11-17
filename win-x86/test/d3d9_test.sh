@@ -25,7 +25,7 @@ $CC $INC -o "$out/d3d9_test" \
     "$root/win-x86/shims/win32_frame.c" \
     "$root/win-x86/shims/win32_guestobj.c" \
     "$root/tools/ws7/recomp/runtime/rc32_mem.c" \
-    -L"$gl" -lRSOpenGL
+    -L"$gl" -lRSOpenGL -lobjc  # (objc: Present turns the thread's autorelease pool each frame)
 # libRSOpenGL's install name is @executable_path/libRSOpenGL.dylib
 cp "$gl/libRSOpenGL.dylib" "$out/"
 for be in metal gl; do

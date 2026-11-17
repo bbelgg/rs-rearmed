@@ -175,6 +175,26 @@ run) the CPU was what it was full screen, 63.4% of a core against 62.6-63.2 then
 CPU does not follow the size of the picture. The first play without shaders prepared is in
 [Shader preparation](#shader-preparation).
 
+## A long run
+
+Thirty minutes of Nonstop Play, unattended, as the Mac edition's ([Mac](../mac/PERFORMANCE.md#a-long-run) has the
+two side by side): bass arrangements here, a library of 2,250 archives of which 2,100 are the Mac edition's
+through a mod. Eight songs, one run.
+
+The run found a leak this edition has had since its first release: the footprint rose 4.4 to 5.8 MB a minute for
+as long as a song played, 1.37 GB to 1.60 GB in half an hour. The game's thread, which presents the frames, had no
+autorelease pool that was ever emptied, and the Metal backend autoreleases on it all through a frame: two render
+encoders a frame from the pass a change of render target begins with a clear pending (37,000 more of them alive
+after five minutes), and every buffer's old storage, which kept GPU memory too (+60 MB). Present now turns a pool
+of the thread's own each frame (`d3d9_dev_present`). With it, ten minutes of the same run: the heap +0.4 MB and
++223 blocks in nine minutes where it gained 39,000 blocks in five, five or six encoders alive, GPU memory level,
+the footprint 1.42 to 1.45 GB. A thirty-minute run with the fix has not been made.
+
+The rest was level: CPU 46 to 53% of a core, 58.7 to 59.5 frames a second, 41 to 43 threads, no swap. Each song
+played leaves its archive open (19 song archives at the start, 36 at the end), as in the Mac edition. Four frames
+inside a song were over 50 ms (657, 145, 72 and 51 ms), and a song's start stops the picture for 2.2 s where the
+Mac edition's takes 0.8 s ([PLAN.md](PLAN.md#open-issues)).
+
 ## Toward the Mac edition
 
 On the same song, screen and settings this edition takes 52.0-53.6% of a core where the Mac edition takes 41.7-43.1%, and
@@ -302,4 +322,5 @@ LP_INPUT_SCRIPT='@callback 1101,3:24,10:24,20:24,32:24,44:24,62:75,68:24' \
 
 `ft.txt`: lines `F <t0 ns> <duration ns> ...`, one per Present; the frame interval is the difference of consecutive `t0`.
 `log.txt`: `lp: thread cpu (10 s): [name %] ... total %` every 10 seconds. Compare one variable at a time, alternate the
-builds, and repeat each at least twice.
+builds, and repeat each at least twice. A long run: `tools/perf/soak.py CONFIG OUT lp 30 bass`, then
+`tools/perf/soak_report.py OUT/lp`.

@@ -220,6 +220,28 @@ took:
 A player's first run may differ: it depends on what is drawn first. Learn & Play's first play, with and without its
 warm-up: [its Shader preparation](../windows/PERFORMANCE.md#shader-preparation).
 
+## A long run
+
+Thirty minutes of Nonstop Play, unattended (`tools/perf/soak.py`; [TESTING.md](TESTING.md#long-runs)): all songs
+of a 2,326-archive library, any tuning, shuffled, lead, rhythm and alternate arrangements, Direct Connect with no
+guitar played, every tuner skipped; the three mod libraries loaded, Song Stems on. Eight songs, one run, on the
+code after 1.16.0.
+
+| | This edition | Learn & Play (bass; the same library through a mod) |
+|---|---|---|
+| Footprint | 1.76 to 1.98 GB, lower at the end than at 10 minutes (-2.2 MB a minute over the run) | 1.37 GB rising to 1.60 GB, 4.4 to 5.8 MB a minute; with its fix ([Windows](../windows/PERFORMANCE.md#a-long-run)) level, 1.42 to 1.45 GB over ten minutes |
+| The heap (malloc) | +3.2 MB, +7,564 blocks in 29 minutes | +68.5 MB, +233,000 blocks; with the fix +0.4 MB, +223 blocks in 9 minutes |
+| GPU memory | level (220 MB at 1 minute, 207 MB at 30) | +60 MB; with the fix level |
+| Leaked blocks (`leaks`) | 2.2 MB at 1 minute, 9.1 MB at 30: the game's own, below | none of the host's |
+| CPU, of a core | 49.0 to 51.6% by five minutes, level | 46.0 to 52.8%, level |
+| Frames | 59.5 to 59.8 a second; none over 50 ms inside a song; 0.8 s at each song's start | 58.7 to 59.5; four over 50 ms inside a song (657, 145, 72 and 51 ms); 2.2 s at each song's start |
+| Threads, swap | 48 to 54, none | 41 to 43, none |
+| Open files | 93 rising to 121: each song played leaves its archive open, as the game mounts it (17 song archives open at the start, 42 at the end) | 73 to 91 (19 to 36) |
+
+What grows in this edition is the game's own: each song makes FFT setups (`vDSP_create_fftsetup`, called from the
+game's code at 0x10010b180 and 0x10010bb70, about 0.6 MB each) and never frees them, about 1 MB a song, as the
+original does with the same calls. A hundred songs are a hundred MB. Not fixed ([PLAN.md](PLAN.md#open-issues)).
+
 ## Learn & Play's route
 
 The route of [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition) run on this edition (2026-11-06,
@@ -316,4 +338,5 @@ tools/perf/profile.py OUT/mac-trace/game.trace [--under NAME]
 `CONFIG` names test installs of your own (`tools/perf/example.json`); what a run pins and checks is in
 [TESTING.md](TESTING.md#measured-runs). The GPU's time by pass: `RS_METAL_PASS_TIMES=FILE`. The
 GPU's work with the frame rate free: `"RS_FPS": "300"` in `CONFIG`'s `env`, one run at a time on a cool Mac. Compare one
-variable at a time, alternate the builds, and repeat each.
+variable at a time, alternate the builds, and repeat each. A long run: `tools/perf/soak.py CONFIG OUT mac 30 guitar`,
+then `tools/perf/soak_report.py OUT/mac`.

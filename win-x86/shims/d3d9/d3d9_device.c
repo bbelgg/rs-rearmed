@@ -958,6 +958,19 @@ __attribute__((weak)) void w32_input_frame(void) {}
 __attribute__((weak)) int rsp_overlay_active(void) { return 0; }
 __attribute__((weak)) void rsp_overlay_run(int width, int height) { (void)width; (void)height; }
 
+// The frame's autoreleased objects end with the frame. The thread that presents is the game's own, with no run
+// loop that drains a pool, and the Metal backend autoreleases on it all through a frame (a pass begun outside a
+// draw, as when the render target changes with a clear pending, a buffer's old storage, an attachment's texture):
+// left to the thread's own pool they stay for the whole run, two render encoders a frame and every buffer that
+// was replaced, 5 MB a minute in a song. So the thread has a pool of its own from one present to the next.
+extern void *objc_autoreleasePoolPush(void);
+extern void objc_autoreleasePoolPop(void *pool);
+static _Thread_local void *t_frame_pool;
+static void frame_pool_turn(void) {
+    if (t_frame_pool) objc_autoreleasePoolPop(t_frame_pool);
+    t_frame_pool = objc_autoreleasePoolPush();
+}
+
 uint32_t d3d9_dev_present(d3d9_device *d) {
     w32_input_frame();
     d3d9_ft_mark_t ft = d3d9_ft_mark();
@@ -977,6 +990,7 @@ uint32_t d3d9_dev_present(d3d9_device *d) {
     d3d9_dev_unlock(d);
     if (t0) lp_frame_event(LPF_PRESENT, lp_frame_now() - t0, 0);
     if (ft) ft('F', ft0, mach_absolute_time(), 0, 0);
+    frame_pool_turn();
     d3d9_present_wait();
     return D3D_OK;
 }

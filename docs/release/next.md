@@ -25,6 +25,11 @@ notes and empties this file. -->
   together after 20 s. An ENUMERATE pressed while the text is still up for the last songs mounts its archives
   right away. With `RS_MODS_LOG=1` the log's `DLC:` line says when the songs were in the lists, and a second one
   how many of the steps' file questions were asked of the step's archive alone.
+- **Learn & Play no longer grows by 5 MB a minute while a song plays.** Every release of Learn & Play so far
+  kept the Metal objects of each frame for the whole run: half an hour of songs added about 200 MB, three hours
+  more than a gigabyte, with GPU memory rising beside it. Each frame's are freed with the frame now. The Mac
+  edition did not have it. Found by a thirty-minute unattended run of Nonstop Play in both editions, which
+  `tools/perf/soak.py` now makes.
 - **New names for mods, in both editions.** Four mid points of the DLC mounting: `manifest_request` and
   `manifest_response` (a mounted archive's song manifest asked for, and answered), `fs_mount` (an archive joins
   the game's file system) and `fs_exists` (the game asks its file system for a file; a hook may answer in its

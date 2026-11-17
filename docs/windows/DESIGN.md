@@ -173,7 +173,9 @@ The frames follow the display's refresh rate: the layer holds each present for a
 rate, as in the Mac edition, and with the Mac's rule and clock (`shims/platform/include/rsp_fps.h`):
 `lp_window.m` takes the layer's vsync off and gives the D3D9 layer a period of 1/N s, which Present keeps to
 whether the window shows or not. The Mac's render thread waits before a frame; here the game's own thread makes
-the frames, so the wait is at the end of Present.
+the frames, so the wait is at the end of Present. Present also turns an autorelease pool of the thread's own each
+frame: the game's thread has no run loop to empty one, and what the Metal backend autoreleases on it during a frame
+(render encoders, a buffer's old storage) would otherwise stay for the whole run.
 
 ## Renderer
 

@@ -45,6 +45,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Switched off in the installer**: as the Mac edition; `lp_settings.c` reads `learn-play/settings.env` and
   `learn-play/options.env` (not released) before anything reads a switch, and logs what it used at the top of
   `last-run.log`, as the Mac launcher does.
+- **Memory in a long session** (not released): the game no longer grows by about 5 MB a minute while a song
+  plays. Present empties an autorelease pool of the game thread's each frame; before, the Metal backend's render
+  encoders and replaced buffers stayed for the whole run ([PERFORMANCE.md](PERFORMANCE.md#a-long-run)).
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
   mounted. "Enumerating downloadable content..." stays until every song is in the lists, and a large library
   mounts in half the time (not released), as in the Mac edition and from its source: the asset loader thread does
@@ -173,6 +176,14 @@ edition" is described there. What has not been tested is under [Open issues](#op
   a guest path that starts with `/` is a host path only inside the game's own folders, and `HeapAlloc` clears a block it
   uses again): four songs played with a guitar since, in Learn a Song, with no fault; no long session, where the reused
   blocks matter. What the shared code got from the same review is in the [Mac plan](../mac/PLAN.md#open-issues).
+- **A long run** (thirty minutes of Nonstop Play, as the [Mac plan](../mac/PLAN.md#open-issues)'s;
+  [PERFORMANCE.md](PERFORMANCE.md#a-long-run)): it found the leak of every release so far, 5 MB a minute in a song,
+  fixed (not released) and checked for ten minutes, not yet for thirty. Left: a song's start stops the picture for
+  2.2 s where the Mac edition's takes 0.8 s (most of this library is served by a mod as it is opened; not
+  measured apart); four frames over 50 ms inside songs in half an hour, the longest 657 ms in the first song
+  (the Mac edition had none); the guest window's memory rose 22 MB in 29 minutes over eight songs, which is the
+  game's own heap and was not looked into; rearmed-mods logs 40 `game note` lines a second here, 2.7 MB of log
+  in half an hour.
 - **The code review of 2026-11-17** (not released): as in the [Mac plan](../mac/PLAN.md#open-issues), which lists
   what it left for both editions; its fixes passed the suites, and this game was relinked on them and run once
   to the note highway with the three mod libraries loaded (`150 archives mounted in 8 frames, 0.47 s, their songs

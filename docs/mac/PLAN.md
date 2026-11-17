@@ -150,6 +150,14 @@ What the edition does today. What has not been tested is under [Open issues](#op
   song manifest, 2 to 3 ms an archive on the game's thread, and each file opened asks the archives mounted before it.
 - **The fixes from the code review of 2026-11-09**: six songs played with a guitar since, with no fault; no long
   session.
+- **A long run** (`tools/perf/soak.py`, thirty minutes of Nonstop Play on a 2,326-archive library;
+  [PERFORMANCE.md](PERFORMANCE.md#a-long-run)): memory, CPU, frames and threads stayed level. What it showed and
+  is left: the game's own FFT setups, about 1 MB a song that is never freed (the game calls
+  `vDSP_create_fftsetup` for each song and keeps none: a thunk that hands the same setup out again for the same
+  size would end it); each played song's archive stays open, as the game mounts it, 25 more after eight songs,
+  which the raised open-file limit is for; and rearmed-mods writes a `game note` line for every note to the log,
+  2 a second here and 40 a second in Learn & Play. Not run: longer than half an hour, a guitar, Song Stems
+  making stems for new songs (the helper's CPU stayed at 1% of a core).
 - **The code review of 2026-11-17** (everything since the one before; not released): its fixes passed the suites,
   and each edition was built on them and run once to the note highway with rearmed-mods, RS Companion and
   songbridge loaded (this one: `147 archives mounted in 6 frames, 0.32 s, their songs in the lists 0.10 s later`,

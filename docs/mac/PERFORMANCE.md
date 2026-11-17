@@ -200,7 +200,7 @@ have replaced its song figures but for the frame rate on that display: both edit
 |---|---|---|
 | Title up, warm shader cache (two runs each) | 7.4, 7.8 s | 6.9, 7.3 s |
 | Title takes keys, Return every 1.5 s, frames 1 s apart | by 11.5-11.9 s | by 10.0-10.4 s |
-| Mounting the archives | 147 archives in 0.46 s and their songs in the lists 0.09 s later, none open after it (`lsof`, one run; not released); 2,326 archives in 27 s, their songs in the lists at the same moment. Before the loop waited for each package and the loader's pause was shortened: the steps of 147 in 0.40 s and their archives open for 2.7 s more | 75 archives in 6 frames, 0.32 s (two runs); 73 in 8 frames, 0.45 s |
+| Mounting the archives | 147 archives in 0.32 s and their songs in the lists 0.15 s later, none open after it (`lsof`, one run; not released); 2,326 archives in 5.4 to 7.7 s, the songs 0.1 s later (five runs). 1.16.0: the steps of 147 in 0.40 s and their archives open for 2.7 s more; of 2,326 in 23.9 s and 33 s more | 75 archives in 6 frames, 0.32 s (two runs); 73 in 8 frames, 0.45 s |
 | A rescan by Enumerate | not timed | 74 archives in 3 frames, 0.14 s |
 | Quit from inside a song | 0.3-0.5 s | 0.3-0.5 s |
 

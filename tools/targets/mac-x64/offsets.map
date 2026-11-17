@@ -25,6 +25,8 @@ dlc_map_root                      0x50    # DLC coordinator: map root node
 dlc_map_begin                     0x58    # DLC coordinator: map begin node
 dlc_map_end                       0x60    # DLC coordinator: map end node
 dlc_map_size                      0x68    # DLC coordinator: map size
+asset_load_name                   0x18    # AssetLoadRequest (ctor 0x101285970: name +0x18, category +0x38, path +0x40) and AssetLoadResponse (read at 0x10055bd1e)
+fs_exists_slot                    0x7     # file system object vtable: bool(fs, const char *path), the path from where the object is mounted (the whole one's 0x10015a2e0 asks each mounted one in turn; an archive's is 0x1001630d0)
 asset_loader_manager              0x8     # asset loader thread's functor (0x1012856c0)
 asset_loader_stop                 0x10    # asset loader thread's functor: u8
 asset_loader_pass_slot            0xc     # AssetFactoryManager vtable (0x101860388): 0x1012822f0

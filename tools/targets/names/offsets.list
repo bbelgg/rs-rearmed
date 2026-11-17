@@ -31,6 +31,8 @@ dlc_map_begin             # DLC coordinator: map begin node
 dlc_map_end               # DLC coordinator: map end node
 dlc_map_size              # DLC coordinator: map size
 dlc_package               # DLC coordinator: the package its update's head is loading, null: none
+asset_load_name           # AssetLoadRequest and AssetLoadResponse: the asset's name, a string of the game's (empty when asked by path)
+fs_exists_slot            # a file system object's vtable (the whole one's and an archive's): has it this file
 asset_loader_manager      # asset loader thread's functor: the AssetFactoryManager
 asset_loader_stop         # asset loader thread's functor: u8, set to end the thread
 asset_loader_pass_slot    # AssetFactoryManager vtable: one pass of the loader thread

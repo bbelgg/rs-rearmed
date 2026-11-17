@@ -318,8 +318,15 @@ void RC_FN(path_md5)(rc_ctx *c) {
 //     0x10035a6ff). If manifests asked for have not been answered by then, the flag is set again and held until
 //     they have: the text stays, and a song list fills in, to the last song.
 //
-// Learn & Play's loop waits for each mount as the first of these does, for its own reason; the other two are open
-// there (win-x86/shims/win32_overrides.c, docs/windows/PLAN.md).
+// And a step itself grew with the library. Mounting an archive, the game asks its file system for the hash file of
+// each shader of its shader cache, "data/Shaders/Generated/NAME.sha1" (ten of them, 0x100088f96), should the
+// archive bring a newer one; the file system asks every archive mounted there in turn, and a song archive never
+// has one. So a step took 2 ms with a hundred archives mounted and 19 ms with 2,300: most of a 27 s mounting.
+// Within one mounting, a question the step before had "no" for is asked of the archives this step mounted alone
+// (fs_asked below): the others have not changed.
+//
+// Learn & Play's loop waits for each mount as the first of these does, for its own reason; the rest is open there
+// (win-x86/shims/win32_overrides.c, docs/windows/PLAN.md).
 // ------------------------------------------------------------------------------------------------
 #define INSTALLING_FLAG RC_OFF(dlc_installing)
 #define LOAD_STALL_S 5.0     // nothing loaded or answered for this long: the mounting goes on without waiting
@@ -348,10 +355,12 @@ static struct {
   int stalled;          // something did not load: this mounting no longer waits
 } g_mount;  // the game thread's
 
-// The manifests asked for and answered since the game started, counted at the two mid points. -1: a point is
-// missing, and nothing waits for manifests.
+// The manifests asked for and answered since the game started, counted at the two mid points. A mount asks for its
+// manifests by path, with no name; the handler is also given the answers to what the game loads by name (a
+// profile's guitar and gear, urn:database:json-db:...), which are not counted. -1: a point is missing, and nothing
+// waits for manifests.
 static atomic_uint g_manifests_asked, g_manifests_answered;
-static int g_manifest_points = -1;
+static int g_manifest_points = -1, g_manifest_response;
 static atomic_int g_loader_busy;  // archives are being mounted: read by the loader thread
 
 static void on_manifest_request(rc_mid_frame *f, void *user) {
@@ -359,14 +368,13 @@ static void on_manifest_request(rc_mid_frame *f, void *user) {
   COUNT(g_manifests_asked);
 }
 static void on_manifest_response(rc_mid_frame *f, void *user) {
-  (void)f, (void)user;
-  COUNT(g_manifests_answered);
-}
-static void mods_manifest_points(void) {
-  int asked = rc_mid_add_name("manifest_request", on_manifest_request, NULL);
-  int answered = rc_mid_add_name("manifest_response", on_manifest_response, NULL);
-  g_manifest_points = asked >= 0 && answered >= 0 ? 0 : -1;
-  if (g_manifest_points < 0) rs_mods_logf("no points for the song manifests: the mounting does not wait for them");
+  (void)user;
+  const uint8_t *name = (const uint8_t *)(uintptr_t)rc_mid_get(f, g_manifest_response);
+  if (!name) return;
+  name += RC_OFF(asset_load_name);  // the game's string: its text in place, or behind a pointer at its start
+  int in_place = RC_LD(uint64_t, name + RC_OFF(efd_str_inline)) == (uint64_t)(uintptr_t)(name + RC_OFF(efd_str_size));
+  const char *text = in_place ? (const char *)name : (const char *)(uintptr_t)RC_LD(uint64_t, name);
+  if (text && !*text) COUNT(g_manifests_answered);
 }
 
 // The asset loader thread's loop (the game's: a pass, 10 ms, until its stop byte is set). A pass of the
@@ -382,6 +390,154 @@ void RC_FN(asset_loader_thread)(rc_ctx *c) {
   }
   OV_VCALL((uint64_t)(uintptr_t)self, RC_SLOT(asset_loader_end));
   ov_ret_u64(c, 0);
+}
+
+// The file questions of a step (the fs_exists and fs_mount points). A step mounts its archive (fs_mount: where, and
+// the archive's file system object) and then asks the whole file system its questions (fs_exists), the same ones
+// in every step. One the step before had "no" for, with every archive mounted then, can only be "yes" now through
+// what this step mounted: that is asked, with the game's own call on the archive (the whole file system's answer
+// is that call on each archive in turn, 0x10015aa0d), and a "yes" goes to the whole file system after all, so the
+// game goes on from the same answer either way. Nothing is taken as known across a mount that was not a step's, in
+// a step that mounted at a place this does not know how to take a path from, or with an archive that does not
+// answer for the appid.appid every archive of dlc/ has. When the mounting ends the whole file system is asked each
+// question once more: an answer other than the last one given switches this off for the run, with a line in the
+// log.
+#define FS_QUESTIONS 16    // room for the questions a step asks (ten)
+#define FS_PATH 160
+#define FS_STEP_MOUNTS 4   // and for the archives it mounts (one)
+#define FS_AT 32
+static struct {
+  int point, fs, path, found, answered;  // fs_exists: the point, its values and its continuation; point -1: none
+  int m_path, m_fs;                      // fs_mount's values
+  int off;                               // an answer was not the file system's: not in this run
+  unsigned step;                         // the step of this mounting, from 1
+  unsigned last;                         // and the last one that asked something
+  uint64_t whole;                        // the whole file system's object
+  struct {
+    char path[FS_PATH];
+    unsigned step;  // the step it was last "no" in; 0: free
+  } no[FS_QUESTIONS];
+  struct {
+    uint64_t fs;
+    char at[FS_AT];
+  } mounted[FS_STEP_MOUNTS];  // what this step mounted, and where (lower case)
+  int nmounted;               // -1: something this cannot answer for
+  unsigned asked, alone;      // the questions of this mounting, and those the step's own archives answered
+} g_fs = {.point = -1};  // the game thread's, in a step
+static _Thread_local int t_in_step;  // this thread is in an install step
+static atomic_int g_fs_stale;        // something was mounted outside a step
+
+static void fs_forget(void) {
+  for (int i = 0; i < FS_QUESTIONS; i++) g_fs.no[i].step = 0;
+}
+
+static void on_fs_mount(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!t_in_step) {
+    atomic_store(&g_fs_stale, 1);
+    return;
+  }
+  const char *at = (const char *)(uintptr_t)rc_mid_get(f, g_fs.m_path);
+  const uint64_t *fsp = (const uint64_t *)(uintptr_t)rc_mid_get(f, g_fs.m_fs);
+  uint64_t fs = fsp ? RC_LD(uint64_t, fsp) : 0;
+  int n = g_fs.nmounted;
+  size_t len = at ? strlen(at) : 0;
+  if (n < 0 || n == FS_STEP_MOUNTS || !fs || !len || len >= FS_AT) {
+    g_fs.nmounted = -1;
+    return;
+  }
+  for (size_t i = 0; i < len; i++) {  // one name of the plain kind, as "data": a path is taken from it below
+    char ch = at[i] >= 'A' && at[i] <= 'Z' ? (char)(at[i] + 32) : at[i];
+    if (!((ch >= 'a' && ch <= 'z') || (ch >= '0' && ch <= '9') || ch == '_')) {
+      g_fs.nmounted = -1;
+      return;
+    }
+    g_fs.mounted[n].at[i] = ch;
+  }
+  g_fs.mounted[n].at[len] = 0;
+  if (!((uint8_t)OV_VCALL(fs, RC_SLOT(fs_exists), (uint64_t)(uintptr_t) "appid.appid") & 1)) {
+    g_fs.nmounted = -1;
+    return;
+  }
+  g_fs.mounted[n].fs = fs;
+  g_fs.nmounted = n + 1;
+}
+
+// 1 when an archive this step mounted has the file, by the path from where it is mounted
+static int fs_in_step_mounts(const char *path) {
+  for (int i = 0; i < g_fs.nmounted; i++) {
+    size_t len = strlen(g_fs.mounted[i].at);
+    if (strncmp(path, g_fs.mounted[i].at, len) || path[len] != '/' || !path[len + 1]) continue;  // not under it
+    if ((uint8_t)OV_VCALL(g_fs.mounted[i].fs, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)(path + len + 1)) & 1) return 1;
+  }
+  return 0;
+}
+
+static void on_fs_exists(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!t_in_step || g_fs.off) return;  // the game's own call
+  const char *path = (const char *)(uintptr_t)rc_mid_get(f, g_fs.path);
+  uint64_t whole = rc_mid_get(f, g_fs.fs);
+  if (!path || !whole || strlen(path) >= FS_PATH) return;
+  if (atomic_exchange(&g_fs_stale, 0)) fs_forget();
+  g_fs.whole = whole;
+  g_fs.last = g_fs.step;
+  g_fs.asked++;
+  int slot = -1, free_slot = -1;
+  for (int i = 0; i < FS_QUESTIONS; i++) {
+    if (!g_fs.no[i].step) free_slot = free_slot < 0 ? i : free_slot;
+    else if (!strcmp(g_fs.no[i].path, path)) slot = i;
+  }
+  int found;
+  if (slot >= 0 && g_fs.no[slot].step == g_fs.step - 1 && g_fs.nmounted > 0 && !fs_in_step_mounts(path)) {
+    found = 0;
+    g_fs.alone++;
+  } else {
+    found = (uint8_t)OV_VCALL(whole, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)path) & 1;
+  }
+  if (found) {
+    if (slot >= 0) g_fs.no[slot].step = 0;
+  } else if (slot >= 0 || free_slot >= 0) {
+    if (slot < 0) strcpy(g_fs.no[slot = free_slot].path, path);
+    g_fs.no[slot].step = g_fs.step;
+  }
+  rc_mid_set(f, g_fs.found, (uint64_t)found);
+  f->go = g_fs.answered;
+}
+
+// The mounting's end: every question last answered "no" to the whole file system once more.
+static void fs_check(void) {
+  if (g_fs.off || !g_fs.whole || atomic_load(&g_fs_stale)) return;
+  for (int i = 0; i < FS_QUESTIONS; i++) {
+    if (g_fs.no[i].step != g_fs.last) continue;
+    if (!((uint8_t)OV_VCALL(g_fs.whole, RC_SLOT(fs_exists), (uint64_t)(uintptr_t)g_fs.no[i].path) & 1)) continue;
+    g_fs.off = 1;
+    rs_mods_logf("DLC: %s is there, and a step was told it was not: file questions go to the whole file system "
+                 "from here on, and a restart mounts the archives with them",
+                 g_fs.no[i].path);
+  }
+}
+
+// The mid points of the mounting: the manifests' and the file system's.
+static void mods_manifest_points(void) {
+  int asked = rc_mid_add_name("manifest_request", on_manifest_request, NULL);
+  int answered = rc_mid_add_name("manifest_response", on_manifest_response, NULL);
+  g_manifest_response = answered < 0 ? -1 : rc_mid_value(answered, "response");
+  g_manifest_points = asked >= 0 && g_manifest_response >= 0 ? 0 : -1;
+  if (g_manifest_points < 0) rs_mods_logf("no points for the song manifests: the mounting does not wait for them");
+  int mount = rc_mid_add_name("fs_mount", on_fs_mount, NULL);
+  int exists = mount < 0 ? -1 : rc_mid_add_name("fs_exists", on_fs_exists, NULL);
+  if (exists >= 0) {
+    g_fs.m_path = rc_mid_value(mount, "path"), g_fs.m_fs = rc_mid_value(mount, "fs");
+    g_fs.fs = rc_mid_value(exists, "fs"), g_fs.path = rc_mid_value(exists, "path");
+    g_fs.found = rc_mid_value(exists, "found"), g_fs.answered = rc_mid_cont(exists, "answered");
+    if (g_fs.m_path >= 0 && g_fs.m_fs >= 0 && g_fs.fs >= 0 && g_fs.path >= 0 && g_fs.found >= 0 && g_fs.answered > 0)
+      g_fs.point = exists;
+  }
+  if (g_fs.point < 0) {
+    g_fs.off = 1;
+    rs_mods_logf("no points for the file system: a step asks all of it");
+  }
 }
 
 // What is left to load of the archives the steps took: the packages in the queue, and the one the head has. 0 when
@@ -428,7 +584,11 @@ static int manifests_waiting(void) {
 // nothing.
 static int mount_step(uint8_t *self, uint64_t o) {
   rs_mods_mounting(1);
+  g_fs.step++;
+  g_fs.nmounted = 0;
+  t_in_step = rs_mods_cfg.fixes;
   OV_GUEST(dlc_install_step, o);
+  t_in_step = 0;
   rs_mods_mounting(0);
   if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) return 0;
   g_mount.steps++;
@@ -445,6 +605,8 @@ void RC_FN(dlc_update)(rc_ctx *c) {
     g_mount.t0 = elapsed_s();
     g_mount.asked0 = atomic_load(&g_manifests_asked);
     g_mount.answered0 = atomic_load(&g_manifests_answered);
+    fs_forget();
+    g_fs.step = g_fs.last = g_fs.asked = g_fs.alone = 0;
   }
   atomic_store_explicit(&g_loader_busy, batched, memory_order_relaxed);
   OV_GUEST(dlc_update_head, o);
@@ -468,6 +630,7 @@ void RC_FN(dlc_update)(rc_ctx *c) {
       if (mount_step(self, o)) COUNT(g_installed);
     } while (*(volatile uint8_t *)(self + INSTALLING_FLAG) && elapsed_s() - t0 < rs_mods_cfg.budget_s);
     if (!*(volatile uint8_t *)(self + INSTALLING_FLAG)) {
+      fs_check();
       g_mount.t_mounted = g_mount.answered_since = elapsed_s();
       g_mount.frames_mounted = g_mount.frames;
       if (manifests_waiting()) self[INSTALLING_FLAG] = g_mount.holding = 1;
@@ -480,6 +643,8 @@ void RC_FN(dlc_update)(rc_ctx *c) {
                    g_mount.steps, g_mount.frames_mounted, g_mount.t_mounted - g_mount.t0, t - g_mount.t_mounted);
     else
       rs_mods_logf("DLC: %u archives mounted in %u frames, %.2f s", g_mount.steps, g_mount.frames, t - g_mount.t0);
+    if (g_fs.asked)
+      rs_mods_logf("DLC: %u of the steps' %u file questions asked of the step's archive alone", g_fs.alone, g_fs.asked);
     memset(&g_mount, 0, sizeof g_mount);
   }
   if (!self[RC_OFF(dlc_first_done)]) self[RC_OFF(dlc_first_done)] = 1;

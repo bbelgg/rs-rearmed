@@ -198,3 +198,5 @@ tuner_skip_offer      0x100544c7f  (uint8_t offer@r14)  # the tuner menu's Skip 
 # Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods.c)
 manifest_request      0x10055e95e  (void *request@r13)  # in the mount's manifest requests 0x10055e740 (called by the mount, 0x1000888fb), after each AssetLoadRequest is sent
 manifest_response     0x10055bc34  (void *manager@rdi, void *response@rsi)  # the ManifestManager's AssetLoadResponse handler 0x10055bc20, after its prologue: once a request, whatever the answer
+fs_mount              0x1003c975f  (const char *path@rdi, void **fs@rsi)  # the package mount's call 0x1003c9750 (its one caller: 0x100088531), after its prologue: the mount point ("data" for an archive of dlc/) and where the archive's file system object is
+fs_exists             0x1003c9c72  (void *fs@rdi, const char *path@rsi, uint8_t found@rax) -> answered=0x1003c9c75  # in the file-exists call 0x1003c9b80, at its question to the whole file system (slot 7 of the object at 0x1018f2160) with the path in lower case; `answered` goes on with found as the answer

@@ -201,3 +201,5 @@ tuner_skip_offer      0x012c2f37  (uint8_t offer@[ebp-0x1d])  # the tuner menu's
 # Batched DLC mounting (built in on the Mac: tools/ws7/recomp/overrides/mods/mods.c)
 manifest_request      unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055e95e
 manifest_response     unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x10055bc34
+fs_mount              unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x1003c975f
+fs_exists             unsupported  not matched (docs/windows/PLAN.md): the Mac's 0x1003c9c72

@@ -246,22 +246,26 @@ with `RS_MODS_LOG=1`.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log has `[rs-mods] DLC: N archives mounted in F frames,
   T s` once the profile has loaded, which is the end of the mounting: every archive's package is loaded and every
   song manifest asked for is in by then, and the menu's "Enumerating downloadable content..." goes with it. When
-  the manifests came later than the last archive the line ends `, their songs in the lists S s later`, T being the
-  time to the last archive. Two checks of that end:
+  the manifests came later than the last archive the line ends `, their songs in the lists S s later`, F and T
+  being the frames and the time to the last archive. A second line, `DLC: A of the steps' Q file questions asked
+  of the step's archive alone`, says how many of the steps' questions about the shader cache did not go to every
+  mounted archive: all but those of the first step (1,460 of 1,470 with 147 archives, 23,210 of 23,240 with 2,326);
+  a line `DLC: PATH is there, and a step was told it was not` would say that an answer was wrong. Three checks of
+  the end:
   - Nothing is left open: count the archives the game has open a few times a second from the start,
-    `lsof -p PID | grep -c '/dlc/.*\.psarc'`, which is 0 by the time the line is in the log (147 archives: `mounted in 9 frames,
-    0.46 s, their songs in the lists 0.09 s later`, none open; before the loop waited for the packages, 138 were open at the line and the
-    last closed 2.7 s later).
-  - No song comes later: go to Learn a Song as soon as the main menu takes Return, search for `a` and note the
-    matches; when the text has gone, leave to the main menu, come back and search again. A search keeps its matches
-    until it is cleared, so the first count is of the moment. With 2,326 archives: 1,072 matches during the
-    mounting, with the text on the screen, and 2,037 after it; before the loader's pause was shortened and the flag
-    held, 1,186 right after the text had gone and 2,037 on coming back.
+    `lsof -p PID | grep -c '/dlc/.*\.psarc'`, which is 0 by the time the line is in the log (147 archives:
+    `mounted in 6 frames, 0.32 s, their songs in the lists 0.15 s later`, none open; 1.16.0 had 138 open at its
+    line, after 0.40 s, and the last closed 2.7 s later).
+  - No song comes later: wait for the line, go to Learn a Song, search for `a` and note the matches; then leave
+    to the main menu, come back and search again. A search keeps its matches until it is cleared, so the first
+    count is of the moment the list was opened. With 2,326 archives: 2,037 both times, the list opened 1.5 s after
+    the line (two runs). 1.16.0: 1,227 in a list opened 3 s after its line, and 2,037 on coming back.
+  - The time: 2,326 archives in 5.4 to 7.7 s (five runs; the longer ones with the song list opened meanwhile),
+    where 1.16.0's line came after 23.9 s with 1,946 archives still open, the last of them for 33 s more.
 
   A step that took an archive and mounted nothing would lose its songs, so compare the song list of a start with
   the budget with one at `RS_MODS_BUDGET_MS=0`, a step a frame as in the original. The two counts were the same
-  with 147 archives in `dlc/`, before the loop waited for the packages; not compared since, nor with a large
-  library.
+  with 147 archives in `dlc/`, in 1.16.0; not compared since, nor with a large library.
 - **Title logo** (`RS_REARMED`): a copy with `static.psarc.rearmed` shows the red "Re-ARMed 2026" tag across
   REMASTERED on the title, and with `RS_REARMED=0` the game's own logo. `ls -l` of `static.psarc` in the copy
   shows which one the launcher linked.

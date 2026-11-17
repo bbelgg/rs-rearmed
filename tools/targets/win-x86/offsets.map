@@ -29,6 +29,8 @@ dlc_map_root                      0x34    # DLC coordinator: map root node
 dlc_map_begin                     0x38    # DLC coordinator: map begin node
 dlc_map_end                       0x3c    # DLC coordinator: map end node
 dlc_map_size                      0x40    # DLC coordinator: map size
+asset_load_name                   unsupported  not matched: manifest_response
+fs_exists_slot                    unsupported  not matched: fs_exists
 asset_loader_manager              unsupported  not matched: asset_loader_thread
 asset_loader_stop                 unsupported  not matched: asset_loader_thread
 asset_loader_pass_slot            unsupported  not matched: asset_loader_thread

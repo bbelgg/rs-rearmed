@@ -47,8 +47,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
   `last-run.log`, as the Mac launcher does.
 - **Batched DLC mounting**: the loop waits for each mount to be finished, so every archive of a large library is
   mounted. The Mac edition's loop waits the same way and, for its "Enumerating downloadable content..." to stay
-  until the songs are in, also shortens the loader thread's pause and holds the flag for the song manifests (not
-  released): neither is here yet ([Open issues](#open-issues)).
+  until the songs are in and a large library to mount faster, also shortens the loader thread's pause, holds the
+  flag for the song manifests and keeps a step from asking every mounted archive for the shader cache's files (not
+  released): none of the three is here yet ([Open issues](#open-issues)).
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
@@ -103,10 +104,14 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - winmm's device names stop at 31 characters, so on that fallback path a long interface name can lose its channel.
 - **Songs after "Enumerating downloadable content..." with a large library**: expected here as the Mac edition had it
   (the text goes when the last archive is mounted, and the song manifests are read 85 a second, so the lists fill
-  for some seconds more): not measured in this game. The Mac edition's two remedies need this game's asset loader
+  for some seconds more): not measured in this game. The Mac edition's remedies need this game's asset loader
   thread loop (its `Sleep(10)` between passes) and the two moments its ManifestManager asks for a manifest and is
   answered, none of them matched yet (`asset_loader_thread`, `manifest_request`, `manifest_response` in
   `tools/targets/win-x86`).
+- **A large library's mounting time**: the Mac edition found a mount step asking every mounted archive for the ten
+  hash files of the shader cache, which made 2,326 archives take 27 s where they now take 5 to 8 s. The same
+  questions are expected in this game's mount; its two moments are not matched either (`fs_mount`, `fs_exists`).
+  2,250 archives were measured at 47 s with a step a frame here, and not since the loop waited for each mount.
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address 0x0`), and a fault
   at guest address 0x168 before it. Neither has come back.
 - **A song ending a few seconds in**: with the machine heavily loaded by other builds, a song went back to its page

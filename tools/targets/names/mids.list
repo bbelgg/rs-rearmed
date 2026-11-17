@@ -174,3 +174,5 @@ tuner_skip_offer      # the tuner menu's buttons: whether Skip Tuner is offered,
 # --- Batched DLC mounting (built in: tools/ws7/recomp/overrides/mods/mods.c)
 manifest_request      # the ManifestManager has asked for a mounted archive's song manifest (a .hsan or .hson file)
 manifest_response     # the ManifestManager is handed the answer to one such request, read or failed
+fs_mount              # an archive is about to join the game's file system: where, and the archive
+fs_exists             # the game asks its file system whether a file is there; a hook may answer in its place

@@ -239,7 +239,7 @@ What each does:
     puts an archive's songs in the lists: it opens the archive, asks for its song manifest and queues its package; the
     update's head, which the game calls once a frame, loads one package a call; and the asset loader thread reads the
     manifest, which the game takes in on its own thread. The menu's "Enumerating downloadable content..." and the
-    song lists' filling in follow one flag, which the step that finds the list empty clears. So the loop does three
+    song lists' filling in follow one flag, which the step that finds the list empty clears. So the loop does four
     things beside the steps:
     - it calls the head until nothing is left to load before the next step, so a package is loaded before the next
       archive is opened, several a frame;
@@ -247,13 +247,22 @@ What each does:
       thread's loop is replaced; a pass ends at the first file it finishes, so the game's pause reads 85 manifests
       a second at the most);
     - if manifests asked for are not yet answered when the list is empty (two mid points count them), the flag is
-      set again and held until they are, or until none has come for 5 s.
+      set again and held until they are, or until none has come for 5 s;
+    - it keeps a step from growing with the library. Mounting an archive, the game asks its file system for the
+      hash file of each of the ten shaders in its shader cache (`data/Shaders/Generated/NAME.sha1`), should the
+      archive bring a newer one, and the file system asks every archive mounted there in turn: 2 ms a step with a
+      hundred archives mounted, 19 ms with 2,300. Within one mounting, a question the step before had "no" for is
+      asked of the archive this step mounted alone, by the game's own call on it (two more mid points, `fs_mount`
+      and `fs_exists`); a "yes" goes to the whole file system after all, and at the mounting's end every question
+      is asked of the whole file system once more, a different answer switching this off for the run.
 
-    Steps alone left the last two behind: the text went after a few frames, with songs still coming into the lists
-    and the menus slow to answer, 2.7 s for 147 archives; with 2,326 the manifests alone were 15 s behind the last archive. Learn & Play's loop waits for
-    each mount as the first of the three does, there because a step taken too early drops an archive; it has neither
-    of the other two yet ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This game's steps drop
-    none either way ([TESTING.md](TESTING.md#unattended-runs)).
+    Steps alone left packages and manifests behind: the text went with songs still coming into the lists and the
+    menus slow to answer, for 2.7 s with 147 archives and for 33 s with 2,326 (1.16.0: the text for 24 s, and a
+    search 6 s after it had 1,227 matches of 2,037). Now the text and the last song end together, after 5 to 8 s
+    with 2,326. Learn & Play's loop waits for each mount as the first of the four does, there because a step taken
+    too early drops an archive; it has none of the other three yet
+    ([Windows design](../windows/DESIGN.md#built-in-fixes-and-mods)). This game's steps drop none either way
+    ([TESTING.md](TESTING.md#unattended-runs)).
   - The open-file limit, which the batched mounting needs: a large library has more archives open than the 256
     descriptors of an app started from Finder. The shared start raises it.
   - The song path cache: every mounted archive's file checks take the MD5 of the same paths again, under the path

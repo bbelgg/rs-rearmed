@@ -4,5 +4,3 @@
 change, in the words the release notes will use: the bold lead says what is now true, the rest says what it was
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
-
-- **Fixed which songs of the first Rocksmith's DLC are listed, in both editions:** the ones you own.

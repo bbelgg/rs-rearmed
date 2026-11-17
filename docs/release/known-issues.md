@@ -44,10 +44,10 @@ into the notes as it stands. -->
   that brings a shader's hash file, Settings and switches… since the two newest built-in mods and Learn & Play's Frame
   rate joined it, a game started with those in its files, the fixes of the code review of 2026-11-17 beyond runs of
   each edition to the note highway (not played with a guitar, and the installer app with them was not run), the two
-  memory fixes over a long session (each was run for ten minutes, where the growth had shown in thirty), the first
-  Rocksmith's DLC songs with custom songs switched off, and in Multiplayer a cable with an interface, two interfaces,
-  the swap in Learn & Play, or any two inputs since this release changed how Player 2's saved input is found. The
-  stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+  memory fixes over a long session (each was run for ten minutes, where the growth had shown in thirty), and in
+  Multiplayer a cable with an interface, two interfaces, the swap in Learn & Play, or any two inputs since 1.17.0
+  changed how Player 2's saved input is found. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been
+  met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**

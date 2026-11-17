@@ -18,7 +18,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Performance**: a song holds 60 fps on a 60 Hz display at 42-43% of a core and 1.2 GB, about a sixth less CPU than
   the original under Rosetta ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)); 74.9 fps on 75 Hz.
 - **Rocksmith 1 songs**: the disc pack's and the DLC pack's are listed and played. The DLC pack's show for the DLC that
-  count as owned (not released): what a copy or refresh finds from the Steam client, the account's ownership tickets,
+  count as owned (new in 1.17.1): what a copy or refresh finds from the Steam client, the account's ownership tickets,
   Steam's package cache and an installed first Rocksmith. The copy's log says what each found. One was found by a
   search and played to the note highway with its DLC counted as owned, and was not listed without. 1.17.0 showed all
   of them while the CDLC skip was on.
@@ -128,7 +128,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 **Not tested or not done yet**
 
-- **Rocksmith 1 DLC found as owned** (not released): no account that owns one has been at hand. The asking of the
+- **Rocksmith 1 DLC found as owned** (new in 1.17.1): no account that owns one has been at hand. The asking of the
   Steam client, the tickets and the package cache were run against the real Steam with apps the test account does own
   (the first Rocksmith, the import pack, a DLC of the game: yes for each, no for a DLC it lacks), an installed first
   Rocksmith only with a made-up appmanifest, and the rest with stand-ins ([TESTING.md](TESTING.md#unattended-runs)).

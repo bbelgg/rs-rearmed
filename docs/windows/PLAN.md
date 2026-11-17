@@ -22,7 +22,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   ([PERFORMANCE.md](PERFORMANCE.md#toward-the-mac-edition)). The title is up in about 7 s. Guest memory doesn't grow
   over songs in a row.
 - **Rocksmith 1 songs**: by the Mac edition's rule and code: the DLC pack's show for the DLC that count as owned
-  (not released), found by a copy or refresh from Steam and its files. One was found by a search and played to the
+  (new in 1.17.1), found by a copy or refresh from Steam and its files. One was found by a search and played to the
   note highway with its DLC counted as owned, and was not listed without. 1.17.0 showed all of them while the CDLC
   skip was on.
 - **Two players**: a song with each player on their own input, as the Mac edition.
@@ -207,7 +207,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   screen on a second display.
 - **Retina, colour and a sharper picture**: run once, full screen on a built-in Retina screen; the upscaled picture
   itself wasn't looked at (snapshots are the back buffer), and nothing was compared with them off.
-- **Rocksmith 1 DLC found as owned** (not released): as in the [Mac edition](../mac/PLAN.md#open-issues): no account
+- **Rocksmith 1 DLC found as owned** (new in 1.17.1): as in the [Mac edition](../mac/PLAN.md#open-issues): no account
   that owns one has been at hand; in the game the DLC was named by hand (`test_steam32` covers the face's answers,
   `test_settings.py` the AppIDs set by hand).
 - **Game Mode**: that macOS leaves it off for this app.

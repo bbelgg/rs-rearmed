@@ -17,7 +17,7 @@ FRAMEWORKS := -framework AudioToolbox -framework CoreAudio -framework CoreFounda
 
 SRC := wa_engine wa_com wa_winmm
 HDR := audio.h wa_engine.h ../win32_guestobj.h ../win32_shims.h $(coreaudio)/rs_audio_host.h \
-       $(coreaudio)/rs_audio_input.h
+       $(coreaudio)/rs_audio_input.h $(runtime)/rc_hook.h
 
 all: $(OUT)/libwinaudio.a
 

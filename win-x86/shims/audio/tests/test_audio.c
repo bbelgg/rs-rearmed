@@ -365,9 +365,10 @@ static void test_render(uint32_t en) {
 
 // --- the hook point si_io ----------------------------------------------------------------------
 // A mod's hooks on the capture stream (wa_engine.h): the Mac's call on the I/O thread, the buffer the hook leaves
-// is what the stream's reader gets, and an input keeps its `self` from one stream to the next.
-enum { SI_PASS, SI_FILL, SI_OWN, SI_KEEP };
+// is what the stream's reader gets, frame for frame, and an input keeps its `self` from one stream to the next.
+enum { SI_PASS, SI_FILL, SI_OWN, SI_KEEP, SI_RAMP };
 static _Atomic int si_mode, si_pre_calls, si_post_calls, si_bad;
+static uint32_t si_ramp;  // the I/O thread's: the frames SI_RAMP has numbered
 static _Atomic(void *) si_self[2];
 static _Atomic uint32_t si_dev;
 static float si_own[64];
@@ -389,6 +390,8 @@ static int si_pre(rc_ctx *c, void *user) {
   float *x = l->mBuffers[0].mData;
   if (mode == SI_FILL)
     for (uint32_t i = 0; i < l->mBuffers[0].mDataByteSize / 4; i++) x[i] = 0.25f;
+  if (mode == SI_RAMP)
+    for (uint32_t i = 0; i < l->mBuffers[0].mDataByteSize / 4; i++) x[i] = (float)si_ramp++;
   if (mode == SI_OWN) c->r[2] = (uint64_t)(uintptr_t)&si_own_list;
   if (mode == SI_KEEP) {
     c->r[0] = 1;
@@ -418,6 +421,27 @@ static uint32_t si_read(wa_stream *st, double secs, float want, uint32_t *same) 
   return frames;
 }
 
+// The same of a stream whose hook numbers its frames (SI_RAMP): how many are not `step` above the one before,
+// the first above -1. At another rate than the device's the first frames lead in from silence, and are not counted.
+static uint32_t si_read_ramp(wa_stream *st, double secs, double step, uint32_t *odd) {
+  static float buf[4096];
+  uint32_t frames = 0, lead = step == 1.0 ? 0 : 4;
+  float prev = -1;
+  *odd = 0;
+  for (double t0 = now(); now() - t0 < secs; usleep(2000)) {
+    uint32_t n = wa_capture_available(st, 0);
+    if (n > 4096) n = 4096;
+    n = wa_capture_peek(st, buf, n);
+    for (uint32_t i = 0; i < n; i++) {
+      if (frames + i >= lead) *odd += fabs((double)buf[i] - prev - step) > 0.01;
+      prev = buf[i];
+    }
+    wa_capture_consume(st, n);
+    frames += n;
+  }
+  return frames;
+}
+
 static void test_si_io(void) {
   wa_endpoint in;
   if (!wa_default_endpoint(WA_CAPTURE, &in)) {
@@ -434,15 +458,24 @@ static void test_si_io(void) {
   wa_fmt_mix(1, &f);  // the guitar input as the game opens it: 48 kHz mono float
   wa_stream *st = wa_stream_open(&in, &f, 256, 256, 1);
   CHECK(st);
-  uint32_t same, frames;
-  // the buffer changed in place is what the reader gets (the first frames lead in from silence when the device
-  // runs at another rate)
-  atomic_store(&si_mode, SI_FILL);
+  wa_stream_info inf;
+  wa_stream_info_get(st, &inf);
+  uint32_t same, frames, odd;
+  // every frame a hook writes reaches the reader, in order, from the stream's first (unless the reader fell
+  // behind and the ring dropped some)
+  atomic_store(&si_mode, SI_RAMP);
   CHECK(!wa_stream_start(st));
+  frames = si_read_ramp(st, 0.1, inf.device_rate / f.rate, &odd);
+  printf("si_io: %u numbered frames read, %u out of step\n", frames, odd);
+  CHECK(frames > 0 && (!odd || wa_capture_overruns(st)));
+  // the buffer changed in place is what the reader gets
+  atomic_store(&si_mode, SI_FILL);
+  usleep(50000);
+  si_read(st, 0.02, 0, &same);
   frames = si_read(st, 0.3, 0.25f, &same);
   int calls = si_pre_calls;
   printf("si_io: %d buffers, %u frames read, %u as the hook left them\n", calls, frames, same);
-  CHECK(calls > 0 && frames > 0 && same + 8 >= frames);
+  CHECK(calls > 0 && frames > 0 && same == frames);
   CHECK(atomic_load(&si_dev) == in.dev && atomic_load(&si_self[0]) && !atomic_load(&si_self[1]));
   // a list of the hook's own
   atomic_store(&si_mode, SI_OWN);
@@ -473,6 +506,19 @@ static void test_si_io(void) {
   CHECK(st && !wa_stream_start(st));
   si_read(st, 0.2, 0, &same);
   CHECK(atomic_load(&si_self[0]) == first && !atomic_load(&si_self[1]));
+  wa_stream_close(st);
+  // a stream at another rate than its device, as the game's is on a device that can't run at 48 kHz: the frames
+  // the hook wrote are interpolated, each a step of the hook's above the one before
+  wa_fmt g = f;
+  g.rate = inf.device_rate == 44100 ? 48000 : 44100;
+  si_ramp = 0;
+  atomic_store(&si_mode, SI_RAMP);
+  st = wa_stream_open(&in, &g, 256, 256, 1);
+  CHECK(st && !wa_stream_start(st));
+  wa_stream_info_get(st, &inf);
+  frames = si_read_ramp(st, 0.2, inf.device_rate / g.rate, &odd);
+  printf("si_io: at %u Hz from %.0f, %u numbered frames read, %u out of step\n", g.rate, inf.device_rate, frames, odd);
+  CHECK(frames > 0 && (!odd || wa_capture_overruns(st)));
   wa_stream_close(st);
   CHECK(!si_bad);
   printf("si_io: ok\n");

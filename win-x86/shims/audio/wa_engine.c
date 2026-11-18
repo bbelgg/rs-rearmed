@@ -648,7 +648,7 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
     s->si_self = si_self_take(ep->uid);
     if (!s->si_self) s->si_self = s;  // more inputs open at a time than the game has
     s->step = s->dev_rate / fmt->rate;
-    s->phase = s->step == 1.0 ? 1.0 : 0.0;
+    s->phase = 0.0;  // at the device's rate too: from 1.0 the stream's second frame was passed over
     AURenderCallbackStruct cb = {input_cb, s};
     if (AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &cb,
                              sizeof cb) != noErr)

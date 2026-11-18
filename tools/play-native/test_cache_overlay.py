@@ -14,6 +14,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -160,12 +161,16 @@ def _num(v):
 
 
 def make_7z(files, coder="lzma1"):
-    """A 7z archive like the game's own (one file per folder, plain header) of FILES [(name, bytes)]."""
+    """A 7z archive like the game's own (one file per folder, plain header) of FILES [(name, bytes)]. coder:
+    lzma1, lzma2, or deflate (stored as it is: a coder cache_overlay doesn't read)."""
     packs, folders = [], []
     for _, data in files:
         if coder == "lzma1":
             p, props = co._lzma1(data)
             folders.append((b"\x03\x01\x01", props, len(data)))
+        elif coder == "deflate":
+            p = data
+            folders.append((b"\x04\x01\x08", b"", len(data)))
         else:
             p = lzma.compress(data, lzma.FORMAT_RAW, filters=[{"id": lzma.FILTER_LZMA2, "dict_size": 1 << 20}])
             folders.append((b"\x21", b"\x10", len(data)))
@@ -186,15 +191,63 @@ def make_7z(files, coder="lzma1"):
     return co.SIG + b"\x00\x04" + struct.pack("<I", zlib.crc32(start)) + start + body + bytes(h)
 
 
-def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN, notices=NOTICES):
+# A made-up song list movie with the shape of the game's: the list's script gives the scroll bar's thumb a clickable
+# area, its bounds read from the thumb and its depth the thumb's own.
+SONGS_POOL = ["ListScene", "ListSceneThumb", "xMin", "yMin", "xMax", "yMax", "mScrollBarThumb", "mScrollBarTrack",
+              "depth", "getDepth", "_x", "_y", "_width", "_height", "id"]
+GET, SET, ADD = bytes([co.A_GET_MEMBER]), bytes([co.A_SET_MEMBER]), b"\x47"
+
+
+def push(*values):
+    """A push of registers (ints), pool strings (str) and strings (bytes)."""
+    body = b""
+    for v in values:
+        if isinstance(v, int):
+            body += bytes([co.P_REGISTER, v])
+        elif isinstance(v, str):
+            body += bytes([co.P_POOL, SONGS_POOL.index(v)])
+        else:
+            body += b"\x00" + v + b"\x00"
+    return bytes([co.A_PUSH]) + struct.pack("<H", len(body)) + body
+
+
+def make_songs_list(edited=False, pool=SONGS_POOL):
+    """The movie (edited: as the overlay has it), with the script of a sprite before the list's."""
+    names = b"".join(n.encode() + b"\x00" for n in pool)
+    part = "mScrollBarTrack" if edited else "mScrollBarThumb"
+    thumb = push(1, part) + GET
+    script = (bytes([co.A_CONSTANT_POOL]) + struct.pack("<HH", len(names) + 2, len(pool)) + names
+              + push(b"a string", 4, "xMin", 1, part) + GET + push("_x") + GET + SET
+              + push(4, "yMin") + thumb + push("_y") + GET + SET
+              + push(4, "xMax") + thumb + push("_x") + GET + thumb + push("_width") + GET + ADD + SET
+              + push(4, "yMax") + thumb + push("_y") + GET + thumb + push("_height") + GET + ADD + SET
+              + push(4, "id", "ListSceneThumb") + SET
+              + co._thumb_depth(SONGS_POOL, edited))
+    tags = b""
+    for code, body in ((co.DO_INIT_ACTION, b"\x01\x00\x00"), (co.DO_INIT_ACTION, b"\x02\x00" + script), (1, b""),
+                       (0, b"")):
+        tags += struct.pack("<HI", (code << 6) | 0x3F, len(body)) + body if len(body) >= 0x3F else \
+            struct.pack("<H", (code << 6) | len(body)) + body
+    head = b"\x00" + struct.pack("<HH", 24 << 8, 1)  # an empty frame size, the rate and the frame count
+    return b"GFX\x08" + struct.pack("<I", 8 + len(head) + len(tags)) + head + tags
+
+
+def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN, notices=NOTICES, songs_list=None,
+               songs_7z=None):
     a = make_7z([("jsonloadlist.txt", b"list"), ("manifests/other.json", b"{}")], coder)
     n = make_7z([("localization/maingame.csv", notices.encode()), ("sparkactionmap.actionmap", b"m")], coder)
     b = make_7z([("manifests/ui_menu_pillar_main.database.json", main.encode("latin-1")),  # not UTF-8, as the game's
                  ("manifests/ui_menu_pillar_mission.database.json", mission.encode()),
                  ("manifests/ui_menu_pillar_startup.database.json", startup.encode()),
                  ("manifests/zz.json", b"z" * 70000)], coder)
+    archives = [("cache0.7z", a), ("cache4.7z", n), ("cache7.7z", b)]
+    if songs_list is not None:
+        songs_7z = make_7z([("gfxassets/views/las_songslist.gfx", songs_list), ("gfxassets/views/other.gfx", b"GFX")],
+                           coder)
+    if songs_7z is not None:  # (the song list's archive as it is)
+        archives.append(("cache8.7z", songs_7z))
     with open(path, "wb") as f:
-        f.write(co.write_psarc([("cache0.7z", a), ("cache4.7z", n), ("cache7.7z", b)]))
+        f.write(co.write_psarc(archives))
 
 
 class Edits(unittest.TestCase):
@@ -278,6 +331,22 @@ class Edits(unittest.TestCase):
         self.assertIsNone(co.edit_notice('1,x,y\r\n'))
 
 
+class SongsList(unittest.TestCase):
+    def test_edit(self):
+        out = co.edit_songs_list(make_songs_list())
+        self.assertEqual(out, make_songs_list(edited=True))  # the thumb's area the track's, on top; nothing moves
+        self.assertIsNone(co.edit_songs_list(out))
+        self.assertIsNone(co.edit_file(co.SONGS_LIST, out))
+
+    def test_not_the_expected_file(self):
+        movie = make_songs_list()
+        self.assertIsNone(co.edit_songs_list(b"CFX" + movie[3:]))  # a compressed movie
+        self.assertIsNone(co.edit_songs_list(movie[:40]))
+        self.assertIsNone(co.edit_songs_list(b""))
+        other = [n.replace("depth", "deep") for n in SONGS_POOL]  # a script with no depth for the thumb
+        self.assertIsNone(co.edit_songs_list(make_songs_list(pool=other)))
+
+
 class TmpDir(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="overlay-test-")
@@ -358,6 +427,58 @@ class Overlay(TmpDir):
         make_cache(os.path.join(game, "cache.psarc"), mission=co.edit_mission(MISSION), main=co.edit_main(MAIN),
                    notices=co.edit_notice(NOTICES))
         self.assertEqual(co.make(game), ["manifests/ui_menu_pillar_startup.database.json"])
+
+    def test_songs_list(self):
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        make_cache(os.path.join(game, "cache.psarc"), songs_list=make_songs_list())
+        self.assertIn(co.SONGS_LIST, co.make(game))
+        ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+        self.assertEqual(ps.names, ["cache4.7z", "cache7.7z", "cache8.7z"])
+        z = co.SevenZip(ps.read("cache8.7z"))
+        self.assertEqual(z.read(co.SONGS_LIST), make_songs_list(edited=True))
+        self.assertEqual(z.read("gfxassets/views/other.gfx"), b"GFX")
+        ps.close()
+
+    def test_songs_list_left_out(self):
+        """An archive with the song list that can't be read or rewritten costs the scroll bar's edit alone."""
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        cache = os.path.join(game, "cache.psarc")
+        menus = sorted(co.EDITS)
+
+        def overlay():
+            ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+            names = ps.names
+            ps.close()
+            return names
+
+        make_cache(cache, songs_7z=b"not a 7z")  # an archive that can't be read, after the menu's
+        self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+        make_cache(cache, songs_7z=make_7z([(co.SONGS_LIST, make_songs_list())], "deflate"))  # a coder it can't read
+        self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+
+        make_cache(cache, songs_list=make_songs_list())  # one that can't be rewritten (a solid one)
+        rewrite = co.rewrite_7z
+
+        def no_songs_list(data, files):
+            if co.SONGS_LIST in files:
+                raise co.Unsupported("solid 7z archive")
+            return rewrite(data, files)
+
+        with mock.patch.object(co, "rewrite_7z", no_songs_list):
+            self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+
+        def none(data, files):
+            raise co.Unsupported("solid 7z archive")
+
+        with mock.patch.object(co, "rewrite_7z", none):  # a menu archive: no overlay, as before
+            with self.assertRaises(co.Unsupported):
+                co.make(game)
+        self.assertFalse(os.path.exists(os.path.join(game, "Update")))
 
     def test_unreadable_cache(self):
         game = os.path.join(self.tmp, "game")
@@ -445,7 +566,7 @@ class RealCache(unittest.TestCase):
                 changed = sorted(x for x in z0.names() if z.read(x) != z0.read(x))
                 self.assertEqual(changed, sorted(x for x in names if x in z0.files))
                 for x in changed:
-                    self.assertIsNone(co.EDITS[x.lower()](z.read(x).decode("utf-8", "surrogateescape")))
+                    self.assertIsNone(co.edit_file(x.lower(), z.read(x)))
             ov.close()
             orig.close()
 

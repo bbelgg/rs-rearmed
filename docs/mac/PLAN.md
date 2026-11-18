@@ -61,6 +61,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
+- **Learn a Song's scroll bar** (not released): it can be dragged from anywhere on it, through the menu overlay's copy
+  of the song list; the game let it be grabbed only near the top of the list.
 - **A fixed frame rate** (new in 1.16.0): the rule and clock of `RS_FPS=N`, the installer's Frame rate, are one
   source that Learn & Play uses too (`shims/platform/include/rsp_fps.h`); this edition runs as before.
 - **Shared with Learn & Play** (new in 1.16.0): the switches, the log and the start of the built-in fixes, the intro

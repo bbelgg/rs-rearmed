@@ -169,6 +169,10 @@ static char g_root[1024];
 
 static void test_exit(int status) {
   // The shell's _Exit(0) after OpenGLView dealloc lands here.
+  // On the frame thread, the main thread's run loop (pump) goes on until the process ends: in the game that is
+  // up to 2 s of writing the Metal cache. A few periods of the controller's event timer pass here, so a quit
+  // path that leaves the run loop something freed (the timer's target) crashes in every run, not in some.
+  if (![NSThread isMainThread]) usleep(350 * 1000);
   CHECK(atomic_load(&g_shutdowns) == 1, "engine shutdown hook ran %d times", atomic_load(&g_shutdowns));
   printf("rsp_shell_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)

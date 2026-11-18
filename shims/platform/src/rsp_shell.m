@@ -728,11 +728,19 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 }
 
 
+// Not as the original: no [super dealloc], the object stays. The main run loop still has renderTimer, whose
+// target this is, and a timer can only be invalidated on its own thread, while this runs on the frame thread.
+// The process goes on until rsp_exit at the end of OpenGLView's dealloc (the display link stops, the Metal
+// cache is written: up to 2 s), and a timer that fired in that time retained a freed object (a crash in
+// objc_retain, before customEventTimer: could look at rsp_quitting). The same for a customEventTimer: or
+// mouseMoved: the main thread was already in. The process ends there, so the memory is not missed.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {  // 0x100185950
   atomic_store(&rsp_quitting, 1);
   rsp_game_shutdown();
-  [super dealloc];
 }
+#pragma clang diagnostic pop
 
 - (double)renderTime {  // 0x100185990
   return renderTime;

@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the song list's scroll bar): a small
-patch archive made from the user's own cache.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the lists' scroll bars): a small
+patch archive made from the user's own cache.psarc and static.psarc.
 
     cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
-    cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing
+    cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing (with the static.psarc
+                                        beside it: static_of)
 
 The game's cable screen ("HOW WOULD YOU LIKE TO CONNECT?") offers a real tone cable, a microphone or no input.
 The game code also handles a fourth button, "othercable" (Direct Connect: any audio interface), and a fourth
@@ -25,7 +26,9 @@ Learn a Song's scroll bar can be dragged only near the top of the list: the rows
 take the clicks on it. Its menu (gfxassets/views/las_songslist.gfx, a Scaleform movie) gives the game the bar's
 clickable area; the edit makes that area the bar's whole track, above the rows, by changing a few bytes of its
 ActionScript (edit_songs_list). It is the one optional edit: an archive with the movie that can't be read or
-rewritten leaves the movie out, not the menu's edits with it.
+rewritten leaves the movie out, not the menu's edits with it. The game's other lists with a scroll bar, the Tone
+Designer's among them, are movies of static.psarc with the same script (gfxassets/views/<name>.gfx): they get the
+same edit, and the overlay holds them as they are, beside the archives (plan_movies). They are optional too.
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -33,11 +36,12 @@ with only those files changed, into the patch container the engine mounts at sta
 
     patcharchives.psarc             mounted by the engine at PatchUpdate/
       cache4.7z, cache7.7z, ...     the cache.psarc archives with the changed files (whichever cacheN.7z has them)
+      gfxassets/views/<name>.gfx    the static.psarc menu movies with the changed lists
 
-The engine's own patch layer takes only .new/.delta archives from the container, so the game reads the
-cacheN.7z from there through a hook: FrontEnd_OpenFile opens PatchUpdate/cacheN.7z first and the cache.psarc
-one when the overlay has none (Mac: tools/ws7/recomp/overrides/mods/mods.c). Without the hook the overlay
-does nothing.
+The engine's own patch layer takes only .new/.delta archives from the container, so the game reads them from
+there through a hook: FrontEnd_OpenFile opens PatchUpdate/cacheN.7z or PatchUpdate/gfxassets/views/<name>.gfx
+first and the game's own when the overlay has none (rs_mods_overlay_name in
+tools/ws7/recomp/overrides/mods/mods_shared.c, both editions). Without the hook the overlay does nothing.
 
 cache.psarc itself is never written, so a modded cache works too: files that already have the entries are left
 as they are, and with nothing to change there is no overlay. Both editions use it (gamefiles.py runs it after a copy
@@ -844,6 +848,49 @@ def edit_file(name, data):
     return None if edited is None or edited == text else edited.encode("utf-8", "surrogateescape")
 
 
+# --- the lists of static.psarc ----------------------------------------------------------------------------
+
+STATIC, STATIC_ORIGINAL = "static.psarc", "static.psarc.original"
+VIEWS = "gfxassets/views/"
+
+
+def static_of(game_dir):
+    """The game's own static.psarc in GAME_DIR: static.psarc.original when the copy has it (static.psarc is a link to
+    it or to the title logo's static.psarc.rearmed), else static.psarc; None without one."""
+    for name in (STATIC_ORIGINAL, STATIC):
+        p = os.path.join(game_dir, name)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def plan_movies(static_path):
+    """{movie name: edited bytes} of the menu movies in static.psarc (gfxassets/views/<name>.gfx) whose list
+    edit_songs_list changes; the song list's own is cache.psarc's (BYTE_EDITS). {} when the archive can't be read,
+    and a movie that can't be is passed by: these are optional, as the song list's."""
+    out = {}
+    try:
+        ps = Psarc(static_path) if static_path else None
+    except (Unsupported, OSError):
+        return out
+    if ps is None:
+        return out
+    try:
+        for name in ps.names:
+            low = name.lower()
+            if not low.startswith(VIEWS) or not low.endswith(".gfx") or "/" in low[len(VIEWS):] or low in BYTE_EDITS:
+                continue
+            try:
+                edited = edit_songs_list(ps.read(name))
+            except Unsupported:
+                continue
+            if edited is not None:
+                out[low] = edited
+    finally:
+        ps.close()
+    return out
+
+
 # --- the overlay -------------------------------------------------------------------------------------------
 
 PATCH_DIR = "Update"
@@ -886,40 +933,42 @@ def plan(cache_path):
     return out
 
 
-def build(cache_path):
-    """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc; (None, []) when it needs no
-    change. The psarc holds the changed cacheN.7z archives under their own names. An archive with a menu file that
-    can't be rewritten (Unsupported: a solid one) costs the whole overlay, one with only BYTE_EDITS files only
-    those."""
+def build(cache_path, static_path=None):
+    """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc and the static.psarc beside it;
+    (None, []) when they need no change. The psarc holds the changed cacheN.7z archives under their own names and
+    the changed menu movies under theirs. An archive with a menu file that can't be rewritten (Unsupported: a solid
+    one) costs the whole overlay, one with only BYTE_EDITS files only those."""
     changes = plan(cache_path)
-    if not changes:
-        return None, []
+    movies = plan_movies(static_path)
     entries, names = [], []
-    ps = Psarc(cache_path)
-    try:
-        for name, files in sorted(changes.items()):
-            try:
-                entries.append((name, rewrite_7z(ps.read(name), files)))
-            except Unsupported:
-                if any(f.lower() in EDITS for f in files):
-                    raise
-                continue
-            names += files
-    finally:
-        ps.close()
+    if changes:
+        ps = Psarc(cache_path)
+        try:
+            for name, files in sorted(changes.items()):
+                try:
+                    entries.append((name, rewrite_7z(ps.read(name), files)))
+                except Unsupported:
+                    if any(f.lower() in EDITS for f in files):
+                        raise
+                    continue
+                names += files
+        finally:
+            ps.close()
+    entries += sorted(movies.items())
+    names += movies
     if not entries:
         return None, []
     return write_psarc(entries, (cache_path,)), sorted(names)
 
 
 def make(game_dir):
-    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc. Returns the names of the
-    files the overlay changes ([] when there is none). Raises Unsupported when the cache cannot be read (the
-    overlay is then removed)."""
+    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc and its static.psarc.
+    Returns the names of the files the overlay changes ([] when there is none). Raises Unsupported when the cache
+    cannot be read (the overlay is then removed)."""
     dst = os.path.join(game_dir, PATCH_DIR, PATCH_NAME)
     cache = os.path.join(game_dir, "cache.psarc")
     try:
-        data, names = build(cache) if os.path.isfile(cache) else (None, [])
+        data, names = build(cache, static_of(game_dir)) if os.path.isfile(cache) else (None, [])
     except Unsupported:
         remove(game_dir)
         raise
@@ -956,6 +1005,8 @@ def main(argv=None):
             for name, files in sorted(plan(argv[1]).items()):
                 for f in sorted(files):
                     print("%s: %s" % (name, f))
+            for f in sorted(plan_movies(static_of(os.path.dirname(os.path.abspath(argv[1]))))):
+                print("%s: %s" % (STATIC, f))
         else:
             names = make(argv[1])
             print("overlay: %s" % (", ".join(names) if names else "nothing to change"))

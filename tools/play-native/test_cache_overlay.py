@@ -480,6 +480,43 @@ class Overlay(TmpDir):
                 co.make(game)
         self.assertFalse(os.path.exists(os.path.join(game, "Update")))
 
+    def test_static_movies(self):
+        """The lists of static.psarc: each menu movie with the list's script, edited, in the overlay as it is."""
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        make_cache(os.path.join(game, "cache.psarc"), songs_list=make_songs_list())
+        movie, edited = make_songs_list(), make_songs_list(edited=True)
+        original, static = os.path.join(game, "static.psarc.original"), os.path.join(game, "static.psarc")
+        with open(original, "wb") as f:
+            f.write(co.write_psarc([("gfxassets/views/td_songlist.gfx", movie), ("gfxassets/views/other.gfx", b"GFX"),
+                                    ("gfxassets/views/las_songslist.gfx", movie),  # cache.psarc's: not twice
+                                    ("gfxassets/libs/commonlib.gfx", movie), ("gfxassets/views/sub/x.gfx", movie),
+                                    ("gfxassets/views/td_amplist.gfx", edited)]))  # (edited already)
+        with open(static, "wb") as f:  # the title logo's copy: the original is read
+            f.write(co.write_psarc([("gfxassets/views/td_racklist.gfx", movie)]))
+        menus = sorted(co.EDITS)
+        self.assertEqual(co.make(game), sorted(menus + [co.SONGS_LIST, "gfxassets/views/td_songlist.gfx"]))
+        ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+        self.assertEqual(ps.names, ["cache4.7z", "cache7.7z", "cache8.7z", "gfxassets/views/td_songlist.gfx"])
+        self.assertEqual(ps.read("gfxassets/views/td_songlist.gfx"), edited)
+        ps.close()
+
+        os.unlink(original)  # static.psarc alone
+        self.assertIn("gfxassets/views/td_racklist.gfx", co.make(game))
+        with open(static, "wb") as f:  # one that can't be read: the rest as before
+            f.write(b"not a psarc")
+        self.assertEqual(co.make(game), sorted(menus + [co.SONGS_LIST]))
+
+        # a cache with every edit made already: the movies alone
+        make_cache(os.path.join(game, "cache.psarc"), co.edit_startup(STARTUP), co.edit_mission(MISSION), "lzma2",
+                   co.edit_main(MAIN), co.edit_notice(NOTICES))
+        with open(static, "wb") as f:
+            f.write(co.write_psarc([("gfxassets/views/td_songlist.gfx", movie)]))
+        self.assertEqual(co.make(game), ["gfxassets/views/td_songlist.gfx"])
+        os.unlink(static)
+        self.assertEqual(co.make(game), [])
+        self.assertFalse(os.path.exists(os.path.join(game, "Update")))
+
     def test_unreadable_cache(self):
         game = os.path.join(self.tmp, "game")
         os.makedirs(os.path.join(game, "Update"))
@@ -569,6 +606,12 @@ class RealCache(unittest.TestCase):
                     self.assertIsNone(co.edit_file(x.lower(), z.read(x)))
             ov.close()
             orig.close()
+            static = co.static_of(os.path.dirname(cache))
+            if static:  # its lists: Tone Designer's among them, each edited once
+                movies = co.plan_movies(static)
+                self.assertIn("gfxassets/views/td_songlist.gfx", movies)
+                for d in movies.values():
+                    self.assertIsNone(co.edit_songs_list(d))
 
 
 if __name__ == "__main__":

@@ -472,7 +472,8 @@ What differs, fix by fix:
   `shims/steam/src/enumerate.h`, compiled in through `interfaces.cpp`. `steam32.c` answers `IsOverlayEnabled` and posts
   the `DlcInstalled_t`, and the game folder is `LP_GAME_DIR`.
 - **Song list scroll bar**: the same edit in the same overlay. This game's song list is byte for byte the Mac
-  game's, with the same bug.
+  game's, with the same bug. The other lists of `static.psarc` come through this edition's hook on FrontEnd_OpenFile
+  by the Mac's rule (`rs_mods_overlay_name`), from this game's own `static.psarc`.
 - **Song ownership during a mount**: the shared hook, which this edition's mounting loop tells when its steps run.
   `RS_MODS_BYPASS=0` also brings back the song-key table, which hides custom songs here whatever their AppID.
 - **Title logo.** The same `tools/loadscreen` and layout as the Mac edition's. `lp_install.py build` makes

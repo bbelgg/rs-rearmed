@@ -250,8 +250,9 @@ Steam may clear its download folder later: the copy is what the game reads, and 
 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
 (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed: it adds DIRECT CONNECT,
-turns SHOP into ENUMERATE and UPLAY into EXIT GAME, and lets Learn a Song's scroll bar be dragged from anywhere on
-it. If your cache can't be read, the copy goes on without it and says so.
+turns SHOP into ENUMERATE and UPLAY into EXIT GAME, and lets the scroll bars of Learn a Song, the Tone Designer and
+the game's other lists be dragged from anywhere on them (those lists are menus of your `static.psarc`, also unchanged).
+If your cache can't be read, the copy goes on without it and says so.
 
 The copy's tools read the game's archives with what the game itself holds (`tools/play-native/psarc_key.py`;
 nothing for it is in RS Re-ARMed). The game's program in the game folder shows it, and the copy keeps a note of it
@@ -511,7 +512,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the song list's scroll bar as the game has it ([Game files](#game-files)) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the lists' scroll bars as the game has them ([Game files](#game-files)) |
 | `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the install, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |

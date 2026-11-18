@@ -61,6 +61,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
+- **Learn a Song's scroll bar** (not released): as the Mac edition, by the same overlay; this game's song list is the
+  same file.
 - **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the installer's Frame rate, with the Mac edition's rule and clock
   (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
 - **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
@@ -158,8 +160,6 @@ edition" is described there. What has not been tested is under [Open issues](#op
   exists to try), a mount that is not finished (the steps then go on after 1 s, with a line in the log) and a
   manifest that does not come (the mounting then goes on after 5 s, with a line in the log: the shared source's
   test has that case, no game run has either).
-- **The song list's scroll bar** (not released): the Mac edition's edit, made by the same overlay; this game's
-  song list not yet checked against it.
 - **A mount that takes more than a second**: this loop then takes its steps without waiting, and a step taken
   before a mount is finished drops its archive, as the loop before 1.14.1 did for every one (the log then has
   `DLC: N archives were not mounted`, after the line that says the wait was given up). It waits on the count of

@@ -6,4 +6,4 @@ like before. Say which edition when it isn't both. tools/release/bump.py moves t
 notes and empties this file. -->
 
 - **Learn a Song's scroll bar can be dragged from anywhere on it:** before, it could be grabbed only near the top of
-  the list. Mac edition; Learn & Play gets the same edit, not yet tried there.
+  the list.

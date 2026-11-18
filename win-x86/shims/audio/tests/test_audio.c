@@ -7,8 +7,9 @@
 // event-driven render stream at the mix format (about 0.6 s of a quiet 440 Hz tone), an
 // exclusive event-mode stream as the game's Wwise sink opens it (0.3 s, 256-frame periods), the
 // guitar input as the game opens it (exclusive, event mode, 48 kHz mono float) when there is a
-// capture device, and waveIn / mixer as NSoundInputMgr_Win32 uses them.
+// capture device, waveIn / mixer as NSoundInputMgr_Win32 uses them, and a mod's hooks on the hook point si_io.
 #include <math.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -362,6 +363,121 @@ static void test_render(uint32_t en) {
   CHECK(vcall(dev, RELEASE, 0, 0) == 0);
 }
 
+// --- the hook point si_io ----------------------------------------------------------------------
+// A mod's hooks on the capture stream (wa_engine.h): the Mac's call on the I/O thread, the buffer the hook leaves
+// is what the stream's reader gets, and an input keeps its `self` from one stream to the next.
+enum { SI_PASS, SI_FILL, SI_OWN, SI_KEEP };
+static _Atomic int si_mode, si_pre_calls, si_post_calls, si_bad;
+static _Atomic(void *) si_self[2];
+static _Atomic uint32_t si_dev;
+static float si_own[64];
+static AudioBufferList si_own_list;
+static pthread_t si_main;
+
+static int si_pre(rc_ctx *c, void *user) {
+  void *self = (void *)(uintptr_t)c->r[7];
+  AudioBufferList *l = (AudioBufferList *)(uintptr_t)c->r[2];
+  int mode = atomic_load(&si_mode);
+  if (user != &si_mode || !self || !l || l->mNumberBuffers != 1 || l->mBuffers[0].mNumberChannels != 1 ||
+      !l->mBuffers[0].mData || !l->mBuffers[0].mDataByteSize || l->mBuffers[0].mDataByteSize % 4 ||
+      pthread_equal(pthread_self(), si_main) || *(uint64_t *)(uintptr_t)c->r[4] != 0)
+    si_bad++;
+  void *first = NULL;
+  if (!atomic_compare_exchange_strong(&si_self[0], &first, self) && first != self) atomic_store(&si_self[1], self);
+  atomic_store(&si_dev, (uint32_t)c->r[6]);
+  si_pre_calls++;
+  float *x = l->mBuffers[0].mData;
+  if (mode == SI_FILL)
+    for (uint32_t i = 0; i < l->mBuffers[0].mDataByteSize / 4; i++) x[i] = 0.25f;
+  if (mode == SI_OWN) c->r[2] = (uint64_t)(uintptr_t)&si_own_list;
+  if (mode == SI_KEEP) {
+    c->r[0] = 1;
+    c->r[4] += 8;
+    return 1;
+  }
+  return 0;
+}
+static void si_post(rc_ctx *c, void *user) {
+  if (user != &si_bad || c->r[0] != 1) si_bad++;
+  si_post_calls++;
+}
+
+// What a reader of the stream gets in `secs`: the frames, and how many of them are `want`
+static uint32_t si_read(wa_stream *st, double secs, float want, uint32_t *same) {
+  static float buf[4096];
+  uint32_t frames = 0;
+  *same = 0;
+  for (double t0 = now(); now() - t0 < secs; usleep(2000)) {
+    uint32_t n = wa_capture_available(st, 0);
+    if (n > 4096) n = 4096;
+    n = wa_capture_peek(st, buf, n);
+    for (uint32_t i = 0; i < n; i++) *same += buf[i] == want;
+    wa_capture_consume(st, n);
+    frames += n;
+  }
+  return frames;
+}
+
+static void test_si_io(void) {
+  wa_endpoint in;
+  if (!wa_default_endpoint(WA_CAPTURE, &in)) {
+    printf("si_io: no input device, skipped\n");
+    return;
+  }
+  si_main = pthread_self();
+  for (int i = 0; i < 64; i++) si_own[i] = 0.5f;
+  si_own_list.mNumberBuffers = 1;
+  si_own_list.mBuffers[0] = (AudioBuffer){1, sizeof si_own, si_own};
+  CHECK(!wa_si_io_hook(si_pre, NULL, &si_mode));
+  CHECK(!wa_si_io_hook(NULL, si_post, &si_bad));
+  wa_fmt f;
+  wa_fmt_mix(1, &f);  // the guitar input as the game opens it: 48 kHz mono float
+  wa_stream *st = wa_stream_open(&in, &f, 256, 256, 1);
+  CHECK(st);
+  uint32_t same, frames;
+  // the buffer changed in place is what the reader gets (the first frames lead in from silence when the device
+  // runs at another rate)
+  atomic_store(&si_mode, SI_FILL);
+  CHECK(!wa_stream_start(st));
+  frames = si_read(st, 0.3, 0.25f, &same);
+  int calls = si_pre_calls;
+  printf("si_io: %d buffers, %u frames read, %u as the hook left them\n", calls, frames, same);
+  CHECK(calls > 0 && frames > 0 && same + 8 >= frames);
+  CHECK(atomic_load(&si_dev) == in.dev && atomic_load(&si_self[0]) && !atomic_load(&si_self[1]));
+  // a list of the hook's own
+  atomic_store(&si_mode, SI_OWN);
+  usleep(50000);
+  si_read(st, 0.02, 0, &same);
+  frames = si_read(st, 0.2, 0.5f, &same);
+  CHECK(frames > 0 && same == frames);
+  // a pre hook that answers keeps the buffers from the game, and the post hooks don't run
+  atomic_store(&si_mode, SI_KEEP);
+  usleep(50000);
+  si_read(st, 0.02, 0, &same);
+  calls = si_pre_calls;
+  int posts = si_post_calls;
+  CHECK(posts > 0 && si_read(st, 0.2, 0, &same) == 0);
+  CHECK(si_pre_calls > calls && si_post_calls == posts);
+  // the input is the same one when its stream is opened again, and another while the first is open
+  atomic_store(&si_mode, SI_PASS);
+  wa_stream *two = wa_stream_open(&in, &f, 256, 256, 1);
+  CHECK(two && !wa_stream_start(two));
+  si_read(two, 0.2, 0, &same);
+  void *first = atomic_load(&si_self[0]), *second = atomic_load(&si_self[1]);
+  CHECK(second && second != first);
+  wa_stream_close(two);
+  wa_stream_close(st);
+  atomic_store(&si_self[0], NULL);
+  atomic_store(&si_self[1], NULL);
+  st = wa_stream_open(&in, &f, 256, 256, 1);
+  CHECK(st && !wa_stream_start(st));
+  si_read(st, 0.2, 0, &same);
+  CHECK(atomic_load(&si_self[0]) == first && !atomic_load(&si_self[1]));
+  wa_stream_close(st);
+  CHECK(!si_bad);
+  printf("si_io: ok\n");
+}
+
 static void test_capture(uint32_t en) {
   uint32_t pd = W();
   uint32_t hr = vcall(en, E_DEFAULT, 3, (uint32_t[]){1, 1, pd});  // eCapture
@@ -602,6 +718,7 @@ int main(int argc, char **argv) {
   test_render(en);
   test_capture(en);
   test_wavein();
+  test_si_io();  // last: its hooks stay
   CHECK(vcall(en, RELEASE, 0, 0) == 0);
   printf("ok\n");
   return 0;

@@ -13,6 +13,10 @@ static uint32_t posted[32], nposted, focus = 99, nfocus;
 void w32_post_input(uint32_t msg, uint32_t wp, uint32_t lp) { posted[nposted++ % 32] = msg; }
 void w32_user_focus(int active) { focus = (uint32_t)active; nfocus++; }
 
+// si_io is the audio layer's point (audio/wa_engine.c): the seam hands its hooks on
+static rc_hook_pre_fn si_io_pre;
+int wa_si_io_hook(rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) { si_io_pre = pre; return 0; }
+
 static uint32_t code, a, b, nseen, npost, drop_a = ~0u, fseen, drop_focus, stay_focused, key_up;
 static int pre(rc_ctx *c, void *user) {
   code = (uint32_t)c->r[7];
@@ -42,6 +46,7 @@ int main(void) {
   CHECK(!rc_hook_add_seam("input_sink", pre, post, NULL));
   CHECK(!rc_hook_add_seam("set_app_focus", pre_focus, NULL, NULL));
   CHECK(rc_hook_add_seam("no_such_point", pre, NULL, NULL));
+  CHECK(!rc_hook_add_seam("si_io", pre_focus, NULL, NULL) && si_io_pre == pre_focus);
 
   // a key waits for the frame, and goes on with the Mac's code, key code and character
   nposted = 0;

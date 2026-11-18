@@ -81,8 +81,9 @@ si_open             0x017c50a0  custom    bool<zero>(void *self@edi, int slot, .
 ```
 
 A point a map marks `unsupported` can still run: the platform layer takes it with `rc_hook_add_seam` (Learn &
-Play's `input_sink` and `set_app_focus`, `win-x86/shims/win32_input.c`). So Learn & Play has 19 of the 21 hook
-points, 17 in its table and these two; it lacks `si_io` and `input_mode_is_cable`.
+Play's `input_sink` and `set_app_focus`, `win-x86/shims/win32_input.c`, and `si_io`, its capture stream's,
+`win-x86/shims/audio/wa_engine.c`). So Learn & Play has 20 of the 21 hook points, 17 in its table and these three;
+it lacks `input_mode_is_cable`.
 
 A `custom` function without an `@register` is refused too, and so is a stdcall, thiscall or fastcall one whose
 stack arguments don't match its own `ret N`. A cdecl or `custom` function's `ret` says nothing of its arguments,

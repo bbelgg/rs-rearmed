@@ -70,7 +70,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Rocksmith Workshop, tone designer | ⚠️ | ✅ the tone designer; ⚠️ the Workshop's other screens |
 | Multiplayer (local), each player on their own input | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces | ✅ two channels of one interface; ⚠️ a cable with an interface, two interfaces, SWAP CABLE ASSIGNMENT |
 | DLC and custom songs | ✅ | ✅ ¹ |
-| Mods (`mods/` folder), hook points, the overlay API and the render API | ✅ all 21 hook points | ✅ the same dylib, built with `rc_mod.h`; 19 of the 21 hook points |
+| Mods (`mods/` folder), hook points, the overlay API and the render API | ✅ all 21 hook points | ✅ the same dylib, built with `rc_mod.h`; 20 of the 21 hook points |
 | Files a mod serves to the game (`rc_file.h`) | ✅ | ✅ |
 | [rearmed-mods](https://github.com/glebb/rearmed-mods) (`rearmed-mods.dylib`) | ✅ | ✅ the same file |
 | Edits and mid points: a mod changes a function from the inside | ✅ | ✅ |

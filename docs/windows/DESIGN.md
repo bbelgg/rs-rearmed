@@ -279,7 +279,12 @@ The policy is the Mac edition's, from the same code (`shims/coreaudio/rs_audio_h
   (`input_cb`), so it needs no collection like the Mac edition's `audio_chan.c`.
 - **The guitar input's channel and gain**: the capture stream reads the device's channels and gives the game the
   one `guitar-input.ini` sets, with the gain and a clip at full scale ([INSTALL.md](INSTALL.md#guitar-input)).
-  The stream is ours, so it needs no hook point (`si_io` is `unsupported`).
+  The stream is ours, so the settings need no hook point.
+- **A mod on the guitar input** (not released). The Mac game's input function is the hook point `si_io`; here the
+  capture stream runs a mod's hooks on that name (`wa_engine.h`). In each I/O cycle the device's frames become the
+  game's channels with the settings above, the hooks see them as one buffer of floats at the device's rate, on the
+  device's I/O thread, and what they leave is resampled if need be and goes into the ring: the game's note detection
+  and tones get what a hook wrote. With no mod the hooks cost one test.
 - **The list of inputs.** `wa_engine.c` lists an interface's channels as mono endpoints, in the priority order
   the game's limit of 10 needs.
 - **An input's level.** The game sets the level through `IAudioEndpointVolume` and the winmm mixer, which share
@@ -472,12 +477,13 @@ What differs, fix by fix:
   directory, before it loads them, so a mod finds its settings there. What a mod has:
   - **Hook points.** `rc_hook_add_name` as on the Mac; the hooks run on a view of the call, the Mac's SysV one, made
     from `tools/targets/win-x86` ([recompiler](../recompiler/README.md#overrides-and-hook-points)). Of the 21 hook
-    points (`tools/targets/names/hooks.list`) 19 work here. Seventeen are functions of this game, nine of them in this
-    game's own shape, adapted in `symbols.map`. Two, `input_sink` and `set_app_focus`, have no function here (the game
-    has window messages and an inlined tick), and `win32_input.c` runs them instead, with the Mac's values: macOS key
-    codes, the character, the pointer from the bottom left. Two are `unsupported`, and a hook on them gives -1 and a log
-    line: `si_io` is the Mac game's CoreAudio input ([Audio](#audio)), and `input_mode_is_cable` is inlined into its
-    caller, which the built-in fix replaces.
+    points (`tools/targets/names/hooks.list`) 20 work here. Seventeen are functions of this game, nine of them in this
+    game's own shape, adapted in `symbols.map`. Three have no function here, and the platform layer runs them instead.
+    `input_sink` and `set_app_focus` (the game has window messages and an inlined tick) are `win32_input.c`'s, with the
+    Mac's values: macOS key codes, the character, the pointer from the bottom left. `si_io` (the game reads its input
+    through PortAudio) is the capture stream's ([Audio](#audio); not released): the Mac's arguments, a buffer a hook may
+    change in place, on the device's I/O thread. One is `unsupported`, and a hook on it gives -1 and a log line:
+    `input_mode_is_cable` is inlined into its caller, which the built-in fix replaces.
 
     What differs with the call the same:
     - `game_frame` is the ServiceManager tick of the Run loop, so it runs more often than frames are presented.
@@ -488,6 +494,12 @@ What differs, fix by fix:
     - While a mod hooks `input_sink` or `set_app_focus`, events wait for the game thread (at the start of each Present)
       and reach the game a frame later. `input_sink`'s arguments, changed by a pre hook, are not taken
       (`set_app_focus`'s is). A modifier key is a down and an up here, where the Mac sends a down for both.
+    - `si_io`'s first argument is not the game's input object but the audio layer's name for the input: the same each
+      time an input is opened, another for each input open at a time, and nothing to read through. Its second is the
+      CoreAudio device; on the Mac a mod's hook has the game's own id there for a channel of the input list. The buffer
+      is in the game's format already (mono for the game's guitar input, its channel and gain applied), in whatever
+      size the device's I/O cycle has, so a hook sees every buffer where the Mac edition collects small ones into slots
+      of 128 first.
     - An argument this game's code has folded away is not taken (`input_bind`'s `force`, `ui_event`'s last two): a hook
       reads its one value, and a change to it goes nowhere.
   - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`): the Mac edition's two groups,

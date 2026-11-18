@@ -1,7 +1,8 @@
 # win-x86 audio: the WASAPI and winmm faces on CoreAudio (audio.h, docs/windows/DESIGN.md "Audio").
 #   make         build $(OUT)/libwinaudio.a (wa_*.c + the Mac build's game-independent audio code)
 #   make test    run tests/test_audio (the objects through their guest cells, no game needed;
-#                plays under a second of a quiet tone on the default output device)
+#                plays under a second of a quiet tone on the default output device, and runs the
+#                hook point si_io on the default input)
 #
 # The game links libwinaudio.a, win32_guestobj.o, win32_ksync.o (w32_event_signal) and the
 # AudioToolbox, CoreAudio and CoreFoundation frameworks.

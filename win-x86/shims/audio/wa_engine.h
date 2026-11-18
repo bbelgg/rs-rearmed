@@ -19,6 +19,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "rc_hook.h"
+
 enum { WA_RENDER = 0, WA_CAPTURE = 1, WA_ALL = 2 };
 
 // A sample format as WAVEFORMATEX(TENSIBLE) states it.
@@ -120,6 +122,23 @@ uint32_t wa_capture_overruns(wa_stream *s);
 
 // The device of the stream (for the workgroup of the thread that feeds it).
 AudioObjectID wa_stream_device(wa_stream *s);
+
+// The hook point si_io (tools/targets/names/hooks.list): one I/O buffer of a guitar input, on the device's I/O
+// thread, before the game has it. The Mac game has a function there, SoundInput's I/O function; this game reads
+// its input from the capture stream, which runs the hooks instead (rc_hook_add_seam, win32_input.c), on the Mac's
+// call: (void *self, uint32_t device, const AudioBufferList *input) -> bool.
+//   input   one buffer of 32-bit floats, what the device gave in this I/O cycle at the device's rate: the
+//           stream's channels interleaved (the game opens a guitar input mono), with the channel, the gain and
+//           the level of the input's settings in them, as the Mac edition's own hook leaves its buffer. What a
+//           pre hook writes there is what the game reads, its note detection and its tones. A pre hook may give
+//           another list instead (the third argument), of the same channels and any number of frames.
+//   device  the CoreAudio device the buffer comes from.
+//   self    tells the inputs apart, and is the same for an input each time its stream is opened. It is not the
+//           game's SoundInput: nothing is to be read through it.
+// A pre hook that answers nonzero keeps the buffer from the game. The post hooks run when the game's ring has it.
+// The hooks run on the I/O thread: no locks, allocation or system calls. Hooks are added before the game runs
+// (a mod's constructor); 0, or -1 when the point's hooks are taken.
+int wa_si_io_hook(rc_hook_pre_fn pre, rc_hook_post_fn post, void *user);
 
 // Endpoint volume (wa_com.c): one software gain per endpoint, shared by IAudioEndpointVolume
 // and the winmm mixer's volume and mute controls. 0..1; the gain is 0 while muted.

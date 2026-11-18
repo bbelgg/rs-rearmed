@@ -122,6 +122,10 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
   a device with more it queues the start of the buffer as it is, a mix-up of channels. A hook (`si_io`,
   `audio_chan.c`) gives it a mono buffer of the chosen channel with the gain instead, and the game's mono path
   does the rest. Settings: `guitar-input.ini` ([INSTALL.md](INSTALL.md#guitar-input)).
+- **A mod on the guitar input.** `si_io` is a hook point for mods too. A mod's hook comes after the one above, so it
+  has that mono buffer, or the device's own with nothing set, and what it writes there is what the game's note
+  detection and tones get. Learn & Play runs the same point from its capture stream (not released;
+  [Windows design](../windows/DESIGN.md#audio)).
 - **The list of inputs.** Each channel of an interface is an input of its own (`shims/coreaudio/rs_audio_input.c`,
   `audio_devs.c`). The game opens a device per slot, 10 at most, so a channel is a device to it: the list it reads has
   ids that hold the real device and the channel, in priority order, and the import thunks of the calls that take a
@@ -391,7 +395,7 @@ What each does:
   this edition and Learn & Play ([recompiler](../recompiler/README.md#overrides-and-hook-points)). What a mod
   has:
   - **Hook points.** `rc_hook_add_name("game_frame", pre, post, user)` hooks a game function by name. The 21 hook points
-    are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has 19 of them).
+    are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has 20 of them).
     `rc_hook_add` with a game address keeps working; `rc_target()` returns `mac-x64`.
   - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables (`tools/targets/mac-x64/edits.map`
     and `mids.map`) have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar (618 edits and 122

@@ -10,6 +10,7 @@
 // window messages and an inlined tick. While a mod hooks either, events wait for the game thread
 // (w32_input_frame, as the Mac's queue waits for its flush) and go through the hooks first; a pre hook that
 // answers nonzero keeps the event from the game. With no such mod nothing waits.
+// rc_hook_add_seam is here too, for every point the platform layer runs: si_io is the audio layer's (wa_engine.h).
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -93,7 +94,10 @@ static seam_ev seam_q[NSEAM];
 static uint32_t seam_h, seam_t;
 static pthread_mutex_t seam_mu = PTHREAD_MUTEX_INITIALIZER;
 
+int wa_si_io_hook(rc_hook_pre_fn pre, rc_hook_post_fn post, void *user);  // audio/wa_engine.c
+
 int rc_hook_add_seam(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) {
+  if (!strcmp(name, "si_io")) return wa_si_io_hook(pre, post, user);  // the capture stream's, on its I/O thread
   seam_point *p = !strcmp(name, p_input.name) ? &p_input : !strcmp(name, p_focus.name) ? &p_focus : NULL;
   if (!p || (pre && p->npre == SEAM_HOOKS) || (post && p->npost == SEAM_HOOKS)) return -1;
   if (pre) {

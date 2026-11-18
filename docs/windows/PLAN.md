@@ -90,9 +90,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 **Mods**
 
-- **Loading and hook points**: 19 of the 21 hook points, `input_bind` the latest (new in 1.16.0); `si_io`, the Mac
-  game's CoreAudio input, has no counterpart, and `input_mode_is_cable` is inlined into a function
-  `win32_overrides.c` replaces. The overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
+- **Loading and hook points**: 20 of the 21 hook points. `si_io`, a guitar input's buffers before the game has them,
+  is the latest (not released): the Mac game's CoreAudio input function has no counterpart, so the capture stream
+  runs the hooks; `input_mode_is_cable` is inlined into a function `win32_overrides.c` replaces. The overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
   ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)): `rearmed-mods.dylib` runs as the same file. No mod code runs
   without the network guard.
 - **Files a mod serves**: as the Mac edition, through the Win32 seam's file calls.

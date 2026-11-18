@@ -3,6 +3,7 @@
 
 #include <AudioToolbox/AudioToolbox.h>
 #include <math.h>
+#include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -325,12 +326,14 @@ struct wa_stream {
   _Atomic float gain;
   _Atomic uint64_t played;
   _Atomic uint32_t underruns, overruns;
-  // capture: the device's channels at its rate, and the resampler's state
+  // capture: the device's channels at its rate, the stream's channels of them (what si_io's hooks see), and
+  // the resampler's state
   uint16_t dev_ch;
-  float *in_buf;
+  float *in_buf, *in_game;
   uint32_t in_max;
   double step, phase;
-  float last[MAX_DEV_CH];
+  float last[MAX_CH];
+  void *si_self;  // the input as si_io's hooks know it
   // the guitar input's settings (rs_audio_input.h): in_ch -1 = the game's channels as they are
   int in_ch;
   float in_gain;
@@ -386,8 +389,102 @@ static OSStatus render_cb(void *ref, AudioUnitRenderActionFlags *flags, const Au
   return noErr;
 }
 
-// Capture: the device's frames, its channels at its rate, to the stream's channels at the
-// stream's rate (linear interpolation when the rates differ), into the ring.
+// ------------------------------------------------------------------------------------------------
+// The hook point si_io (wa_engine.h)
+// ------------------------------------------------------------------------------------------------
+#define SI_HOOKS 8
+static struct {
+  rc_hook_pre_fn pre[SI_HOOKS];
+  rc_hook_post_fn post[SI_HOOKS];
+  void *pre_user[SI_HOOKS], *post_user[SI_HOOKS];
+  _Atomic int npre, npost;
+} g_si;
+
+int wa_si_io_hook(rc_hook_pre_fn pre, rc_hook_post_fn post, void *user) {
+  int npre = atomic_load(&g_si.npre), npost = atomic_load(&g_si.npost);
+  if ((pre && npre == SI_HOOKS) || (post && npost == SI_HOOKS)) return -1;
+  if (pre) {
+    g_si.pre_user[npre] = user;
+    g_si.pre[npre] = pre;
+    atomic_store(&g_si.npre, npre + 1);
+  }
+  if (post) {
+    g_si.post_user[npost] = user;
+    g_si.post[npost] = post;
+    atomic_store(&g_si.npost, npost + 1);
+  }
+  return 0;
+}
+
+// What a hook has as `self`: an endpoint keeps its entry from one stream to the next, since a mod keeps what it
+// knows of an input by it, and the game opens an input's stream again and again. Two streams on one endpoint at a
+// time are two inputs.
+#define SI_INPUTS 16
+typedef struct {
+  char uid[192];
+  int open;
+} si_input;
+static si_input g_si_in[SI_INPUTS];
+static pthread_mutex_t g_si_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static void *si_self_take(const char *uid) {
+  int k = -1;
+  pthread_mutex_lock(&g_si_mu);
+  for (int i = 0; i < SI_INPUTS && k < 0; i++)
+    if (!g_si_in[i].open && !strcmp(g_si_in[i].uid, uid)) k = i;
+  for (int i = 0; i < SI_INPUTS && k < 0; i++)
+    if (!g_si_in[i].uid[0]) k = i;
+  for (int i = 0; i < SI_INPUTS && k < 0; i++)  // every entry has had an endpoint: one that is closed goes to this one
+    if (!g_si_in[i].open) k = i;
+  if (k >= 0) {
+    snprintf(g_si_in[k].uid, sizeof g_si_in[k].uid, "%s", uid);
+    g_si_in[k].open = 1;
+  }
+  pthread_mutex_unlock(&g_si_mu);
+  return k < 0 ? NULL : &g_si_in[k];
+}
+
+static void si_self_give(void *self) {
+  uintptr_t at = (uintptr_t)self, first = (uintptr_t)g_si_in;
+  if (at < first || at >= first + sizeof g_si_in) return;  // a render stream's NULL, or the stream itself
+  pthread_mutex_lock(&g_si_mu);
+  ((si_input *)self)->open = 0;
+  pthread_mutex_unlock(&g_si_mu);
+}
+
+// The pre hooks on one buffer, on the view of a call a hook has on this target (rc_hook.h, rc32_hook.c): the Mac's
+// arguments in the SysV registers, the stack pointer on a return address. 1 when a hook has answered, and the
+// game doesn't get the buffer. Otherwise *x and *frames are what the hooks left: the buffer changed in place, or
+// a list of their own.
+static int si_io_pre(wa_stream *s, rc_ctx *c, uint64_t *frame, AudioBufferList *list, float **x, uint32_t *frames) {
+  uint32_t ch = s->fmt.channels;
+  list->mNumberBuffers = 1;
+  list->mBuffers[0].mNumberChannels = ch;
+  list->mBuffers[0].mDataByteSize = *frames * ch * (uint32_t)sizeof(float);
+  list->mBuffers[0].mData = *x;
+  memset(c, 0, sizeof *c);
+  frame[0] = 0;
+  c->r[4] = (uint64_t)(uintptr_t)frame;
+  c->r[7] = (uint64_t)(uintptr_t)s->si_self;
+  c->r[6] = s->ep.dev;
+  c->r[2] = (uint64_t)(uintptr_t)list;
+  int n = atomic_load_explicit(&g_si.npre, memory_order_acquire);
+  for (int i = 0; i < n; i++)
+    if (g_si.pre[i](c, g_si.pre_user[i])) return 1;
+  c->r[4] = (uint64_t)(uintptr_t)&frame[1];  // the return address popped
+  const AudioBufferList *l = (const AudioBufferList *)(uintptr_t)c->r[2];
+  if (!l || !l->mNumberBuffers || !l->mBuffers[0].mData || l->mBuffers[0].mNumberChannels != ch) return 0;
+  uint32_t left = l->mBuffers[0].mDataByteSize / (ch * (uint32_t)sizeof(float));
+  if (l->mBuffers[0].mData != *x)
+    *x = l->mBuffers[0].mData;
+  else if (left > *frames)
+    return 0;  // our buffer holds no more than it did
+  *frames = left;
+  return 0;
+}
+
+// Capture: the device's frames, its channels at its rate, to the stream's channels with the input's settings,
+// past si_io's hooks, then at the stream's rate (linear interpolation when the rates differ) into the ring.
 static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *ts, UInt32 bus,
                          UInt32 frames, AudioBufferList *unused) {
   (void)unused;
@@ -400,20 +497,30 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
   abl.mBuffers[0].mData = s->in_buf;
   if (AudioUnitRender(s->unit, flags, ts, bus, frames, &abl) != noErr) return noErr;
   uint32_t ch = s->fmt.channels, dch = s->dev_ch;
-  uint64_t w = atomic_load_explicit(&s->w, memory_order_relaxed);
-  uint64_t r = atomic_load_explicit(&s->r, memory_order_acquire);
-  float frame[MAX_CH], peak = 0, gain = s->in_gain * atomic_load_explicit(&s->gain, memory_order_relaxed);
+  float *x = s->in_game, peak = 0, gain = s->in_gain * atomic_load_explicit(&s->gain, memory_order_relaxed);
   uint32_t pushed = 0, dropped = 0, clips = 0;
-  for (uint32_t i = 0; i < frames;) {
-    // one output frame: at phase between last (i - 1) and in_buf[i]
-    const float *cur = s->in_buf + (size_t)i * dch;
+  for (uint32_t i = 0; i < frames; i++)
     for (uint32_t c = 0; c < ch; c++) {
       uint32_t sc = s->in_ch >= 0 ? (uint32_t)s->in_ch : c < dch ? c : 0;
-      float a = s->last[sc], b = cur[sc];
-      frame[c] = rs_audio_input_apply(s->step == 1.0 ? b : a + (float)s->phase * (b - a), gain, &peak, &clips);
+      x[(size_t)i * ch + c] = rs_audio_input_apply(s->in_buf[(size_t)i * dch + sc], gain, &peak, &clips);
     }
+  rs_audio_input_note(&s->in_stats, peak, clips, frames);
+  int hooked = atomic_load_explicit(&g_si.npre, memory_order_acquire) ||
+               atomic_load_explicit(&g_si.npost, memory_order_acquire);
+  rc_ctx view;
+  uint64_t frame[8];
+  AudioBufferList list;
+  if (hooked && si_io_pre(s, &view, frame, &list, &x, &frames)) return noErr;
+  uint64_t w = atomic_load_explicit(&s->w, memory_order_relaxed);
+  uint64_t r = atomic_load_explicit(&s->r, memory_order_acquire);
+  float out[MAX_CH];
+  for (uint32_t i = 0; i < frames;) {
+    // one output frame: at phase between last (i - 1) and x[i]
+    const float *cur = x + (size_t)i * ch;
+    for (uint32_t c = 0; c < ch; c++)
+      out[c] = s->step == 1.0 ? cur[c] : s->last[c] + (float)s->phase * (cur[c] - s->last[c]);
     if ((uint32_t)(w - r) + pushed < s->ring_frames) {
-      ring_write(s, w + pushed, frame, 1);
+      ring_write(s, w + pushed, out, 1);
       pushed++;
     } else {
       dropped++;
@@ -421,15 +528,19 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
     s->phase += s->step;
     while (s->phase >= 1.0 && i < frames) {
       s->phase -= 1.0;
-      for (uint32_t c = 0; c < dch; c++) s->last[c] = cur[c];
+      for (uint32_t c = 0; c < ch; c++) s->last[c] = cur[c];
       i++;
-      cur += dch;
+      cur += ch;
     }
   }
   atomic_store_explicit(&s->w, w + pushed, memory_order_release);
-  rs_audio_input_note(&s->in_stats, peak, clips, pushed);
   if (dropped) atomic_fetch_add_explicit(&s->overruns, dropped, memory_order_relaxed);
   if ((uint32_t)(w + pushed - r) >= s->period_frames) signal_guest(s);
+  if (hooked) {
+    view.r[0] = 1;  // the Mac function's answer: the buffer was this input's
+    int n = atomic_load_explicit(&g_si.npost, memory_order_acquire);
+    for (int i = 0; i < n; i++) g_si.post[i](&view, g_si.post_user[i]);
+  }
   return noErr;
 }
 
@@ -532,7 +643,10 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
       goto fail;
     s->in_max = 8192;
     s->in_buf = calloc((size_t)s->in_max * s->dev_ch, sizeof(float));
-    if (!s->in_buf) goto fail;
+    s->in_game = calloc((size_t)s->in_max * fmt->channels, sizeof(float));
+    if (!s->in_buf || !s->in_game) goto fail;
+    s->si_self = si_self_take(ep->uid);
+    if (!s->si_self) s->si_self = s;  // more inputs open at a time than the game has
     s->step = s->dev_rate / fmt->rate;
     s->phase = s->step == 1.0 ? 1.0 : 0.0;
     AURenderCallbackStruct cb = {input_cb, s};
@@ -578,6 +692,8 @@ void wa_stream_close(wa_stream *s) {
   free(s->ring);
   free(s->conv);
   free(s->in_buf);
+  free(s->in_game);
+  si_self_give(s->si_self);
   free(s);
 }
 

@@ -2,7 +2,8 @@
 #   make test    run tests/test_ksync (kernel32 waits from host threads), then again with LP_WAKE_ALL=1,
 #                tests/test_nofile (the open-file limit) and tests/test_close (CloseHandle against the
 #                other handle calls, under the address sanitizer), tests/test_kfile (paths and finds),
-#                tests/test_input (input_sink and set_app_focus, the hook points of the input layer)
+#                tests/test_input (input_sink and set_app_focus, the hook points of the input layer, and
+#                si_io handed on to the audio layer)
 OUT      ?= build
 root     := ../../..
 runtime  := $(root)/tools/ws7/recomp/runtime

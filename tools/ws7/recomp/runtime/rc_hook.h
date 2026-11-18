@@ -109,7 +109,8 @@ typedef struct {
 } rc_target_value;
 
 // A point of the target's table that has no function in this game, run by the platform layer instead (Learn &
-// Play's input_sink and set_app_focus, win32_input.c). 0 when the layer has taken the hooks.
+// Play's input_sink and set_app_focus, win32_input.c, and si_io, audio/wa_engine.h). 0 when the layer has taken the
+// hooks.
 int rc_hook_add_seam(const char *name, rc_hook_pre_fn pre, rc_hook_post_fn post, void *user);
 // A call to such a point, as rc_call_name would make it (Learn & Play: input_sink feeds the input layer). 0 when
 // the layer has it.

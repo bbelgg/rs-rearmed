@@ -14,6 +14,7 @@ import struct
 import sys
 import tempfile
 import unittest
+from unittest import mock
 import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -160,12 +161,16 @@ def _num(v):
 
 
 def make_7z(files, coder="lzma1"):
-    """A 7z archive like the game's own (one file per folder, plain header) of FILES [(name, bytes)]."""
+    """A 7z archive like the game's own (one file per folder, plain header) of FILES [(name, bytes)]. coder:
+    lzma1, lzma2, or deflate (stored as it is: a coder cache_overlay doesn't read)."""
     packs, folders = [], []
     for _, data in files:
         if coder == "lzma1":
             p, props = co._lzma1(data)
             folders.append((b"\x03\x01\x01", props, len(data)))
+        elif coder == "deflate":
+            p = data
+            folders.append((b"\x04\x01\x08", b"", len(data)))
         else:
             p = lzma.compress(data, lzma.FORMAT_RAW, filters=[{"id": lzma.FILTER_LZMA2, "dict_size": 1 << 20}])
             folders.append((b"\x21", b"\x10", len(data)))
@@ -227,7 +232,8 @@ def make_songs_list(edited=False, pool=SONGS_POOL):
     return b"GFX\x08" + struct.pack("<I", 8 + len(head) + len(tags)) + head + tags
 
 
-def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN, notices=NOTICES, songs_list=None):
+def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN, notices=NOTICES, songs_list=None,
+               songs_7z=None):
     a = make_7z([("jsonloadlist.txt", b"list"), ("manifests/other.json", b"{}")], coder)
     n = make_7z([("localization/maingame.csv", notices.encode()), ("sparkactionmap.actionmap", b"m")], coder)
     b = make_7z([("manifests/ui_menu_pillar_main.database.json", main.encode("latin-1")),  # not UTF-8, as the game's
@@ -236,8 +242,10 @@ def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN,
                  ("manifests/zz.json", b"z" * 70000)], coder)
     archives = [("cache0.7z", a), ("cache4.7z", n), ("cache7.7z", b)]
     if songs_list is not None:
-        archives.append(("cache8.7z", make_7z([("gfxassets/views/las_songslist.gfx", songs_list),
-                                                ("gfxassets/views/other.gfx", b"GFX")], coder)))
+        songs_7z = make_7z([("gfxassets/views/las_songslist.gfx", songs_list), ("gfxassets/views/other.gfx", b"GFX")],
+                           coder)
+    if songs_7z is not None:  # (the song list's archive as it is)
+        archives.append(("cache8.7z", songs_7z))
     with open(path, "wb") as f:
         f.write(co.write_psarc(archives))
 
@@ -431,6 +439,46 @@ class Overlay(TmpDir):
         self.assertEqual(z.read(co.SONGS_LIST), make_songs_list(edited=True))
         self.assertEqual(z.read("gfxassets/views/other.gfx"), b"GFX")
         ps.close()
+
+    def test_songs_list_left_out(self):
+        """An archive with the song list that can't be read or rewritten costs the scroll bar's edit alone."""
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        cache = os.path.join(game, "cache.psarc")
+        menus = sorted(co.EDITS)
+
+        def overlay():
+            ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+            names = ps.names
+            ps.close()
+            return names
+
+        make_cache(cache, songs_7z=b"not a 7z")  # an archive that can't be read, after the menu's
+        self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+        make_cache(cache, songs_7z=make_7z([(co.SONGS_LIST, make_songs_list())], "deflate"))  # a coder it can't read
+        self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+
+        make_cache(cache, songs_list=make_songs_list())  # one that can't be rewritten (a solid one)
+        rewrite = co.rewrite_7z
+
+        def no_songs_list(data, files):
+            if co.SONGS_LIST in files:
+                raise co.Unsupported("solid 7z archive")
+            return rewrite(data, files)
+
+        with mock.patch.object(co, "rewrite_7z", no_songs_list):
+            self.assertEqual(co.make(game), menus)
+        self.assertEqual(overlay(), ["cache4.7z", "cache7.7z"])
+
+        def none(data, files):
+            raise co.Unsupported("solid 7z archive")
+
+        with mock.patch.object(co, "rewrite_7z", none):  # a menu archive: no overlay, as before
+            with self.assertRaises(co.Unsupported):
+                co.make(game)
+        self.assertFalse(os.path.exists(os.path.join(game, "Update")))
 
     def test_unreadable_cache(self):
         game = os.path.join(self.tmp, "game")

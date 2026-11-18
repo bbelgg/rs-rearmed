@@ -24,7 +24,8 @@ game's own label (row 19651, in every language) and its own action, which the fi
 Learn a Song's scroll bar can be dragged only near the top of the list: the rows of songs below the one in focus
 take the clicks on it. Its menu (gfxassets/views/las_songslist.gfx, a Scaleform movie) gives the game the bar's
 clickable area; the edit makes that area the bar's whole track, above the rows, by changing a few bytes of its
-ActionScript (edit_songs_list).
+ActionScript (edit_songs_list). It is the one optional edit: an archive with the movie that can't be read or
+rewritten leaves the movie out, not the menu's edits with it.
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -850,7 +851,8 @@ PATCH_NAME = "patcharchives.psarc"
 
 
 def plan(cache_path):
-    """{archive name in cache.psarc: {file name in it: edited bytes}} of what the overlay changes."""
+    """{archive name in cache.psarc: {file name in it: edited bytes}} of what the overlay changes. An archive that
+    can't be read once the menu's files are found, or a BYTE_EDITS file that can't be, is passed by."""
     out = {}
     ps = Psarc(cache_path)
     try:
@@ -858,13 +860,23 @@ def plan(cache_path):
         for name in ps.names:
             if not name.lower().endswith(".7z"):
                 continue
-            z = SevenZip(ps.read(name))
+            try:
+                z = SevenZip(ps.read(name))
+            except Unsupported:
+                if found.issuperset(EDITS):
+                    continue  # (only the song list's movie can be in it)
+                raise
             for inner in z.names():
                 want = inner.lower()
                 if want in found or (want not in EDITS and want not in BYTE_EDITS):
                     continue
                 found.add(want)
-                edited = edit_file(want, z.read(inner))
+                try:
+                    edited = edit_file(want, z.read(inner))
+                except Unsupported:
+                    if want in EDITS:
+                        raise
+                    continue
                 if edited is not None:
                     out.setdefault(name, {})[inner] = edited
             if len(found) == len(EDITS) + len(BYTE_EDITS):
@@ -876,16 +888,28 @@ def plan(cache_path):
 
 def build(cache_path):
     """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc; (None, []) when it needs no
-    change. The psarc holds the changed cacheN.7z archives under their own names."""
+    change. The psarc holds the changed cacheN.7z archives under their own names. An archive with a menu file that
+    can't be rewritten (Unsupported: a solid one) costs the whole overlay, one with only BYTE_EDITS files only
+    those."""
     changes = plan(cache_path)
     if not changes:
         return None, []
+    entries, names = [], []
     ps = Psarc(cache_path)
     try:
-        entries = [(name, rewrite_7z(ps.read(name), files)) for name, files in sorted(changes.items())]
+        for name, files in sorted(changes.items()):
+            try:
+                entries.append((name, rewrite_7z(ps.read(name), files)))
+            except Unsupported:
+                if any(f.lower() in EDITS for f in files):
+                    raise
+                continue
+            names += files
     finally:
         ps.close()
-    return write_psarc(entries, (cache_path,)), sorted(f for files in changes.values() for f in files)
+    if not entries:
+        return None, []
+    return write_psarc(entries, (cache_path,)), sorted(names)
 
 
 def make(game_dir):

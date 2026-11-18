@@ -41,6 +41,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed
   mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original.
 - **Retina, colour and a sharper picture**: as the Mac edition, the renderer being shared.
+- **The tuner's red peg** (not released): as the Mac edition, from the renderer's rule for a draw that samples its
+  own target ([DESIGN.md](DESIGN.md#direct3d-9)). Before it the tuner also turned purple with a back buffer of
+  1102x717 or 1104x718, in 9 of 10 runs at those sizes; with the rule five runs at 1102x717 and one at 1470x956
+  show the tuner as it should be.
 
 **Built-in fixes** (the Mac edition's, on this game's own functions and with the same switches:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))
@@ -119,6 +123,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   Mac edition's, which a mod serves in this game's form as they are opened; this loop waits for each archive's file
   to be closed, by a thread of the game's, where the Mac's waits on the game's own queue of packages (`dlc_package`
   and `dlc_package_queue`, not matched here); and a frame of the mounting took 87 ms, 50 of them the loop's budget.
+- **What started the purple tuner** was not found. The loop it grew in is gone (the glow's blur no longer reads its
+  own last frame), but not what first put purple into the glow's texture at its right edge at a 1102x717 and a
+  1104x718 back buffer and not at 1280x720 or 1470x956: nothing the game drew there. The red peg has not been
+  compared with the game on Windows.
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address 0x0`), and a fault
   at guest address 0x168 before it. Neither has come back.
 - **A song ending a few seconds in**: with the machine heavily loaded by other builds, a song went back to its page

@@ -15,3 +15,8 @@ notes and empties this file. -->
   there is what the game's note detection and tones get. Until now the point was the Mac edition's alone, and a mod
   that changes the guitar's sound on the way in stayed off in Learn & Play. Learn & Play now has 20 of the 21 hook
   points. The first argument only tells the inputs apart there: it is not the game's input object.
+- **The tuner shows in red which peg to turn, and Learn & Play's tuner can no longer turn purple.** The game lights
+  the tuning peg of the string it is listening to in red, with a glow it blurs in a way the renderer drew wrong:
+  the peg stayed grey in both editions. In Learn & Play at some window and picture sizes (seen at 1102x717 and
+  1104x718) purple streaks also grew from the right edge of the screen before a song, until the whole tuner was
+  purple; the note highway after it was normal.

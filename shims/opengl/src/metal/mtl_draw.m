@@ -466,6 +466,47 @@ void rsm_end_pass(RSMContext *ctx) {
     }
 }
 
+// --- A draw that samples its own target ----------------------------------------------------
+// GL and Direct3D 9 leave the result undefined, and a game can still count on what the graphics cards it was made
+// on did: the draw reads what was drawn to the target before it. The tuner of both games blurs the glow of the peg
+// to turn that way, with two draws that read the texture they draw into. A Metal pass on an Apple GPU keeps its
+// pixels in tile memory until it ends, so there the draw reads the texture as the pass before left it: the last
+// frame's blur, never this frame's picture. The peg stayed grey, and in Learn & Play what once got into the
+// texture stayed in it and spread with every frame, until the whole tuner was purple.
+//
+// So such a draw samples a copy: the pass ends, the target is copied as it is by then, and the pass goes on with
+// what it had (rsm_draw). Only for a texture of one level drawn into as a whole 2D picture: rendering one level
+// of a mip chain from another is not this, and is left alone.
+static bool rsm_own_target_copy(RSMContext *ctx) {
+    id<MTLTexture> src = ctx->pass_color;
+    id<MTLTexture> c = ctx->own_copy;
+    if (!c || c.width != src.width || c.height != src.height || c.pixelFormat != src.pixelFormat) {
+        MTLTextureDescriptor *d = [MTLTextureDescriptor texture2DDescriptorWithPixelFormat:src.pixelFormat
+                                                                                     width:src.width
+                                                                                    height:src.height
+                                                                                 mipmapped:NO];
+        d.usage = MTLTextureUsageShaderRead;
+        d.storageMode = MTLStorageModePrivate;
+        c = [ctx->dev newTextureWithDescriptor:d];
+        if (!c)
+            return false;
+        c.label = @"rsgl copy of a target its draw samples";
+        ctx->own_copy = c;
+        ctx->own_view = nil;
+        static int told;
+        if (!told++)
+            rsm_log("a draw samples the %lux%lu target it draws into: it samples a copy", (unsigned long)src.width,
+                    (unsigned long)src.height);
+    }
+    rsm_end_pass(ctx);  // what was drawn so far is in the target now (and a clear still pending)
+    id<MTLBlitCommandEncoder> b = [rsm_cmd(ctx) blitCommandEncoder];
+    [b copyFromTexture:src sourceSlice:0 sourceLevel:0 toTexture:c destinationSlice:0 destinationLevel:0 sliceCount:1
+            levelCount:1];
+    [b endEncoding];
+    ctx->own_for = (__bridge void *)src;
+    return true;
+}
+
 // --- Depth / stencil state ---------------------------------------------------------------
 static unsigned rsm_sop(GLenum op) {
     switch (op) {
@@ -1254,6 +1295,26 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                                                                              : rsm_texture_view(t);
             if (rsm_texlog_on && t && unit < RSM_TEXLOG_UNITS)
                 log_ids[unit] = t->log_id;
+            if (t && t->mtl && t->mtl == ctx->pass_color && !cube && t->levels == 1 && !ctx->pass_color_level &&
+                !ctx->pass_color_slice) {
+                // Its own target: a copy (rsm_own_target_copy). Making the copy ends the pass this draw was being
+                // set up in, so the draw starts again, and finds the copy made for it.
+                if (ctx->own_for != (__bridge void *)t->mtl) {
+                    if (rsm_own_target_copy(ctx)) {
+                        rsm_draw(ctx, mode, first, count, itype, indices, instances, indexed);
+                        ctx->own_for = NULL;
+                        return;
+                    }
+                } else if (t->swz == RSM_SWZ_NONE) {
+                    mt = ctx->own_copy;
+                } else {
+                    if (!ctx->own_view || ctx->own_view_swz != t->swz) {
+                        ctx->own_view = rsm_texture_view_of(t, ctx->own_copy);
+                        ctx->own_view_swz = t->swz;
+                    }
+                    mt = ctx->own_view;
+                }
+            }
             id<MTLTexture> instead = t && t->rule ? rsm_rule_texture(ctx, t->rule, &hidden) : nil;
             if (instead)
                 mt = instead;

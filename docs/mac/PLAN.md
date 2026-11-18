@@ -39,6 +39,11 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
+- **The tuner's red peg** (not released): the game lights the peg of the string it listens to in red, with a glow it
+  blurs by draws that sample the texture they draw into. Metal gave such a draw the last frame's picture, so the
+  peg stayed grey; now it gets a copy of what was drawn before it
+  ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). Learn & Play's tuner turned purple from the same cause
+  at some sizes; this edition's was not seen to (one run at 1103x717 before the rule).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 
@@ -117,6 +122,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - The first play of a song after an install stutters briefly on Metal (pipelines built on first use). A draw that
   waits for a shader compile hurries it; the gain isn't measured.
 - Mods that draw with OpenGL show nothing on Metal; they need the overlay API.
+- The tuner's red peg has not been compared with the original game, and after the rule that brought it back this
+  edition was run at the built-in screen's size only.
 - Renderer details: `RS_GL_CHECK` keeps one pending error per thread, not per context; `GL_TEXTURE_BASE_LEVEL` is
   ignored on Metal; shared CGL contexts are not supported on Metal; only the first GPU gets a disk cache. A draw keeps
   its pipeline key while nothing it is made of has changed, but the game sets vertex state or the program before every

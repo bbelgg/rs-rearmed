@@ -1459,6 +1459,18 @@ id<MTLTexture> rsm_texture_view(RSMTexture *t) {
     return t->view;
 }
 
+// Another texture of t's format (a copy of it) as shaders sample t: through t's swizzle.
+id<MTLTexture> rsm_texture_view_of(RSMTexture *t, id<MTLTexture> storage) {
+    if (t->swz == RSM_SWZ_NONE || !storage)
+        return storage;
+    id<MTLTexture> v = [storage newTextureViewWithPixelFormat:storage.pixelFormat
+                                                  textureType:storage.textureType
+                                                       levels:NSMakeRange(0, storage.mipmapLevelCount)
+                                                       slices:NSMakeRange(0, 1)
+                                                      swizzle:rsm_swizzle(t->swz)];
+    return v ? v : storage;
+}
+
 // --- Texture storage ----------------------------------------------------------------
 static int rsm_full_levels(int w, int h) {
     int m = w > h ? w : h, n = 1;

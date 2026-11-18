@@ -2399,6 +2399,100 @@ static void case_packed_float(void) {
     glok("packed float");
 }
 
+// A draw that samples the texture it draws into reads what the pass has drawn so far (mtl_draw.m, "A draw that
+// samples its own target"): the games' tuner blurs a glow in place that way, twice a frame. Without the rule
+// a Metal pass reads the texture as the pass before left it. GL leaves the result undefined, so these pixels are
+// checked on Metal only and stay out of the dump the two backends are compared by.
+static void own_target_check(int x, int y, int r, int g, int b, int a, const char *what) {
+    unsigned char p[4] = {0x5A, 0x5A, 0x5A, 0x5A};
+    glReadPixels(x, y, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, p);
+    if (rs_gfx_backend() != RS_GFX_METAL)
+        return;
+    check(near(p[0], r, 1) && near(p[1], g, 1) && near(p[2], b, 1) && near(p[3], a, 1),
+          "%s: pixel (%d,%d) = %d,%d,%d,%d want %d,%d,%d,%d", what, x, y, p[0], p[1], p[2], p[3], r, g, b, a);
+}
+
+static void case_own_target(void) {
+    // what the draw read comes back with its channels moved one place: red -> green -> blue
+    static const char kFSturn[] =
+        "#version 120\n"
+        "uniform sampler2D tex;\n"
+        "varying vec2 v_tc;\n"
+        "void main() { vec4 c = texture2D(tex, v_tc); gl_FragColor = vec4(c.b, c.r, c.g, c.a); }\n";
+    GLuint color, ds;
+    GLuint fbo = make_fbo(&color, &ds, 32, 32);
+    GLuint pc = program(kVS, kFScolor, "pos", NULL);
+    GLuint pt = program(kVStex, kFSturn, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(pt, "tex"), 0);
+    glActiveTexture(GL_TEXTURE0);
+    glViewport(0, 0, 32, 32);
+    // The tuner's frame, three times: a clear, something drawn, then two draws over the whole target that read
+    // it. The second reads what the first wrote, and nothing is left of the frame before: its red was on the
+    // other half.
+    for (int frame = 0; frame < 3; frame++) {
+        int left = !(frame & 1);
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glClearColor(0, 0, 0, 1);
+        glClear(GL_COLOR_BUFFER_BIT);
+        glUseProgram(pc);
+        uniform4(pc, "color", 1, 0, 0, 1);
+        glDisableVertexAttribArray(1);
+        draw_rect(left ? 0 : 32, 0, left ? 32 : 64, 64);
+        glUseProgram(pt);
+        glBindTexture(GL_TEXTURE_2D, color);
+        draw_tex_rect(0, 0, 64, 64);
+        draw_tex_rect(0, 0, 64, 64);
+        own_target_check(left ? 8 : 24, 16, 0, 0, 255, 255, "this frame's red, read and written twice");
+        own_target_check(left ? 24 : 8, 16, 0, 0, 0, 255, "nothing of the frame before");
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        rs_gfx_present(rs_gfx_current());
+    }
+    // A clear with no draw after it is what the draw reads too.
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glClearColor(0.5f, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    draw_tex_rect(0, 0, 64, 64);
+    own_target_check(16, 16, 0, 128, 0, 255, "the clear before the draw");
+    // A draw that reads another texture between two that read the target: each gets its own texture.
+    static const unsigned char white[4] = {255, 255, 255, 255};
+    GLuint other = texture_rgba(1, 1, white, GL_NEAREST);
+    draw_tex_rect(0, 0, 32, 64);
+    glBindTexture(GL_TEXTURE_2D, color);
+    draw_tex_rect(0, 0, 64, 64);
+    own_target_check(8, 16, 255, 255, 255, 255, "another texture, then the target again");
+    own_target_check(24, 16, 0, 0, 128, 255, "the target, read a second time");
+    // A target without alpha is sampled through a swizzle, and so is its copy: alpha reads as one.
+    static const char kFSalpha[] =
+        "#version 120\n"
+        "uniform sampler2D tex;\n"
+        "varying vec2 v_tc;\n"
+        "void main() { vec4 c = texture2D(tex, v_tc); gl_FragColor = vec4(c.a, c.r, 0.0, 1.0); }\n";
+    GLuint rgb;
+    glGenTextures(1, &rgb);
+    glBindTexture(GL_TEXTURE_2D, rgb);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 32, 32, 0, GL_RGB, GL_UNSIGNED_BYTE, NULL);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, rgb, 0);
+    check(glCheckFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE, "RGB target complete");
+    glClearColor(0.5f, 0, 0, 0);
+    glClear(GL_COLOR_BUFFER_BIT);
+    GLuint pa = program(kVStex, kFSalpha, "pos", "tc", NULL);
+    glUniform1i(glGetUniformLocation(pa, "tex"), 0);
+    draw_tex_rect(0, 0, 64, 64);
+    own_target_check(16, 16, 255, 128, 0, 255, "a target without alpha");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, W, H);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteTextures(1, &other);
+    glDeleteTextures(1, &rgb);
+    // the dump: the default framebuffer, which no draw here read
+    glClearColor(0, 0, 0, 1);
+    glClear(GL_COLOR_BUFFER_BIT);
+    snap();
+    glok("own target");
+}
+
 typedef struct {
     const char *name;
     void (*fn)(void);
@@ -2448,6 +2542,7 @@ static const test_case kCases[] = {
     {"pbo_bounds", case_pbo_bounds, 0},
     {"key_reuse", case_key_reuse, 1},
     {"packed_float", case_packed_float, 1},
+    {"own_target", case_own_target, 0},
     {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };

@@ -392,6 +392,11 @@ typedef struct {
     bool pass_msaa_shape;          // the targets may take MSAA (rsm_pass_targets); begin_pass decides
     int pass_samples;              // of the open pass: 1, or the MSAA count
     NSMapTable *msaa;              // target texture (weak) -> its multisampled twin (RSMMsaa)
+    // A draw that samples its own target (mtl_draw.m) samples a copy of it instead
+    id<MTLTexture> own_copy;       // the copy, kept for the next such draw
+    id<MTLTexture> own_view;       // the copy through a texture's swizzle, when it has one
+    int own_view_swz;
+    void *own_for;                 // the target own_copy holds, while the draw it was made for is drawn; else NULL
     // One descriptor for every pass: a new one per pass costs more than the encoder's own setup on this side.
     MTLRenderPassDescriptor *pass_desc;
     MTLRenderPassColorAttachmentDescriptor *pass_desc_color;
@@ -480,6 +485,7 @@ RSMTexture *rsm_texture(RSMContext *ctx, GLuint name);
 RSMRenderbuffer *rsm_renderbuffer(RSMContext *ctx, GLuint name);
 void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t);  // build t->sampler
 id<MTLTexture> rsm_texture_view(RSMTexture *t);             // what shaders sample
+id<MTLTexture> rsm_texture_view_of(RSMTexture *t, id<MTLTexture> storage);  // storage through t's swizzle
 // The attachment's texture / level / slice / pixel format. NO = none.
 bool rsm_attachment_texture(RSMContext *ctx, const rsm_attachment *a, id<MTLTexture> *tex,
                             int *level, int *slice);

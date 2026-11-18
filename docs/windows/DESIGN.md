@@ -190,6 +190,13 @@ are shared with the Mac edition ([Mac renderer](../mac/METAL.md)). Only Metal pr
   `DrawPrimitive`/`DrawIndexedPrimitive` (and the `UP` forms), `Lock`/`Unlock`, render targets, `Clear`,
   `StretchRect`, `ColorFill`, `Reset`; with the D3D9-to-GL conventions (half-pixel offset, depth range,
   row-major constants, BGRA vertex colours). X8R8G8B8 textures sample with alpha 1 (Bink writes 0 there).
+- **A draw that reads its own render target**: the tuner blurs the glow of the peg to turn in place, with two draws
+  that sample the texture they are drawing into, as the Mac game's does, and about a hundred draws of the first
+  frames after the start read a screen-sized target the same way. Direct3D 9 leaves that undefined; the graphics
+  cards the game was made for give the draw what was drawn before it. The layer passes the draws on as they are,
+  and the Metal core gives each a copy of its target
+  ([Mac renderer](../mac/METAL.md#metal-core-shimsopenglsrcmetal)). Before that the glow was missing, and with a
+  back buffer of 1102x717 or 1104x718 the tuner turned purple from its right edge.
 - **Dynamic buffers**: an `Unlock` of a dynamic buffer only marks the range; a draw uploads the part it
   reads (`LP_D3D9_EAGER=1` uploads at `Unlock`). The game locks its 1 MB dynamic vertex buffer whole about
   2,900 times a second.

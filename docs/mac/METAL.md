@@ -126,6 +126,18 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   stencil sample 0), so whatever samples them later sees the resolved picture. The twins keep their samples for
   the next pass that loads them; a pass that would load a twin that is out of date (its target was drawn to
   without it) draws without MSAA. Post effects, the smaller targets and render-to-texture are left alone.
+- **A draw that samples its own target** samples a copy of it. GL and Direct3D 9 leave the result undefined, and a
+  game can still count on what its graphics cards did, which is to read what was drawn to the target before the
+  draw: the tuner of both games blurs the glow of the peg to turn with two draws that read the half-size texture
+  they draw into. A Metal pass on an Apple GPU keeps its pixels in tile memory until it ends, so there the draw
+  read the texture as the pass before left it: the last frame's blur and never this frame's picture. The glow was
+  missing, and in Learn & Play at some sizes of the screen (a 1102x717 and a 1104x718 back buffer) something got
+  into the texture at its right edge and spread with every frame, until the whole picture was purple. So when a
+  program's sampler holds the colour target of the pass (a 2D texture of one level, drawn into whole), the pass
+  ends, the target is copied to a texture kept for this, and the pass goes on with what it had, the draw sampling
+  the copy (through the texture's swizzle when it has one). That is two half-size copies a frame in the tuner and
+  none on the note highway; Learn & Play also draws this way about a hundred times as it starts. The log says
+  `a draw samples the WxH target it draws into` the first time.
 - **Programs**: `glLinkProgram` hands vertex + fragment GLSL to `rsmsl_translate` (`src/msl/msl_xlat.h`)
   and keeps the reflection (attributes, uniforms, samplers), so status, locations and `glUniform*` work at
   once; the MSL compile (`newLibraryWithSource:`, 0.1–0.5 s cold) goes to a compile pool (CPUs − 2 worker

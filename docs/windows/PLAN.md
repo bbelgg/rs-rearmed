@@ -92,9 +92,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 - **Loading and hook points**: 20 of the 21 hook points. `si_io`, a guitar input's buffers before the game has them,
   is the latest (not released): the Mac game's CoreAudio input function has no counterpart, so the capture stream
-  runs the hooks; `input_mode_is_cable` is inlined into a function `win32_overrides.c` replaces. The overlay API, the render API, the `mods/` folder and one mod ABI with the Mac
-  ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)): `rearmed-mods.dylib` runs as the same file. No mod code runs
-  without the network guard.
+  runs the hooks; `input_mode_is_cable` is inlined into a function `win32_overrides.c` replaces. The overlay API,
+  the render API, the `mods/` folder and one mod ABI with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)):
+  `rearmed-mods.dylib` runs as the same file. No mod code runs without the network guard.
 - **Files a mod serves**: as the Mac edition, through the Win32 seam's file calls.
 - **Edits and mid points, and 7-string charts**: as the Mac edition, with this game's tables
   (`tools/targets/win-x86/edits.map`, `mids.map`); the points that are the Mac's own are `none` here.
@@ -172,6 +172,10 @@ edition" is described there. What has not been tested is under [Open issues](#op
   timer.
 - **Guitar input**: as in the [Mac plan](../mac/PLAN.md#open-issues); and guitar latency against the Mac edition has not
   been measured.
+- **A mod on the guitar input** (`si_io`, not released): the game heard what a test mod and rearmed-mods' Drop Pedal
+  wrote, with the Mac's microphone as the input ([TESTING.md](TESTING.md#unattended-runs)). Not played: a guitar, a
+  cable or an interface, two players, the waveIn path, and a device that can't run at 48 kHz (the audio layer's
+  test has the hooks on a stream at another rate than its device, without the game).
 - **Two players**: a cable with an interface, two interfaces, and SWAP CABLE ASSIGNMENT on interfaces. Two inputs have
   not been played since Player 2's saved input became the shared hook; a single player's way to the note highway never
   calls `input_bind`, so in the game only the hook's place in the table is checked, and the unit tests stand for what

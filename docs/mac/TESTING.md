@@ -331,6 +331,12 @@ with `RS_MODS_LOG=1`.
   RS7X v1 block`), the guitar rebuilt with 7 strings and the seven-peg headstock, and leaving it the song file
   freed, 6 strings and `back to the stock headstock`. The pause menu's TUNER shows seven pegs and B STANDARD
   7STR. Play 100 s to see the chords on the low B, then a six-string song and a bass arrangement.
+- **A mod's hook on the guitar input** (`si_io`): Learn & Play's check
+  ([Windows testing](../windows/TESTING.md#unattended-runs)) fits here as it is: a test mod that fills each buffer
+  with a quiet sine of 110 Hz, and rearmed-mods' Show Current Note for the note the game hears, 45. Here the point is
+  the game's own function, and a mod's hook comes after `audio_chan.c`'s: the buffer is that hook's mono one, small
+  ones collected into slots of 128 frames, or the device's own where that hook has nothing to do (no channel, gain
+  or level to apply, or `RS_AUDIO_INPUT=0`). Not run here.
 - **Decoded song audio** (`ak_src_submit`): a mod on the hook point that writes each stereo block with its file
   ID and position; 30 s of a song, then rearmed-mods' rewind (`z`, `AllowRewind = on`). The blocks should match
   vgmstream's decode of the song's `.wem` to about -90 dB.

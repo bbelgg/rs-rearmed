@@ -68,7 +68,7 @@ what a mod asks for by name, and for its built-in fixes.
   Lua, the crypto, the efd framework, the audio engine's CoreAudio side, the online layer, the built-in
   fixes).
 - **Hook points.** `runtime/rc_hook.h`: `rc_hook_add_name(name, pre, post, user)` runs code before and
-  after a named game function (`tools/targets/names/hooks.list`: 21 points, of which Learn & Play has 19);
+  after a named game function (`tools/targets/names/hooks.list`: 21 points, of which Learn & Play has 20);
   `rc_hook_add(addr, ...)` takes a Mac address; `rc_target()` names the target. Both apps export this runtime
   to mods. A name the game doesn't have (`unsupported` in its `symbols.map`, and not taken by its platform
   layer) gives -1 and a log line, at load, in either edition. A hook

@@ -280,6 +280,10 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   Return on the notice MULTIPLAYER INPUT SUPPORT, on the second profile, on CONTINUE, on the mode and the first
   song, on Play Song, Skip Tuner, Return: a split-screen song; Player 2's profile needs an input, or it stops at
   "It sounds like Player 2's cable is unplugged". TONE DESIGNER: Return on EDIT TONE.
+- **The lists**: as the Mac edition's ([Mac testing](../mac/TESTING.md#unattended-runs)), screen for screen and
+  with the same `menu:` names: the profile list, Nonstop Play's SONG LIST EDITOR, and the Tone Designer's
+  categories and gear behind EDIT TONE, a slot and CHANGE. The same care with keys in a screen's first seconds,
+  and the key's name is `esc` here too.
 - **Tools** (Space on the main menu): OPTIONS (Down 3), VISUAL SETTINGS (Down 2), VENUE MODE (Down 7), Return,
   Return on On: from then on a song opens a portal to a venue about 30 s in, with or without a guitar. Esc four
   times to the menu. The rooms of Session Mode are reverbs, not venues.

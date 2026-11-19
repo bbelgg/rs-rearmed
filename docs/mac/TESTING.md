@@ -183,8 +183,10 @@ of either edition has no guitar input. What it has:
 - **`tools/perf/run.py CONFIG OUT --route-only`** ([Measured runs](#measured-runs)): the whole route to the note
   highway and out, each key waiting for its screen.
 - **Seeing a run**: snapshots (`RS_GL_SNAPSHOT_DIR=DIR`, `RS_GL_SNAPSHOT_SECS=N`; each is a readback of about
-  70 ms, so judge smoothness without them), frame times (`RS_GL_FRAMETIMES=FILE`; keep the window in front for
-  anything measured) and the logs of [Diagnostics](#diagnostics). The rearmed-mods library
+  70 ms, so judge smoothness without them; one a second can fall behind the game on a busy machine, by 20 s after
+  ten minutes and by more under load, so take one every 3 s to see the screen a key led to), frame times
+  (`RS_GL_FRAMETIMES=FILE`; keep the window in front for anything measured) and the logs of
+  [Diagnostics](#diagnostics). The rearmed-mods library
   (`rearmed-mods.dylib` in `<home>/mods/`, `RSMods.ini` in the game folder, `RS_MODS_LOG=1`) logs a `menu:` line
   for each screen, which is what a script should wait for.
 - **The installed app by `open`**: the launcher hands the game only what it lists, so a test copy of its
@@ -230,8 +232,22 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   "MAKE SOME NOISE!", which waits for a guitar; Esc goes back to the list. A Return on the tuner is Calibrate, which
   comes back to the tuner. MULTIPLAYER:
   [By hand](#by-hand-and-with-computer-use).
-- **Tools** (Space on the main menu): OPTIONS is Down three times; [Measured runs](#measured-runs) has the way
-  to Venue Mode.
+- **The lists**: the profile list is one of the game's scrolling lists, and so are these. NONSTOP PLAY's songs:
+  Down and Return on its page is SONG LIST EDITOR (`NonStopPlay_SongList`); Return there ticks a song, Esc goes
+  back. A tuner of Nonstop Play that is cancelled (Esc) shows the set list, which brings the tuner again by
+  itself: a second Esc within two seconds leaves to the page. TONE DESIGNER (the eighth entry: Down seven
+  times): Return on EDIT TONE (`ToneDesigner_EditTone`: PRE, AMP, LOOP, CABINET, RACK), Return on a slot with
+  gear in it (`ToneDesigner_EditGear`: its knobs, then CHANGE, MOVE, REMOVE, FINISH; Return on a knob gives it
+  Left and Right until the next Return), Return on CHANGE for the categories (`ToneDesigner_CategoryList`) and
+  Return on one for its gear (`ToneDesigner_PedalList`, `ToneDesigner_RackList`). Esc goes back a screen at a
+  time; from the Tone Designer's own menu it asks SAVE TONE?, where Down and Return is No. Keys sent while
+  a screen moves in are lost, and the main menu loses them for longer (of seven Downs sent 20 s after it came
+  up, on a busy machine, three arrived): wait, send them a second apart, and look at a snapshot before a Return
+  that depends on the cursor. The key's name is `esc`: a name keyfifo doesn't know is skipped (`keyfifo: no key` in
+  the log).
+- **Tools** (Space on the main menu): DIFFICULTY SETTINGS, TONE DESIGNER, TUNER, OPTIONS (Down three times),
+  SHOP, CHORD BOOK, TECHNIQUE GUIDE, STATS. Return on OPTIONS, then on MIXER, is the mixer's page;
+  [Measured runs](#measured-runs) has the way to Venue Mode.
 - **Quitting**: Esc on the main menu, Return on "Are you sure you want to quit?" goes to the title; Esc there
   and Return on EXIT GAME? is a normal quit, which saves the profile.
 

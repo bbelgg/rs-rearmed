@@ -2449,6 +2449,8 @@ let optionSpecs: [OptionSpec] = [
                kind: .choice([("Default (16x)", ""), ("1x (the game's)", "1"), ("2x", "2"), ("4x", "4"), ("8x", "8"), ("16x", "16")]), editions: "both", group: "Picture", advanced: true),
     OptionSpec(key: "RS_METAL_MSAA", title: "Anti-aliasing", detail: "MSAA on the game's 3D picture.",
                kind: .choice([("Default (4x)", ""), ("Off", "1"), ("2x", "2"), ("4x", "4"), ("8x", "8")]), editions: "both", group: "Picture", advanced: false),
+    OptionSpec(key: "RS_METAL_SHARPEN", title: "Sharpening", detail: "Sharpens the picture on the screen, after any upscaling: 0-100%.",
+               kind: .choice([("Off", ""), ("Low (30%)", "30"), ("Medium (60%)", "60"), ("High (100%)", "100")]), editions: "both", group: "Picture", advanced: false),
     OptionSpec(key: "RS_METAL_DRAWABLES", title: "Low-latency presentation", detail: "2 frames queued instead of 3: each one shows a refresh sooner, a late one as a repeat.",
                kind: .choice([("Default (3 with vsync)", ""), ("On (2)", "2")]), editions: "both", group: "Picture", advanced: true),
     OptionSpec(key: "RS_METAL_HUD", title: "Performance overlay", detail: "Apple's Metal HUD over the game (macOS 13 and later): frame rate, frame times, GPU memory.",

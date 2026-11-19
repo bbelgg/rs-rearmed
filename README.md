@@ -95,6 +95,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Scrolling lists with the trackpad and the mouse wheel | ✅ | ✅ the same rows for the same swipe |
 | A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; ⚠️ full screen on such a screen | ✅ a window of any shape, full screen on a MacBook's screen; ⚠️ an ultrawide screen |
 | Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer; not compared with them off |
+| Sharpening, after any upscaling | ✅ | ⚠️ the same renderer, not yet tried |
 | A performance overlay (Apple's Metal HUD) and low-latency presentation | ✅ | ⚠️ the same code, not yet tried |
 | Frame rate follows the display | ✅ 60 and 75 Hz; ⚠️ 120 Hz | ✅ 60 and 75 Hz; ⚠️ 120 Hz |
 | Metal renderer, shaders prepared at install | ✅ | ✅ |

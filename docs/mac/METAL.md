@@ -179,6 +179,10 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   the size it would have, and it is scaled up to the backing size the same way. Layer contexts are tagged sRGB
   (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the display;
   `RS_METAL_COLORS=vivid` leaves the layer untagged.
+- **Sharpening** (`RS_METAL_SHARPEN=N`, 0-100; 0 or unset: none): the present draws the frame with `rsm_sharpen_fs` in
+  place of a plain copy, at the drawable's own pixels, so after any upscaling. Each pixel is pushed away from its four
+  neighbours' mean, the more the higher N, and kept within their range (the limit of AMD's RCAS, written here, not
+  taken from its code): an edge gets steeper and never rings, and a flat area stays as it is.
 - **Conventions** (applied by the translator, so the core passes GL state through unchanged):
   - row 0 of every texture and render target is GL's bottom row; the vertex shader epilogue negates
     `y`, so viewport and scissor rectangles map 1:1 and uploads/reads need no flip; only present flips;

@@ -575,7 +575,7 @@ editions and the parts both share). Neither touches the Mac game install or its 
    (`lp_game.exe`), the DLL images, the shader corpus and the game's icon. It sets no environment; `lp_main.c` takes its
    folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods switched off
    and the other switches set from `settings.env` and `options.env` there (`lp_settings.c`, the Mac launcher's rules:
-   only their nine and 38 keys, and a value in the environment wins), read before `mods_guard`, so the start again with
+   only their nine and 39 keys, and a value in the environment wins), read before `mods_guard`, so the start again with
    the network guard keeps them.
 8. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link.

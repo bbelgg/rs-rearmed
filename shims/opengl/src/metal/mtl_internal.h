@@ -397,6 +397,7 @@ typedef struct {
     id<MTLTexture> own_view;       // the copy through a texture's swizzle, when it has one
     int own_view_swz;
     void *own_for;                 // the target own_copy holds, while the draw it was made for is drawn; else NULL
+    id<MTLRenderPipelineState> sharpen_pipeline;
     // One descriptor for every pass: a new one per pass costs more than the encoder's own setup on this side.
     MTLRenderPassDescriptor *pass_desc;
     MTLRenderPassColorAttachmentDescriptor *pass_desc_color;

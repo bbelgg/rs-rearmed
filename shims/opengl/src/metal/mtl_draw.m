@@ -25,6 +25,17 @@ static NSString *const kInternalMSL =
      "fragment float4 rsm_blit_fs(rsm_blit_v in [[stage_in]], texture2d<float> t [[texture(0)]],\n"
      "                            sampler s [[sampler(0)]]) {\n"
      "  return float4(t.sample(s, in.uv).rgb, 1.0);\n"
+     "}\n"
+     // The present sharpened (RS_METAL_SHARPEN): the pixel moved away from its four neighbours' mean by k, and kept
+     // within their range, so an edge gets steeper and never rings.
+     "struct rsm_sharp_u { float2 px; float k; };\n"
+     "fragment float4 rsm_sharpen_fs(rsm_blit_v in [[stage_in]], texture2d<float> t [[texture(0)]],\n"
+     "                               sampler s [[sampler(0)]], constant rsm_sharp_u &u [[buffer(0)]]) {\n"
+     "  float3 c = t.sample(s, in.uv).rgb;\n"
+     "  float3 n = t.sample(s, in.uv + float2(0, u.px.y)).rgb, so = t.sample(s, in.uv - float2(0, u.px.y)).rgb;\n"
+     "  float3 e = t.sample(s, in.uv + float2(u.px.x, 0)).rgb, w = t.sample(s, in.uv - float2(u.px.x, 0)).rgb;\n"
+     "  float3 lo = min(c, min(min(n, so), min(e, w))), hi = max(c, max(max(n, so), max(e, w)));\n"
+     "  return float4(clamp(c + u.k * (4.0 * c - n - so - e - w), lo, hi), 1.0);\n"
      "}\n";
 
 static id<MTLTexture> rsm_dummy(RSMContext *ctx, bool cube) {
@@ -1403,16 +1414,33 @@ void rsmtl_glDrawElementsInstancedARB(GLenum mode, GLsizei count, GLenum type, c
 }
 
 // --- Present -------------------------------------------------------------------------------
+// RS_METAL_SHARPEN=N, 0-100: the present sharpens the frame by N% (rsm_sharpen_fs's k, at most 0.5), after any
+// upscaling, at the drawable's own pixels. 0 or unset: none.
+static float rsm_sharpen(void) {
+    static float k = -1;
+    if (k < 0) {
+        const char *e = getenv("RS_METAL_SHARPEN");
+        int n = e && *e ? atoi(e) : 0;
+        n = n < 0 ? 0 : n > 100 ? 100 : n;
+        k = (float)n / 200.0f;
+        if (n)
+            rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", n);
+    }
+    return k;
+}
+
 void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src, id<MTLSamplerState> smp) {
-    if (!ctx->present_pipeline || ctx->present_pipeline.label.integerValue != (NSInteger)target.pixelFormat) {
+    float k = rsm_sharpen();
+    __strong id<MTLRenderPipelineState> *pipe = k > 0 ? &ctx->sharpen_pipeline : &ctx->present_pipeline;
+    if (!*pipe || (*pipe).label.integerValue != (NSInteger)target.pixelFormat) {
         MTLRenderPipelineDescriptor *d = [MTLRenderPipelineDescriptor new];
         d.vertexFunction = [ctx->internal_lib newFunctionWithName:@"rsm_blit_vs"];
-        d.fragmentFunction = [ctx->internal_lib newFunctionWithName:@"rsm_blit_fs"];
+        d.fragmentFunction = [ctx->internal_lib newFunctionWithName:k > 0 ? @"rsm_sharpen_fs" : @"rsm_blit_fs"];
         d.colorAttachments[0].pixelFormat = target.pixelFormat;
         d.label = [NSString stringWithFormat:@"%lu", (unsigned long)target.pixelFormat];
         NSError *e = nil;
-        ctx->present_pipeline = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
-        if (!ctx->present_pipeline) {
+        *pipe = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
+        if (!*pipe) {
             rsm_log("present pipeline: %s", e.localizedDescription.UTF8String);
             return;
         }
@@ -1424,9 +1452,13 @@ void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src
     if (rsm_pt_on())
         rsm_pt_pass_begin(rp, target, RSM_PT_PRESENT, 1, false, false);
     id<MTLRenderCommandEncoder> e = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
-    [e setRenderPipelineState:ctx->present_pipeline];
+    [e setRenderPipelineState:*pipe];
     [e setFragmentTexture:src atIndex:0];
     [e setFragmentSamplerState:smp atIndex:0];
+    if (k > 0) {  // one of the drawable's pixels in uv, and k
+        float u[4] = {1.0f / (float)target.width, 1.0f / (float)target.height, k, 0};
+        [e setFragmentBytes:u length:sizeof u atIndex:0];
+    }
     [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [e endEncoding];
 }

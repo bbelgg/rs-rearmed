@@ -544,6 +544,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
+| `RS_METAL_SHARPEN=N` | 0 | sharpen the picture on the screen by N%, 0-100, after any upscaling |
 | `RS_METAL_DRAWABLES=2`, or `3` | 3 with vsync, 2 without | the frames queued for the screen: 2 with vsync is low-latency presentation, each frame on the screen a refresh sooner and a late one shown as a repeat |
 | `RS_METAL_HUD=1` | off | Apple's Metal Performance HUD over the game (macOS 13 and later): its frame rate, frame times and GPU memory |
 | `RS_WINDOW_ANY_SHAPE=0` | on | a window keeps 16:9, as in the original ([Window modes](#window-modes)) |

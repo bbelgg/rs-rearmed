@@ -4,3 +4,6 @@
 change, in the words the release notes will use: the bold lead says what is now true, the rest says what it was
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
+
+- **Sharpening:** `RS_METAL_SHARPEN=N` (0-100), Sharpening in the installer, sharpens the picture on the screen after
+  any upscaling. Before, there was none.

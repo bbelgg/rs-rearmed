@@ -44,6 +44,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
   peg stayed grey; now it gets a copy of what was drawn before it
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). Learn & Play's tuner turned purple from the same cause
   at some sizes; this edition's was not seen to (one run at 1103x717 before the rule).
+- **Render scale** (not released): `RS_METAL_SCALE=N`, the installer's Render scale (under Advanced), renders at N%
+  (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
+  0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
+  ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

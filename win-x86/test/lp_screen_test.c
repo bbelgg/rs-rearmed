@@ -55,6 +55,11 @@ int main(void) {
   CHECK(w == 1280 && h == 720, "2560x1440 at 2x: %gx%g", w, h);
   lp_fit_window(0, 0, 0, 0, 0, &w, &h);
   CHECK(w >= 1 && h >= 1, "degenerate sizes stay positive");
+  // RS_METAL_SCALE: game pixels at 0.5 and 0.75 per point are twice and 4/3 as many points
+  lp_fit_window(640, 360, 0.5, 1470, 894, &w, &h);
+  CHECK(w == 1280 && h == 720, "640x360 at 0.5: %gx%g", w, h);
+  lp_fit_window(960, 540, 0.75, 1470, 894, &w, &h);
+  CHECK(w == 1280 && h == 720, "960x540 at 0.75: %gx%g", w, h);
 
   // the pointer: a 1280x720 back buffer in a 1000x400 view is 711x400 points, 144.5 points in
   int32_t x, y;
@@ -85,6 +90,27 @@ int main(void) {
   CHECK(!lp_follow_size(1280, 720, 2, 2560, 1440, &rw, &rh), "RS_METAL_RETINA=1: pixels, 2560x1440 is the same");
   CHECK(lp_follow_size(1470, 956, 2, 2560, 1440, &rw, &rh) && rw == 2940 && rh == 1912, "macOS full screen at 2x: %dx%d", rw, rh);
   CHECK(lp_follow_size(0.4, 0, 0, 1280, 720, &rw, &rh) && rw == 1 && rh == 1, "never below 1x1: %dx%d", rw, rh);
+  // RS_METAL_SCALE: whole pixels of the window's points at the scale
+  CHECK(lp_follow_size(641, 361, 0.5, 1280, 720, &rw, &rh) && rw == 320 && rh == 180, "641x361 at 0.5: %dx%d", rw, rh);
+  CHECK(lp_follow_size(641, 361, 0.75, 1280, 720, &rw, &rh) && rw == 480 && rh == 270, "641x361 at 0.75: %dx%d", rw,
+        rh);
+  CHECK(!lp_follow_size(1280, 720, 0.5, 640, 360, &rw, &rh), "at 0.5 a 1280x720 window is the 640x360 back buffer");
+
+  // the upscale: a back buffer to the screen's pixels, no more than the screen has (lp_output_size)
+  CHECK(lp_output_size(1470, 956, 2, 1, 1470, 956, &rw, &rh) && rw == 2940 && rh == 1912, "points at 2x: %dx%d", rw,
+        rh);
+  CHECK(lp_output_size(1280, 720, 2, 1, 1470, 956, &rw, &rh) && rw == 2560 && rh == 1440, "a window at 2x: %dx%d", rw,
+        rh);
+  CHECK(!lp_output_size(2940, 1912, 2, 2, 1470, 956, &rw, &rh) && rw == 2940, "RS_METAL_RETINA=1: the pixels already");
+  CHECK(!lp_output_size(1280, 720, 1, 1, 1920, 1080, &rw, &rh), "a 1x screen: nothing to scale");
+  // a back buffer larger than the screen in points (Fullscreen=2 at 1920x1080, RS_D3D9_DISPLAY): capped
+  CHECK(lp_output_size(1920, 1080, 2, 1, 1470, 956, &rw, &rh) && rw == 2940 && rh == 1654, "capped: %dx%d", rw, rh);
+  CHECK(lp_output_size(735, 478, 2, 0.5, 1470, 956, &rw, &rh) && rw == 2940 && rh == 1912, "0.5 at 2x: %dx%d", rw, rh);
+  CHECK(lp_output_size(1102, 717, 2, 0.75, 1470, 956, &rw, &rh) && rw == 2939 && rh == 1912, "0.75 at 2x: %dx%d", rw,
+        rh);
+  CHECK(lp_output_size(640, 360, 1, 0.5, 1280, 720, &rw, &rh) && rw == 1280 && rh == 720, "0.5 at 1x: %dx%d", rw, rh);
+  CHECK(lp_output_size(1280, 720, 2, 1, 0, 0, &rw, &rh) && rw == 2560, "no screen: no cap");
+  CHECK(!lp_output_size(0, 0, 2, 1, 1470, 956, &rw, &rh), "degenerate sizes: nothing");
 
   printf("%d passed, %d failed\n", passed, failed);
   return failed != 0;

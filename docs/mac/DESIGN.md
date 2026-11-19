@@ -67,7 +67,7 @@ The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-AR
 checks the copy is complete (telling a drive that is not connected from an incomplete copy), links `static.psarc` to the
 title logo or the original, keeps the game's `Rocksmith.ini` offline ([Online services](#online-services)), passes the
 built-in mods switched off in `settings.env` (only its nine switches) and the other switches set in `options.env` (only
-its 35; a value in the environment wins over either), seeds the
+its 36; a value in the environment wins over either), seeds the
 offline Steam saves once, and starts the game with the network guard inserted (`open -n -a`). Nothing of Steam's is read
 while the game runs, except `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves
 are there.
@@ -78,6 +78,10 @@ The shell follows the display's refresh rate (`RS_FPS` fixes a rate; its rule an
 `shims/platform/include/rsp_fps.h`, which Learn & Play uses too). On a Retina screen the game renders in
 points and each frame is scaled up to the screen's pixels with MetalFX (`rs_gfx_set_output_size`,
 [METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)); `RS_METAL_RETINA=1` renders at backing-pixel size instead.
+`RS_METAL_SCALE=N` renders at N% of either, 50-100, scaled up the same way (`shims/platform/include/rsp_scale.h`, which
+Learn & Play uses too): the drawable and the engine's resolution take that size, and mouse positions are converted at
+that scale. Below 1 a division can't give a window's points back from the engine's pixels, so `rsp_screen_width` and
+`rsp_screen_height` give the points last set (`rsp_engine.c`); otherwise a window would be adopted again every 0.1 s.
 A window takes any shape, where the original kept it at 16:9 (`RS_WINDOW_ANY_SHAPE=0` does too): the game sets
 its cameras from its resolution and lays out its menus to the width, so it needs nothing more
 ([INSTALL.md](INSTALL.md#window-modes)). The screen saver and display sleep stay off while the game is open, in

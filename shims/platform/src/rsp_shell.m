@@ -384,7 +384,7 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
     [self rsp_renderScaleChanged];
   }
 }
-// RS_METAL_RETINA=1: the engine renders at the drawable's pixel size. A new backing scale (the
+// RS_METAL_RETINA=1 or RS_METAL_SCALE: the engine renders at the drawable's pixel size. A new backing scale (the
 // window moved to another screen) re-sends the current resolution, converted (rsp_set_display_mode).
 - (void)rsp_renderScaleChanged {
   double s = rsp_mtl_scale(rsp_g_mtl);
@@ -399,7 +399,7 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
     w = controller->CurrentSetting_Width;
     h = controller->CurrentSetting_Height;
   }
-  fprintf(stderr, "[rsp] render scale %.1f: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
+  fprintf(stderr, "[rsp] render scale %g: engine %dx%d for %dx%d points\n", s, (int)lround(w * s),
           (int)lround(h * s), w, h);
   if (controller && !pending && w > 0 && h > 0) {
     rsp_mode_request(controller, rsp_is_fullscreen(), w, h);
@@ -489,7 +489,7 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
   if (ft0) rsp_ft_mark_fn()('G', ft0, mach_absolute_time(), 0, 0);
   if (!done && rsp_overlay_active()) {
     int w, h;
-    rsp_mtl_size(m, &w, &h);  // the drawable: points, or pixels with RS_METAL_RETINA=1
+    rsp_mtl_size(m, &w, &h);  // the drawable: points, or pixels with RS_METAL_RETINA=1, at RS_METAL_SCALE
     rsp_overlay_run(w, h);
   }
   uint64_t f0 = d0 ? mach_absolute_time() : 0;
@@ -779,7 +779,7 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 
 - (void)mouseMoved:(NSEvent *)e {  // 0x100185b40
   NSPoint p = [openGLView convertPoint:[e locationInWindow] fromView:nil];
-  // points -> engine pixels (not in the original: the render scale is 1 unless RS_METAL_RETINA=1)
+  // points -> engine pixels (not in the original: the render scale is 1 unless RS_METAL_RETINA or RS_METAL_SCALE)
   rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_engine_coord(p.x), rsp_mouse_engine_coord(p.y));
 }
 

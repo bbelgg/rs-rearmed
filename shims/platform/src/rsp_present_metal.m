@@ -5,6 +5,7 @@
 // the backend is always GL).
 #import "rsp_present.h"
 #include "rsp_renderer.h"
+#include "rsp_scale.h"
 
 #import <AppKit/AppKit.h>
 #import <Metal/Metal.h>
@@ -19,6 +20,7 @@
 #include <pthread.h>
 #include <stdatomic.h>
 #include <stdio.h>
+#include <math.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -148,7 +150,8 @@ rsp_mtl *rsp_mtl_create(void *layer, int w, int h, int swap_interval) {
   return m;
 }
 
-// The drawable size for the view: points (1x), or backing pixels with RS_METAL_RETINA=1.
+// The drawable size for the view: points (1x), or backing pixels with RS_METAL_RETINA=1, at RS_METAL_SCALE's
+// percentage (rsp_scale.h). *scale is the layer's: the backing scale with RS_METAL_RETINA=1, else 1.
 static void view_size(NSView *view, int *w, int *h, CGFloat *scale) {
   NSRect b = [view bounds];
   NSSize s = b.size;
@@ -157,14 +160,16 @@ static void view_size(NSView *view, int *w, int *h, CGFloat *scale) {
     s = [view convertRectToBacking:b].size;
     *scale = b.size.width > 0 ? s.width / b.size.width : 1.0;
   }
-  *w = s.width >= 1 ? (int)(s.width + 0.5) : 1;
-  *h = s.height >= 1 ? (int)(s.height + 0.5) : 1;
+  double k = rsp_metal_scale();
+  *w = s.width * k >= 1 ? (int)(s.width * k + 0.5) : 1;
+  *h = s.height * k >= 1 ? (int)(s.height * k + 0.5) : 1;
 }
 
-// Not RS_METAL_RETINA: the game renders in points and libRSOpenGL scales each frame up to the view's backing
-// pixels (MetalFX), so a Retina screen gets a sharp picture for a fraction of the native cost. 1x screens: nothing.
+// A drawable smaller than the view's backing pixels (the game in points on a Retina screen, or RS_METAL_SCALE below
+// 100): libRSOpenGL scales each frame up to them (MetalFX), so a Retina screen gets a sharp picture for a fraction
+// of the native cost. The backing pixels already (RS_METAL_RETINA=1, or a 1x screen, at 100%): nothing.
 static void set_output(rsp_mtl *m, NSView *view) {
-  if (!gfx.set_output || rsp_mtl_retina()) return;
+  if (!gfx.set_output) return;
   NSSize s = [view convertRectToBacking:[view bounds]].size;
   int ow = (int)(s.width + 0.5), oh = (int)(s.height + 0.5);
   gfx.lock(m->ctx);
@@ -197,9 +202,9 @@ rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
     abort();
   }
   set_output(m, view);
-  fprintf(stderr, "[rsp] Metal drawable %dx%d (%s), %d drawables, display sync %s\n", w, h,
-          rsp_mtl_retina() ? "backing pixels" : "points", rsp_mtl_drawables(swap_interval),
-          swap_interval ? "on" : "off");
+  fprintf(stderr, "[rsp] Metal drawable %dx%d (%s at %d%%), %d drawables, display sync %s\n", w, h,
+          rsp_mtl_retina() ? "backing pixels" : "points", (int)lround(rsp_metal_scale() * 100),
+          rsp_mtl_drawables(swap_interval), swap_interval ? "on" : "off");
   return m;
 }
 
@@ -237,7 +242,9 @@ void rsp_mtl_view_resized(rsp_mtl *m, NSView *view) {
   set_output(m, view);
 }
 
-double rsp_mtl_scale(rsp_mtl *m) { return rsp_mtl_retina() ? m->layer.contentsScale : 1.0; }
+double rsp_mtl_scale(rsp_mtl *m) {
+  return (rsp_mtl_retina() ? m->layer.contentsScale : 1.0) * rsp_metal_scale();
+}
 
 void rsp_mtl_set_swap_interval(rsp_mtl *m, int interval) { atomic_store(&m->want_swap, interval); }
 

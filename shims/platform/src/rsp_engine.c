@@ -7,6 +7,8 @@
 
 #include <pthread.h>
 #include <stdarg.h>
+#include <stdatomic.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -251,8 +253,21 @@ static int to_engine(int v) { return (int)lround(v * g_render_scale); }
 static int from_engine(int v) { return (int)lround(v / g_render_scale); }
 int rsp_mouse_engine_coord(double v) { return rsp_mouse_coord(v * g_render_scale); }
 
+// The last size set in points beside what it became in engine pixels, one word each (the shell reads them on the
+// main thread, the frame thread sets them): below scale 1 a division can't give the points back (a 641-point window
+// at 0.5 is 321 pixels, which is 642 points), and a window whose size never matched would be re-adopted, and the
+// engine's resolution set again, every 0.1 s (rsp_shell.m's customEventTimer:).
+static _Atomic uint64_t g_set_w, g_set_h;
+static uint64_t set_pair(int points, int engine) { return (uint64_t)(uint32_t)engine << 32 | (uint32_t)points; }
+static int to_points(int engine, uint64_t set) {
+  return engine && (int)(uint32_t)(set >> 32) == engine ? (int)(uint32_t)set : from_engine(engine);
+}
+
 void rsp_set_display_mode(int fs, int w, int h) {  // 0x10017a1f0
-  if (H->set_resolution) H->set_resolution(H->ctx, to_engine(w), to_engine(h));
+  int ew = to_engine(w), eh = to_engine(h);
+  atomic_store(&g_set_w, set_pair(w, ew));
+  atomic_store(&g_set_h, set_pair(h, eh));
+  if (H->set_resolution) H->set_resolution(H->ctx, ew, eh);
   if (H->set_fullscreen) H->set_fullscreen(H->ctx, fs & 0xff);
 }
 int rsp_is_fullscreen(void) {  // 0x10017a210
@@ -264,12 +279,12 @@ int rsp_no_vsync(void) {  // 0x10017a220
 int rsp_screen_width(void) {  // 0x10017a310
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return from_engine(w);
+  return to_points(w, atomic_load(&g_set_w));
 }
 int rsp_screen_height(void) {  // 0x10017a330
   int w = 0, h = 0;
   if (H->get_resolution) H->get_resolution(H->ctx, &w, &h);
-  return from_engine(h);
+  return to_points(h, atomic_load(&g_set_h));
 }
 
 // ---------------------------------------------------------------------------

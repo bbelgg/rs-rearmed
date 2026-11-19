@@ -95,6 +95,22 @@ about 4% of it. The MacBook Air has no fan, so later runs in a row say nothing.
 
 So half of it is the game's own scene and effects, a quarter is the upscaler, and the note highway is cheap.
 
+**A render scale** (`RS_METAL_SCALE`) on an M1 MacBook Air, on AC, full screen, one song at each setting, the GPU's
+watts from macOS's energy counters (IOReport) while the song played:
+
+| | 100% | 75% | 50% | 100%, `RS_METAL_UPSCALE=0` |
+|---|---|---|---|---|
+| Its own Retina screen, looks like 1680x1050 (the game at 1680x1050, scaled up to 3360x2100), highest quality | 6.1 W | 5.9 W | 5.6 W | 3.4 W |
+| A 1680x1050 external display (1x: at 100% nothing is scaled), lowest and highest quality | 0.5-0.7 W | the same | the same | |
+
+On the Retina screen most of the GPU's work is MetalFX's upscale to the backing size, which a render scale doesn't
+shrink (it reads fewer pixels and writes as many), so 50% takes a tenth off and the plain bilinear scale two fifths.
+The CPU drew 1.3-1.6 W there, the chip averaged 74-81 °C and peaked at 92 °C as the runs followed each other, macOS
+reported no thermal pressure, and the frame rate held 60. On the 1x display the GPU's clock is near its floor, so less
+work doesn't show as fewer watts; the highest quality cost about 0.2 W of GPU and 0.2 W of CPU over the lowest.
+A 50% scale with `RS_METAL_UPSCALE=0` was played on a 1470x956 Retina screen, not measured; untried: a larger screen,
+and `RS_METAL_RETINA=1`.
+
 ## Where the CPU goes
 
 A Time Profiler trace of 30 s of the song from 45 s in (`tools/perf/run.py --trace 30`, `tools/perf/profile.py`), one of

@@ -134,10 +134,12 @@ The 32-bit runtime (`tools/ws7/recomp/runtime/rc32_*`,
 ### Screen and window
 
 The game sees the host's main screen as its desktop (`GetSystemMetrics`, `EnumDisplaySettings`, the D3D9
-display mode): in points, or in backing pixels with `RS_METAL_RETINA=1` (`RS_D3D9_DISPLAY=WxH` overrides). In points on a
-Retina screen, `lp_window.m` asks libRSOpenGL for an output of the back buffer times the backing scale
-(`rs_gfx_set_output_size`), so each frame is scaled up with MetalFX before the layer fits it to the window, as on the Mac
-([Mac METAL.md](../mac/METAL.md#metal-core-shimsopenglsrcmetal)).
+display mode): in points, or in backing pixels with `RS_METAL_RETINA=1`, at `RS_METAL_SCALE`'s percentage (the Mac
+edition's `shims/platform/include/rsp_scale.h`; `RS_D3D9_DISPLAY=WxH` overrides). With fewer game pixels than the
+screen's (points on a Retina screen, or a scale below 100), `lp_window.m` asks libRSOpenGL for an output of the screen's
+pixels for the back buffer, no larger than the screen (`rs_gfx_set_output_size`), so each frame is scaled up with MetalFX
+before the layer fits it to the window, as on the Mac ([Mac METAL.md](../mac/METAL.md#metal-core-shimsopenglsrcmetal)).
+A window the user resizes becomes the game's resolution at the same scale.
 `[Renderer.Win32] Fullscreen` in `Rocksmith.ini` (in the game: Options > Visual Settings > Windowed Mode):
 
 | `Fullscreen` | Device | Window |
@@ -560,7 +562,7 @@ editions and the parts both share). Neither touches the Mac game install or its 
    (`lp_game.exe`), the DLL images, the shader corpus and the game's icon. It sets no environment; `lp_main.c` takes its
    folders from `~/Library/Application Support/RS Re-ARMed/learn-play/` (`LP_HOME`), and the built-in mods switched off
    and the other switches set from `settings.env` and `options.env` there (`lp_settings.c`, the Mac launcher's rules:
-   only their nine and 35 keys, and a value in the environment wins), read before `mods_guard`, so the start again with
+   only their nine and 36 keys, and a value in the environment wins), read before `mods_guard`, so the start again with
    the network guard keeps them.
 8. **Clean** (`build-clean`): the intermediates go; the translated libraries (about 140 MB) stay as the
    cache that makes the next run skip to the link.

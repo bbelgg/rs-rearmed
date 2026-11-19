@@ -20,3 +20,9 @@ notes and empties this file. -->
   the peg stayed grey in both editions. In Learn & Play at some window and picture sizes (seen at 1102x717 and
   1104x718) purple streaks also grew from the right edge of the screen before a song, until the whole tuner was
   purple; the note highway after it was normal.
+- **A render scale for less GPU work:** Render scale, under Advanced in the installer's Settings and switches
+  (`RS_METAL_SCALE`, 50-100%), has the game draw fewer pixels and scales them up with MetalFX, for a softer picture.
+  Before, the game drew at the window's size in points, or every pixel with Full Retina resolution. On an M1 MacBook
+  Air's own screen 50% took a tenth off the GPU's power. Learn & Play at 50% is fine.
+- **MetalFX upscaling is a normal setting in the installer:** turning it off gives a softer picture on a Retina screen
+  for clearly less GPU work, two fifths of it on an M1 MacBook Air's own screen. Before, it was under Advanced.

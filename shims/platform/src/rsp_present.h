@@ -18,7 +18,9 @@
 //   gl_context hook / rsp_g_gl_context nil: the game only stores the pointer (see rsp_shell.m)
 //
 // Drawable size: the view's size in points (1x, what the GL surface is without
-// wantsBestResolutionOpenGLSurface), or with RS_METAL_RETINA=1 its backing size in pixels.
+// wantsBestResolutionOpenGLSurface), or with RS_METAL_RETINA=1 its backing size in pixels, at
+// RS_METAL_SCALE's percentage (rsp_scale.h). A drawable smaller than the backing pixels is scaled up
+// to them at present.
 // Drawables: RS_METAL_DRAWABLES=2|3, else 3 with vsync (Apple's default: a late frame does not
 // block nextDrawable for a whole refresh) and 2 without (RS_FPS / no_vsync: presents are not
 // held for the display, so a third drawable only adds latency).
@@ -66,7 +68,8 @@ void rsp_mtl_size(rsp_mtl *m, int *w, int *h);
 void rsp_mtl_resize(rsp_mtl *m, int w, int h);
 // The size the drawable should have for `view` now, then rsp_mtl_resize (takes the lock).
 void rsp_mtl_view_resized(rsp_mtl *m, NSView *view);
-// Drawable pixels per view point: the backing scale with RS_METAL_RETINA=1, else 1.
+// Drawable pixels per view point: the backing scale with RS_METAL_RETINA=1, else 1, times
+// RS_METAL_SCALE's fraction.
 double rsp_mtl_scale(rsp_mtl *m);
 // Any thread; the layer is changed by the next rsp_mtl_present (the frame thread).
 void rsp_mtl_set_swap_interval(rsp_mtl *m, int interval);

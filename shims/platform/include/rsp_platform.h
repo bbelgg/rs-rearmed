@@ -125,8 +125,9 @@ int rsp_no_vsync(void);                            // 0x10017a220
 int rsp_screen_width(void);                        // 0x10017a310
 int rsp_screen_height(void);                       // 0x10017a330
 // Engine pixels per window point (not in the original): 1, or the backing scale with Metal and
-// RS_METAL_RETINA=1. The shell works in points; rsp_set_display_mode, rsp_screen_width/height and
-// mouse positions convert at the engine boundary, so the engine renders at the drawable's size.
+// RS_METAL_RETINA=1, times RS_METAL_SCALE's fraction (rsp_scale.h). The shell works in points;
+// rsp_set_display_mode, rsp_screen_width/height and mouse positions convert at the engine boundary,
+// so the engine renders at the drawable's size. rsp_screen_width/height give back the points last set.
 void rsp_set_render_scale(double s);
 double rsp_render_scale(void);
 // A mouse coordinate in window points -> the engine's pixels: rsp_mouse_coord(v * render scale).

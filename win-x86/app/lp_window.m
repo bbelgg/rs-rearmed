@@ -4,8 +4,8 @@
 //
 // Sizes follow the Mac build's shell (shims/platform/src/rsp_shell.m): the desktop the game sees
 // (lp_screen_size: GetSystemMetrics, EnumDisplaySettings, the D3D9 display mode) is the main
-// screen in points, or in backing pixels with RS_METAL_RETINA=1. The real display mode never
-// changes (ChangeDisplaySettings does nothing).
+// screen in points, or in backing pixels with RS_METAL_RETINA=1, at RS_METAL_SCALE's percentage
+// (shims/platform/include/rsp_scale.h). The real display mode never changes (ChangeDisplaySettings does nothing).
 //
 // Window modes: Rocksmith.ini's [Renderer.Win32] Fullscreen, the game's Options > Visual Settings >
 // Windowed Mode:
@@ -41,6 +41,7 @@
 // env: LP_OFFSCREEN=1     no window: the device renders offscreen
 //      RS_FPS=N           a fixed frame rate, with vsync off (1-1000; unset or 0: the display's rate)
 //      RS_METAL_RETINA=1  the desktop, and so the game's resolution, in backing pixels
+//      RS_METAL_SCALE=N   the desktop and a followed window at N% (50-100), scaled up to the screen's pixels
 //      RS_FULLSCREEN=1|0  always full screen / always a window, whatever the game's setting
 //      RS_WINDOW_ANY_SHAPE=0  16:9 with the game's bars, and a resized window keeps the resolution
 //      LP_WINDOW_SCRIPT   window resizes and full-screen toggles for unattended checks
@@ -48,6 +49,7 @@
 #import <IOKit/pwr_mgt/IOPMLib.h>
 #import <QuartzCore/CAMetalLayer.h>
 
+#include <math.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -57,6 +59,7 @@
 #include "lp_screen.h"
 #include "rs_gfx.h"
 #include "rsp_fps.h"
+#include "rsp_scale.h"
 
 #ifndef LP_VERSION
 #define LP_VERSION "dev"  // build.sh passes the repository's VERSION
@@ -80,13 +83,16 @@ static int retina(void) {
   return e && *e && *e != '0';
 }
 
+// The game's pixels per point at a backing scale: 1, or the backing scale with RS_METAL_RETINA=1, at RS_METAL_SCALE.
+static double game_scale(CGFloat backing) { return (retina() ? backing : 1) * rsp_metal_scale(); }
+
 // the main screen's frame and visible frame in points, and the scale the game's pixels have
 static void screen_info(NSRect *frame, NSRect *visible, CGFloat *scale) {
   on_main(^{
     NSScreen *s = [NSScreen mainScreen];
     *frame = s ? s.frame : NSMakeRect(0, 0, 1920, 1080);
     *visible = s ? s.visibleFrame : *frame;
-    *scale = s && retina() ? s.backingScaleFactor : 1;
+    *scale = game_scale(s ? s.backingScaleFactor : 1);
   });
 }
 
@@ -154,7 +160,7 @@ static void follow_window(const char *why) {
   if (!any_shape() || !g_win || !g_view || g_full) return;
   NSSize c = g_view.bounds.size;
   int w, h;
-  if (!lp_follow_size(c.width, c.height, retina() ? g_win.backingScaleFactor : 1, g_bw, g_bh, &w, &h)) return;
+  if (!lp_follow_size(c.width, c.height, game_scale(g_win.backingScaleFactor), g_bw, g_bh, &w, &h)) return;
   g_asked_w = w;
   g_asked_h = h;
   lp_request_resolution(g_hwnd, w, h);
@@ -218,13 +224,16 @@ void lp_window_style(uint32_t hwnd, uint32_t style) {
 void d3d9_platform_windowed(int windowed) { g_windowed = windowed; }
 
 // The game reset its device (d3d9_device.c's Reset) to a w x h back buffer.
-// Not RS_METAL_RETINA: the game renders in points, and libRSOpenGL scales each frame up to the screen's backing
-// pixels (MetalFX) before the layer fits it to the window, as the Mac edition does (rsp_present_metal.m). 1x: nothing.
+// Game pixels fewer than the screen's (the game in points on a Retina screen, or RS_METAL_SCALE below 100):
+// libRSOpenGL scales each frame up to the screen's backing pixels (MetalFX) before the layer fits it to the window,
+// as the Mac edition does (rsp_present_metal.m), to no more than the screen has. The backing pixels already: nothing.
 static rs_gfx_context *g_ctx;
 static void set_output(int w, int h) {
   CGFloat s = g_win ? g_win.backingScaleFactor : 1;
-  if (!g_ctx || retina() || s <= 1) return;
-  rs_gfx_set_output_size(g_ctx, (int)(w * s + 0.5), (int)(h * s + 0.5));
+  NSSize pts = g_win && g_win.screen ? g_win.screen.frame.size : NSZeroSize;
+  int ow, oh;
+  if (g_ctx && lp_output_size(w, h, s, game_scale(s), pts.width, pts.height, &ow, &oh))
+    rs_gfx_set_output_size(g_ctx, ow, oh);
 }
 
 void d3d9_platform_resize(uint32_t hwnd, int w, int h) {
@@ -532,9 +541,9 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
     });
   __block NSSize content;
   on_main(^{ content = g_view.bounds.size; });
-  fprintf(stderr, "lp: window for HWND 0x%x: %s %.0fx%.0f points, back buffer %dx%d (desktop %dx%d%s): %s\n", hwnd,
-          full ? "full screen" : "windowed", content.width, content.height, w, h, dw, dh,
-          g_force < 0 ? "" : g_force ? ", RS_FULLSCREEN=1" : ", RS_FULLSCREEN=0",
+  fprintf(stderr, "lp: window for HWND 0x%x: %s %.0fx%.0f points, back buffer %dx%d (desktop %dx%d at %d%%%s): %s\n",
+          hwnd, full ? "full screen" : "windowed", content.width, content.height, w, h, dw, dh,
+          (int)lround(rsp_metal_scale() * 100), g_force < 0 ? "" : g_force ? ", RS_FULLSCREEN=1" : ", RS_FULLSCREEN=0",
           ctx ? "Metal layer" : "no layer context, offscreen");
   return ctx ? ctx : rs_gfx_create_offscreen(w, h);
 }

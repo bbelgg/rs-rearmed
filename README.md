@@ -90,6 +90,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Your own plug-in in place of the game's tones (rearmed-mods' ToneHost add-on) | ✅ | ✅ |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |
 | Window, full screen, Retina (MetalFX upscaling), sRGB colours on wide-colour screens | ✅ | ✅ the same renderer; the upscaled picture not checked |
+| A render scale, 50-100%, for less GPU work (the installer's Render scale, under Advanced) | ✅ | ✅ 50% is fine |
 | A 16:10 or ultrawide screen or window drawn at its own shape | ✅ a window of any shape; ⚠️ full screen on such a screen | ✅ a window of any shape, full screen on a MacBook's screen; ⚠️ an ultrawide screen |
 | Sharper textures (anisotropic filtering, the game's LOD bias) and 4x MSAA | ✅ | ✅ the same renderer; not compared with them off |
 | Frame rate follows the display | ✅ 60 and 75 Hz; ⚠️ 120 Hz | ✅ 60 and 75 Hz; ⚠️ 120 Hz |

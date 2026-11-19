@@ -175,7 +175,8 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   MetalFX's spatial scaler (`MTLFXSpatialScaler`, perceptual mode for 8-bit sRGB, macOS 13+, the framework weakly
   linked) from the default colour texture into a texture of the drawable's size, which it then draws flipped. Without
   MetalFX, or with `RS_METAL_UPSCALE=0`, the frame is drawn bilinearly into the larger drawable. `RS_METAL_RETINA=1`
-  makes the framebuffer itself the backing size, and nothing is scaled. Layer contexts are tagged sRGB
+  makes the framebuffer itself the backing size, and nothing is scaled. `RS_METAL_SCALE=N` makes the framebuffer N% of
+  the size it would have, and it is scaled up to the backing size the same way. Layer contexts are tagged sRGB
   (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the display;
   `RS_METAL_COLORS=vivid` leaves the layer untagged.
 - **Conventions** (applied by the translator, so the core passes GL state through unchanged):

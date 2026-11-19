@@ -600,8 +600,10 @@ static void rsm_upscale_setup(RSMContext *ctx) {
         s.inputContentWidth = d.inputWidth;
         s.inputContentHeight = d.inputHeight;
         ctx->fx_scaler = s;
+        // The first few sizes, not only the first: a new window's output changes as it reaches its screen and goes
+        // full screen.
         static int told;
-        if (!told++)
+        if (told++ < 4)
             rsm_log("upscaling %dx%d to %dx%d with MetalFX (RS_METAL_UPSCALE)", ctx->w, ctx->h, ctx->out_w, ctx->out_h);
     }
 }

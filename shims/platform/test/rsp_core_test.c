@@ -16,6 +16,7 @@
 #include <signal.h>
 
 #include "rsp_fps.h"
+#include "rsp_scale.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
 
@@ -341,6 +342,19 @@ static void test_render_scale(void) {
   for (size_t i = 0; i < sizeof mc / sizeof *mc; i++)
     CHECK(rsp_mouse_engine_coord(mc[i].v) == mc[i].want, "scale 2: mouse %g -> %d (want %d)", mc[i].v,
           rsp_mouse_engine_coord(mc[i].v), mc[i].want);
+  // Below 1 (RS_METAL_SCALE): odd point sizes can't come back by division (641 pixels are 1282 points at 0.5), so
+  // the points last set do; an engine size the shell didn't set is converted.
+  rsp_set_render_scale(0.5);
+  rsp_set_display_mode(0, 1281, 721);
+  CHECK(s->width == 641 && s->height == 361, "scale 0.5: engine %dx%d", s->width, s->height);
+  CHECK(rsp_screen_width() == 1281 && rsp_screen_height() == 721, "scale 0.5: points %dx%d", rsp_screen_width(),
+        rsp_screen_height());
+  rsp_set_render_scale(0.75);
+  rsp_set_display_mode(0, 1279, 719);
+  CHECK(s->width == 959 && s->height == 539 && rsp_screen_width() == 1279 && rsp_screen_height() == 719,
+        "scale 0.75: engine %dx%d", s->width, s->height);
+  s->width = 960;
+  CHECK(rsp_screen_width() == 1280, "scale 0.75: an engine width not set -> %d", rsp_screen_width());
   rsp_set_render_scale(0);
   CHECK(rsp_render_scale() == 1.0, "scale 0 -> 1");
   rsp_set_render_scale(-2);
@@ -698,6 +712,15 @@ static void test_renderer_startup(void) {
   CHECK(strstr(out, "gen 1 backend metal") != NULL, "setting metal again: metal (%s)", out);
 }
 
+// --- RS_METAL_SCALE (rsp_scale.h: both editions') ------------------------------
+static void test_scale(void) {
+  CHECK(rsp_scale_value(NULL) == 1.0 && rsp_scale_value("") == 1.0 && rsp_scale_value("100") == 1.0, "unset or 100");
+  CHECK(rsp_scale_value("75") == 0.75 && rsp_scale_value("50") == 0.5, "a percentage");
+  CHECK(rsp_scale_value("49") == 1.0 && rsp_scale_value("101") == 1.0 && rsp_scale_value("0") == 1.0, "out of range");
+  CHECK(rsp_scale_value("75%") == 1.0 && rsp_scale_value("0.75") == 1.0 && rsp_scale_value("half") == 1.0,
+        "a whole number only");
+}
+
 // --- RS_FPS (rsp_fps.h: both editions') ----------------------------------------
 static void test_fps(void) {
   CHECK(rsp_fps_value(NULL) == 0 && rsp_fps_value("") == 0 && rsp_fps_value("0") == 0, "unset or 0: the display");
@@ -747,6 +770,7 @@ int main(int argc, char **argv) {
   test_renderer_decide();
   test_renderer_files();
   test_renderer_startup();
+  test_scale();
   test_fps();
   printf("rsp_core_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)

@@ -52,3 +52,15 @@ int lp_follow_size(double cw, double ch, double scale, int bw, int bh, int *w, i
   *h = fh < 1 ? 1 : (int)fh;
   return *w != bw || *h != bh;
 }
+
+int lp_output_size(int w, int h, double backing, double game_scale, double sw, double sh, int *ow, int *oh) {
+  *ow = w;
+  *oh = h;
+  if (w <= 0 || h <= 0 || backing <= 0 || game_scale <= 0) return 0;
+  double up = backing / game_scale;
+  if (sw > 0 && sh > 0) up = fmin(up, fmin(sw * backing / w, sh * backing / h));
+  if (up <= 1) return 0;
+  *ow = (int)(w * up + 0.5);
+  *oh = (int)(h * up + 0.5);
+  return 1;
+}

@@ -3,11 +3,13 @@
 // A fix that needs nothing of one game alone is here too, written as a mod is (rc_mod.h): it finds the game's
 // functions and fields by name when it runs, so the same object is right for either game. Built into both apps
 // (overrides/mods/build.sh, win-x86/build/build_shims.sh).
+#include <ctype.h>
 #include <stdarg.h>
 #include <stdatomic.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 #include "rc_mod.h"
@@ -59,6 +61,49 @@ void rs_mods_logf(const char *fmt, ...) {
   fputc('\n', stderr);
   funlockfile(stderr);
   va_end(ap);
+}
+
+// ------------------------------------------------------------------------------------------------
+// The cache overlay's names (mods_shared.h). Each edition's hook on FrontEnd_OpenFile opens the name first and the
+// path itself when the overlay has no such file, so a menu movie the overlay doesn't hold opens as before, through a
+// mod's later hook too (rearmed-mods serves three movies of its own). A path in the overlay already is no one's: the
+// Mac's hook opens the name through the hook point again.
+// ------------------------------------------------------------------------------------------------
+static int is_cache_7z(const char *p) {
+  if (strncasecmp(p, "cache", 5) != 0) return 0;
+  p += 5;
+  if (*p < '0' || *p > '9') return 0;
+  while (*p >= '0' && *p <= '9') p++;
+  return strcasecmp(p, ".7z") == 0;
+}
+
+static int is_sep(char c) { return c == '/' || c == '\\'; }
+
+// The menu movie's name in path, from "gfxassets": ...gfxassets\views\<name>.gfx, <name> without a separator; NULL
+static const char *views_movie(const char *path) {
+  for (const char *p = path; *p; p++) {
+    if ((p != path && !is_sep(p[-1])) || strncasecmp(p, "gfxassets", 9) || !is_sep(p[9]) ||
+        strncasecmp(p + 10, "views", 5) || !is_sep(p[15]))
+      continue;
+    const char *name = p + 16;
+    size_t k = strlen(name);
+    if (k <= 4 || strcasecmp(name + k - 4, ".gfx") || strpbrk(name, "/\\")) return NULL;
+    return p;
+  }
+  return NULL;
+}
+
+int rs_mods_overlay_name(const char *path, char *alt, size_t n) {
+  static const char pre[] = "patchupdate/";
+  const size_t pn = sizeof pre - 1;
+  if (!path || !alt || !strncasecmp(path, pre, pn)) return 0;
+  if (is_cache_7z(path)) return snprintf(alt, n, "%s%s", pre, path) < (int)n;
+  const char *m = views_movie(path);
+  size_t k = m ? strlen(m) : 0;
+  if (!m || pn + k + 1 > n) return 0;
+  memcpy(alt, pre, pn);
+  for (size_t i = 0; i <= k; i++) alt[pn + i] = m[i] == '\\' ? '/' : (char)tolower((unsigned char)m[i]);
+  return 1;
 }
 
 // ------------------------------------------------------------------------------------------------

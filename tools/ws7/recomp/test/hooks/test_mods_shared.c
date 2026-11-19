@@ -1027,6 +1027,29 @@ static void fs_reset(void) {
   for (int k = 0; k < ARCHIVES; k++) arch_asks[k] = 0, arch_has[k] = 0, arch_appid[k] = 1;
 }
 
+// The cache overlay's names (rs_mods_overlay_name): a cacheN.7z as it is, a menu movie of static.psarc in lower case
+// with '/', nothing for any other file, a path in the overlay already, or a name that doesn't fit.
+static void overlay_names(void) {
+  char alt[64];
+  CHECK(rs_mods_overlay_name("cache8.7z", alt, sizeof alt) && !strcmp(alt, "patchupdate/cache8.7z"));
+  CHECK(rs_mods_overlay_name("Cache12.7z", alt, sizeof alt) && !strcmp(alt, "patchupdate/Cache12.7z"));
+  CHECK(rs_mods_overlay_name("data\\gfxassets\\views\\TD_SongList.gfx", alt, sizeof alt) &&
+        !strcmp(alt, "patchupdate/gfxassets/views/td_songlist.gfx"));
+  CHECK(rs_mods_overlay_name("gfxassets/views/td_songlist.gfx", alt, sizeof alt) &&
+        !strcmp(alt, "patchupdate/gfxassets/views/td_songlist.gfx"));
+  CHECK(rs_mods_overlay_name("/game/data/gfxassets/views/x.gfx", alt, sizeof alt) &&
+        !strcmp(alt, "patchupdate/gfxassets/views/x.gfx"));
+  const char *not[] = {"cache.7z", "cache8.7z.bak", "data\\gfxassets\\libs\\commonlib.gfx",
+                       "data\\gfxassets\\tuner.gfx", "data\\gfxassets\\views\\sub\\x.gfx",
+                       "data\\gfxassets\\views\\x.dds", "data\\gfxassets\\views\\.gfx",
+                       "data\\mygfxassets\\views\\x.gfx", "patchupdate/gfxassets/views/x.gfx", "PatchUpdate/cache8.7z",
+                       "dlc/x_m.psarc", ""};
+  for (size_t i = 0; i < sizeof not / sizeof *not; i++) CHECK(!rs_mods_overlay_name(not[i], alt, sizeof alt));
+  CHECK(!rs_mods_overlay_name(NULL, alt, sizeof alt));
+  CHECK(!rs_mods_overlay_name("data\\gfxassets\\views\\a_name_too_long_for_the_buffer.gfx", alt, 40));
+  CHECK(!rs_mods_overlay_name("cache8.7z", alt, 21) && rs_mods_overlay_name("cache8.7z", alt, 22));
+}
+
 // A step's file questions: one the step before had "no" for is asked of the archive this step mounted alone, by
 // the path from its mount point, and the whole file system is asked whenever that is not known to be enough.
 static void file_questions(void) {
@@ -1284,6 +1307,7 @@ int main(void) {
   manifests();
   mounting_edges();
   file_questions();
+  overlay_names();
   printf("mods_shared: ok (%s)\n", rc_guest_ptr_size == 4 ? "32-bit guest" : "64-bit guest");
   return 0;
 }

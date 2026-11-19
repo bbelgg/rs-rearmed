@@ -71,7 +71,10 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
 - **Learn a Song's scroll bar** (not released): it can be dragged from anywhere on it, through the menu overlay's copy
-  of the song list; the game let it be grabbed only near the top of the list.
+  of the song list; the game let it be grabbed only near the top of the list. The same for the game's 24 other lists,
+  the Tone Designer's among them, through the overlay's copies of their movies, and the 16 of them that had no bar
+  have one: Nonstop Play's songs, the inlays, the Tone Designer's amps, pedals, cabinets and racks, Session Mode's and
+  more.
 - **A fixed frame rate** (new in 1.16.0): the rule and clock of `RS_FPS=N`, the installer's Frame rate, are one
   source that Learn & Play uses too (`shims/platform/include/rsp_fps.h`); this edition runs as before.
 - **Shared with Learn & Play** (new in 1.16.0): the switches, the log and the start of the built-in fixes, the intro

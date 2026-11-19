@@ -155,10 +155,10 @@ Where each of those comes from, for this game and for a Mac game from Steam's do
 way: [the Mac edition's table](../mac/INSTALL.md#game-files). The language is English unless the Mac game's
 appmanifest is in Steam's library or `RS_STEAM_LANGUAGE` is set.
 
-The **Direct Connect overlay** is made as in the Mac edition, from the copy's `cache.psarc`. The copy's tools read
-the game's archives the same way too, but Learn & Play's exe shows what they need only once unpacked: the first
-copy leaves your DLC's list and the overlay to the build step, which keeps a note of it (`game/.rearmed/toc-key`),
-and a refresh after that needs neither the image nor the game folder.
+The **Direct Connect overlay** is made as in the Mac edition, from the copy's `cache.psarc` and `static.psarc`. The
+copy's tools read the game's archives the same way too, but Learn & Play's exe shows what they need only once
+unpacked: the first copy leaves your DLC's list and the overlay to the build step, which keeps a note of it
+(`game/.rearmed/toc-key`), and a refresh after that needs neither the image nor the game folder.
 
 - **Disk use.** On the same APFS volume the copy is clones: seconds, and no extra space, though `du` and the
   Finder count the full size. Once it's made, Steam's download may be deleted, though that frees nothing if the
@@ -343,7 +343,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_BUDGET_MS=N` | 50 | the time per frame for mounting DLC archives, in ms; 0 mounts one per frame and asks every file question of the whole file system, as the game does |
 | `RS_MODS_INTRO=0` | on | the intro screens play |
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
-| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the song list's scroll bar as the game has it ([Game files](#game-files)) |
+| `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the lists' scroll bars as the game has them ([Game files](#game-files)) |
 | `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
 | `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |

@@ -42,13 +42,14 @@ static inline void ov_ret32(rc_ctx *c, uint32_t eax) {
 // Direct Connect: the cache overlay (the Mac's is tools/ws7/recomp/overrides/mods/mods.c, a pre hook on the
 // same function). FrontEnd_OpenFile (image VA 0x101ba80; the Mac's 0x1003c7810): DataStream **
 // open(DataStream **out [stack], const char *path [ecx]), the caller removes `out`; eax = out. The game
-// opens the archives inside cache.psarc (cache0.7z ... cache8.7z, the menu data among them) through it,
-// and the installer's overlay (tools/play-native/cache_overlay.py) is <game>/Update/patcharchives.psarc,
-// which the engine mounts at PatchUpdate/ (0x101b297, "%spatcharchives.psarc"). For a cacheN.7z this
-// opens PatchUpdate/<name> first and the name itself when the overlay has none; RS_MODS_OVERLAY=0 turns
-// that off. The rest is the original: the path in lower case (the original's own lower-casing is behind a
-// packer stub), the front-end file system (the singleton at 0x1ee67c4) Open, slot +0x10, thiscall
-// bool(const char *, DataStream **), and the stream's AddRef (slot +0x4) for *out.
+// opens the archives inside cache.psarc (cache0.7z ... cache8.7z, the menu data among them) and the menu
+// movies of static.psarc (data\gfxassets\views\<name>.gfx) through it, and the installer's overlay
+// (tools/play-native/cache_overlay.py) is <game>/Update/patcharchives.psarc, which the engine mounts at
+// PatchUpdate/ (0x101b297, "%spatcharchives.psarc"). For a cacheN.7z or a menu movie this opens its name in
+// PatchUpdate/ first (rs_mods_overlay_name, one rule with the Mac) and the path itself when the overlay has
+// none; RS_MODS_OVERLAY=0 turns that off. The rest is the original: the path in lower case (the original's own
+// lower-casing is behind a packer stub), the front-end file system (the singleton at 0x1ee67c4) Open, slot +0x10,
+// thiscall bool(const char *, DataStream **), and the stream's AddRef (slot +0x4) for *out.
 static uint32_t rd32(uint32_t g) {
   uint32_t v;
   memcpy(&v, RC32_H(g), 4);
@@ -56,14 +57,6 @@ static uint32_t rd32(uint32_t g) {
 }
 
 static void wr32(uint32_t g, uint32_t v) { memcpy(RC32_H(g), &v, 4); }
-
-static int is_cache_7z(const char *p) {
-  if (strncasecmp(p, "cache", 5) != 0) return 0;
-  p += 5;
-  if (*p < '0' || *p > '9') return 0;
-  while (*p >= '0' && *p <= '9') p++;
-  return strcasecmp(p, ".7z") == 0;
-}
 
 // Open `path` (guest, lower case) through the front end; the stream (0: none) with a reference for the caller.
 static uint32_t fe_open(rc_ctx *c, uint32_t path, uint32_t slot) {
@@ -80,20 +73,18 @@ void RC_NFN(frontend_open_file)(rc_ctx *c) {
   uint32_t esp = (uint32_t)c->r[4];
   uint32_t out = rd32(esp + 4);
   const char *path = RC32_H((uint32_t)c->r[1]);
-  // scratch on the guest stack below the caller's frame: the stream slot and the lower-case path
+  // scratch on the guest stack below the caller's frame: the stream slot, the lower-case path and its name in the
+  // overlay (patchupdate/ and at most the path)
   size_t n = strnlen(path, 4096);
-  uint32_t scratch = (esp - 64 - (uint32_t)n - 32) & ~15u;
-  uint32_t slot = scratch, buf = scratch + 16;
-  char *b = RC32_H(buf);
-  static const char pre[] = "patchupdate/";
-  const int pn = (int)sizeof pre - 1;
-  memcpy(b, pre, pn);
-  for (size_t i = 0; i < n; i++) b[pn + i] = (char)tolower((unsigned char)path[i]);
-  b[pn + n] = 0;
+  uint32_t scratch = (esp - 64 - 2 * (uint32_t)n - 64) & ~15u;
+  uint32_t slot = scratch, low = scratch + 16, alt = low + (uint32_t)n + 1;
+  char *l = RC32_H(low);
+  for (size_t i = 0; i < n; i++) l[i] = (char)tolower((unsigned char)path[i]);
+  l[n] = 0;
   c->r[4] = scratch - 16;
   uint32_t s = 0;
-  if (rs_mods_cfg.overlay && is_cache_7z(b + pn)) s = fe_open(c, buf, slot);
-  if (!s) s = fe_open(c, buf + pn, slot);
+  if (rs_mods_cfg.overlay && rs_mods_overlay_name(l, RC32_H(alt), n + sizeof "patchupdate/")) s = fe_open(c, alt, slot);
+  if (!s) s = fe_open(c, low, slot);
   c->r[4] = esp;
   wr32(out, s);
   ov_ret32(c, out);

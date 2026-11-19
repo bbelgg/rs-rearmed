@@ -64,8 +64,9 @@ RS_STEAM_ID, the Steam account the edition
 plays as: the account whose Steam license has the edition's
 depot, so another account logged in to Steam later doesn't change the saves, profiles and songs. RS_STEAM_ID
 set when the copy is made chooses it; a refresh keeps an earlier choice unless the license says otherwise).
-After each copy or refresh, DEST/Update/patcharchives.psarc is made from the copy's cache.psarc: the Direct
-Connect menu entries (cache_overlay.py, next to this file); cache.psarc itself is not changed.
+After each copy or refresh, DEST/Update/patcharchives.psarc is made from the copy's cache.psarc and static.psarc:
+the Direct Connect menu entries and the lists' scroll bars (cache_overlay.py, next to this file); neither archive is
+changed.
 
 Files are compared by size and modification time; when only the time differs, by SHA-256. A file being
 replaced is written next to it first and then renamed over it, so a clone is never written through. SOURCE is

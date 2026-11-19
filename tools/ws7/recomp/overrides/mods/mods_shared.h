@@ -17,8 +17,9 @@
 //   RS_MODS_BUDGET_MS  per-frame budget of the batched DLC mounting (default 50; 0 = one per frame)
 //   RS_MODS_AUTOSAVE=0 the Auto Save warning dialog is shown (default: skipped)
 //   RS_MODS_MULTIPLAYER=0 Player 2 takes a Real Tone cable only, as in the original (default: any input)
-//   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only, without the
-//                      menu entries the installer's overlay adds (Direct Connect) (default on)
+//   RS_MODS_OVERLAY=0  the cache overlay off: the cacheN.7z archives come from cache.psarc only and the menu movies
+//                      from static.psarc, without what the installer's overlay changes in them (Direct Connect, the
+//                      lists' scroll bars) (default on)
 //   RS_MODS_FRAME_RATE=0 what the game counts in frames (calibration, the tuner) is left to the frame rate, as in
 //                      the original (default: as at 60 Hz at any rate; framerate.h)
 //   RS_MODS_GUITARCADE_SKIP=0 a Guitarcade game's tuner has no Skip Tuner, as in the original (default: it has
@@ -44,6 +45,14 @@ int rs_mods_env_on(const char *name, int dflt);
 
 // A line of what a fix did, `[rs-mods] ...`, with RS_MODS_LOG=1; nothing without.
 void rs_mods_logf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+// The cache overlay (tools/play-native/cache_overlay.py: <game>/Update/patcharchives.psarc, which the engine mounts at
+// PatchUpdate/): the name a file the game opens through FrontEnd_OpenFile has there, into alt (n bytes), for each
+// edition's hook to open first. A cacheN.7z of cache.psarc is patchupdate/<path> as it is; a menu movie of
+// static.psarc, ...gfxassets\views\<name>.gfx with '\' or '/' in any case (the game opens them as
+// data\gfxassets\views\<name>.gfx), is patchupdate/gfxassets/views/<name>.gfx in lower case. 0 for any other file
+// (the game opens it as it is) and for a patchupdate/ path, which is the overlay's already.
+int rs_mods_overlay_name(const char *path, char *alt, size_t n);
 
 // The start of the built-in fixes, once the edition's environment is final and before the game runs: the Mac's
 // from a constructor (the launcher has set it), Learn & Play's from lp_mods_init (after settings.env). Reads the

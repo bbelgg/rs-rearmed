@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the song list's scroll bar): a small
-patch archive made from the user's own cache.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the lists' scroll bars): a small
+patch archive made from the user's own cache.psarc and static.psarc.
 
     cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
-    cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing
+    cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing (with the static.psarc
+                                        beside it: static_of)
 
 The game's cable screen ("HOW WOULD YOU LIKE TO CONNECT?") offers a real tone cable, a microphone or no input.
 The game code also handles a fourth button, "othercable" (Direct Connect: any audio interface), and a fourth
@@ -25,7 +26,11 @@ Learn a Song's scroll bar can be dragged only near the top of the list: the rows
 take the clicks on it. Its menu (gfxassets/views/las_songslist.gfx, a Scaleform movie) gives the game the bar's
 clickable area; the edit makes that area the bar's whole track, above the rows, by changing a few bytes of its
 ActionScript (edit_songs_list). It is the one optional edit: an archive with the movie that can't be read or
-rewritten leaves the movie out, not the menu's edits with it.
+rewritten leaves the movie out, not the menu's edits with it. The game's other lists with a scroll bar, the Tone
+Designer's among them, are movies of static.psarc with the same script (gfxassets/views/<name>.gfx): they get the
+same edit, and the overlay holds them as they are, beside the archives (plan_movies). They are optional too. Most of
+the game's lists have no bar at all, Nonstop Play's songs among them: the edit also gives each of those one, where
+the lists with a bar have theirs (_edit_bar_shown).
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -33,11 +38,12 @@ with only those files changed, into the patch container the engine mounts at sta
 
     patcharchives.psarc             mounted by the engine at PatchUpdate/
       cache4.7z, cache7.7z, ...     the cache.psarc archives with the changed files (whichever cacheN.7z has them)
+      gfxassets/views/<name>.gfx    the static.psarc menu movies with the changed lists
 
-The engine's own patch layer takes only .new/.delta archives from the container, so the game reads the
-cacheN.7z from there through a hook: FrontEnd_OpenFile opens PatchUpdate/cacheN.7z first and the cache.psarc
-one when the overlay has none (Mac: tools/ws7/recomp/overrides/mods/mods.c). Without the hook the overlay
-does nothing.
+The engine's own patch layer takes only .new/.delta archives from the container, so the game reads them from
+there through a hook: FrontEnd_OpenFile opens PatchUpdate/cacheN.7z or PatchUpdate/gfxassets/views/<name>.gfx
+first and the game's own when the overlay has none (rs_mods_overlay_name in
+tools/ws7/recomp/overrides/mods/mods_shared.c, both editions). Without the hook the overlay does nothing.
 
 cache.psarc itself is never written, so a modded cache works too: files that already have the entries are left
 as they are, and with nothing to change there is no overlay. Both editions use it (gamefiles.py runs it after a copy
@@ -705,8 +711,8 @@ THUMB_READS = 6  # the area's bounds: the thumb's _x, _y, _x and _width, _y and 
 THUMB_TOP = 1000000  # the area's depth: the list's own are small numbers
 
 
-def _swf_tags(movie):
-    """Each tag of an uncompressed Flash movie: (code, start of its body, its end)."""
+def _swf_tag_list(movie):
+    """Each tag of an uncompressed Flash movie: (code, its start, the start of its body, its end)."""
     bits = movie[8] >> 3
     at = 8 + (5 + 4 * bits + 7) // 8 + 4  # past the frame's size, the rate and the frame count
     tags = []
@@ -715,11 +721,16 @@ def _swf_tags(movie):
         code, length, body = word >> 6, word & 0x3F, at + 2
         if length == 0x3F:
             length, body = struct.unpack_from("<I", movie, at + 2)[0], at + 6
-        tags.append((code, body, body + length))
+        tags.append((code, at, body, body + length))
         if code == 0:
             break
         at = body + length
     return tags
+
+
+def _swf_tags(movie):
+    """Each tag of an uncompressed Flash movie: (code, start of its body, its end)."""
+    return [(code, body, end) for code, _, body, end in _swf_tag_list(movie)]
 
 
 def _as_pool(code):
@@ -812,18 +823,234 @@ def _edit_list_script(script):
     return None if code == script else bytes(code)
 
 
+# --- a scroll bar for each list ---------------------------------------------------------------------------
+# The lists' class (ListScene, one script in every list's movie) draws the bar only for a list that asks for it,
+# with ShowScrollBar(true) and SetScrollBarXPos: Learn a Song, the inlays, the rewards, the shop's and the Tone
+# Designer's songs do. The others scroll with none: Nonstop Play's songs, the Tone Designer's amps, pedals, cabinets
+# and the rest, Session Mode's bands and instruments, the profiles, the settings. The edit gives a list that doesn't
+# ask a bar where the lists that do have it, BAR_GAP right of the list's panel, unless that is past the class's own
+# place for a bar at the screen's right edge (Load Tone's short list and the skins have no room there). The bar also
+# needs the game's count of the list's entries; for a list it doesn't give one, the edit takes the list's own (the
+# inlays ask for a bar, but the game gives them no count, so they had none).
+# In ActionScript, where UpdateScrollBar starts:
+#
+#   if (!this.mShowScrollBar) {                     // r9: a register the method has and doesn't use
+#     r9 = this.mTopListPanelXPos + this.mTopListPanelWidth + BAR_GAP;
+#     if (!(BAR_RIGHTMOST < r9)) { this.mShowScrollBar = true; this.mScrollBarXPos = r9; }
+#   }
+#   if (this.mDataObj.ListEntriesCount == undefined) this.mDataObj.ListEntriesCount = this.mSortedData.length;
+A_EQUALS2, A_TRY, A_WITH, A_IF, A_DEFINE_FUNCTION, A_DEFINE_FUNCTION2 = 0x49, 0x8F, 0x94, 0x9D, 0x9B, 0x8E
+P_BOOL, P_POOL16 = 5, 9
+BAR_GAP, BAR_RIGHTMOST, BAR_REGISTER = 2, 1270, 9  # (BAR_RIGHTMOST: mScrollBarXPos as the class has it)
+BAR_NAMES = ("mShowScrollBar", "mTopListPanelXPos", "mTopListPanelWidth", "mScrollBarXPos", "mDataObj",
+             "ListEntriesCount", "mSortedData")
+
+
+def _as_actions(code):
+    """Each action of a script in order, a function's body as more actions: (its start, op, its body, its end)."""
+    out, at = [], 0
+    while at < len(code):
+        op = code[at]
+        length = struct.unpack_from("<H", code, at + 1)[0] if op >= 0x80 else 0
+        body = at + (3 if op >= 0x80 else 1)
+        out.append((at, op, body, body + length))
+        at = body + length
+    if at != len(code):
+        raise Unsupported("a script's last action past its end")
+    return out
+
+
+def _as_replace(code, at, end, new):
+    """CODE with its actions [AT, END) replaced by NEW (which has its own branches right): each branch around them and
+    each function that holds them kept right. Unsupported for a branch from outside into them, or a try or with block
+    (they have sizes too)."""
+    delta = len(new) - (end - at)
+    out = bytearray(code[:at] + new + code[end:])
+
+    def moved(x):
+        return x + delta if x >= end else x
+    for start, op, body, stop in _as_actions(code):
+        if op in (A_TRY, A_WITH):
+            raise Unsupported("a try or with block in the script")
+        if at <= start < end:
+            continue
+        if op in (A_IF, A_JUMP):
+            target = stop + struct.unpack_from("<h", code, body)[0]
+            if at < target < end:
+                raise Unsupported("a branch into the edit")
+            struct.pack_into("<h", out, moved(body), moved(target) - moved(stop))
+        elif op in (A_DEFINE_FUNCTION, A_DEFINE_FUNCTION2):  # (its body's size is the header's last word)
+            size = struct.unpack_from("<H", code, stop - 2)[0]
+            if stop <= at and end <= stop + size:
+                struct.pack_into("<H", out, moved(stop - 2), size + delta)
+    return bytes(out)
+
+
+def _as_push(*items):
+    data = b"".join(items)
+    return bytes([A_PUSH]) + struct.pack("<H", len(data)) + data
+
+
+def _as_name(pool, name):  # a push's item: a name of the constant pool
+    i = pool.index(name)
+    return bytes([P_POOL, i]) if i <= 0xFF else bytes([P_POOL16]) + struct.pack("<H", i)
+
+
+def _as_text(text):  # a push's item: a string of its own
+    return bytes([P_STRING]) + text.encode("latin-1") + b"\0"
+
+
+def _as_branch(op, offset):
+    return bytes([op]) + struct.pack("<Hh", 2, offset)
+
+
+# A few actions put together (_as_asm): ("label", name) marks a place, ("if" | "jump", name) branches to it,
+# ("push", value, ...) pushes strings (the pool's, else their own), whole numbers, booleans, None (undefined) and
+# ("r", n) registers, ("store", n) stores the top in register n, and an int is an action without data.
+A_ADD2, A_LESS2, A_NOT, A_STORE_REGISTER = 0x47, 0x48, 0x12, 0x87
+P_UNDEFINED = 3
+
+
+def _as_value(pool, v):
+    if v is None:
+        return bytes([P_UNDEFINED])
+    if isinstance(v, bool):
+        return bytes([P_BOOL, int(v)])
+    if isinstance(v, int):
+        return bytes([P_INT]) + struct.pack("<i", v)
+    if isinstance(v, tuple):  # ("r", n)
+        return bytes([P_REGISTER, v[1]])
+    return _as_name(pool, v) if v in pool else _as_text(v)
+
+
+def _as_asm(pool, items):
+    def size(item):
+        if isinstance(item, int):
+            return 1
+        kind = item[0]
+        return {"label": 0, "if": 5, "jump": 5, "store": 4}.get(kind) or len(piece(item, {}, 0))
+
+    def piece(item, labels, end):
+        if isinstance(item, int):
+            return bytes([item])
+        kind = item[0]
+        if kind == "label":
+            return b""
+        if kind in ("if", "jump"):
+            return _as_branch(A_IF if kind == "if" else A_JUMP, labels[item[1]] - end if labels else 0)
+        if kind == "store":
+            return bytes([A_STORE_REGISTER]) + struct.pack("<HB", 1, item[1])
+        if kind == "push":
+            return _as_push(*(_as_value(pool, v) for v in item[1:]))
+        raise ValueError(kind)
+    labels, at = {}, 0
+    for item in items:
+        if not isinstance(item, int) and item[0] == "label":
+            labels[item[1]] = at
+        at += size(item)
+    out, at = b"", 0
+    for item in items:
+        part = piece(item, labels, at + size(item))
+        out += part
+        at += len(part)
+    return out
+
+
+def _bar_shown(pool):
+    """The actions put where UpdateScrollBar starts (a scroll bar for each list, above)."""
+    this, x = ("r", 1), ("r", BAR_REGISTER)
+    get, put = A_GET_MEMBER, A_SET_MEMBER
+    return _as_asm(pool, [
+        ("push", this, "mShowScrollBar"), get, ("if", "placed"),
+        ("push", this, "mTopListPanelXPos"), get, ("push", this, "mTopListPanelWidth"), get, A_ADD2,
+        ("push", BAR_GAP), A_ADD2, ("store", BAR_REGISTER), A_POP,
+        ("push", BAR_RIGHTMOST, x), A_LESS2, ("if", "placed"),
+        ("push", this, "mShowScrollBar", True), put, ("push", this, "mScrollBarXPos", x), put,
+        ("label", "placed"),
+        ("push", this, "mDataObj"), get, ("push", "ListEntriesCount"), get, ("push", None), A_EQUALS2, A_NOT,
+        ("if", "counted"),
+        ("push", this, "mDataObj"), get, ("push", "ListEntriesCount", this, "mSortedData"), get, ("push", "length"),
+        get, put,
+        ("label", "counted")])
+
+
+def _as_registers(code):
+    """The registers CODE's actions use: those its pushes read, its stores write and its functions' parameters are
+    given (a function's body follows its header as more actions, so its too); None for a push it doesn't know."""
+    used = set()
+    for _, op, body, stop in _as_actions(code):
+        if op == A_STORE_REGISTER:
+            used.add(code[body])
+        elif op == A_DEFINE_FUNCTION2:  # name, parameters' count, registers, flags, then each parameter's register
+            at = code.index(b"\x00", body) + 1
+            count, at = struct.unpack_from("<H", code, at)[0], at + 5
+            for _ in range(count):
+                used.add(code[at])
+                at = code.index(b"\x00", at + 1) + 1
+        elif op == A_PUSH:
+            at = body
+            while at < stop:
+                kind = code[at]
+                if kind == P_STRING:
+                    at = code.index(b"\x00", at + 1) + 1
+                    continue
+                if kind not in P_SIZES:
+                    return None
+                if kind == P_REGISTER:
+                    used.add(code[at + 1])
+                at += 1 + P_SIZES[kind]
+    return used
+
+
+def _edit_bar_shown(script):
+    """The lists' script with a bar for each list (_bar_shown, where UpdateScrollBar starts: the one method that
+    begins by reading mShowScrollBar, with a register BAR_REGISTER that nothing in it uses); None when it has that
+    already or is not the script this knows."""
+    pool = _as_pool(script)
+    if pool is None or any(n not in pool for n in BAR_NAMES):
+        return None
+    shown = _bar_shown(pool)
+    if shown in script:
+        return None
+    first = _as_asm(pool, [("push", ("r", 1), "mShowScrollBar"), A_GET_MEMBER, A_NOT])  # (as UpdateScrollBar starts)
+    starts = []
+    for start, op, body, stop in _as_actions(script):
+        if op == A_DEFINE_FUNCTION2 and script[stop:stop + len(first)] == first:
+            registers = script[script.index(b"\x00", body) + 3]  # (after its name and its parameters' count)
+            used = _as_registers(script[start:stop + struct.unpack_from("<H", script, stop - 2)[0]])
+            free = registers > BAR_REGISTER and used is not None and BAR_REGISTER not in used
+            starts.append(stop if free else None)
+    if len(starts) != 1 or starts[0] is None:
+        return None
+    return _as_replace(script, starts[0], starts[0], shown)
+
+
+def _swf_with_tag(movie, start, end, code, content):
+    """MOVIE with CONTENT in place of its tag at [START, END), in a long tag, and the movie's length made right."""
+    out = bytearray(movie[:start] + struct.pack("<HI", (code << 6) | 0x3F, len(content)) + content + movie[end:])
+    struct.pack_into("<I", out, 4, len(out))
+    return bytes(out)
+
+
 def edit_songs_list(data):
-    """Learn a Song's list with its scroll bar's thumb grabbed anywhere on the track; None when it has that already
-    or is not the expected file. The script keeps its length, so no tag's or the movie's length changes."""
+    """A list's movie (Learn a Song's, or another with the same script) with its scroll bar's thumb grabbed anywhere
+    on the track, and a bar for a list that doesn't ask for one; None when it has that already or is not the
+    expected file. The bar's edit is left out of a script it can't be made in. The script gets longer, so its tag
+    and the movie say their new lengths."""
     if len(data) < 9 or data[:3] not in (b"GFX", b"FWS"):  # (an uncompressed movie, as the game's is)
         return None
     try:
-        for code, body, end in _swf_tags(data):
+        for code, start, body, end in _swf_tag_list(data):
             if code != DO_INIT_ACTION:
                 continue
             script = _edit_list_script(data[body + 2:end])  # (after the sprite's id)
-            if script is not None:
-                return data[:body + 2] + script + data[end:]
+            if script is None:
+                continue
+            try:
+                script = _edit_bar_shown(script) or script
+            except (Unsupported, struct.error, ValueError, IndexError):
+                pass
+            return _swf_with_tag(data, start, end, code, data[body:body + 2] + script)
     except (struct.error, ValueError, IndexError):
         return None
     return None
@@ -842,6 +1069,49 @@ def edit_file(name, data):
     text = data.decode("utf-8", "surrogateescape")
     edited = EDITS[name](text)
     return None if edited is None or edited == text else edited.encode("utf-8", "surrogateescape")
+
+
+# --- the lists of static.psarc ----------------------------------------------------------------------------
+
+STATIC, STATIC_ORIGINAL = "static.psarc", "static.psarc.original"
+VIEWS = "gfxassets/views/"
+
+
+def static_of(game_dir):
+    """The game's own static.psarc in GAME_DIR: static.psarc.original when the copy has it (static.psarc is a link to
+    it or to the title logo's static.psarc.rearmed), else static.psarc; None without one."""
+    for name in (STATIC_ORIGINAL, STATIC):
+        p = os.path.join(game_dir, name)
+        if os.path.isfile(p):
+            return p
+    return None
+
+
+def plan_movies(static_path):
+    """{movie name: edited bytes} of the menu movies in static.psarc (gfxassets/views/<name>.gfx) whose list
+    edit_songs_list changes; the song list's own is cache.psarc's (BYTE_EDITS). {} when the archive can't be read,
+    and a movie that can't be is passed by: these are optional, as the song list's."""
+    out = {}
+    try:
+        ps = Psarc(static_path) if static_path else None
+    except (Unsupported, OSError):
+        return out
+    if ps is None:
+        return out
+    try:
+        for name in ps.names:
+            low = name.lower()
+            if not low.startswith(VIEWS) or not low.endswith(".gfx") or "/" in low[len(VIEWS):] or low in BYTE_EDITS:
+                continue
+            try:
+                edited = edit_songs_list(ps.read(name))
+            except Unsupported:
+                continue
+            if edited is not None:
+                out[low] = edited
+    finally:
+        ps.close()
+    return out
 
 
 # --- the overlay -------------------------------------------------------------------------------------------
@@ -886,40 +1156,42 @@ def plan(cache_path):
     return out
 
 
-def build(cache_path):
-    """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc; (None, []) when it needs no
-    change. The psarc holds the changed cacheN.7z archives under their own names. An archive with a menu file that
-    can't be rewritten (Unsupported: a solid one) costs the whole overlay, one with only BYTE_EDITS files only
-    those."""
+def build(cache_path, static_path=None):
+    """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc and the static.psarc beside it;
+    (None, []) when they need no change. The psarc holds the changed cacheN.7z archives under their own names and
+    the changed menu movies under theirs. An archive with a menu file that can't be rewritten (Unsupported: a solid
+    one) costs the whole overlay, one with only BYTE_EDITS files only those."""
     changes = plan(cache_path)
-    if not changes:
-        return None, []
+    movies = plan_movies(static_path)
     entries, names = [], []
-    ps = Psarc(cache_path)
-    try:
-        for name, files in sorted(changes.items()):
-            try:
-                entries.append((name, rewrite_7z(ps.read(name), files)))
-            except Unsupported:
-                if any(f.lower() in EDITS for f in files):
-                    raise
-                continue
-            names += files
-    finally:
-        ps.close()
+    if changes:
+        ps = Psarc(cache_path)
+        try:
+            for name, files in sorted(changes.items()):
+                try:
+                    entries.append((name, rewrite_7z(ps.read(name), files)))
+                except Unsupported:
+                    if any(f.lower() in EDITS for f in files):
+                        raise
+                    continue
+                names += files
+        finally:
+            ps.close()
+    entries += sorted(movies.items())
+    names += movies
     if not entries:
         return None, []
     return write_psarc(entries, (cache_path,)), sorted(names)
 
 
 def make(game_dir):
-    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc. Returns the names of the
-    files the overlay changes ([] when there is none). Raises Unsupported when the cache cannot be read (the
-    overlay is then removed)."""
+    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc and its static.psarc.
+    Returns the names of the files the overlay changes ([] when there is none). Raises Unsupported when the cache
+    cannot be read (the overlay is then removed)."""
     dst = os.path.join(game_dir, PATCH_DIR, PATCH_NAME)
     cache = os.path.join(game_dir, "cache.psarc")
     try:
-        data, names = build(cache) if os.path.isfile(cache) else (None, [])
+        data, names = build(cache, static_of(game_dir)) if os.path.isfile(cache) else (None, [])
     except Unsupported:
         remove(game_dir)
         raise
@@ -956,6 +1228,8 @@ def main(argv=None):
             for name, files in sorted(plan(argv[1]).items()):
                 for f in sorted(files):
                     print("%s: %s" % (name, f))
+            for f in sorted(plan_movies(static_of(os.path.dirname(os.path.abspath(argv[1]))))):
+                print("%s: %s" % (STATIC, f))
         else:
             names = make(argv[1])
             print("overlay: %s" % (", ".join(names) if names else "nothing to change"))

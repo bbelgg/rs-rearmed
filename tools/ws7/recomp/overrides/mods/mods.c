@@ -703,20 +703,14 @@ const int OV_MODS_COUNT = (int)(sizeof ov_mods_entries / sizeof ov_mods_entries[
 // them in cache.psarc, mounted at the root of the VFS (0x1003c9682). The installer's overlay
 // (tools/play-native/cache_overlay.py) is <game>/Update/patcharchives.psarc, the patch container the engine
 // mounts at PatchUpdate/ itself when the file is there (0x1003c8cd1, "%spatcharchives.psarc"). It holds new
-// copies of the cacheN.7z archives whose menu files it changes, made from the user's own cache.psarc. The
-// engine's patch layer takes only its own .new/.delta archives from there, so for a cacheN.7z this opens
-// PatchUpdate/<name> first, and the name itself when the overlay has no such archive (or there is no
-// overlay). cache.psarc is never changed. The pre hook calls the hook point again, which passes the patch
-// path through unchanged.
+// copies of the cacheN.7z archives whose menu files it changes, made from the user's own cache.psarc, and of
+// the menu movies of static.psarc whose lists it changes (gfxassets/views/<name>.gfx, which the game opens through
+// the same function: Scaleform's file opener calls it). The engine's patch layer takes only its own .new/.delta
+// archives from there, so for a cacheN.7z or a menu movie this opens its name in PatchUpdate/ first
+// (rs_mods_overlay_name, one rule with Learn & Play), and the path itself when the overlay has no such file (or
+// there is no overlay). cache.psarc and static.psarc are never changed. The pre hook calls the hook point again,
+// which passes the patch path through unchanged.
 // ------------------------------------------------------------------------------------------------
-
-static int is_cache_7z(const char *p) {
-  if (strncasecmp(p, "cache", 5) != 0) return 0;
-  p += 5;
-  if (*p < '0' || *p > '9') return 0;
-  while (*p >= '0' && *p <= '9') p++;
-  return strcasecmp(p, ".7z") == 0;
-}
 
 // Two players on any input. A player's input mode and input live in their profile, but the Multiplayer screens
 // ask whether Player 2 is in Real Tone mode (input_mode_is_cable: its only callers) and, when not, set them to it, so
@@ -740,11 +734,10 @@ static int before_open_file(rc_ctx *c, void *user) {
   OV_ARGS(a, c);
   uint64_t out = OV_U64(a);
   const char *path = OV_PTR(a, const char);
-  if (!rs_mods_cfg.overlay || !out || !path || !is_cache_7z(path)) return 0;
-  char alt[64];
-  if (snprintf(alt, sizeof alt, "patchupdate/%s", path) >= (int)sizeof alt) return 0;
+  char alt[160];
+  if (!rs_mods_cfg.overlay || !out || !path || !rs_mods_overlay_name(path, alt, sizeof alt)) return 0;
   OV_GUEST(frontend_open_file, out, (uint64_t)(uintptr_t)alt);
-  if (!*(uint64_t *)(uintptr_t)out) return 0;  // not in the overlay: the original opens it from cache.psarc
+  if (!*(uint64_t *)(uintptr_t)out) return 0;  // not in the overlay: the original opens it from the game's archive
   COUNT(g_overlaid);
   rs_mods_logf("cache overlay: %s from Update/patcharchives.psarc", path);
   ov_ret_u64(c, out);

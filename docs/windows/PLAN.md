@@ -69,7 +69,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
 - **Learn a Song's scroll bar** (not released): as the Mac edition, by the same overlay; this game's song list is the
-  same file.
+  same file. The other lists, and a bar for those that had none (not released): as the Mac edition, by the same rule.
 - **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the installer's Frame rate, with the Mac edition's rule and clock
   (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
 - **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)

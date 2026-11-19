@@ -311,8 +311,8 @@ The installer writes the built-in mods to `settings.env` and every other switch 
 everything is the game's own setting. By hand they are lines of `KEY=0` or `KEY=1` for the built-in mods and
 the other on/off switches, and `KEY=value` for the rest: other lines are ignored (a switch only the Mac edition
 has is passed on and does nothing), and the top of `logs/last-run.log` says what was used. The Mac edition has
-its own files, read the same way. The Mac edition also lists ten of the picture switches in the game's ADV DISPLAY
-SETTINGS; this one doesn't yet ([PLAN.md](PLAN.md#status)).
+its own files, read the same way. The Mac edition also lists the picture switches in the game's ADV DISPLAY SETTINGS;
+this one doesn't yet ([PLAN.md](PLAN.md#status)).
 
 ```
 RS_MODS_INTRO=0

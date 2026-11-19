@@ -51,11 +51,12 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
-- **In the game's menu** (new in 1.19.0): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
-  game's own rows, saved where the installer saves them, for the next start; the other renderer's rows are greyed, as
-  are those a switch set for the session (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar
-  that can be dragged ([INSTALL.md](INSTALL.md#settings-and-switches)).
-  Learn & Play's are set in the installer only ([its plan](../windows/PLAN.md#status)).
+- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY not released): OPTIONS → ADV DISPLAY
+  SETTINGS lists twelve of the picture switches after the game's own rows, saved where the installer saves them, for the
+  next start; the other renderer's rows are greyed, as are those a switch set for the session (`launchctl setenv`)
+  holds, and the longer list scrolls, with a scroll bar that can be dragged
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play's are set in the installer only
+  ([its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

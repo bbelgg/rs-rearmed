@@ -10,9 +10,9 @@
 //
 //   AdvancedDisplaySettings, menu_refresh_slot  after the game's (as the list is made, and when Edit Setting closes):
 //                                               our buttons' CurrentSettingValue, the value the list's "CURRENT
-//                                               SETTING:" line shows, and those of the renderer not chosen locked,
-//                                               greyed by the overlay's edit of the movie (Multithreaded GL with
-//                                               Metal; the Metal options with OpenGL), as are those the session sets
+//                                               SETTING:" line shows, and those that can't be changed now locked,
+//                                               greyed by the overlay's edit of the movie, with why (locked: the
+//                                               other renderer's, Low Latency at a fixed rate, the session's switches)
 //   AdvancedDisplaySettings, menu_press_slot    a press on one of our buttons ("Buttons.<id>.States"): the edited
 //                                               setting is ours and Edit Setting opens, as for the game's own (not
 //                                               for a locked one); any other press is the game's
@@ -146,9 +146,9 @@ static void set_loc(uint64_t obj, const char *name, const char *text) {  // "$[r
 }
 
 // --- the options ------------------------------------------------------------------------------------------------
-// A checkbox has two choices, off and on (its switch 0 or 1), shown as the game's own Off and On; a slider has one
-// notch for each of its choices. Each choice is a value of the switch ("" none) and the text it shows. The order of
-// the buttons is cache_overlay.py's MENU_OPTIONS (their ids match).
+// A checkbox has two choices, off and on (its switch 0 or 1; Low Latency's none or 2), shown as the game's own Off and
+// On; a slider has one notch for each of its choices. Each choice is a value of the switch ("" none) and the text it
+// shows. The order of the buttons is cache_overlay.py's MENU_OPTIONS (their ids match).
 #define CHOICES 6
 typedef struct {
   const char *id;   // the button's ID in the definition, and the setting's name
@@ -170,6 +170,7 @@ static option g_opts[] = {
     {"rsAnyWindowShape", "RS_WINDOW_ANY_SHAPE", 0, 0, 2, 1, OFF_ON, NULL, NULL, 0},
     {"rsRenderer", NULL, 1, 0, 2, 0, {"metal", "opengl"}, {"METAL", "OPENGL"}, NULL, NULL, 0},
     {"rsMultithreadedGL", "RS_GL_MTENGINE", 0, OPENGL, 2, 0, OFF_ON, NULL, NULL, 0},
+    {"rsLowLatency", "RS_METAL_DRAWABLES", 0, METAL, 2, 0, {"", "2"}, {"$[31679]", "$[31678]"}, NULL, NULL, 0},
     {"rsMetalFXUpscaling", "RS_METAL_UPSCALE", 0, METAL, 2, 1, OFF_ON, NULL, NULL, 0},
     {"rsFullRetina", "RS_METAL_RETINA", 0, METAL, 2, 0, OFF_ON, NULL, NULL, 0},
     {"rsRenderScale", "RS_METAL_SCALE", 1, METAL, 4, 3, {"50", "75", "90", ""}, {"50%", "75%", "90%", "100%"}, NULL,
@@ -179,6 +180,7 @@ static option g_opts[] = {
     {"rsTextureFiltering", "RS_METAL_ANISO", 1, METAL, 5, 4, {"1", "2", "4", "8", "16"},
      {"1X", "2X", "4X", "8X", "16X"}, NULL, NULL, 0},
     {"rsColor", "RS_METAL_COLORS", 1, METAL, 2, 0, {"", "vivid"}, {"SRGB", "VIVID"}, NULL, NULL, 0},
+    {"rsPerformanceOverlay", "RS_METAL_HUD", 0, METAL, 2, 0, OFF_ON, NULL, NULL, 0},
 };
 #define NOPTS (sizeof g_opts / sizeof *g_opts)
 
@@ -200,11 +202,15 @@ static const char *home(void) {
   return h && *h ? h : NULL;
 }
 
-// The choice a value of the option's switch is: a checkbox's off when it starts with 0, n, N, f or F (as the
-// launchers read toggles), a slider's by its value in any case; the default without one, -1 for another value.
+// A checkbox whose switch is 0 or 1, a toggle as the launchers read it (not Low Latency's none or 2).
+static int is_toggle(const option *o) { return !o->slider && !strcmp(o->value[1], "1"); }
+
+// The choice a value of the option's switch is: a toggle's off when it starts with 0, n, N, f or F (as the launchers
+// read toggles), another checkbox's (Low Latency's) and a slider's by its value in any case; the default without one,
+// -1 for another value.
 static int choice_of(const option *o, const char *v) {
   if (!v || !*v) return o->dflt;
-  if (!o->slider) return !strchr("0nNfF", v[0]);
+  if (is_toggle(o)) return !strchr("0nNfF", v[0]);
   for (int i = 0; i < o->n; i++)
     if (!strcasecmp(v, o->value[i])) return i;
   return -1;
@@ -295,7 +301,6 @@ static int save_renderer(const char *value) {
 // only). For the renderer: an RS_GL_BACKEND from outside the game (rsp_renderer_env_given: not the shell's own
 // restart), except the gl the launcher passes for a renderer file of OpenGL. One the file has the same can't be told
 // apart.
-static int is_toggle(const option *o) { return !o->slider && !strcmp(o->value[1], "1"); }
 
 // options.env's value for KEY as the launcher reads it: the first line KEY=VALUE with a value (for a toggle, 0 or 1),
 // the ends' white space taken off both; "" without one.
@@ -354,13 +359,33 @@ static uint64_t call1(uint64_t fn, uint64_t a) {
   return rc_call_guest(fn, args, 1, NULL, 0, NULL);
 }
 
-// An option of one renderer can be changed while that renderer is the chosen one, the one the game starts with next.
-static int usable(const option *o) {
-  const option *renderer = NULL;  // (the option without a switch; its choice is METAL - 1 or OPENGL - 1)
-  for (size_t i = 0; i < NOPTS && !renderer; i++)
-    if (!g_opts[i].env) renderer = &g_opts[i];
-  int r = renderer->now >= 0 ? renderer->now : renderer->dflt;
-  return !o->only || o->only - 1 == r;
+static const option *opt_of_id(const char *id) {
+  for (size_t i = 0; i < NOPTS; i++)
+    if (!strcmp(g_opts[i].id, id)) return &g_opts[i];
+  return NULL;
+}
+static int choice(const option *o) { return o->now >= 0 ? o->now : o->dflt; }
+
+// Whether the game starts next at a fixed frame rate: the Frame Rate slider's choice, or for a rate it has no notch for
+// (90 or 144, which the installer allows) RS_FPS as the shell reads it (rsp_fps_value: a whole number from 1 to 1000).
+static int fixed_rate(const option *fps) {
+  if (fps->now >= 0) return fps->now != fps->dflt;
+  const char *v = getenv(fps->env);
+  if (!v) return 0;
+  char *end;
+  long n = strtol(v, &end, 10);
+  return !*end && n >= 1 && n <= 1000;
+}
+
+// Why an option can't be changed now, as its row says it (NULL: it can), by the choices the game starts with next:
+// an option of one renderer while the other is chosen; Low Latency with a fixed frame rate, whose presents are not
+// held for the display and have the two drawables already; a switch the session sets (session_set).
+static const char SESSION[] = "SET FOR THIS SESSION";
+static const char *locked(const option *o) {
+  const option *renderer = opt_of_id("rsRenderer"), *fps = opt_of_id("rsFrameRate");
+  if (o->only && o->only - 1 != choice(renderer)) return o->only == METAL ? "METAL ONLY" : "OPENGL ONLY";
+  if (!strcmp(o->id, "rsLowLatency") && fixed_rate(fps)) return "DISPLAY RATE ONLY";
+  return o->session ? SESSION : NULL;
 }
 
 // A row the session sets: its value, and that it is the session's ("8X, SET FOR THIS SESSION").
@@ -368,19 +393,19 @@ static void set_session_value(uint64_t btn, const option *o) {
   const char *v = choice_text(o, o->now);
   char text[128];
   if (strncmp(v, "$[", 2)) {
-    snprintf(text, sizeof text, "%s, SET FOR THIS SESSION", v);
+    snprintf(text, sizeof text, "%s, %s", v, SESSION);
   } else {
     gstr t;
     loc(&t, v);
-    snprintf(text, sizeof text, "%s, SET FOR THIS SESSION", gstr_text(&t));
+    snprintf(text, sizeof text, "%s, %s", gstr_text(&t), SESSION);
     gstr_free(&t);
   }
   set_text(btn, "CurrentSettingValue", text);
 }
 
 // The list's buttons after the game's (it calls it as the list is made, and again when Edit Setting closes): ours with
-// their CurrentSettingValue, and those of the renderer not chosen locked (States.Locked: the overlay's edit of the
-// movie greys the row) with the renderer they are for as their value, and those the session sets with its value.
+// their CurrentSettingValue, and those that can't be changed now locked (States.Locked: the overlay's edit of the
+// movie greys the row) with why as their value (the session's: its value too).
 static uint64_t my_refresh(uint64_t menu) {
   uint64_t r = call1(g_refresh, menu);
   uint64_t defn = RC_LD(uint64_t, menu + RC_OFF(menu_definition));
@@ -389,12 +414,12 @@ static uint64_t my_refresh(uint64_t menu) {
     uint64_t btn = OV_GUEST(json_find, defn, (uint64_t)(uintptr_t)o->id);
     if (!btn) continue;
     uint64_t states = OV_GUEST(json_find, btn, (uint64_t)(uintptr_t)"States");
-    if (states) set_bool(states, "Locked", !usable(o) || o->session);
-    if (usable(o) && o->session)
+    const char *why = locked(o);
+    if (states) set_bool(states, "Locked", why != NULL);
+    if (why == SESSION)
       set_session_value(btn, o);
     else
-      set_loc(btn, "CurrentSettingValue",
-              usable(o) ? choice_text(o, o->now) : o->only == METAL ? "METAL ONLY" : "OPENGL ONLY");
+      set_loc(btn, "CurrentSettingValue", why ? why : choice_text(o, o->now));
   }
   return r;
 }
@@ -403,7 +428,7 @@ static uint64_t my_press(uint64_t menu) {
   const gstr *path = (const gstr *)(uintptr_t)(menu + RC_OFF(menu_pressed_path));
   option *o = opt_of_path(gstr_text(path));
   if (!o) return call1(g_press, menu);
-  if (!usable(o) || o->session) return 0;  // locked: nothing to edit
+  if (locked(o)) return 0;  // nothing to edit
   RC_ST(const char *, RC_GA(menu_current_setting), o->name);
   uint64_t screens = OV_GUEST(menu_screens, OV_GUEST(ui_current));
   gstr cls, alias;

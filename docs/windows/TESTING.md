@@ -521,6 +521,7 @@ edition's table, in its order ([Mac testing](../mac/TESTING.md#diagnostics)).
 | `RS_FULLSCREEN=1\|0` | full screen or a window, whatever the game's setting |
 | `RS_WINDOW_ANY_SHAPE=0` | 16:9 with the game's bars, and a resized window keeps the resolution ([DESIGN.md](DESIGN.md#screen-and-window)) |
 | `RS_METAL_RETINA=1` | render in backing pixels |
+| `RS_METAL_SCALE=N` | the desktop and a resized window at N% (50-100), scaled up to the screen's pixels; the window's log line has `desktop WxH at N%` |
 | `RS_FPS=N` | a fixed frame rate, with vsync off, as in the Mac edition; the log says `lp: RS_FPS=N: a frame every M ms, vsync off` |
 | `RS_AUDIO_RS_NAMES=0` | keep CoreAudio's device names |
 | `RS_AUDIO_FRAMES`, `RS_AUDIO_RT`, `RS_AUDIO_INPUT_TRIM`, `RS_AUDIO_SET_RATE` | the audio policy ([INSTALL.md](INSTALL.md#settings-and-switches)) |

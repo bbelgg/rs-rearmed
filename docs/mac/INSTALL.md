@@ -525,6 +525,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_GL_BACKEND=gl`, or `metal` | the `renderer` file | the [renderer](#renderer), whatever the file says |
 | `RS_METAL_UPSCALE=0` | on | no MetalFX upscaling on a Retina screen: a plain bilinear scale, as on macOS 12, which has no MetalFX |
 | `RS_METAL_RETINA=1` | off | render every pixel of a Retina screen, about 4x the GPU work (otherwise the game renders in points and each frame is scaled up to the screen's pixels) |
+| `RS_METAL_SCALE=N` | 100 | the game renders at N% of its size, 50-100 (of the backing pixels with `RS_METAL_RETINA=1`), and each frame is scaled up to the screen's pixels with MetalFX: less GPU work for a softer picture, menus and text too |
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |

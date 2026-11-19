@@ -47,7 +47,7 @@ edition's 19.4-19.7, and a third as many over 20 ms (10 to 13 in a run). In `LP_
 
 With the renderer's own times in the log, one more run: all 9,001 frames went on the screen one refresh apart. The GPU's
 90% is its clock slowed to fill the refresh, not its limit. The free frame rate and the GPU's time by pass were run in
-the Mac edition only; Learn & Play draws through the same renderer.
+the Mac edition only; Learn & Play draws through the same renderer. So was the render scale (`RS_METAL_SCALE`).
 
 ## Where the CPU goes
 

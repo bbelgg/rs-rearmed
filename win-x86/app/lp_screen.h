@@ -32,3 +32,9 @@ int lp_any_shape(const char *env);
 // (whole pixels, at least 1x1, as the Mac shell's whole points); 1 when it is not the w x h back
 // buffer the game has now (bw x bh).
 int lp_follow_size(double cw, double ch, double scale, int bw, int bh, int *w, int *h);
+
+// The output libRSOpenGL scales a w x h back buffer up to (rs_gfx_set_output_size): the back buffer times the screen's
+// backing scale over the game's pixels per point (game_scale: 1, or the backing scale with RS_METAL_RETINA=1, at
+// RS_METAL_SCALE), and never more than a screen of sw x sh points has pixels (none given: no cap); 0 when that is no
+// upscale (the back buffer has the pixels already, or more), *ow x *oh the back buffer's own then.
+int lp_output_size(int w, int h, double backing, double game_scale, double sw, double sh, int *ow, int *oh);

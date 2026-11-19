@@ -45,6 +45,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
   own target ([DESIGN.md](DESIGN.md#direct3d-9)). Before it the tuner also turned purple with a back buffer of
   1102x717 or 1104x718, in 9 of 10 runs at those sizes; with the rule five runs at 1102x717 and one at 1470x956
   show the tuner as it should be.
+- **Render scale** (not released): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
+  sees and a resized window at N%. Played full screen on a 1470x956 Retina screen to a song's note highway: 50% (a
+  735x478 frame) is fine.
 
 **Built-in fixes** (the Mac edition's, on this game's own functions and with the same switches:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))

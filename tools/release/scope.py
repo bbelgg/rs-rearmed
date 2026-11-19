@@ -142,7 +142,8 @@ RULES = {
     "tools/metal/": rule(BOTH, run=BOTH, suites=["ct.msl", "lp.shaders"]),
     "shims/opengl/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.opengl", "ct.msl", "lp.d3d9"]),
     "shims/coreaudio/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.audio", "lp.audio"]),
-    # (Learn & Play's Present paces its frames on the shell's clock: include/rsp_fps.h)
+    # (Learn & Play's Present paces its frames on the shell's clock, include/rsp_fps.h, and its window takes the render
+    # scale, include/rsp_scale.h)
     "shims/platform/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.platform", "lp.screen", "lp.d3d9"]),
     # (rs_overlay.h and rs_render.h are a mod's headers: the hooks tests compile with them)
     "shims/include/": rule(BOTH, build=BOTH, run=BOTH, suites=["ct.shims", "ct.opengl", "ct.platform", "hooks"]),

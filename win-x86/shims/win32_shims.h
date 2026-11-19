@@ -47,7 +47,8 @@ const char *w32_host_module_name(uint32_t h);
 
 // --- the display (win32_user32.c)
 // The desktop size the game sees: the host's main screen in points, or in pixels with
-// RS_METAL_RETINA=1 (lp_screen_size, win-x86/app/lp_window.m); RS_D3D9_DISPLAY=WxH overrides.
+// RS_METAL_RETINA=1, at RS_METAL_SCALE's percentage (lp_screen_size, win-x86/app/lp_window.m);
+// RS_D3D9_DISPLAY=WxH overrides.
 void w32_display_size(int32_t *w, int32_t *h);
 // The host resized window h's client area to w x ht pixels (GetClientRect then has it).
 void w32_window_size(uint32_t h, int w, int ht);

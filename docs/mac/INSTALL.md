@@ -251,8 +251,9 @@ Steam may clear its download folder later: the copy is what the game reads, and 
 Each copy or refresh also makes the **Direct Connect overlay**, `game/Update/patcharchives.psarc`
 (`tools/play-native/cache_overlay.py`), from your own `cache.psarc`, which isn't changed: it adds DIRECT CONNECT,
 turns SHOP into ENUMERATE and UPLAY into EXIT GAME, and lets the scroll bars of Learn a Song, the Tone Designer and
-the game's other lists be dragged from anywhere on them (those lists are menus of your `static.psarc`, also unchanged).
-If your cache can't be read, the copy goes on without it and says so.
+the game's other lists be dragged from anywhere on them, with a bar for the lists that had none, Nonstop Play's songs
+among them (those lists are menus of your `static.psarc`, also unchanged). If your cache can't be read, the copy
+goes on without it and says so.
 
 The copy's tools read the game's archives with what the game itself holds (`tools/play-native/psarc_key.py`;
 nothing for it is in RS Re-ARMed). The game's program in the game folder shows it, and the copy keeps a note of it

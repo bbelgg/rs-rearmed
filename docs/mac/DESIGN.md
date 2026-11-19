@@ -376,19 +376,26 @@ What each does:
   finds. Only new names are written, so nothing the game has open is touched; `.rearmed/enumerated.txt` names them, so a
   refresh takes them into the manifest and `steam.env`, or removes one the source no longer has.
 - **Song list scroll bar.** In Learn a Song's list, the scroll bar's thumb can be dragged only near the top of the
-  list. The list's menu (`gfxassets/views/las_songslist.gfx`, a Scaleform movie in one of `cache.psarc`'s `cacheN.7z`
-  archives) gives the game each part that can be clicked, with a depth, and a click goes to the deepest one under the
-  mouse. The rows of songs reach over the bar, and the ones below the song in focus are deeper than the thumb. The game
-  also takes the parts only now and then, so the thumb's clickable area stays where the thumb was. The overlay's copy
-  makes that area the whole track, which doesn't move, above everything else: a few bytes of the list's ActionScript,
-  each change as long as what it replaces. A click anywhere on the bar then grabs the thumb. A list it doesn't know is
-  left as it is, and an archive holding it that can't be read or rewritten is left out of the overlay, without the
-  menu's edits going with it. The game's other lists with a scroll bar have the same script and the same bug: 24
-  movies of `static.psarc` (`gfxassets/views/<name>.gfx`: the Tone Designer's lists, settings, profile select,
-  Session Mode's, the shop's and more). The overlay holds each one edited, as it is beside the archives
-  (`plan_movies`), and the hook on FrontEnd_OpenFile, which the game's Scaleform file opener calls for every movie,
-  opens `patchupdate/gfxassets/views/<name>.gfx` first (`rs_mods_overlay_name` in `mods_shared.c`, one rule for both
-  editions). A movie the overlay doesn't hold opens as before, through a mod's own hook too (rearmed-mods serves three).
+  list. The list's menu (`gfxassets/views/las_songslist.gfx`, a Scaleform movie in one of `cache.psarc`'s
+  `cacheN.7z` archives) gives the game each part that can be clicked, with a depth, and a click goes to the deepest
+  one under the mouse. The rows of songs reach over the bar, and the ones below the song in focus are deeper than
+  the thumb. The game also takes the parts only now and then, so the thumb's clickable area stays where the thumb
+  was. The overlay's copy makes that area the whole track, which doesn't move, above everything else: a few bytes of
+  the list's ActionScript, each change as long as what it replaces. A click anywhere on the bar then grabs the
+  thumb. A list it doesn't know is left as it is, and an archive holding it that can't be read or rewritten is left
+  out of the overlay, without the menu's edits going with it. The game's other lists have the same script and the
+  same bug: 24 movies of `static.psarc` (`gfxassets/views/<name>.gfx`: the Tone Designer's lists, settings, profile
+  select, Session Mode's, the shop's and more). Most of them have no bar at all: the lists' class (ListScene) draws
+  one only for a list that asks for it (ShowScrollBar), and 8 of the 25 do. So the overlay's copy also gives each
+  list that doesn't ask a bar where the others have theirs, two pixels right of the list's panel, unless that is
+  past the class's own place for it at the screen's right edge (Load Tone's short list and the skins have no room
+  there), and takes the list's own count of entries when the game gives none (the inlays ask for a bar, but the game
+  gives them no count, so they had none): actions added where UpdateScrollBar starts, so the script and the movie
+  get longer (a script it can't be added to keeps the thumb's edit alone). The overlay holds each one edited, as it
+  is beside the archives (`plan_movies`), and the hook on FrontEnd_OpenFile, which the game's Scaleform file opener
+  calls for every movie, opens `patchupdate/gfxassets/views/<name>.gfx` first (`rs_mods_overlay_name` in
+  `mods_shared.c`, one rule for both editions). A movie the overlay doesn't hold opens as before, through a mod's
+  own hook too (rearmed-mods serves three).
 - **Song ownership during a mount** (shared, a pre hook on `steam_dlc_owned`). The game checks an archive's AppID
   against the list it made once at start from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later.
   While the install steps run the hook answers yes (each edition's mounting loop says when they do): an archive in

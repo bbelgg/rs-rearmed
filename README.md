@@ -85,7 +85,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Microphone, other interfaces, Direct Connect | ✅ | ✅ |
 | ENUMERATE: new songs without a restart | ✅ | ✅ |
 | EXIT GAME in the main menu | ✅ | ✅ |
-| Scroll bars dragged from anywhere on them: Learn a Song, the Tone Designer's lists and the game's other lists | ✅ | ✅ Learn a Song; ⚠️ the other lists not yet tried |
+| Scroll bars dragged from anywhere on them: Learn a Song, the Tone Designer's lists and the game's other lists, and a bar for the lists that had none (Nonstop Play's songs, the Tone Designer's amps and pedals, ...) | ✅ | ✅ |
 | Lower guitar latency | ✅ | ⚠️ |
 | Your own plug-in in place of the game's tones (rearmed-mods' ToneHost add-on) | ✅ | ✅ |
 | Input channel and gain, every channel listed, calibration that can boost | ✅ | ✅ |

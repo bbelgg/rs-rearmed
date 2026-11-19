@@ -192,10 +192,14 @@ def make_7z(files, coder="lzma1"):
 
 
 # A made-up song list movie with the shape of the game's: the list's script gives the scroll bar's thumb a clickable
-# area, its bounds read from the thumb and its depth the thumb's own.
+# area, its bounds read from the thumb and its depth the thumb's own, and has an UpdateScrollBar that draws the bar
+# (here: sets drawn) for a list that asks for it.
 SONGS_POOL = ["ListScene", "ListSceneThumb", "xMin", "yMin", "xMax", "yMax", "mScrollBarThumb", "mScrollBarTrack",
-              "depth", "getDepth", "_x", "_y", "_width", "_height", "id"]
+              "depth", "getDepth", "_x", "_y", "_width", "_height", "id", "UpdateScrollBar"] + list(co.BAR_NAMES)
 GET, SET, ADD = bytes([co.A_GET_MEMBER]), bytes([co.A_SET_MEMBER]), b"\x47"
+# What the interpreter below runs and the overlay's own actions don't have
+A_GET_VARIABLE, A_SUBTRACT, A_MULTIPLY, A_DIVIDE, A_OR = 0x1C, 0x0B, 0x0C, 0x0D, 0x11
+METHOD_FLAGS = 0x29  # preload this, suppress arguments and super: as the game's methods
 
 
 def push(*values):
@@ -211,8 +215,97 @@ def push(*values):
     return bytes([co.A_PUSH]) + struct.pack("<H", len(body)) + body
 
 
-def make_songs_list(edited=False, pool=SONGS_POOL):
-    """The movie (edited: as the overlay has it), with the script of a sprite before the list's."""
+class AS2:
+    """Enough of ActionScript 2 to run the overlay's own actions: objects are dicts (a missing member undefined, None),
+    a native method a Python function of (this, *args), a script's method its body run with this in r1."""
+
+    def __init__(self, pool, variables):
+        self.pool, self.variables = pool, variables
+
+    def call(self, fn, this, args):
+        if callable(fn):
+            return fn(this, *args)
+        code, start, end, registers = fn
+        return self.run(code, start, [None, this] + [None] * (registers - 2), end)
+
+    def member(self, obj, name):
+        if isinstance(obj, list):
+            return len(obj) if name == "length" else obj[int(name)]
+        while obj is not None:
+            if name in obj:
+                return obj[name]
+            obj = obj.get("__proto__")
+        return None
+
+    def run(self, code, start=0, regs=None, end=None):
+        stack, regs, at, end = [], regs or [None] * 4, start, len(code) if end is None else end
+        while at < end:
+            op = code[at]
+            size = struct.unpack_from("<H", code, at + 1)[0] if op >= 0x80 else 0
+            body = at + (3 if op >= 0x80 else 1)
+            at = body + size
+            if op == co.A_PUSH:
+                i = body
+                while i < body + size:
+                    kind = code[i]
+                    if kind == co.P_STRING:
+                        j = code.index(b"\x00", i + 1)
+                        stack.append(code[i + 1:j].decode())
+                        i = j + 1
+                        continue
+                    value = {co.P_POOL: lambda: self.pool[code[i + 1]], co.P_REGISTER: lambda: regs[code[i + 1]],
+                             co.P_BOOL: lambda: bool(code[i + 1]), co.P_UNDEFINED: lambda: None,
+                             co.P_INT: lambda: struct.unpack_from("<i", code, i + 1)[0]}[kind]()
+                    stack.append(value)
+                    i += 1 + co.P_SIZES[kind]
+            elif op == co.A_DEFINE_FUNCTION2:
+                registers = code[code.index(b"\x00", body) + 3]  # (after the name and the parameters' count)
+                length = struct.unpack_from("<H", code, at - 2)[0]
+                stack.append((code, at, at + length, registers))
+                at += length
+            elif op in (co.A_IF, co.A_JUMP):
+                if op == co.A_JUMP or stack.pop():
+                    at += struct.unpack_from("<h", code, body)[0]
+            elif op == co.A_STORE_REGISTER:
+                regs[code[body]] = stack[-1]
+            elif op == 0:
+                break
+            elif op == A_GET_VARIABLE:
+                stack.append(self.variables[stack.pop()])
+            elif op == co.A_GET_MEMBER:
+                name = stack.pop()
+                stack.append(self.member(stack.pop(), name))
+            elif op == co.A_SET_MEMBER:
+                value, name = stack.pop(), stack.pop()
+                stack.pop()[name] = value
+            elif op == co.A_CALL_METHOD:
+                name, obj, n = stack.pop(), stack.pop(), stack.pop()
+                args = [stack.pop() for _ in range(n)]
+                stack.append(self.call(self.member(obj, name), obj, args))
+            elif op == co.A_POP:
+                stack.pop()
+            elif op == co.A_NOT:
+                stack.append(not stack.pop())
+            else:
+                b, a = stack.pop(), stack.pop()
+                stack.append({co.A_ADD2: lambda: a + b, A_SUBTRACT: lambda: a - b, A_MULTIPLY: lambda: a * b,
+                              A_DIVIDE: lambda: a / b, co.A_LESS2: lambda: a < b, co.A_EQUALS2: lambda: a == b,
+                              A_OR: lambda: bool(a or b)}[op]())
+        return stack[-1] if stack else None
+
+
+
+def method(body, registers, params=()):
+    """A method of a class's script with BODY, and PARAMS: (its register, its name) each."""
+    head = (b"\x00" + struct.pack("<HBH", len(params), registers, METHOD_FLAGS)
+            + b"".join(bytes([r]) + n + b"\x00" for r, n in params) + struct.pack("<H", len(body)))
+    return bytes([co.A_DEFINE_FUNCTION2]) + struct.pack("<H", len(head)) + head + body
+
+
+def make_songs_list(edited=False, pool=SONGS_POOL, bar=True, registers=10, more=b"", params=(), barred=None):
+    """The movie (edited: as the overlay has it), with the script of a sprite before the list's; bar: the list's script
+    has UpdateScrollBar, with REGISTERS and PARAMS, and MORE actions after it draws the bar. barred: whether the edited
+    one has the bar's actions too (None: when nothing takes r9 from them)."""
     names = b"".join(n.encode() + b"\x00" for n in pool)
     part = "mScrollBarTrack" if edited else "mScrollBarThumb"
     thumb = push(1, part) + GET
@@ -223,6 +316,13 @@ def make_songs_list(edited=False, pool=SONGS_POOL):
               + push(4, "yMax") + thumb + push("_y") + GET + thumb + push("_height") + GET + ADD + SET
               + push(4, "id", "ListSceneThumb") + SET
               + co._thumb_depth(SONGS_POOL, edited))
+    if bar:
+        draw = co._as_asm(pool, [("push", ("r", 1), "mShowScrollBar"), co.A_GET_MEMBER, co.A_NOT, ("if", "end"),
+                                 ("push", ("r", 1), "drawn", True), co.A_SET_MEMBER, ("label", "end")])
+        if barred is None:
+            barred = registers > co.BAR_REGISTER and not more and not params
+        shown = co._bar_shown(pool) if edited and barred else b""
+        script += push(2, "UpdateScrollBar") + method(shown + draw + more, registers, params) + SET
     tags = b""
     for code, body in ((co.DO_INIT_ACTION, b"\x01\x00\x00"), (co.DO_INIT_ACTION, b"\x02\x00" + script), (1, b""),
                        (0, b"")):
@@ -334,9 +434,54 @@ class Edits(unittest.TestCase):
 class SongsList(unittest.TestCase):
     def test_edit(self):
         out = co.edit_songs_list(make_songs_list())
-        self.assertEqual(out, make_songs_list(edited=True))  # the thumb's area the track's, on top; nothing moves
+        self.assertEqual(out, make_songs_list(edited=True))  # the thumb's area the track's, on top; a bar for each list
         self.assertIsNone(co.edit_songs_list(out))
         self.assertIsNone(co.edit_file(co.SONGS_LIST, out))
+
+    def test_edit_without_the_bar(self):  # no UpdateScrollBar, or no register it may take: the thumb's edit alone
+        r9 = co.BAR_REGISTER
+        store = bytes([co.A_STORE_REGISTER]) + struct.pack("<HB", 1, r9) + bytes([co.A_POP])
+        for kw in ({"bar": False}, {"registers": r9}, {"more": push(r9) + bytes([co.A_POP])},
+                   {"more": push(b"x") + store}, {"params": [(r9, b"a")]}):
+            self.assertEqual(co.edit_songs_list(make_songs_list(**kw)), make_songs_list(edited=True, **kw), kw)
+        # registers other than r9 used: the bar too
+        kw = {"more": push(3, 8) + bytes([co.A_POP, co.A_POP]), "params": [(2, b"a")]}
+        self.assertEqual(co.edit_songs_list(make_songs_list(**kw)), make_songs_list(edited=True, barred=True, **kw))
+
+    def test_bar_edit_failing(self):  # however the bar's edit fails, the thumb's stays
+        for error in (co.Unsupported, struct.error, ValueError, IndexError):
+            with mock.patch.object(co, "_edit_bar_shown", side_effect=error("x")):
+                self.assertEqual(co.edit_songs_list(make_songs_list()), make_songs_list(edited=True, barred=False))
+
+    def bar(self, **this):
+        """THIS (a list's own members) after the edited UpdateScrollBar ran on it."""
+        movie = co.edit_songs_list(make_songs_list())
+        script = [movie[body + 2:end] for code, body, end in co._swf_tags(movie) if code == co.DO_INIT_ACTION][1]
+        stop = [stop for _, op, _, stop in co._as_actions(script) if op == co.A_DEFINE_FUNCTION2][0]
+        fn = (script, stop, stop + struct.unpack_from("<H", script, stop - 2)[0], 10)
+        list_ = dict({"mShowScrollBar": False, "mScrollBarXPos": co.BAR_RIGHTMOST, "mDataObj": {"ListEntriesCount": 9},
+                      "mSortedData": [{}] * 9}, **this)
+        AS2(SONGS_POOL, {}).call(fn, list_, [])
+        return list_
+
+    def test_bar_for_each_list(self):
+        # one that doesn't ask: its bar right of its panel, as the game's lists have theirs (a Tone Designer list)
+        tone = self.bar(mTopListPanelXPos=400, mTopListPanelWidth=770)
+        self.assertEqual((tone["mShowScrollBar"], tone["mScrollBarXPos"], tone["drawn"]), (True, 1172, True))
+        edge = self.bar(mTopListPanelXPos=498, mTopListPanelWidth=770)  # right at the screen's edge: still one
+        self.assertEqual((edge["mShowScrollBar"], edge["mScrollBarXPos"]), (True, co.BAR_RIGHTMOST))
+        # past it (Load Tone's list, which keeps the class's width): none, as before
+        load = self.bar(mTopListPanelXPos=381, mTopListPanelWidth=1075)
+        self.assertEqual((load["mShowScrollBar"], load["mScrollBarXPos"], load.get("drawn")),
+                         (False, co.BAR_RIGHTMOST, None))
+        # one that asks: as it put it
+        asked = self.bar(mShowScrollBar=True, mScrollBarXPos=980, mTopListPanelXPos=400, mTopListPanelWidth=770)
+        self.assertEqual((asked["mScrollBarXPos"], asked["drawn"]), (980, True))
+
+    def test_bar_counts_the_entries(self):
+        self.assertEqual(self.bar(mTopListPanelXPos=208, mTopListPanelWidth=770)["mDataObj"]["ListEntriesCount"], 9)
+        none = self.bar(mTopListPanelXPos=208, mTopListPanelWidth=770, mDataObj={}, mSortedData=[{}] * 3)
+        self.assertEqual(none["mDataObj"]["ListEntriesCount"], 3)  # the game gave no count: the list's own
 
     def test_not_the_expected_file(self):
         movie = make_songs_list()
@@ -612,6 +757,10 @@ class RealCache(unittest.TestCase):
                 self.assertIn("gfxassets/views/td_songlist.gfx", movies)
                 for d in movies.values():
                     self.assertIsNone(co.edit_songs_list(d))
+                nsp = movies["gfxassets/views/nsp_songlist.gfx"]  # Nonstop Play's songs, which had no bar
+                pools = [(co._as_pool(nsp[b + 2:e]) or [], nsp[b + 2:e]) for c, b, e in co._swf_tags(nsp)
+                         if c == co.DO_INIT_ACTION]
+                self.assertTrue(any("mShowScrollBar" in p and co._bar_shown(p) in s for p, s in pools))
 
 
 if __name__ == "__main__":

@@ -555,7 +555,7 @@ switches…, under Advanced. All off unless set.
 | `--renderer-check` | the renderer a start would use, without starting the game |
 | `RS_RENDERER_TEST_NO_METAL=1` | act as if Metal could not start |
 | `RS_METAL_SAFE_LOAD=0\|1`, `RS_METAL_CORPUS_WARM=0\|1`, `RS_METAL_CORPUS_LIMIT=N` | force safe load, the corpus warm, or warm only part of the corpus |
-| `RS_METAL_CACHE=0`, `RS_MTL_COMPILE_THREADS=N`, `RS_METAL_DRAWABLES=2\|3` | no disk cache, the compile pool's size, the drawable count |
+| `RS_METAL_CACHE=0`, `RS_MTL_COMPILE_THREADS=N` | no disk cache, the compile pool's size |
 | `RS_FPS=N`, `RS_NO_VSYNC=1\|0`, `RS_NO_VSYNC_AFTER=S`, `RS_RENDER_THREAD=0` | a fixed frame rate; swap interval 0 or not, from S seconds on (default 30); the original's frame in the display link's callback |
 | `RS_LUA_TRACE=1` | Lua chunk loads, failed calls and errors |
 | `RC_LOG_UNRESOLVED=1`, `RC_TRACE_INITS=1` | every unresolved bind, each initializer before it runs |

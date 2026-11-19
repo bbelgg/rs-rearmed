@@ -39,6 +39,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
+- **Performance overlay and low latency** (not released): `RS_METAL_HUD=1` shows Apple's Metal Performance HUD over
+  the game (macOS 13 and later), and `RS_METAL_DRAWABLES=2` queues two frames for the screen instead of three with
+  vsync, each shown a refresh sooner ([INSTALL.md](INSTALL.md#settings-and-switches)).
 - **The tuner's red peg** (new in 1.18.0): the game lights the peg of the string it listens to in red, with a glow it
   blurs by draws that sample the texture they draw into. Metal gave such a draw the last frame's picture, so the
   peg stayed grey; now it gets a copy of what was drawn before it

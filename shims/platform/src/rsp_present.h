@@ -21,9 +21,8 @@
 // wantsBestResolutionOpenGLSurface), or with RS_METAL_RETINA=1 its backing size in pixels, at
 // RS_METAL_SCALE's percentage (rsp_scale.h). A drawable smaller than the backing pixels is scaled up
 // to them at present.
-// Drawables: RS_METAL_DRAWABLES=2|3, else 3 with vsync (Apple's default: a late frame does not
-// block nextDrawable for a whole refresh) and 2 without (RS_FPS / no_vsync: presents are not
-// held for the display, so a third drawable only adds latency).
+// Drawables: RS_METAL_DRAWABLES=2|3, else 3 with vsync and 2 without (rsp_layer.h, Learn & Play's too), and
+// RS_METAL_HUD's Metal Performance HUD on the layer.
 #ifndef RSP_PRESENT_H
 #define RSP_PRESENT_H
 
@@ -82,7 +81,7 @@ void *rsp_mtl_context(rsp_mtl *m);       // the rs_gfx_context
 CGDirectDisplayID rsp_mtl_display(NSView *view);
 // RS_METAL_RETINA=1.
 int rsp_mtl_retina(void);
-// Drawable count for a swap interval (RS_METAL_DRAWABLES, else 3 with sync, 2 without).
+// Drawable count for a swap interval (rsp_layer_drawables: RS_METAL_DRAWABLES, else 3 with sync, 2 without).
 int rsp_mtl_drawables(int swap_interval);
 
 // Safe load (not in the original). With a modded cache.psarc (a community "fast-load" cache) the

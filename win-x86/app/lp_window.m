@@ -60,6 +60,7 @@
 #include "rs_gfx.h"
 #include "rsp_fps.h"
 #include "rsp_scale.h"
+#include "rsp_layer.h"
 
 #ifndef LP_VERSION
 #define LP_VERSION "dev"  // build.sh passes the repository's VERSION
@@ -516,12 +517,11 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
     layer.contentsGravity = kCAGravityResizeAspect;  // a back buffer of another shape: letterboxed
     layer.backgroundColor = CGColorGetConstantColor(kCGColorBlack);
     layer.drawableSize = CGSizeMake(w, h);
-    if (rsp_fps()) {
-      // as the Mac edition's swap interval 0 (rsp_present_metal.m): presents are not held for the display, so a
-      // third drawable would only add latency
-      layer.displaySyncEnabled = NO;
-      layer.maximumDrawableCount = 2;
-    }
+    // as the Mac edition's (rsp_layer.h): RS_FPS's presents are not held for the display, and the drawables are
+    // RS_METAL_DRAWABLES's, else 2 without vsync and 3 with it
+    if (rsp_fps()) layer.displaySyncEnabled = NO;
+    layer.maximumDrawableCount = (NSUInteger)rsp_layer_drawables(!rsp_fps());
+    rsp_layer_show_hud(layer);
     v.wantsLayer = YES;
     v.layer = layer;
     g_view = v;

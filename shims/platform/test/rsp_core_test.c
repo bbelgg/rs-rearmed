@@ -16,6 +16,7 @@
 #include <signal.h>
 
 #include "rsp_fps.h"
+#include "rsp_layer.h"
 #include "rsp_scale.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
@@ -726,6 +727,33 @@ static void test_scale(void) {
         "a whole number only");
 }
 
+// --- RS_METAL_DRAWABLES, RS_METAL_HUD (rsp_layer.h: both editions') -------------
+static void test_layer(void) {
+  CHECK(rsp_layer_drawables_value(NULL) == 0 && rsp_layer_drawables_value("") == 0, "unset: the default's");
+  CHECK(rsp_layer_drawables_value("2") == 2 && rsp_layer_drawables_value("3") == 3, "2 or 3 drawables");
+  CHECK(rsp_layer_drawables_value("1") == 0 && rsp_layer_drawables_value("4") == 0 &&
+            rsp_layer_drawables_value("2x") == 0 && rsp_layer_drawables_value("two") == 0,
+        "anything else: the default's");
+  CHECK(!rsp_layer_hud_value(NULL) && !rsp_layer_hud_value("") && !rsp_layer_hud_value("0") &&
+            !rsp_layer_hud_value("no") && !rsp_layer_hud_value("false"),
+        "the HUD off as the launchers read a toggle");
+  CHECK(rsp_layer_hud_value("1") && rsp_layer_hud_value("yes") && rsp_layer_hud_value("true"), "the HUD on");
+  CHECK(rsp_layer_hud_env(1, 0) == 1, "the HUD with Metal: MTL_HUD_ENABLED set");
+  CHECK(rsp_layer_hud_env(1, 1) == -1, "the HUD with OpenGL: none, MTL_HUD_ENABLED taken out");
+  CHECK(!rsp_layer_hud_env(0, 0) && !rsp_layer_hud_env(0, 1), "no HUD: MTL_HUD_ENABLED left as it is");
+  // rsp_layer_env itself, RS_METAL_HUD=1 (read once: here first), and an MTL_HUD_ENABLED=1 from the start before, as
+  // main's restart for OpenGL has it
+  setenv("RS_METAL_HUD", "1", 1);
+  setenv("MTL_HUD_ENABLED", "1", 1);
+  rsp_layer_env(1);
+  CHECK(!getenv("MTL_HUD_ENABLED"), "a start with OpenGL: no MTL_HUD_ENABLED");
+  rsp_layer_env(0);
+  const char *hud = getenv("MTL_HUD_ENABLED");
+  CHECK(hud && !strcmp(hud, "1"), "a start with Metal: MTL_HUD_ENABLED=1");
+  unsetenv("MTL_HUD_ENABLED");
+  unsetenv("RS_METAL_HUD");
+}
+
 // --- RS_FPS (rsp_fps.h: both editions') ----------------------------------------
 static void test_fps(void) {
   CHECK(rsp_fps_value(NULL) == 0 && rsp_fps_value("") == 0 && rsp_fps_value("0") == 0, "unset or 0: the display");
@@ -776,6 +804,7 @@ int main(int argc, char **argv) {
   test_renderer_files();
   test_renderer_startup();
   test_scale();
+  test_layer();
   test_fps();
   printf("rsp_core_test (%s): %d passed, %d failed\n",
 #if defined(__arm64__)

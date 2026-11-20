@@ -39,12 +39,12 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
-- **The tuner's red peg** (not released): the game lights the peg of the string it listens to in red, with a glow it
+- **The tuner's red peg** (new in 1.18.0): the game lights the peg of the string it listens to in red, with a glow it
   blurs by draws that sample the texture they draw into. Metal gave such a draw the last frame's picture, so the
   peg stayed grey; now it gets a copy of what was drawn before it
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). Learn & Play's tuner turned purple from the same cause
   at some sizes; this edition's was not seen to (one run at 1103x717 before the rule).
-- **Render scale** (not released): `RS_METAL_SCALE=N`, the installer's Render scale (under Advanced), renders at N%
+- **Render scale** (new in 1.18.0): `RS_METAL_SCALE=N`, the installer's Render scale (under Advanced), renders at N%
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
@@ -70,7 +70,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
-- **Learn a Song's scroll bar** (not released): it can be dragged from anywhere on it, through the menu overlay's copy
+- **Learn a Song's scroll bar** (new in 1.18.0): it can be dragged from anywhere on it, through the menu overlay's copy
   of the song list; the game let it be grabbed only near the top of the list. The same for the game's 24 other lists,
   the Tone Designer's among them, through the overlay's copies of their movies, and the 16 of them that had no bar
   have one: Nonstop Play's songs, the inlays, the Tone Designer's amps, pedals, cabinets and racks, Session Mode's and

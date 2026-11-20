@@ -41,11 +41,11 @@ edition" is described there. What has not been tested is under [Open issues](#op
   original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed
   mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original.
 - **Retina, colour and a sharper picture**: as the Mac edition, the renderer being shared.
-- **The tuner's red peg** (not released): as the Mac edition, from the renderer's rule for a draw that samples its
+- **The tuner's red peg** (new in 1.18.0): as the Mac edition, from the renderer's rule for a draw that samples its
   own target ([DESIGN.md](DESIGN.md#direct3d-9)). Before it the tuner also turned purple with a back buffer of
   1102x717 or 1104x718, in 9 of 10 runs at those sizes; with the rule five runs at 1102x717 and one at 1470x956
   show the tuner as it should be.
-- **Render scale** (not released): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
+- **Render scale** (new in 1.18.0): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
   sees and a resized window at N%. Played full screen on a 1470x956 Retina screen to a song's note highway: 50% (a
   735x478 frame) is fine.
 
@@ -68,8 +68,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
-- **Learn a Song's scroll bar** (not released): as the Mac edition, by the same overlay; this game's song list is the
-  same file. The other lists, and a bar for those that had none (not released): as the Mac edition, by the same rule.
+- **Learn a Song's scroll bar** (new in 1.18.0): as the Mac edition, by the same overlay; this game's song list is the
+  same file. The other lists, and a bar for those that had none (new in 1.18.0): as the Mac edition, by the same rule.
 - **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the installer's Frame rate, with the Mac edition's rule and clock
   (`shims/platform/include/rsp_fps.h`): vsync off and a frame every 1/N s, whatever the display's rate.
 - **Shared with the Mac edition** (new in 1.16.0): the switches, the log (its lines start `[rs-mods] ` as the Mac's)
@@ -98,7 +98,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 **Mods**
 
 - **Loading and hook points**: 20 of the 21 hook points. `si_io`, a guitar input's buffers before the game has them,
-  is the latest (not released): the Mac game's CoreAudio input function has no counterpart, so the capture stream
+  is the latest (new in 1.18.0): the Mac game's CoreAudio input function has no counterpart, so the capture stream
   runs the hooks; `input_mode_is_cable` is inlined into a function `win32_overrides.c` replaces. The overlay API,
   the render API, the `mods/` folder and one mod ABI with the Mac ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods)):
   `rearmed-mods.dylib` runs as the same file. No mod code runs without the network guard.
@@ -183,7 +183,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   timer.
 - **Guitar input**: as in the [Mac plan](../mac/PLAN.md#open-issues); and guitar latency against the Mac edition has not
   been measured.
-- **A mod on the guitar input** (`si_io`, not released): the game heard what a test mod and rearmed-mods' Drop Pedal
+- **A mod on the guitar input** (`si_io`, new in 1.18.0): the game heard what a test mod and rearmed-mods' Drop Pedal
   wrote, with the Mac's microphone as the input ([TESTING.md](TESTING.md#unattended-runs)). Not played: a guitar, a
   cable or an interface, two players, the waveIn path, and a device that can't run at 48 kHz (the audio layer's
   test has the hooks on a stream at another rate than its device, without the game).

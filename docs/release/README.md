@@ -85,13 +85,45 @@ installers already out keep trusting the old one, for what GitHub serves them as
 SHA-256 `package.sh` wrote and the uploaded signature verifies on it. If it stops after the push, `publish.sh 1.13.0 --yes --resume` goes on from the tag
 that is there. A zip rebuilt later has another checksum: publish the one that was checked.
 
+### On GitHub
+
+Steps 6 to 8 can also be run on GitHub, by the same scripts: the **Release** workflow
+(`.github/workflows/release.yml`, Actions → Release → Run workflow, or
+`gh workflow run release.yml -f version=1.13.0 -f publish=true`). Steps 1 to 5 stay where the games are: the
+release commit is made as above and pushed to `main` first, which is a push to ask about like any other. The
+workflow then checks that the head of `main` is that commit, writes the notes
+(`bump.py --notes --next-from HEAD^`, since the release commit has emptied `next.md`), builds and signs the
+installer and runs `publish.sh`. With **Publish** off it stops where step 7 does, having sent nothing; **Resume**
+is `--resume`.
+
+Only the maintainers can run it, and only from `main`:
+
+- GitHub starts a workflow by hand only for an account with write access to the repository.
+- The workflow's first job refuses anyone but the names in it (a new maintainer is added there), and any branch
+  but `main`.
+- The update key is the secret `RS_UPDATE_KEY` of the environment `release`, which gives its secrets only to
+  `main` and holds the job until one of its reviewers approves it. A workflow changed on another branch, or by a
+  pull request, never sees the key.
+
+The environment is set up once (Settings → Environments → `release`): the two maintainers as required
+reviewers, deployment branches limited to `main`, and the secret, which is the one line of the key's file
+(`gh secret set RS_UPDATE_KEY --env release < "$RS_UPDATE_KEY"` prints nothing of it). Whoever can change the
+workflow on `main` and approve the job can use the key, so that is the same people as the ones who may hold it.
+
+The seed is too large for a secret. The workflow takes it out of the newest published release's installer, after
+checking that zip's signature with `updatePublicKey`; so a release with a new seed or a new update key is made by
+hand. The zip is built on GitHub's Mac, so its SHA-256 is that run's (the run's summary shows `package.txt`), and
+no check or game run is made there: what the release was checked with is still the release commit's to say.
+
 ## Rules that hold
 
 - Ask the maintainer before step 8 ([AGENTS.md](../../AGENTS.md)): it is the only step that changes anything remote.
+  Starting the Release workflow with Publish on is step 8 too.
 - The seed is never in git; `package.sh` takes it from `RS_LP_SEED` and refuses to build a release's installer
   without it ([Shipping the seed](../../win-x86/unpack/README.md#shipping-the-seed)).
 - The update key is never in git either, nor in a log or a message: `package.sh` takes its path from
   `RS_UPDATE_KEY` and refuses to go on without it, or with a key other than the one the installer trusts
-  ([The update signature](#the-update-signature)). Only a release's zip is signed with it.
+  ([The update signature](#the-update-signature)). Only a release's zip is signed with it. Its one copy outside
+  the maintainer's Mac is the `release` environment's secret ([On GitHub](#on-github)).
 - What gets pushed is `main` as it should read: one commit per piece of work, the repository's identity, UTC, and
   no home paths or machine names. `publish.sh` checks the last three and lists the commits for the first.

@@ -4,6 +4,8 @@
   tools/release/bump.py 1.13.0              edit the tree, write the notes and a commit message draft
   tools/release/bump.py 1.13.0 --dry-run    say what would change
   tools/release/bump.py --notes             print the notes as they stand, for the version in VERSION
+  tools/release/bump.py --notes --next-from HEAD^    the same at the release commit, which has emptied next.md:
+                                            What's new is read from that commit (the release workflow's notes)
 
 In the tree:
   VERSION                                 the new version
@@ -24,6 +26,7 @@ import argparse
 import json
 import os
 import re
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -50,8 +53,9 @@ def body(text):
     return "\n".join(lines).strip("\n")
 
 
-def notes(root, version):
-    new = body(read(root, NEXT))
+def notes(root, version, next_text=None):
+    """NEXT_TEXT stands in for next.md: the release commit's own copy is empty."""
+    new = body(read(root, NEXT) if next_text is None else next_text)
     if not re.search(r"^- \S", new, re.M):
         raise SystemExit("error: %s has no entry: a release needs something new to say" % NEXT)
     parts = ["## What's new", new, "## Known issues", body(read(root, KNOWN)),
@@ -146,11 +150,18 @@ def main():
     ap.add_argument("version", nargs="?")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--notes", action="store_true", help="print the notes and change nothing")
+    ap.add_argument("--next-from", metavar="COMMIT", help="with --notes: What's new from that commit's next.md")
     a = ap.parse_args()
     out = os.environ.get("RS_RELEASE_OUT") or os.path.join(os.environ.get("RS_BUILD_DIR") or
                                                            os.path.join(ROOT, "build"), "release")
+    if a.next_from and not a.notes:
+        ap.error("--next-from goes with --notes")
     if a.notes:
-        sys.stdout.write(notes(ROOT, a.version or read(ROOT, "VERSION").split("\n")[0].strip()))
+        earlier = None
+        if a.next_from:
+            earlier = subprocess.run(["git", "-C", ROOT, "show", "%s:%s" % (a.next_from, NEXT)], check=True,
+                                     stdout=subprocess.PIPE, universal_newlines=True).stdout
+        sys.stdout.write(notes(ROOT, a.version or read(ROOT, "VERSION").split("\n")[0].strip(), earlier))
         return
     if not a.version:
         ap.error("the new version, or --notes")

@@ -64,6 +64,8 @@ Start `tools/release/check.py` in the background, then:
 ## 6. Publish
 
 - `tools/release/publish.sh X.Y.Z --yes`. If it stops, read why; `--resume` continues after a push.
+  (Steps 5 and 6 can run on GitHub instead, once the release commit is pushed: the Release workflow,
+  `docs/release/README.md`, On GitHub. Both the push and the workflow's start need the same yes.)
 - Report the release's URL and the confirmed SHA-256, and what stays open (unrun checks, a run of the published
   installer). Record the same in your notes for the next release.
 

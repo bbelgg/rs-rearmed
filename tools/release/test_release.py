@@ -165,6 +165,15 @@ class Bump(unittest.TestCase):
                                 "It downloads the v1.13.0 source. Works once installed by 1.11.0 or later.\n")
         self.assertNotIn("<!--", notes)
 
+    def test_the_notes_at_the_release_commit(self):
+        # What the release workflow asks for: next.md is empty by then, so What's new comes from the commit before.
+        root = self.tree()
+        out = os.path.join(root, "out")
+        bump.bump(root, "1.13.0", out)
+        with self.assertRaises(SystemExit):
+            bump.notes(root, "1.13.0")
+        self.assertEqual(bump.notes(root, "1.13.0", NEXT), self.read(out, "notes-1.13.0.md"))
+
     def test_next_is_emptied_and_keeps_its_instructions(self):
         root = self.tree()
         bump.bump(root, "1.13.0", os.path.join(root, "out"))

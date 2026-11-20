@@ -173,7 +173,8 @@ One release covers both editions; the steps and their scripts (`tools/release`) 
 - A release's installer is signed with the maintainer's update key (`RS_UPDATE_KEY`), which the installers in use
   check before they replace themselves with it. Like the seed it is never in the repository; never print it, and
   sign nothing but a release's zip with it ([docs/release/README.md](docs/release/README.md#the-update-signature)).
-- Publishing (`tools/release/publish.sh … --yes`) is the remote change to ask about, every time.
+- Publishing (`tools/release/publish.sh … --yes`, or the Release workflow with Publish on,
+  [docs/release/README.md](docs/release/README.md#on-github)) is the remote change to ask about, every time.
 
 ## Building
 

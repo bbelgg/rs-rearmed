@@ -1,0 +1,132 @@
+# The installer of a release, built, signed and published on GitHub's runner: steps 6 to 8 of
+# docs/release/README.md (package.sh, publish.sh), by the same scripts as on the maintainer's Mac.
+#
+# Before it, as for any release: the release commit ("Release 1.18.0: ...") is at the head of main and pushed.
+# The workflow makes no commit and changes no file of the tree; it adds the tag and the release.
+#
+# Who can run it: the maintainers named in the first job, from main only. Three things hold that:
+#   - GitHub lets only an account with write access start a workflow by hand;
+#   - the first job refuses anyone but the names in it, and any branch but main;
+#   - the signing key is a secret of the "release" environment, which is given only to main and waits for a
+#     maintainer's approval (docs/release/README.md, On GitHub: how the environment is set up).
+#
+# What it needs:
+#   - the secret RS_UPDATE_KEY in the environment "release": the one line of the update key's file;
+#   - the seed, which is too large for a secret: taken from the newest published release's installer, once that
+#     zip's signature is checked with the key the installer's source trusts.
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: The version to release, as VERSION at main says it (1.18.0)
+        required: true
+        type: string
+      publish:
+        description: Publish (off, it builds, signs and checks everything, and sends nothing)
+        type: boolean
+        default: false
+      resume:
+        description: Go on after a run that stopped once the tag was pushed
+        type: boolean
+        default: false
+
+run-name: Release ${{ inputs.version }}${{ !inputs.publish && ' (look only)' || '' }}
+
+permissions: {}
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  allowed:
+    name: Who may release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Only the maintainers, only from main
+        env:
+          ACTOR: ${{ github.actor }}
+          TRIGGERING_ACTOR: ${{ github.triggering_actor }}
+          REF: ${{ github.ref }}
+        run: |
+          # Both: who started the run, and who started it again.
+          for who in "$ACTOR" "$TRIGGERING_ACTOR"; do
+            case $who in
+              bbelgg|glebb) ;;
+              *) echo "::error::$who is not one of the maintainers who make releases"; exit 1 ;;
+            esac
+          done
+          [[ $REF == refs/heads/main ]] || { echo "::error::a release is made from main, not $REF"; exit 1; }
+
+  release:
+    name: Build, sign and publish
+    needs: allowed
+    runs-on: macos-15
+    environment: release
+    permissions:
+      contents: write   # the tag and the release
+    env:
+      TZ: UTC
+      VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0   # the tags, and the commit before the release commit
+
+      - name: The release commit
+        run: |
+          [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$VERSION' is not a version (1.18.0)"; exit 1; }
+          [[ $(head -1 VERSION) == "$VERSION" ]] \
+            || { echo "::error::VERSION at main is $(head -1 VERSION): make and push the release commit first"; exit 1; }
+          subject=$(git log -1 --format=%s)
+          [[ $subject == "Release $VERSION: "* ]] \
+            || { echo "::error::the head of main is not the release commit: $subject"; exit 1; }
+          # The tag is made as whoever made the release commit, as a release from their Mac would be.
+          git config user.name "$(git log -1 --format=%an)"
+          git config user.email "$(git log -1 --format=%ae)"
+          mkdir -p "$RUNNER_TEMP/release"
+          echo "RS_RELEASE_OUT=$RUNNER_TEMP/release" >> "$GITHUB_ENV"
+
+      - name: The notes
+        run: |
+          # The release commit emptied next.md, so What's new is the commit before's.
+          python3 tools/release/bump.py --notes --next-from 'HEAD^' > "$RS_RELEASE_OUT/notes-$VERSION.md"
+          cat "$RS_RELEASE_OUT/notes-$VERSION.md" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: The seed, from the newest release
+        run: |
+          source tools/release/lib.sh
+          last="$RUNNER_TEMP/last"
+          mkdir -p "$last"
+          gh release download --pattern "$rel_zip_name" --pattern "$rel_sig_name" --dir "$last"
+          rel_signed "$last/$rel_zip_name" "$last/$rel_sig_name" \
+            || rel_die "the newest release's installer is not signed with the key this source trusts: make this release by hand"
+          unzip -p "$last/$rel_zip_name" 'RS Re-ARMed Installer.app/Contents/Resources/seed.bin' > "$RUNNER_TEMP/seed.bin"
+          [[ -s $RUNNER_TEMP/seed.bin ]] || rel_die "the newest release's installer has no seed"
+
+      - name: The installer, signed
+        env:
+          KEY: ${{ secrets.RS_UPDATE_KEY }}
+        run: |
+          [[ -n $KEY ]] || { echo "::error::the release environment has no RS_UPDATE_KEY secret"; exit 1; }
+          # The key is a file for this step only.
+          key="$RUNNER_TEMP/update.key"
+          trap 'rm -f "$key"' EXIT
+          (umask 077; printf '%s\n' "$KEY" > "$key")
+          RS_LP_SEED="$RUNNER_TEMP/seed.bin" RS_UPDATE_KEY="$key" tools/release/package.sh
+          { echo; echo '```'; cat "$RS_RELEASE_OUT/package.txt"; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Ready?
+        if: ${{ !inputs.publish }}
+        run: tools/release/publish.sh "$VERSION" ${{ inputs.resume && '--resume' || '' }}
+
+      - name: Publish
+        if: ${{ inputs.publish }}
+        run: tools/release/publish.sh "$VERSION" --yes ${{ inputs.resume && '--resume' || '' }}

@@ -1278,12 +1278,15 @@ menu_ads_vtable                                                  0x10180c4e8  da
 menu_ads_vtable_copy                                             0x10187beb8  data  void *[67]
 menu_edit_vtable                                                 0x10180c710  data  void *[67]
 menu_ads_refresh                                                 0x1006ce2e0  sysv  void(void *menu)
+menu_ads_input                                                   0x1006d0770  sysv  void(void *menu, int player, int event, int a, int b, int c, int d, int e)
 menu_ads_press                                                   0x1006d0800  sysv  void(void *menu)
 menu_edit_build                                                  0x1006d31b0  sysv  void(void *menu)
 menu_edit_input                                                  0x1006d93c0  sysv  void(void *menu, int player, int event, int a, int b, int c, int d, int e)
 menu_screens                                                     0x100365eb0  sysv  void *(void *ui)
 menu_push                                                        0x10036d150  sysv  void(void *screens, void *cls, void *alias, void **out)
 json_find                                                        0x100106350  sysv  void *(void *object, const char *name)
+json_get_number                                                  0x100106190  sysv  int(double *out, void *object, const char *name)
+json_get_bool                                                    0x100106130  sysv  int(uint8_t *out, void *object, const char *name)
 json_set_text                                                    0x1000fd3f0  sysv  void(void **out, void *object, void **key, const char *text)
 json_set_bool                                                    0x1000fd300  sysv  void(void **out, void *object, void **key, int value)
 json_set_number                                                  0x1000fd380  sysv  void(void **out, void *object, void **key, double value)

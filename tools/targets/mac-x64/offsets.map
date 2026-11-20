@@ -402,6 +402,7 @@ menu_press_slot               0x37
 menu_input_slot               0x12
 menu_definition               0x290
 menu_pressed_path             0x2e8
+menu_button_names             0x308
 menu_focus                    0x80
 ui_class_slot                 0x3
 ui_class_parent               0x8

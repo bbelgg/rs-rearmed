@@ -408,6 +408,7 @@ menu_press_slot                   unsupported  not yet: Learn & Play's menus are
 menu_input_slot                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
 menu_definition                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
 menu_pressed_path                 unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
+menu_button_names                 unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
 menu_focus                        unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
 ui_class_slot                     unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
 ui_class_parent                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)

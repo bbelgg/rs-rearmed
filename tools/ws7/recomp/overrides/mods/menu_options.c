@@ -3,7 +3,7 @@
 // The overlay (tools/play-native/cache_overlay.py, MENU_OPTIONS) adds a button for each option to
 // AdvancedDisplaySettings' definition (manifests/ui_menu_pillar_options.database.json), its label and description
 // rows of the game's text table, and the game lists, sorts and shows them with its own. Its code knows only its own
-// settings, so four of its methods have a native one in front of them, set in the classes' vtables at the first frame
+// settings, so five of its methods have a native one in front of them, set in the classes' vtables at the first frame
 // (each slot only while it holds the game's own function): a vtable entry outside the image is called as a native
 // function with the guest's arguments (rc_icall_native), and each calls the game's own first, or instead of it for
 // what isn't ours.
@@ -21,6 +21,7 @@
 //                                               choices as the game makes Visual Quality's
 //   EditSetting, menu_input_slot                after the game's: a change of our control, saved, and a slider's
 //                                               Value (the choice it shows) set
+//   AdvancedDisplaySettings, menu_input_slot    before the game's: a drag of the list's scroll bar (below)
 //
 // An option is an RS Re-ARMed switch (the renderer: its file). Its value is the one this run started with (the
 // launcher passes options.env), and a change is written to options.env, the file the installer's Settings and
@@ -469,6 +470,78 @@ static uint64_t my_input(uint64_t menu, uint64_t player, uint64_t event, uint64_
   return r;
 }
 
+// --- dragging the list's scroll bar ------------------------------------------------------------------------------
+// The overlay's edit of SettingsScene puts the game's own scroll bar beside the panel (cache_overlay.py: BAR_GAP and
+// THUMB_LEAST there, SettingsScene's BACKGROUND_* in the movie: the same numbers as here, a test says). The game's
+// lists drag theirs in their own input (ListScene's thumb: the row whose place the pointer is at, the focus moved
+// there); Adv Display Settings' has no such code, so its input has this in front of it: a press on the bar starts
+// a drag, the game's own Up and Down move the focus to the row under the pointer as the bar shows rows (the thumb's
+// middle), and the release ends it. Neither reaches the game, so a row isn't clicked. Its events: the pointer's
+// place in the game's resolution, the movie's 1280 x 720 scaled to it (as its hit test has it).
+enum { EV_UP = 0xb, EV_DOWN = 0xc, EV_BUTTON = 0x1f, EV_POINTER = 0x22 };  // a: 0 press, 1 release
+enum { STAGE_W = 1280, STAGE_H = 720, PANEL_X = 70, PANEL_W = 600, PANEL_Y = 40, PANEL_H = 640 };
+enum { BAR_GAP = 8, THUMB_LEAST = 100, BAR_REACH = 24 };  // (BAR_REACH: the bar's width and some, to press it)
+
+static uint64_t g_ads_input;
+static int g_dragging;
+
+static void ads_key(uint64_t menu, uint64_t player, uint64_t event) {  // a press and release, as the keys make them
+  for (uint64_t a = 0; a < 2; a++) {
+    const uint64_t args[] = {menu, player, event, a, 0, 0, 0, 0};
+    rc_call_guest(g_ads_input, args, 8, NULL, 0, NULL);
+  }
+}
+
+// The list's rows (its buttons), and the place of the focused one in their order (SortOrder; -1: none).
+static int ads_rows(uint64_t menu, int *focus) {
+  uint64_t defn = RC_LD(uint64_t, menu + RC_OFF(menu_definition));
+  uint64_t at = RC_LD(uint64_t, menu + RC_OFF(menu_button_names));
+  uint64_t end = RC_LD(uint64_t, menu + RC_OFF(menu_button_names) + 8);
+  double order[256], focused = -1;
+  int n = 0;
+  for (; defn && at < end && n < 256; at += 32, n++) {
+    uint64_t btn = OV_GUEST(json_find, defn, (uint64_t)(uintptr_t)gstr_text((const gstr *)(uintptr_t)at));
+    uint64_t states = btn ? OV_GUEST(json_find, btn, (uint64_t)(uintptr_t)"States") : 0;
+    uint8_t on = 0;
+    const char *sort = "SortOrder", *focus_key = "Focus";
+    if (!btn || !(uint8_t)OV_GUEST(json_get_number, (uint64_t)(uintptr_t)&order[n], btn, (uint64_t)(uintptr_t)sort))
+      order[n] = n;
+    if (states && (uint8_t)OV_GUEST(json_get_bool, (uint64_t)(uintptr_t)&on, states, (uint64_t)(uintptr_t)focus_key) &&
+        on)
+      focused = order[n];
+  }
+  *focus = -1;
+  for (int k = 0; focused >= 0 && k < n; k++) *focus += order[k] <= focused;
+  return n;
+}
+
+// The focus moved to the row whose thumb place is at Y (the movie's).
+static void drag_to(uint64_t menu, uint64_t player, double y) {
+  int focus, n = ads_rows(menu, &focus);
+  if (n < 2 || focus < 0) return;
+  double thumb = fmax((double)PANEL_H / n, THUMB_LEAST);
+  double f = (y - PANEL_Y - thumb / 2) / (PANEL_H - thumb);
+  int row = (int)lround((f < 0 ? 0 : f > 1 ? 1 : f) * (n - 1));
+  for (; focus < row; focus++) ads_key(menu, player, EV_DOWN);
+  for (; focus > row; focus--) ads_key(menu, player, EV_UP);
+}
+
+static uint64_t my_ads_input(uint64_t menu, uint64_t player, uint64_t event, uint64_t a, uint64_t b, uint64_t c,
+                             uint64_t d, uint64_t e) {
+  if (event == EV_BUTTON || (event == EV_POINTER && g_dragging)) {
+    int w = 0, h = 0;
+    OV_GUEST(get_resolution, (uint64_t)(uintptr_t)&w, (uint64_t)(uintptr_t)&h);
+    double x = w > 0 ? (double)(int)b * STAGE_W / w : -1, y = h > 0 ? (double)(int)c * STAGE_H / h : -1;
+    int was = g_dragging, bar = PANEL_X + PANEL_W + BAR_GAP;
+    if (event == EV_BUTTON)
+      g_dragging = a == 0 && x >= bar - BAR_REACH / 4 && x < bar + BAR_REACH && y >= PANEL_Y && y < PANEL_Y + PANEL_H;
+    if (g_dragging) drag_to(menu, player, y);
+    if (g_dragging || was) return 0;
+  }
+  const uint64_t args[] = {menu, player, event, a, b, c, d, e};
+  return rc_call_guest(g_ads_input, args, 8, NULL, 0, NULL);
+}
+
 // --- the start ----------------------------------------------------------------------------------------------------
 // The slot SLOT of the vtable at VT, from the game's FN to NATIVE: 0 when it holds something else (left as it is).
 static int put(uint64_t vt, int slot, uint64_t fn, uint64_t native, uint64_t *orig) {
@@ -505,7 +578,10 @@ static int before_frame(rc_ctx *c, void *user) {
           put(copy, RC_SLOT(menu_press), press, (uint64_t)(uintptr_t)my_press, &g_press) +
           put(edit, RC_SLOT(menu_build), RC_A(RC_ADDR(menu_edit_build)), (uint64_t)(uintptr_t)my_build, &g_build) +
           put(edit, RC_SLOT(menu_input), RC_A(RC_ADDR(menu_edit_input)), (uint64_t)(uintptr_t)my_input, &g_input);
-  rs_mods_logf("menu options: %zu in Adv Display Settings, %d of 6 vtable slots set", NOPTS, n);
+  uint64_t input = RC_A(RC_ADDR(menu_ads_input));
+  n += put(ads, RC_SLOT(menu_input), input, (uint64_t)(uintptr_t)my_ads_input, &g_ads_input) +
+       put(copy, RC_SLOT(menu_input), input, (uint64_t)(uintptr_t)my_ads_input, &g_ads_input);
+  rs_mods_logf("menu options: %zu in Adv Display Settings, %d of 8 vtable slots set", NOPTS, n);
   return 0;
 }
 

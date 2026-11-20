@@ -371,6 +371,28 @@ class AS2:
         return stack[-1] if stack else None
 
 
+def native(name):
+    """A whole number menu_options.c names (an enum's NAME = N), which drags the bar beside SettingsScene's panel."""
+    with open(os.path.join(os.path.dirname(os.path.abspath(co.__file__)), "..", "ws7", "recomp", "overrides", "mods",
+                           "menu_options.c")) as f:
+        return int(re.search(r"\b%s = (\d+)" % name, f.read()).group(1))
+
+
+def as_constants(script):
+    """{NAME: n} of a script's pushes of a register, a pool name and a whole number, as a class sets its constants
+    (r.NAME = n), the first push of each NAME."""
+    pool, out = co._as_pool(script) or [], {}
+    for _, op, body, stop in co._as_actions(script):
+        if op != co.A_PUSH or script[body] != co.P_REGISTER or script[body + 2] != co.P_POOL:
+            continue
+        name, kind = pool[script[body + 3]], script[body + 4] if body + 4 < stop else None
+        if kind == co.P_INT:
+            out.setdefault(name, struct.unpack_from("<i", script, body + 5)[0])
+        elif kind == co.P_DOUBLE:  # (the high half first)
+            out.setdefault(name, struct.unpack("<d", script[body + 9:body + 13] + script[body + 5:body + 9])[0])
+    return out
+
+
 def settings_scene(rows, focus, entry_y=100, height=50, description=150):
     """A SettingsScene as the game's lays out ROWS (the one at FOCUS with its description), and what it was asked."""
     calls, drawn = [], []
@@ -531,6 +553,15 @@ class Edits(unittest.TestCase):
         self.assertEqual(out.index('"subtitles"'), OPTIONS.index('"subtitles"'))  # another menu's left as it is
         self.assertIsNone(co.edit_options(out))
         self.assertIsNone(co.edit_options('{ "PlaySettings" : {} }'))
+
+    def test_bar_matches_the_native_drag(self):
+        """menu_options.c drags the bar the overlay puts beside SettingsScene's panel: the same numbers."""
+        self.assertEqual((native("BAR_GAP"), native("THUMB_LEAST")), (co.SETTINGS_BAR_GAP, co.THUMB_LEAST))
+        # SettingsScene's own BACKGROUND_X, _Y, _WIDTH and 720 less twice _Y, as the test's scene has them
+        scene, proto, variables, _, _ = settings_scene(1, 0)
+        cls = variables["rs"]["views"]["optionsmenu"]["controls"]["SettingsScene"]
+        self.assertEqual((native("PANEL_X"), native("PANEL_Y"), native("PANEL_W"), native("PANEL_H")),
+                         (cls["BACKGROUND_X"], cls["BACKGROUND_Y"], cls["BACKGROUND_WIDTH"], cls["BACKGROUND_HEIGHT"]))
 
     def test_options_match_the_native_table(self):
         """The buttons are the ones menu_options.c gives a control to, in its order."""
@@ -1013,6 +1044,14 @@ class RealCache(unittest.TestCase):
                 self.assertIsNone(co.edit_display_settings(shown))
                 for text in ("GREY_CLR_HILITE", "rsPopulateButtons"):
                     self.assertIn(co._as_text(text), shown)
+                # SettingsScene's panel, where menu_options.c drags its bar: its height 720 less twice its top
+                panel = [k for c, b, e in co._swf_tags(shown) if c == co.DO_INIT_ACTION
+                         for k in [as_constants(shown[b + 2:e])] if "BACKGROUND_X" in k]
+                self.assertEqual(len(panel), 1)
+                k = panel[0]
+                self.assertEqual((k["BACKGROUND_X"], k["BACKGROUND_Y"], k["BACKGROUND_WIDTH"],
+                                  k["BACKGROUND_HEIGHT"] - 2 * k["BACKGROUND_Y"]),
+                                 tuple(native(n) for n in ("PANEL_X", "PANEL_Y", "PANEL_W", "PANEL_H")))
                 nsp = movies["gfxassets/views/nsp_songlist.gfx"]  # Nonstop Play's songs, which had no bar
                 pools = [(co._as_pool(nsp[b + 2:e]) or [], nsp[b + 2:e]) for c, b, e in co._swf_tags(nsp)
                          if c == co.DO_INIT_ACTION]

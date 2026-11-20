@@ -416,6 +416,7 @@ menu_press_slot           # a settings menu's vtable: a button press
 menu_input_slot           # EditSetting's vtable: an input event
 menu_definition           # a menu: its definition object (JSON)
 menu_pressed_path         # a settings menu: the pressed button's path ("buttons.<id>.states"), a game string
+menu_button_names         # a settings menu: its buttons' names, a std::vector of game strings (begin, end)
 menu_focus                # EditSetting: the focused control
 ui_class_slot             # a control's vtable: its class info
 ui_class_parent           # a class info: its parent's

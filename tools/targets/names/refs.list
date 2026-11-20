@@ -503,12 +503,15 @@ menu_ads_vtable           # AdvancedDisplaySettings' vtable
 menu_ads_vtable_copy      # the same 67 slots in __data
 menu_edit_vtable          # EditSetting's vtable
 menu_ads_refresh          # AdvancedDisplaySettings: each button's CurrentSettingText and CurrentSettingValue (menu_refresh_slot)
+menu_ads_input            # AdvancedDisplaySettings: an input event (menu_input_slot), before its base's
 menu_ads_press            # a settings menu's button press: the pressed path's setting, then Edit Setting (menu_press_slot)
 menu_edit_build           # EditSetting: the edited setting's control (menu_build_slot)
 menu_edit_input           # EditSetting: an input event, a control's change taken (menu_input_slot)
 menu_screens              # the UI manager's screens, what a press pushes Edit Setting onto
 menu_push                 # (screens, class, alias, &out): a menu pushed by its class name and alias (game strings)
 json_find                 # (object, const char *name): its child of that name, borrowed, or null
+json_get_number           # (double *out, object, const char *name): 1 with its number of that name in out; 0 when it has none
+json_get_bool             # (uint8_t *out, object, const char *name): 1 with its boolean of that name in out; 0 when it has none
 json_set_text             # (&out, object, &key, const char *text): sets a text
 json_set_bool             # (&out, object, &key, bool): sets a boolean
 json_set_number           # (&out, object, &key, double in xmm0): sets a number

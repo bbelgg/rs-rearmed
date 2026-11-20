@@ -633,7 +633,8 @@ static int renderer_child(int argc, char **argv) {
   const char *how = argc > 2 ? argv[2] : "check";
   int session = strcmp(how, "check") != 0;
   rsp_renderer_out o = rsp_renderer_startup(argv, NULL, loaded, child_metal_ok, session ? RSP_RENDERER_SESSION : 0);
-  printf("gen %d backend %s reason %d\n", g_child_gen, rsp_renderer_name(o.backend), o.reason);
+  printf("gen %d backend %s reason %d given %d\n", g_child_gen, rsp_renderer_name(o.backend), o.reason,
+         rsp_renderer_env_given());
   fflush(stdout);
   if (!strcmp(how, "clean")) rsp_exit(0);
   if (!strcmp(how, "exit")) exit(0);
@@ -665,12 +666,15 @@ static void test_renderer_startup(void) {
   snprintf(fb, sizeof fb, "%s/renderer-fallback.txt", home);
   snprintf(set, sizeof set, "%s/renderer", home);
 
+  // given: an RS_GL_BACKEND from outside (rsp_renderer_env_given), not the restart's own
   run_child(home, "", "check", out, sizeof out);
-  CHECK(strstr(out, "gen 1 backend metal") != NULL, "default: metal, no restart: %s", out);
+  CHECK(strstr(out, "gen 1 backend metal") && strstr(out, "given 0"), "default: metal, no restart: %s", out);
   run_child(home, "RSP_TEST_NO_METAL=1", "check", out, sizeof out);
-  CHECK(strstr(out, "gen 2 backend opengl") != NULL, "no Metal: restarted once with gl: %s", out);
+  CHECK(strstr(out, "gen 2 backend opengl") && strstr(out, "given 0"), "no Metal: restarted once with gl: %s", out);
   run_child(home, "RS_GL_BACKEND=gl", "check", out, sizeof out);
-  CHECK(strstr(out, "gen 1 backend opengl") != NULL, "env gl: %s", out);
+  CHECK(strstr(out, "gen 1 backend opengl") && strstr(out, "given 1"), "env gl: %s", out);
+  run_child(home, "RS_GL_BACKEND=vulkan", "check", out, sizeof out);
+  CHECK(strstr(out, "gen 1 backend metal") && strstr(out, "given 0"), "env unreadable: %s", out);
 
   // A clean Metal session leaves no marker; exit() and SIGTERM are clean too.
   run_child(home, "", "clean", out, sizeof out);
@@ -694,11 +698,12 @@ static void test_renderer_startup(void) {
         "second crash in a row: marker 1 (%s / %s)", out, b);
   // An explicit RS_GL_BACKEND=metal: Metal anyway (and it counts on).
   run_child(home, "RS_GL_BACKEND=metal", "crash", out, sizeof out);
-  CHECK(strstr(out, "gen 1 backend metal") && read_file(p, b, sizeof b) && atoi(b) == 2, "forced: %s / %s", out, b);
+  CHECK(strstr(out, "gen 1 backend metal") && strstr(out, "given 1") && read_file(p, b, sizeof b) && atoi(b) == 2,
+        "forced: %s / %s", out, b);
   // The next start: OpenGL, restarted, the setting switched, a note, the count reset.
   CHECK(access(fb, F_OK) != 0, "no note yet");
   run_child(home, "", "clean", out, sizeof out);
-  CHECK(strstr(out, "gen 2 backend opengl") != NULL, "after two abnormal endings: opengl (%s)", out);
+  CHECK(strstr(out, "gen 2 backend opengl") && strstr(out, "given 0"), "after two abnormal endings: opengl (%s)", out);
   CHECK(read_file(set, b, sizeof b) && !strcmp(b, "opengl\n"), "setting -> opengl (%s)", b);
   CHECK(access(p, F_OK) != 0, "marker gone");
   CHECK(read_file(fb, b, sizeof b) && strstr(b, "echo metal >"), "note written");

@@ -1272,3 +1272,27 @@ num_hash                     unsupported  inlined into num_dtor, num_intern and 
 display_ratio_16_9           unsupported  no such constant: the camera setup takes its render target's width / height (0x101168cdc)
 settings_read                unsupported  inlined: get_resolution and set_resolution are functions here
 settings_apply               unsupported  inlined: get_resolution and set_resolution are functions here
+# --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c)
+menu_current_setting                                             0x1018783a0  data  const char *
+menu_ads_vtable                                                  0x10180c4e8  data  void *[67]
+menu_ads_vtable_copy                                             0x10187beb8  data  void *[67]
+menu_edit_vtable                                                 0x10180c710  data  void *[67]
+menu_ads_refresh                                                 0x1006ce2e0  sysv  void(void *menu)
+menu_ads_press                                                   0x1006d0800  sysv  void(void *menu)
+menu_edit_build                                                  0x1006d31b0  sysv  void(void *menu)
+menu_edit_input                                                  0x1006d93c0  sysv  void(void *menu, int player, int event, int a, int b, int c, int d, int e)
+menu_screens                                                     0x100365eb0  sysv  void *(void *ui)
+menu_push                                                        0x10036d150  sysv  void(void *screens, void *cls, void *alias, void **out)
+json_find                                                        0x100106350  sysv  void *(void *object, const char *name)
+json_set_text                                                    0x1000fd3f0  sysv  void(void **out, void *object, void **key, const char *text)
+json_set_bool                                                    0x1000fd300  sysv  void(void **out, void *object, void **key, int value)
+json_set_number                                                  0x1000fd380  sysv  void(void **out, void *object, void **key, double value)
+json_key_free                                                    0x1000f59b0  sysv  void(void **key)
+loc_text                                                         0x1001bfd20  sysv  void(void *out, const void *in)
+ui_checkbox_class                                                0x1018f8b70  data  void *
+ui_slider_class                                                  0x1018f5eb8  data  void *
+efd_free_flag                                                    0x10193a8d0  data  uint8_t
+json_set_array                                                   0x1000fd270  sysv  void(void **out, void *object, void **key)
+json_array_add                                                   0x1000ed5e0  sysv  void(void *array, void *value)
+menu_slider_xscale                                               0x1013ed450  data  double
+menu_slider_yscale                                               0x1013ecf90  data  double

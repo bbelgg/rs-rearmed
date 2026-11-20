@@ -97,6 +97,10 @@ rsp_renderer_out rsp_renderer_startup(char **argv, const char *bundle, int loade
 // abnormal and executes the process again with RS_GL_BACKEND=gl. Returns -1 when it cannot (no
 // argv from rsp_renderer_startup, or the exec failed).
 int rsp_renderer_restart_gl(const char *why);
+// Whether this start's RS_GL_BACKEND names a renderer and came from outside the process (the launcher's, or one set
+// for the login session): 0 when unset, unreadable, or set by the restart of rsp_renderer_startup or
+// rsp_renderer_restart_gl. Adv Display Settings locks its renderer row with one the renderer file doesn't explain.
+int rsp_renderer_env_given(void);
 
 #ifdef __cplusplus
 }

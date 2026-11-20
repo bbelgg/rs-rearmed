@@ -91,6 +91,7 @@ __attribute__((constructor)) static void mods_init(void) {
     rs_mods_logf("no Auto Save warning hook point");
   if (rc_hook_add_name("input_mode_is_cable", before_is_cable, NULL, NULL))
     rs_mods_logf("no hook point for Player 2's input mode");
+  rs_menu_options_start();  // menu_options.c: RS Re-ARMed's options in Adv Display Settings
   if (rs_mods_cfg.fixes && !rs_mods_env_on("RS_MODS_NO_THREAD", 0)) {
     pthread_t t;
     if (pthread_create(&t, NULL, keys_thread, NULL) == 0) pthread_detach(t);

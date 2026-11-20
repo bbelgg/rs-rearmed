@@ -112,8 +112,10 @@ workflow on `main` and approve the job can use the key, so that is the same peop
 
 The seed is too large for a secret. The workflow takes it out of the newest published release's installer, after
 checking that zip's signature with `updatePublicKey`; so a release with a new seed or a new update key is made by
-hand. The zip is built on GitHub's Mac, so its SHA-256 is that run's (the run's summary shows `package.txt`), and
-no check or game run is made there: what the release was checked with is still the release commit's to say.
+hand. The zip is built on GitHub's Mac, with the SDK of the macOS the workflow names, which decides the installer's
+look ([Mac testing](../mac/TESTING.md#installer-tests)), so its SHA-256 is that run's (the run's summary shows
+`package.txt`), and no check or game run is made there: what the release was checked with is still the release
+commit's to say.
 
 ## Rules that hold
 

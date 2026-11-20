@@ -1249,6 +1249,7 @@ class InstallerWindow: NSWindow {
     let guideAction = NSButton(title: "", target: nil, action: nil)
     let guideStop = NSButton(title: "Stop", target: nil, action: nil)
     var guideClosed: NSLayoutConstraint!
+    var guideOpen: [NSLayoutConstraint] = []
     var startAtEdge: NSLayoutConstraint!
     var startBesideClose: NSLayoutConstraint!
     var guideShown = 0
@@ -1566,20 +1567,27 @@ class InstallerWindow: NSWindow {
         let guideSmall = guideBox.heightAnchor.constraint(equalToConstant: 0)
         guideSmall.priority = .defaultLow
         guideSmall.isActive = true
+        // Laid out against the box itself, with its margins as constants, and not against its content view: where
+        // the box puts that view depends on the SDK the app was built with (with macOS 15's the view sat 43 points
+        // above a box 43 points too short, and every text of 1.18.0's installer ran over the line above it).
+        let (mx, my) = (guideBox.contentViewMargins.width, guideBox.contentViewMargins.height)
+        // The two that give the box its height, off while it is closed (guideClosed).
+        guideOpen = [
+            guideBox.bottomAnchor.constraint(greaterThanOrEqualTo: guideText.bottomAnchor, constant: my),
+            guideBox.bottomAnchor.constraint(greaterThanOrEqualTo: guideStop.bottomAnchor, constant: my),
+        ]
         NSLayoutConstraint.activate([
-            guideTitle.topAnchor.constraint(equalTo: inside.topAnchor),
-            guideTitle.leadingAnchor.constraint(equalTo: inside.leadingAnchor),
+            guideTitle.topAnchor.constraint(equalTo: guideBox.topAnchor, constant: my),
+            guideTitle.leadingAnchor.constraint(equalTo: guideBox.leadingAnchor, constant: mx),
             guideText.topAnchor.constraint(equalTo: guideTitle.bottomAnchor, constant: 4),
-            guideText.leadingAnchor.constraint(equalTo: inside.leadingAnchor),
+            guideText.leadingAnchor.constraint(equalTo: guideBox.leadingAnchor, constant: mx),
             guideText.trailingAnchor.constraint(equalTo: guideStop.leadingAnchor, constant: -12),
-            guideText.bottomAnchor.constraint(lessThanOrEqualTo: inside.bottomAnchor),
-            guideAction.topAnchor.constraint(equalTo: inside.topAnchor),
-            guideAction.trailingAnchor.constraint(equalTo: inside.trailingAnchor),
+            guideAction.topAnchor.constraint(equalTo: guideBox.topAnchor, constant: my),
+            guideAction.trailingAnchor.constraint(equalTo: guideBox.trailingAnchor, constant: -mx),
             guideStop.topAnchor.constraint(equalTo: guideAction.bottomAnchor, constant: 6),
-            guideStop.trailingAnchor.constraint(equalTo: inside.trailingAnchor),
+            guideStop.trailingAnchor.constraint(equalTo: guideBox.trailingAnchor, constant: -mx),
             guideStop.widthAnchor.constraint(equalTo: guideAction.widthAnchor),
             guideAction.widthAnchor.constraint(greaterThanOrEqualToConstant: 130),
-            inside.bottomAnchor.constraint(greaterThanOrEqualTo: guideStop.bottomAnchor),
         ])
 
         // Buttons
@@ -1938,6 +1946,7 @@ class InstallerWindow: NSWindow {
         if !runner.isRunning, let r = result {
             guideBox.isHidden = false
             guideClosed.isActive = false
+            NSLayoutConstraint.activate(guideOpen)
             boxColor(r.good ? .systemGreen : .systemOrange)
             guideTitle.stringValue = r.title
             guideText.stringValue = r.text
@@ -1952,7 +1961,8 @@ class InstallerWindow: NSWindow {
         guideStop.isHidden = false
         let show = runner.isRunning && !runner.guideCode.isEmpty
         guideBox.isHidden = !show
-        guideClosed.isActive = !show
+        if show { guideClosed.isActive = false; NSLayoutConstraint.activate(guideOpen) }
+        else { NSLayoutConstraint.deactivate(guideOpen); guideClosed.isActive = true }
         guard show else { return }
         guideTitle.stringValue = runner.guideTitle
         guideText.stringValue = runner.guideText

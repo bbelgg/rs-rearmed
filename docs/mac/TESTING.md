@@ -111,7 +111,10 @@ defaults (`UserDefaults`), so a test run changes what the next real run starts w
   failed step (Try Again, Show Log File), the title row's button for a newer release (which has no installer to
   take, so its offer is the page), or the box of an installer that has just replaced an older one. Close (Escape) is at the bottom
   right once a run has ended, stopped ones too, with Build Again (Build & Install after a run that did not
-  finish) beside it. Looked at in the three previews, not yet after a real run.
+  finish) beside it. Looked at in the three previews, not yet after a real run. AppKit draws and lays out an app by
+  the SDK it was built with, and GitHub's runner may have an older one than this Mac (1.18.0's installer, built with
+  macOS 15's, had the box's texts over the line above it). To look at a build as that SDK's, change the version its
+  program names and sign it again: `vtool -set-build-version macos 12.0 15.5 -replace -output OUT PROGRAM`.
 - **The installer replacing itself, in its window**: `RS_TEST_KEEP=1 tools/installer/test_update.sh` keeps its
   scratch folder, with the installer built with the test's key (`tree/tools/installer`) and a release in each
   `r-*` folder. Those releases are the same program with another version written on it, so for the window build

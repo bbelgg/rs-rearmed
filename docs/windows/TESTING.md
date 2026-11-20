@@ -84,7 +84,7 @@ env HOME=<test home> CFFIXED_USER_HOME=<test home> TMPDIR=<folder> \
   published yet. Delete `.installer-version` in the source folder to make it unpack a new one. It has to be the
   commit the app was built at: the app checks the download against the digest `build.sh` built in.
 - `RS_INSTALLER_PREVIEW=installed|failed|update|updated`: the window as such a run leaves it, with nothing run
-  ([Mac testing](../mac/TESTING.md#installer-tests)).
+  ([Mac testing](../mac/TESTING.md#installer-tests), which also says how to look at it as a build with an older SDK).
 - `RS_UPDATE_URL`: the answer to "which release is the newest", for a test of the installer replacing itself
   ([Mac testing](../mac/TESTING.md#installer-tests)).
 - `-BuildFolder`: typing into the field does not work from the background (`app_click` then `app_type` is

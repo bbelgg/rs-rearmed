@@ -67,12 +67,16 @@ jobs:
   release:
     name: Build, sign and publish
     needs: allowed
-    runs-on: macos-15
+    # The installer takes its look and some of its layout from the SDK it is built with, so it is built with the
+    # Xcode it is looked at with on the maintainer's Mac (docs/mac/TESTING.md, Installer tests): the image that has
+    # it, and DEVELOPER_DIR below, since the image's default is another. Change both when that Xcode changes.
+    runs-on: xcode-27
     environment: release
     permissions:
       contents: write   # the tag and the release
     env:
       TZ: UTC
+      DEVELOPER_DIR: /Applications/Xcode_27.2.app/Contents/Developer
       VERSION: ${{ inputs.version }}
       GH_TOKEN: ${{ github.token }}
     steps:
@@ -82,6 +86,8 @@ jobs:
 
       - name: The release commit
         run: |
+          [[ -d $DEVELOPER_DIR ]] || { echo "::error::this image has no $DEVELOPER_DIR: name the Xcode it has"; exit 1; }
+          xcodebuild -version
           [[ $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::'$VERSION' is not a version (1.18.0)"; exit 1; }
           [[ $(head -1 VERSION) == "$VERSION" ]] \
             || { echo "::error::VERSION at main is $(head -1 VERSION): make and push the release commit first"; exit 1; }

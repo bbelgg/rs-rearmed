@@ -475,6 +475,9 @@ What differs, fix by fix:
   game's, with the same bug. The other lists of `static.psarc`, with a bar for those that had none, come through
   this edition's hook on FrontEnd_OpenFile by the Mac's rule (`rs_mods_overlay_name`), from this game's own
   `static.psarc`.
+- **RS Re-ARMed's options in ADV DISPLAY SETTINGS**: not yet ([PLAN.md](PLAN.md#status)). `menu_options.c` works on
+  the Mac game's menu functions and vtables, which aren't matched here (`tools/targets/win-x86`: unsupported), so this
+  edition's overlay leaves the menu's edits out (`gamefiles.py` tells `cache_overlay.py` the edition).
 - **Song ownership during a mount**: the shared hook, which this edition's mounting loop tells when its steps run.
   `RS_MODS_BYPASS=0` also brings back the song-key table, which hides custom songs here whatever their AppID.
 - **Title logo.** The same `tools/loadscreen` and layout as the Mac edition's. `lp_install.py build` makes

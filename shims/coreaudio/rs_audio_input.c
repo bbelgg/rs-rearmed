@@ -9,6 +9,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <strings.h>
+#include <TargetConditionals.h>
 #include <unistd.h>
 #include <xlocale.h>
 
@@ -111,6 +112,14 @@ void rs_audio_input_for(const char *name, rs_audio_input *out) {
   }
   char home[1024];
   const char *path = getenv("RS_AUDIO_INPUT_FILE"), *h = getenv("HOME");
+#if TARGET_OS_IPHONE
+  // iOS: in the app's folder, the one the Files app shows (LP_HOME), beside options.env
+  const char *lp = getenv("LP_HOME");
+  if ((!path || !*path) && lp && *lp) {
+    snprintf(home, sizeof home, "%s/guitar-input.ini", lp);
+    path = home;
+  }
+#endif
   if ((!path || !*path) && h) {
     snprintf(home, sizeof home, "%s/Library/Application Support/RS Re-ARMed/guitar-input.ini", h);
     path = home;

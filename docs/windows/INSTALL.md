@@ -295,7 +295,8 @@ has inputs). The delay has not been measured against the Mac edition.
 The same as in the Mac edition, from the same code and the same `guitar-input.ini`:
 [Guitar input](../mac/INSTALL.md#guitar-input). The list with each channel of an interface, the calibration that
 can boost, the per-device `Channel` and `GainDb` and the `RS_AUDIO_INPUT…` switches all hold here. Only a device
-named "Rocksmith USB Guitar Adapter" counts as the Real Tone cable.
+named "Rocksmith USB Guitar Adapter" counts as the Real Tone cable. On iPhone and iPad (experimental) the file is
+`guitar-input.ini` in the app's folder, the one the Files app shows ([ios/README.md](../../ios/README.md#playing)).
 
 ### Two players
 

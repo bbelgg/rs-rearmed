@@ -6,8 +6,9 @@
 // volume, which most interfaces don't have.
 //
 // The settings are per device, as more than one interface can be connected. Both editions read them from
-// ~/Library/Application Support/RS Re-ARMed/guitar-input.ini (RS_AUDIO_INPUT_FILE names another file), one
-// section per device, by its name in the system (upper or lower case, and spaces around it, don't matter):
+// ~/Library/Application Support/RS Re-ARMed/guitar-input.ini (on iPhone and iPad, guitar-input.ini in the app's
+// folder, the one the Files app shows; RS_AUDIO_INPUT_FILE names another file), one section per device, by its name
+// in the system (upper or lower case, and spaces around it, don't matter):
 //
 //   [HX Stomp]
 //   Channel=5

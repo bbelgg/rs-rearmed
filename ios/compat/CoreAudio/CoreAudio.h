@@ -3,9 +3,10 @@
 // SDK's own CoreAudio/CoreAudio.h by the iOS build's include path (ios/build_lp.sh), so that code stays one source.
 //
 // iOS has one input and one output at a time, the session's route: here two devices, the input (a Real Tone Cable,
-// an interface or the built-in microphone) and the output (the speaker, headphones, an interface), with the Mac's
-// properties answered from the route: name, UID, transport, channels, sample rate, I/O buffer and latency. The
-// selectors keep the Mac's values. The default devices change with the route (AVAudioSessionRouteChangeNotification).
+// an interface or the built-in microphone) and the output (the speaker, headphones, an interface), or one when a USB
+// interface is both (as the Mac has it), with the Mac's properties answered from the route: name, UID, transport,
+// channels (all of an interface's), sample rate, I/O buffer and latency. The selectors keep the Mac's values. The
+// default devices change with the route (AVAudioSessionRouteChangeNotification), each change logged.
 #ifndef RS_IOS_COREAUDIO_H
 #define RS_IOS_COREAUDIO_H
 

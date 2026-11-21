@@ -69,6 +69,13 @@ is what `~/Library/Application Support/RS Re-ARMed/learn-play` is on the Mac: `g
   entry per channel as on the Mac; without one, the built-in microphone. The output is the speaker, headphones or the
   interface.
 
+### Picture and heat
+
+A phone's GPU gets less to do than a Mac's by default: no MSAA (`RS_METAL_MSAA=1`), no MetalFX upscaling
+(`RS_METAL_UPSCALE=0`), the game's own texture filtering (`RS_METAL_ANISO=1`). `options.env` in the app's folder sets
+them otherwise, as on the Mac ([the switches](../docs/windows/INSTALL.md#settings-and-switches)); `RS_METAL_SCALE=N`
+(50-100) renders fewer pixels still.
+
 ## Status
 
 See [docs/windows/PLAN.md](../docs/windows/PLAN.md) (iPhone and iPad). Open: a touch layout of its own (the game's

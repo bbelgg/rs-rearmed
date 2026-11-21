@@ -506,6 +506,11 @@ void lp_ios_fail(const char *msg) {
 static void *start_game(void *arg) {
   (void)arg;
   pthread_setname_np("lp start");
+  // A phone's GPU and its heat: no MSAA, no MetalFX upscaling, the game's own texture filtering (the Mac's defaults
+  // are 4, on and 16). options.env in the app's folder sets them otherwise, as on the Mac.
+  setenv("RS_METAL_MSAA", "1", 0);
+  setenv("RS_METAL_UPSCALE", "0", 0);
+  setenv("RS_METAL_ANISO", "1", 0);
   import_folder();  // before the game lists its songs
   int rc = lp_main(g_argc, g_argv);
   if (rc)

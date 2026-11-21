@@ -183,6 +183,29 @@ step_bundle() {
     done
   fi
   if [ -n "$corpus" ] && [ -f "$corpus" ]; then cp "$corpus" "$r/"; else echo "note: no shader corpus: the game compiles its shaders as it plays"; fi
+  app_icon "$r" || echo "note: no app icon (the game image has none sips can read): iOS shows a blank one"
+}
+
+# The app's icon: the game's own (the exe's, as the Mac app's RS2014.icns), drawn opaque by make_icon.swift and
+# compiled by actool into the bundle (Assets.car and the loose PNGs; Info.plist's CFBundleIcons names AppIcon).
+app_icon() {
+  i=$b/icon
+  rm -rf "$i" && mkdir -p "$i/Assets.xcassets/AppIcon.appiconset" "$i/out"
+  python3 -I -c 'import sys; sys.path.insert(0, sys.argv[1]); import lp_build
+ico = lp_build.pe_icon(open(sys.argv[2], "rb").read())
+sys.exit(1) if not ico else open(sys.argv[3], "wb").write(ico)' "$root/win-x86/install" \
+    "${LP_IMAGE:-$bdir/win-x86/image/Rocksmith2014.exe}" "$i/game.ico" || return 1
+  sips -s format png "$i/game.ico" --out "$i/game.png" >/dev/null || return 1
+  swift "$here/make_icon.swift" "$i/game.png" "$i/Assets.xcassets/AppIcon.appiconset/icon.png" || return 1
+  cat > "$i/Assets.xcassets/AppIcon.appiconset/Contents.json" <<'JSON'
+{"images": [{"filename": "icon.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}],
+ "info": {"author": "xcode", "version": 1}}
+JSON
+  printf '{"info": {"author": "xcode", "version": 1}}\n' > "$i/Assets.xcassets/Contents.json"
+  xcrun actool "$i/Assets.xcassets" --compile "$i/out" --platform $sdkname --minimum-deployment-target "$min" \
+    --app-icon AppIcon --target-device iphone --target-device ipad --output-partial-info-plist "$i/partial.plist" \
+    --output-format human-readable-text >/dev/null || return 1
+  cp "$i"/out/* "$1/"
   ls -la "$r" "$r/dlls"
 }
 

@@ -3,7 +3,8 @@
 // game on a thread of its own once the window is up and the microphone has been asked for, and the game's thread
 // runs the game as on the Mac.
 //
-// The screen is the game's desktop (lp_screen_size): the screen in landscape at its own shape, 720 pixels high
+// The screen is the game's desktop (lp_screen_size): the screen in landscape at its own shape, without the side
+// margins of the Dynamic Island or the notch, 720 pixels high
 // (RS_METAL_RETINA=1: in its pixels) at RS_METAL_SCALE's percentage; an iPhone 15 Plus's is 1561x720. The game always
 // has the whole screen: a windowed device of another size is asked to take the desktop's (lp_request_resolution, as
 // the Mac app does for a resized window), so it draws at the screen's shape with no bars; until it has, the back
@@ -79,12 +80,18 @@ static double game_scale(CGFloat backing, CGFloat pts_h) {
   return (retina() ? backing : fmin(backing, LP_IOS_HEIGHT / pts_h)) * rsp_metal_scale();
 }
 
-// the screen in landscape, in points, and its pixels per point
+static UIView *g_view;  // the game's view (LPGameView)
+
+// The part of the screen the game has, in landscape, in points, and its pixels per point: the screen without the
+// side margins iOS keeps for the Dynamic Island or the notch (the window's safe area; the same on both sides, so the
+// picture stays centred, the layer letterboxing it in black); the whole height, as the home indicator hides itself.
 static void screen_info(CGSize *pts, CGFloat *backing) {
   on_main(^{
     UIScreen *s = UIScreen.mainScreen;
     CGSize b = s.bounds.size;
-    *pts = CGSizeMake(fmax(b.width, b.height), fmin(b.width, b.height));
+    UIEdgeInsets in = g_view.window ? g_view.window.safeAreaInsets : UIEdgeInsetsZero;
+    CGFloat side = fmax(in.left, in.right);
+    *pts = CGSizeMake(fmax(b.width, b.height) - 2 * side, fmin(b.width, b.height));
     *backing = s.scale;
   });
 }
@@ -110,7 +117,6 @@ static int any_shape(void) {
   return on;
 }
 
-static UIView *g_view;
 static CAMetalLayer *g_layer;
 static rs_gfx_context *g_ctx;
 static int g_bw, g_bh;  // the back buffer

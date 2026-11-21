@@ -110,8 +110,8 @@ sound, not its guitar input, until the game is started again).
 
 ### Picture and heat
 
-The game fills the screen at the screen's own shape: its desktop is the screen 720 pixels high (an iPhone 15 Plus's
-is 1561x720), and the app asks the game for that resolution at its start, as the Mac app does for a resized window;
+The game fills the screen at the screen's own shape, clear of the Dynamic Island or the notch (thin black margins at
+both sides, the safe area iOS gives): its desktop is that area 720 pixels high (1362x720 on an iPhone 15 Plus), and the app asks the game for that resolution at its start, as the Mac app does for a resized window;
 the game keeps it in Rocksmith.ini. `RS_METAL_RETINA=1` makes it the screen's own pixels (2796x1290 there: more heat),
 `RS_METAL_SCALE=N` fewer.
 

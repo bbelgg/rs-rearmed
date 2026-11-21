@@ -1,10 +1,13 @@
 #!/usr/bin/env python3
-"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the lists' scroll bars): a small
-patch archive made from the user's own cache.psarc and static.psarc.
+"""The menu overlay (Direct Connect, Enumerate, Exit Game, Multiplayer's notice, the lists' scroll bars,
+RS Re-ARMed's options in Adv Display Settings): a small patch archive made from the user's own cache.psarc and
+static.psarc.
 
-    cache_overlay.py make GAME_DIR      write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing to change)
-    cache_overlay.py show CACHE.psarc   print what the overlay would change, write nothing (with the static.psarc
-                                        beside it: static_of)
+    cache_overlay.py make GAME_DIR [EDITION]     write GAME_DIR/Update/patcharchives.psarc (or remove it: nothing
+                                                 to change)
+    cache_overlay.py show CACHE.psarc [EDITION]  print what the overlay would change, write nothing (with the
+                                                 static.psarc beside it: static_of)
+    EDITION                                      the game's: mac (when not given) or learn-play
 
 The game's cable screen ("HOW WOULD YOU LIKE TO CONNECT?") offers a real tone cable, a microphone or no input.
 The game code also handles a fourth button, "othercable" (Direct Connect: any audio interface), and a fourth
@@ -31,6 +34,12 @@ Designer's among them, are movies of static.psarc with the same script (gfxasset
 same edit, and the overlay holds them as they are, beside the archives (plan_movies). They are optional too. Most of
 the game's lists have no bar at all, Nonstop Play's songs among them: the edit also gives each of those one, where
 the lists with a bar have theirs (_edit_bar_shown).
+
+In the Mac edition, Adv Display Settings also lists RS Re-ARMed's picture switches: the overlay adds their buttons to
+the menu (manifests/ui_menu_pillar_options.database.json) and their texts to the game's (edit_maingame), and its movie
+(gfxassets/views/displaysettings.gfx of static.psarc) greys a row that can't be used and scrolls its list, which no
+longer fits (edit_display_settings). The rest is native (tools/ws7/recomp/overrides/mods/menu_options.c), on the Mac
+game's own menu code, so Learn & Play's overlay leaves these out (LP_EDITS).
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -686,6 +695,91 @@ def edit_enumerate(text):
     return None
 
 
+# --- RS Re-ARMed's options in Adv Display Settings -------------------------------------------------------
+
+OPTIONS = "manifests/ui_menu_pillar_options.database.json"
+OPTIONS_MENU = '"AdvancedDisplaySettings"'
+# The buttons tools/ws7/recomp/overrides/mods/menu_options.c gives a value and a control to: (id, label row, label,
+# description row, description, sort order). The rows are new rows of the game's text table, after its own last
+# (37382), in every language for now; a comma in a text is {C}, as in the game's.
+MENU_OPTIONS = [
+    ("rsFrameRate", "38911", "FRAME RATE", "38912",
+     "DISPLAY follows the screen's refresh rate. A fixed rate turns vertical sync off. Takes effect the next time the "
+     "game starts.", 10),
+    ("rsAnyWindowShape", "38913", "ANY WINDOW SHAPE", "38914",
+     "Lets the game's window take any shape{C} the picture drawn to fit it. Disabling this keeps 16:9 with bars. "
+     "Takes effect the next time the game starts.", 11),
+    ("rsRenderer", "38915", "RENDERER", "38916",
+     "METAL is the default. OPENGL is the original renderer{C} should Metal have a problem. Takes effect the next "
+     "time the game starts.", 12),
+    ("rsMultithreadedGL", "38917", "MULTITHREADED GL ENGINE", "38918",
+     "Apple's multithreaded OpenGL engine{C} used only with the OPENGL renderer. Takes effect the next time the game "
+     "starts.", 13),
+    ("rsMetalFXUpscaling", "38901", "METALFX UPSCALING", "38902",
+     "Scales the picture up to a Retina screen's pixels with MetalFX. Disabling this uses a plain scale{C} improving "
+     "performance. Takes effect the next time the game starts.", 14),
+    ("rsFullRetina", "38903", "FULL RETINA RESOLUTION", "38904",
+     "Draws every pixel of a Retina screen{C} for the sharpest picture. Enabling this takes about four times the "
+     "graphics work. Takes effect the next time the game starts.", 15),
+    ("rsRenderScale", "38919", "RENDER SCALE", "38920",
+     "Draws the game at a lower resolution and scales it up to the screen{C} for less graphics work and a softer "
+     "picture. Takes effect the next time the game starts.", 16),
+    ("rsAntiAliasing", "38905", "ANTI-ALIASING", "38906",
+     "Smooths the edges of the 3D scene with MSAA. Lower settings improve performance. Takes effect the next time "
+     "the game starts.", 17),
+    ("rsTextureFiltering", "38907", "TEXTURE FILTERING", "38908",
+     "Keeps textures sharp when seen at an angle. 1X is the game's own. Takes effect the next time the game starts.",
+     18),
+    ("rsColor", "38909", "COLOR", "38910",
+     "SRGB shows the game's colors as it made them. VIVID leaves them unmatched{C} more saturated on a wide-color "
+     "screen. Takes effect the next time the game starts.", 19),
+]
+TEXT_COLUMNS = 8  # the table's languages after a row's id
+
+
+def edit_options(text):
+    """Adv Display Settings' definition with RS Re-ARMed's buttons (MENU_OPTIONS) first among its own, laid out as
+    the game's; None when it has them already or has no such menu."""
+    if '"%s":' % MENU_OPTIONS[0][0] in text:
+        return None
+    at = text.find(OPTIONS_MENU)
+    at = text.find('"Buttons"', at) if at >= 0 else -1
+    at = text.find("{", at) if at >= 0 else -1
+    if at < 0:
+        return None
+    nl = "\r\n" if "\r\n" in text else "\n"
+    m = re.compile(r"[\r\n]+(\t*)\"", re.S).search(text, at)  # the first button's indentation
+    ind = m.group(1) if m else "\t" * 5
+    entries = "".join(
+        '%s%s"%s":%s%s{%s%s\t"ID": "%s",%s%s\t"Label": "$[%s]%s",%s%s\t"Description" : "$[%s]%s",%s'
+        '%s\t"State": "up",%s%s\t"SortOrder" : %d,%s%s\t"Component": "RSButton"%s%s},'
+        % (nl, ind, bid, nl, ind, nl, ind, bid, nl, ind, lrow, label, nl, ind, drow, desc.replace("{C}", ","), nl,
+           ind, nl, ind, order, nl, ind, nl, ind)
+        for bid, lrow, label, drow, desc, order in MENU_OPTIONS)
+    return text[:at + 1] + entries + text[at + 1:]
+
+
+def edit_text_rows(text):
+    """The text table with MENU_OPTIONS' rows added where missing; None when it has them all."""
+    nl = "\r\n" if "\r\n" in text else "\n"
+    rows = []
+    for _, lrow, label, drow, desc, _ in MENU_OPTIONS:
+        for row, t in ((lrow, label), (drow, desc)):
+            if not re.search(r"^%s," % row, text, re.M):
+                rows.append(row + "," + ",".join([t] * (TEXT_COLUMNS - 1) + [""]))
+    if not rows:
+        return None
+    body = text if text.endswith(nl) or not text else text + nl
+    return body + nl.join(rows) + nl
+
+
+def edit_maingame(text):
+    """The text table's edits: the notices (edit_notice) and RS Re-ARMed's rows (edit_text_rows)."""
+    out = edit_notice(text) or text
+    out = edit_text_rows(out) or out
+    return None if out == text else out
+
+
 def edit_notice(text):
     """The notices of the Shop's overlay check and of Multiplayer's inputs, in every language; None when they say
     that already or the table has no such rows. A row is `id,text,text,...`, a comma in a text written {C}."""
@@ -906,9 +1000,13 @@ def _as_branch(op, offset):
 
 # A few actions put together (_as_asm): ("label", name) marks a place, ("if" | "jump", name) branches to it,
 # ("push", value, ...) pushes strings (the pool's, else their own), whole numbers, booleans, None (undefined) and
-# ("r", n) registers, ("store", n) stores the top in register n, and an int is an action without data.
-A_ADD2, A_LESS2, A_NOT, A_STORE_REGISTER = 0x47, 0x48, 0x12, 0x87
+# ("r", n) registers, ("store", n) stores the top in register n, ("function", registers, items) is a method (this in
+# r1, as the game's: no arguments or super), and an int is an action without data.
+A_ADD2, A_SUBTRACT, A_MULTIPLY, A_DIVIDE, A_LESS2, A_OR, A_NOT, A_STORE_REGISTER = (
+    0x47, 0x0B, 0x0C, 0x0D, 0x48, 0x11, 0x12, 0x87)
+A_GET_VARIABLE = 0x1C
 P_UNDEFINED = 3
+AS_METHOD_FLAGS = 0x29  # preload this, suppress arguments and super
 
 
 def _as_value(pool, v):
@@ -942,6 +1040,10 @@ def _as_asm(pool, items):
             return bytes([A_STORE_REGISTER]) + struct.pack("<HB", 1, item[1])
         if kind == "push":
             return _as_push(*(_as_value(pool, v) for v in item[1:]))
+        if kind == "function":
+            body = _as_asm(pool, item[2])
+            head = b"\x00" + struct.pack("<HBH", 0, item[1], AS_METHOD_FLAGS) + struct.pack("<H", len(body))
+            return bytes([A_DEFINE_FUNCTION2]) + struct.pack("<H", len(head)) + head + body
         raise ValueError(kind)
     labels, at = {}, 0
     for item in items:
@@ -1056,18 +1158,261 @@ def edit_songs_list(data):
     return None
 
 
-EDITS = {STARTUP: edit_startup, MISSION: edit_mission, MAIN: edit_main, NOTICES: edit_notice}
+# --- Adv Display Settings' rows -------------------------------------------------------------------------
+# The menu's movie (static.psarc's gfxassets/views/displaysettings.gfx, Display Settings' too) colors a row's label
+# WHITE_CLR, or BLUE_CLR_HILITE while it has the focus: it has no look for a row that can't be used. The edit gives it
+# one in the movie's own greys, GREY_CLR and GREY_CLR_HILITE, for a row whose States.Locked is set (a field of the
+# game's own StatesTemplate; menu_options.c sets it for the options of the renderer not chosen). Its rows' scripts get
+# longer, so what holds them is made to say so (_as_replace, edit_display_settings).
+
+DISPLAY_SETTINGS = "gfxassets/views/displaysettings.gfx"
+
+
+def _edit_row_color(script):
+    """The rows' script with a locked row's color (GREY_CLR, GREY_CLR_HILITE with the focus); None when it has that
+    already or is not the script this knows. Its color is the pushes of
+
+        "fontColor", rows[i].States.Focus == true ? rs.common.Prefs.BLUE_CLR_HILITE : rs.common.Prefs.WHITE_CLR
+
+    and the edit makes the choice one of four, by States.Locked as well."""
+    pool = _as_pool(script)
+    names = ("fontColor", "States", "Focus", "rs", "common", "Prefs", "WHITE_CLR", "BLUE_CLR_HILITE")
+    if pool is None or any(n not in pool for n in names) or _as_text("GREY_CLR_HILITE") in script:
+        return None
+    prefs = (_as_push(_as_name(pool, "rs")) + bytes([A_GET_VARIABLE]) + _as_push(_as_name(pool, "common"))
+             + bytes([A_GET_MEMBER]) + _as_push(_as_name(pool, "Prefs")) + bytes([A_GET_MEMBER]))
+
+    def color(item):
+        return prefs + _as_push(item) + bytes([A_GET_MEMBER])
+    white, blue = color(_as_name(pool, "WHITE_CLR")), color(_as_name(pool, "BLUE_CLR_HILITE"))
+    focus = (bytes([A_GET_MEMBER]) + _as_push(_as_name(pool, "Focus")) + bytes([A_GET_MEMBER])
+             + _as_push(bytes([P_BOOL, 1])) + bytes([A_EQUALS2]))
+    choice = _as_branch(A_IF, len(white) + 5) + white + _as_branch(A_JUMP, len(blue)) + blue
+    font, states = _as_name(pool, "fontColor"), _as_name(pool, "States")
+    head = bytes([A_PUSH]) + struct.pack("<H", len(font) + 2 + len(states)) + font + bytes([P_REGISTER])
+    found = [(m.start(), m.group(1)[0]) for m in re.finditer(
+        re.escape(head) + b"(.)" + re.escape(states + focus + choice), script, re.S)]  # (the row's register)
+    if len(found) != 1:
+        return None
+    at, row = found[0]
+    at += len(head) + 1 + len(states) + len(focus)  # the choice's start (its if)
+    if at not in {start for start, _, _, _ in _as_actions(script)}:
+        return None
+    locked = (_as_push(bytes([P_REGISTER, row]), _as_name(pool, "States")) + bytes([A_GET_MEMBER])
+              + _as_push(_as_text("Locked")) + bytes([A_GET_MEMBER]))
+    grey, grey_hilite = color(_as_text("GREY_CLR")), color(_as_text("GREY_CLR_HILITE"))
+    focused = locked + _as_branch(A_IF, len(blue) + 5) + blue + _as_branch(A_JUMP, len(grey_hilite)) + grey_hilite
+    unfocused = (locked + _as_branch(A_IF, len(white) + 5) + white + _as_branch(A_JUMP, len(grey) + 5 + len(focused))
+                 + grey + _as_branch(A_JUMP, len(focused)))
+    return _as_replace(script, at, at + len(choice), _as_branch(A_IF, len(unfocused)) + unfocused + focused)
+
+
+# --- Adv Display Settings' list, scrolled -----------------------------------------------------------------
+# SettingsScene (the list of the settings menus: Display, Visual Quality, Play, ...) lays its rows out from
+# mEntryInitialPosY down, the focused row's CURRENT SETTING line and description under it, and has no scroll: rows past
+# its panel run off the screen. The edit wraps its PopulateButtons on the class's prototype: the rows laid out from a
+# scroll's distance higher (rsScroll, the least change that shows the focused row with its description), those outside
+# the panel hidden, and the game's own scroll bar beside the panel (rsTrack, rsThumb: CommonLib's clips, attached as
+# its lists do in ListScene.UpdateScrollBar) while the list is longer than the panel.
+# A list that fits is as it was. In ActionScript:
+#
+#   if (proto.rsPopulateButtons == undefined) {
+#     proto.rsPopulateButtons = proto.PopulateButtons;
+#     proto.PopulateButtons = function () {      // r2 top, r3 the panel's height for rows, r4 rows, r5 a row's
+#       if (this.rsScroll == undefined) this.rsScroll = 0;  // height, r6 the description's, r7 the most scroll,
+#       r2 = this.mEntryInitialPosY;             // r8 the focused row (-1 none), r9 the scroll, r10 a row, r11 a y,
+#       this.mEntryInitialPosY = r2 - this.rsScroll; this.rsPopulateButtons(); this.mEntryInitialPosY = r2;
+#       ... r9 from the focused row, kept within 0 and r7; laid out again when it changed;
+#       ... each row's _visible: inside the panel; the bar shown, sized and placed, or hidden
+#     };
+#   }
+LIST_MARGIN = 24  # between the last row and the panel's bottom
+SETTINGS_BAR_GAP, THUMB_LEAST = 8, 100  # the bar right of the panel; the thumb's least height, the game's lists' own
+
+
+def _scroll_method():
+    R = lambda n: ("r", n)  # noqa: E731
+    G, S, ADD, SUB, MUL, DIV, LT, NOT, POP = (A_GET_MEMBER, A_SET_MEMBER, A_ADD2, A_SUBTRACT, A_MULTIPLY, A_DIVIDE,
+                                              A_LESS2, A_NOT, A_POP)
+
+    def member(*path):  # this.a.b... pushed
+        return [("push", R(1), path[0]), G] + [x for name in path[1:] for x in (("push", name), G)]
+
+    def cls():  # rs.views.optionsmenu.controls.SettingsScene
+        return ([("push", "rs"), A_GET_VARIABLE]
+                + [x for name in ("views", "optionsmenu", "controls", "SettingsScene") for x in (("push", name), G)])
+
+    def call(obj, name, *args):  # obj.name(args) with its result popped; args: lists of items, each one value
+        return [x for a in reversed(args) for x in a] + [("push", len(args))] + obj + [("push", name),
+                                                                                         A_CALL_METHOD, POP]
+
+    def layout(scroll):  # the game's layout, its rows from r2 - scroll
+        return ([("push", R(1), "mEntryInitialPosY", R(2))] + scroll + [SUB, S]
+                + call([("push", R(1))], "rsPopulateButtons")
+                + [("push", R(1), "mEntryInitialPosY", R(2)), S])
+
+    def row_id(reg):  # this.mSortedData[reg].objId
+        return member("mSortedData") + [("push", reg), G, ("push", "objId"), G]
+
+    def attach(linkage, name):  # this[name] = this.attachMovie(linkage, name, this.getNextHighestDepth())
+        return [("push", R(1), name, 0, R(1), "getNextHighestDepth"), A_CALL_METHOD,
+                ("push", name, linkage, 3, R(1), "attachMovie"), A_CALL_METHOD, S]
+
+    def put(clip, name, value):  # this[clip][name] = value
+        return member(clip) + [("push", name)] + value + [S]
+
+    body = (
+        member("rsScroll") + [("push", None), A_EQUALS2, NOT, ("if", "scrolled"), ("push", R(1), "rsScroll", 0), S,
+                              ("label", "scrolled")]
+        + member("mEntryInitialPosY") + [("store", 2), POP]
+        + layout(member("rsScroll"))
+        # r3: the panel's bottom less the margin, from r2
+        + cls() + [("store", 13), POP, ("push", R(13), "BACKGROUND_Y"), G, ("push", R(13), "BACKGROUND_HEIGHT"), G, ADD,
+                   ("push", LIST_MARGIN), SUB, ("push", R(2)), SUB, ("store", 3), POP]
+        + member("mSortedData", "length") + [("store", 4), POP]
+        + [("push", R(4), 0), A_EQUALS2, ("if", "bar")]  # (no rows: no scroll, no bar)
+        + member("mEntryHeight") + [("store", 5), POP]
+        + member("mEntryCurrentPosY") + [("push", R(2))] + member("rsScroll") + [SUB, SUB, ("store", 6), POP]
+        + [("push", R(4), R(5)), MUL, ("push", R(6)), ADD, ("push", R(3)), SUB, ("store", 7), POP,
+           ("push", R(7), 0), LT, NOT, ("if", "most"), ("push", 0), ("store", 7), POP, ("label", "most")]
+        # r8: the focused row
+        + [("push", -1), ("store", 8), POP, ("push", 0), ("store", 10), POP, ("label", "find"),
+           ("push", R(10), R(4)), LT, NOT, ("if", "found"),
+           ("push", R(1), "mDataObj"), G, ("push", "Buttons"), G] + row_id(R(10)) + [G, ("push", "States"), G,
+                                                                                    ("push", "Focus"), G,
+                                                                                    ("push", True), A_EQUALS2, NOT,
+                                                                                    ("if", "next")]
+        + [("push", R(10)), ("store", 8), POP, ("label", "next"), ("push", R(10), 1), ADD, ("store", 10), POP,
+           ("jump", "find"), ("label", "found")]
+        # r9: the least change that shows it and its description, within 0 and r7
+        + member("rsScroll") + [("store", 9), POP, ("push", R(8), 0), LT, ("if", "kept"),
+                                ("push", R(8), R(5)), MUL, ("push", R(5)), ADD, ("push", R(6)), ADD, ("push", R(3)),
+                                SUB, ("store", 11), POP, ("push", R(9), R(11)), LT, NOT, ("if", "low"),
+                                ("push", R(11)), ("store", 9), POP, ("label", "low"),
+                                ("push", R(8), R(5)), MUL, ("store", 11), POP, ("push", R(11), R(9)), LT, NOT,
+                                ("if", "kept"), ("push", R(11)), ("store", 9), POP, ("label", "kept")]
+        + [("push", R(7), R(9)), LT, NOT, ("if", "under"), ("push", R(7)), ("store", 9), POP, ("label", "under"),
+           ("push", R(9), 0), LT, NOT, ("if", "over"), ("push", 0), ("store", 9), POP, ("label", "over")]
+        + [("push", R(9))] + member("rsScroll") + [A_EQUALS2, ("if", "shown"), ("push", R(1), "rsScroll", R(9)), S]
+        + layout([("push", R(9))]) + [("label", "shown")]
+        # each row inside the panel shown, the others hidden
+        + [("push", 0), ("store", 10), POP, ("label", "row"), ("push", R(10), R(4)), LT, NOT, ("if", "bar"),
+           ("push", R(10), R(5)), MUL, ("push", R(9)), SUB, ("store", 11), POP,
+           ("push", R(8), 0), LT, ("if", "placed"), ("push", R(8), R(10)), LT, NOT, ("if", "placed"),
+           ("push", R(11), R(6)), ADD, ("store", 11), POP, ("label", "placed")]
+        + member("mButtons") + row_id(R(10)) + [G, ("push", "_visible"),  # = !(y < -1 || r3 + 1 < y + r5)
+                                                ("push", R(11), -1), LT, ("push", R(3), 1), ADD, ("push", R(11), R(5)),
+                                                ADD, LT, A_OR, NOT, S]
+        + [("push", R(10), 1), ADD, ("store", 10), POP, ("jump", "row")]
+        # the game's scroll bar (CommonLib's clips, as its lists attach them): made when first needed, shown while the
+        # list is longer than the panel, its thumb at the focused row's place (at the scroll's without one)
+        + [("label", "bar")] + member("rsTrack") + [("push", None), A_EQUALS2, NOT, ("if", "made"),
+                               ("push", 0, R(7)), LT, NOT, ("if", "end")]
+        + attach("scrollBar_trackUp", "rsTrack") + attach("scrollBar_thumbDown", "rsThumb") + [("label", "made")]
+        + [("push", R(4), 0), A_EQUALS2, ("push", 0, R(7)), LT, NOT, A_OR, NOT, ("store", 11), POP]
+        + put("rsTrack", "_visible", [("push", R(11))]) + put("rsThumb", "_visible", [("push", R(11))])
+        + [("push", R(11)), NOT, ("if", "end")]
+        + cls() + [("store", 13), POP, ("push", R(13), "BACKGROUND_X"), G, ("push", R(13), "BACKGROUND_WIDTH"), G, ADD,
+                   ("push", SETTINGS_BAR_GAP), ADD, ("store", 15), POP]
+        + put("rsTrack", "_x", [("push", R(15))]) + put("rsThumb", "_x", [("push", R(15))])
+        + put("rsTrack", "_y", [("push", R(13), "BACKGROUND_Y"), G])
+        + put("rsTrack", "_height", [("push", R(13), "BACKGROUND_HEIGHT"), G])
+        + [("push", R(13), "BACKGROUND_HEIGHT"), G, ("push", R(4)), DIV, ("store", 14), POP,
+           ("push", R(14), THUMB_LEAST), LT, NOT, ("if", "thumb"), ("push", THUMB_LEAST), ("store", 14), POP,
+           ("label", "thumb")]
+        + put("rsThumb", "_height", [("push", R(14))])
+        + [("push", R(9), R(7)), DIV, ("store", 11), POP, ("push", R(8), 0), LT, ("if", "at"), ("push", R(4), 1), SUB,
+           ("push", 0), A_EQUALS2, ("if", "at"), ("push", R(8), R(4), 1), SUB, DIV, ("store", 11), POP, ("label", "at")]
+        + put("rsThumb", "_y", [("push", R(13), "BACKGROUND_Y"), G, ("push", R(13), "BACKGROUND_HEIGHT"), G,
+                                ("push", R(14)), SUB, ("push", R(11)), MUL, ADD])
+        + [("label", "end")])
+    return body
+
+
+SCROLL_REGISTERS = 16  # the method's: r1 this, r2-r15 its own
+
+
+def _scroll_install(pool):
+    """The actions that wrap SettingsScene.prototype.PopulateButtons, once (register 2 as the class's script has it)."""
+    path = [x for name in ("views", "optionsmenu", "controls", "SettingsScene", "prototype")
+            for x in (("push", name), A_GET_MEMBER)]
+    proto = ("r", 2)
+    return _as_asm(pool, [("push", "rs"), A_GET_VARIABLE] + path + [
+        ("store", 2), A_POP,
+        ("push", proto, "rsPopulateButtons"), A_GET_MEMBER, ("push", None), A_EQUALS2, A_NOT, ("if", "done"),
+        ("push", proto, "rsPopulateButtons", proto, "PopulateButtons"), A_GET_MEMBER, A_SET_MEMBER,
+        ("push", proto, "PopulateButtons"), ("function", SCROLL_REGISTERS, _scroll_method()), A_SET_MEMBER,
+        ("label", "done")])
+
+
+def _edit_list_scroll(script):
+    """SettingsScene's script with its list scrolled (_scroll_method), the wrapping added where it ends (so it runs
+    also when the class was made already); None when it has it or is not that script."""
+    pool = _as_pool(script)
+    names = ("SettingsScene", "PopulateButtons", "mEntryInitialPosY", "mEntryCurrentPosY", "mEntryHeight",
+             "mSortedData", "objId", "mButtons", "mDataObj", "BACKGROUND_Y", "BACKGROUND_HEIGHT", "CLASS_NAME")
+    if pool is None or any(n not in pool for n in names) or _as_text("rsPopulateButtons") in script:
+        return None
+    if _as_push(_as_name(pool, "CLASS_NAME"))[3:] not in script or b"SettingsScene\0" not in script:
+        return None
+    acts = _as_actions(script)
+    if not acts or acts[-1][1] != 0:  # (it ends with End)
+        return None
+    at = acts[-1][0]
+    return _as_replace(script, at, at + 1, _scroll_install(pool) + b"\x00")
+
+
+def edit_display_settings(data):
+    """Adv Display Settings' movie with a locked row greyed and its list scrolled; None when it has that already
+    or is not the expected file. Each script it edits gets longer: its tag and the movie say their new lengths."""
+    if len(data) < 9 or data[:3] not in (b"GFX", b"FWS"):  # (an uncompressed movie, as the game's is)
+        return None
+    try:
+        out, last = [], 0
+        for code, start, body, end in _swf_tag_list(data):
+            if code != DO_INIT_ACTION:
+                continue
+            old = data[body + 2:end]  # (after the sprite's id)
+            script = _edit_row_color(old) or old
+            script = _edit_list_scroll(script) or script
+            if script == old:
+                continue
+            content = data[body:body + 2] + script
+            out += [data[last:start], struct.pack("<HI", (code << 6) | 0x3F, len(content)), content]
+            last = end
+        if not out:
+            return None
+        movie = bytearray(b"".join(out) + data[last:])
+        struct.pack_into("<I", movie, 4, len(movie))
+        return bytes(movie)
+    except (struct.error, ValueError, IndexError, Unsupported):
+        return None
+
+
+EDITS = {STARTUP: edit_startup, MISSION: edit_mission, MAIN: edit_main, NOTICES: edit_maingame,
+         OPTIONS: edit_options}
 BYTE_EDITS = {SONGS_LIST: edit_songs_list}  # (a movie, not text)
+MOVIE_EDITS = {DISPLAY_SETTINGS: edit_display_settings}  # a static.psarc movie's own edit, after the lists'
+# Learn & Play's: without RS Re-ARMed's options in Adv Display Settings, whose native half is the Mac game's only
+LP_EDITS = dict({k: f for k, f in EDITS.items() if k != OPTIONS}, **{NOTICES: edit_notice})
+EDITIONS = ("mac", "learn-play")
 
 
-def edit_file(name, data):
+def edits_of(edition):
+    """(text edits, static.psarc movies' own edits) of EDITION's overlay."""
+    if edition not in EDITIONS:
+        raise ValueError("no such edition: %s" % edition)
+    return (EDITS, MOVIE_EDITS) if edition == "mac" else (LP_EDITS, {})
+
+
+def edit_file(name, data, edits=EDITS):
     """A file's bytes with its edit made (NAME in lower case, in EDITS or BYTE_EDITS); None when it needs none."""
     if name in BYTE_EDITS:
         edited = BYTE_EDITS[name](data)
         return None if edited is None or edited == data else edited
     # surrogateescape: the main menu's file has bytes that are not UTF-8, and they stay as they are
     text = data.decode("utf-8", "surrogateescape")
-    edited = EDITS[name](text)
+    edited = edits[name](text)
     return None if edited is None or edited == text else edited.encode("utf-8", "surrogateescape")
 
 
@@ -1087,10 +1432,12 @@ def static_of(game_dir):
     return None
 
 
-def plan_movies(static_path):
+def plan_movies(static_path, edition="mac"):
     """{movie name: edited bytes} of the menu movies in static.psarc (gfxassets/views/<name>.gfx) whose list
-    edit_songs_list changes; the song list's own is cache.psarc's (BYTE_EDITS). {} when the archive can't be read,
-    and a movie that can't be is passed by: these are optional, as the song list's."""
+    edit_songs_list changes, or that have an edit of their own (MOVIE_EDITS); the song list's own is cache.psarc's
+    (BYTE_EDITS). {} when the archive can't be read, and a movie that can't be is passed by: these are optional, as
+    the song list's."""
+    movie_edits = edits_of(edition)[1]
     out = {}
     try:
         ps = Psarc(static_path) if static_path else None
@@ -1104,7 +1451,10 @@ def plan_movies(static_path):
             if not low.startswith(VIEWS) or not low.endswith(".gfx") or "/" in low[len(VIEWS):] or low in BYTE_EDITS:
                 continue
             try:
-                edited = edit_songs_list(ps.read(name))
+                data = ps.read(name)
+                edited = edit_songs_list(data)
+                if low in movie_edits:
+                    edited = movie_edits[low](edited or data) or edited
             except Unsupported:
                 continue
             if edited is not None:
@@ -1120,9 +1470,10 @@ PATCH_DIR = "Update"
 PATCH_NAME = "patcharchives.psarc"
 
 
-def plan(cache_path):
-    """{archive name in cache.psarc: {file name in it: edited bytes}} of what the overlay changes. An archive that
-    can't be read once the menu's files are found, or a BYTE_EDITS file that can't be, is passed by."""
+def plan(cache_path, edition="mac"):
+    """{archive name in cache.psarc: {file name in it: edited bytes}} of what EDITION's overlay changes. An archive
+    that can't be read once the menu's files are found, or a BYTE_EDITS file that can't be, is passed by."""
+    edits = edits_of(edition)[0]
     out = {}
     ps = Psarc(cache_path)
     try:
@@ -1133,36 +1484,37 @@ def plan(cache_path):
             try:
                 z = SevenZip(ps.read(name))
             except Unsupported:
-                if found.issuperset(EDITS):
+                if found.issuperset(edits):
                     continue  # (only the song list's movie can be in it)
                 raise
             for inner in z.names():
                 want = inner.lower()
-                if want in found or (want not in EDITS and want not in BYTE_EDITS):
+                if want in found or (want not in edits and want not in BYTE_EDITS):
                     continue
                 found.add(want)
                 try:
-                    edited = edit_file(want, z.read(inner))
+                    edited = edit_file(want, z.read(inner), edits)
                 except Unsupported:
-                    if want in EDITS:
+                    if want in edits:
                         raise
                     continue
                 if edited is not None:
                     out.setdefault(name, {})[inner] = edited
-            if len(found) == len(EDITS) + len(BYTE_EDITS):
+            if len(found) == len(edits) + len(BYTE_EDITS):
                 break
     finally:
         ps.close()
     return out
 
 
-def build(cache_path, static_path=None):
-    """(patcharchives.psarc as bytes, [changed file names]) for a cache.psarc and the static.psarc beside it;
+def build(cache_path, static_path=None, edition="mac"):
+    """(patcharchives.psarc as bytes, [changed file names]) for EDITION's cache.psarc and the static.psarc beside it;
     (None, []) when they need no change. The psarc holds the changed cacheN.7z archives under their own names and
     the changed menu movies under theirs. An archive with a menu file that can't be rewritten (Unsupported: a solid
     one) costs the whole overlay, one with only BYTE_EDITS files only those."""
-    changes = plan(cache_path)
-    movies = plan_movies(static_path)
+    edits = edits_of(edition)[0]
+    changes = plan(cache_path, edition)
+    movies = plan_movies(static_path, edition)
     entries, names = [], []
     if changes:
         ps = Psarc(cache_path)
@@ -1171,7 +1523,7 @@ def build(cache_path, static_path=None):
                 try:
                     entries.append((name, rewrite_7z(ps.read(name), files)))
                 except Unsupported:
-                    if any(f.lower() in EDITS for f in files):
+                    if any(f.lower() in edits for f in files):
                         raise
                     continue
                 names += files
@@ -1184,14 +1536,15 @@ def build(cache_path, static_path=None):
     return write_psarc(entries, (cache_path,)), sorted(names)
 
 
-def make(game_dir):
-    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc and its static.psarc.
+def make(game_dir, edition="mac"):
+    """Write (or remove) GAME_DIR/Update/patcharchives.psarc for GAME_DIR/cache.psarc and its static.psarc, for
+    EDITION's game (gamefiles.py's).
     Returns the names of the files the overlay changes ([] when there is none). Raises Unsupported when the cache
     cannot be read (the overlay is then removed)."""
     dst = os.path.join(game_dir, PATCH_DIR, PATCH_NAME)
     cache = os.path.join(game_dir, "cache.psarc")
     try:
-        data, names = build(cache, static_of(game_dir)) if os.path.isfile(cache) else (None, [])
+        data, names = build(cache, static_of(game_dir), edition) if os.path.isfile(cache) else (None, [])
     except Unsupported:
         remove(game_dir)
         raise
@@ -1220,18 +1573,18 @@ def remove(game_dir):
 
 def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
-    if len(argv) != 2 or argv[0] not in ("make", "show"):
+    if not 2 <= len(argv) <= 3 or argv[0] not in ("make", "show") or argv[2:] and argv[2] not in EDITIONS:
         sys.stderr.write(__doc__.split("\n\n")[1] + "\n")
         return 64
     try:
         if argv[0] == "show":
-            for name, files in sorted(plan(argv[1]).items()):
+            for name, files in sorted(plan(argv[1], *argv[2:]).items()):
                 for f in sorted(files):
                     print("%s: %s" % (name, f))
-            for f in sorted(plan_movies(static_of(os.path.dirname(os.path.abspath(argv[1]))))):
+            for f in sorted(plan_movies(static_of(os.path.dirname(os.path.abspath(argv[1]))), *argv[2:])):
                 print("%s: %s" % (STATIC, f))
         else:
-            names = make(argv[1])
+            names = make(*argv[1:])
             print("overlay: %s" % (", ".join(names) if names else "nothing to change"))
     except (Unsupported, OSError) as e:
         sys.stderr.write("error: %s\n" % e)

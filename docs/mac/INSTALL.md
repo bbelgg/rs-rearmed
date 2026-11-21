@@ -503,6 +503,17 @@ Clear overrides… unsets them after asking.
 
 Learn & Play sees a variable set this way too ([its switches](../windows/INSTALL.md#settings-and-switches)).
 
+**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists ten of the switches after the game's own rows: FRAME RATE, ANY
+WINDOW SHAPE, RENDERER, MULTITHREADED GL ENGINE, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE,
+ANTI-ALIASING, TEXTURE FILTERING and COLOR. A change is written to `options.env` (the renderer to the `renderer`
+file), as the installer writes it, and takes effect the next time the game starts. A switch set for the login session
+(`launchctl setenv`; for the renderer, `RS_GL_BACKEND`) still wins over it, as over the installer's page, so its row
+shows the session's value, greyed, with SET FOR THIS SESSION, until it is unset (`launchctl unsetenv`) and the game
+started again. One set to the value `options.env` has can't be told apart: its row can be changed, but the session's
+value is the one used. The other renderer's rows are greyed too. The list scrolls with the focus, and its scroll bar
+can be dragged. They come with the menu overlay (`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with
+`RS_MODS_OVERLAY=0`. Learn & Play doesn't have them yet ([its plan](../windows/PLAN.md#status)).
+
 Each row is a switch set away from its default, and what that does. Everything is compiled into the app; the
 `RS_METAL_` switches are for the Metal renderer.
 

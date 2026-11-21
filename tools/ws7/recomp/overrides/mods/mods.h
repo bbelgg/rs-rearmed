@@ -19,6 +19,8 @@ typedef struct {
 } rs_mods_stats;
 rs_mods_stats rs_mods_stats_get(void);
 void rs_mods_stats_reset(void);
+// RS Re-ARMed's options in the Adv Display Settings menu (menu_options.c), from the start of the fixes
+void rs_menu_options_start(void);
 
 // The overrides (guest function entry points).
 void RC_FN(num_dtor)(rc_ctx *c);  // JSON number object destructor (removes its node)

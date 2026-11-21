@@ -409,3 +409,16 @@ guitar_string_size
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt           # ServiceManager holder: float, this frame's time in seconds
+# --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c)
+menu_build_slot           # a menu's vtable: build its definition (AdvancedDisplaySettings' setup, EditSetting's control)
+menu_refresh_slot         # AdvancedDisplaySettings' vtable: the buttons' current values
+menu_press_slot           # a settings menu's vtable: a button press
+menu_input_slot           # EditSetting's vtable: an input event
+menu_definition           # a menu: its definition object (JSON)
+menu_pressed_path         # a settings menu: the pressed button's path ("buttons.<id>.states"), a game string
+menu_button_names         # a settings menu: its buttons' names, a std::vector of game strings (begin, end)
+menu_focus                # EditSetting: the focused control
+ui_class_slot             # a control's vtable: its class info
+ui_class_parent           # a class info: its parent's
+ui_checkbox_checked       # RSCheckBox: u8 checked
+ui_slider_value           # RSSlider: float value

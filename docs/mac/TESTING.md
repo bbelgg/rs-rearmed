@@ -251,6 +251,12 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
 - **Tools** (Space on the main menu): DIFFICULTY SETTINGS, TONE DESIGNER, TUNER, OPTIONS (Down three times),
   SHOP, CHORD BOOK, TECHNIQUE GUIDE, STATS. Return on OPTIONS, then on MIXER, is the mixer's page;
   [Measured runs](#measured-runs) has the way to Venue Mode.
+- **ADV DISPLAY SETTINGS** (RS Re-ARMed's options): Return on OPTIONS (`OptionsMenu`), Down three times and Return
+  (`AdvancedDisplaySettings`). RS Re-ARMed's rows come after the game's own; Return on one opens it (`EditSetting`),
+  Left and Right change it, and Backspace goes back to the list. Each change is a `menu options:` line in the log,
+  with the switch and its value. A switch set with `launchctl setenv` to another value than `options.env`'s (for the
+  renderer, `RS_GL_BACKEND`) greys its row, which says the value and SET FOR THIS SESSION, with a `menu options:`
+  line at the start.
 - **Quitting**: Esc on the main menu, Return on "Are you sure you want to quit?" goes to the title; Esc there
   and Return on EXIT GAME? is a normal quit, which saves the profile.
 

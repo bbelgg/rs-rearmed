@@ -1267,7 +1267,7 @@ class Copier:
         if cache_overlay is None:
             return
         try:
-            names = cache_overlay.make(self.dest)
+            names = cache_overlay.make(self.dest, self.edition)
         except Exception as e:  # a damaged or hand-made cache.psarc can fail in many ways: never the copy's end
             cache_overlay.remove(self.dest)
             self.progress.say("No Direct Connect menu entries: %s." % e)

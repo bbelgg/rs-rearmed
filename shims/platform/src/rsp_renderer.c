@@ -200,6 +200,7 @@ void rsp_metal_session_forget(const char *home) {
 // --- Startup -----------------------------------------------------------------------------------
 
 static char **g_argv;
+static int g_env_given;  // rsp_renderer_env_given
 
 // `why`: what the restarted process reports (a reason number, or text for a late fallback).
 static int exec_with(const char *backend_env, const char *why) {
@@ -220,6 +221,8 @@ int rsp_renderer_restart_gl(const char *why) {
   fprintf(stderr, "[rsp] %s; starting again with OpenGL\n", why);
   return exec_with("gl", why);
 }
+
+int rsp_renderer_env_given(void) { return g_env_given; }
 
 // A notification banner, fire and forget (osascript, double fork: never waited for).
 static void notify(const char *text) {
@@ -259,6 +262,7 @@ rsp_renderer_out rsp_renderer_startup(char **argv, const char *bundle, int loade
     o = rsp_renderer_decide(&in);
   }
   const char *restarted = getenv("RS_RENDERER_FALLBACK");
+  g_env_given = !restarted && rsp_renderer_parse(in.env) != RSP_GFX_NONE;
   if (o.reason == RSP_RENDERER_CRASHES) {
     fprintf(stderr,
             "[rsp] Metal ended abnormally twice in a row; starting with OpenGL. Set the renderer to metal "

@@ -9,6 +9,7 @@ that has the entries already, and gamefiles.py making it after a copy. With the 
 import io
 import lzma
 import os
+import re
 import shutil
 import struct
 import sys
@@ -156,6 +157,35 @@ NOTICES = ("5857,Invite a Friend,,,,,\u30d5,,\r\n"
            "36676,Your audio input device is not properly configured.,Ton,Tu,La,Dein,\u30aa,,\r\n")
 
 
+# The shape of the options menu's definition: Adv Display Settings' buttons among the other menus'.
+OPTIONS = """{
+	"DisplaySettings" :
+	{
+		"View" : { "Definition" : { "Buttons": { "subtitles": { "ID": "subtitles" } } } }
+	},
+	"AdvancedDisplaySettings" :
+	{
+		"View" :
+		{
+			"Definition" :
+			{
+				"Title": "$[36632]VISUAL QUALITY SETTINGS",
+				"Buttons":
+				{
+					"visualQuality":
+					{
+						"ID": "visualQuality",
+						"SortOrder" : 0,
+						"Component": "RSButton"
+					}
+				}
+			}
+		}
+	}
+}
+""".replace("\n", "\r\n")
+
+
 def _num(v):
     return co._wnum(v)
 
@@ -213,6 +243,53 @@ def push(*values):
         else:
             body += b"\x00" + v + b"\x00"
     return bytes([co.A_PUSH]) + struct.pack("<H", len(body)) + body
+
+
+# A made-up Adv Display Settings movie with the shape of the game's: a row's label colored white, or blue with the
+# focus, in a function with branches around it, after a branch over the function.
+DS_POOL = ["Draw", "fontColor", "States", "Focus", "rs", "common", "Prefs", "WHITE_CLR", "BLUE_CLR_HILITE", "fontSize"]
+
+
+def ds_push(*values):
+    """A push of registers (ints), pool strings (str) and booleans."""
+    body = b""
+    for v in values:
+        if isinstance(v, bool):
+            body += bytes([co.P_BOOL, int(v)])
+        elif isinstance(v, int):
+            body += bytes([co.P_REGISTER, v])
+        else:
+            body += bytes([co.P_POOL, DS_POOL.index(v)])
+    return bytes([co.A_PUSH]) + struct.pack("<H", len(body)) + body
+
+
+def ds_color(name):
+    prefs = ds_push("rs") + bytes([co.A_GET_VARIABLE]) + ds_push("common") + GET + ds_push("Prefs") + GET
+    return prefs + ds_push(name) + GET
+
+
+def make_display_settings(into=False):
+    """The movie (into: a branch into the color's choice), and where the function's body starts in its script."""
+    white, blue = ds_color("WHITE_CLR"), ds_color("BLUE_CLR_HILITE")
+    choice = co._as_branch(co.A_IF, len(white) + 5) + white + co._as_branch(co.A_JUMP, len(blue)) + blue
+    focus = ds_push("Focus") + GET + ds_push(True) + bytes([co.A_EQUALS2])
+    row = ds_push("fontColor", 6, "States") + GET + focus + choice
+    row += ds_push("fontSize", 1) + bytes([co.A_POP, co.A_POP, co.A_POP])
+    after = len(row) + 5  # the forward branch's offset: past the row and the backward branch, to the body's end
+    top = ds_push(1) + co._as_branch(co.A_IF, after - (len(blue) + 5 + len(ds_push("fontSize", 1)) + 3 if into else 0))
+    body = top + row
+    body += co._as_branch(co.A_JUMP, -(len(body) + 5))  # back to the body's start
+    func = (bytes([co.A_DEFINE_FUNCTION2]) + struct.pack("<H", 12) + b"Draw\x00"
+            + struct.pack("<HBHH", 0, 8, 0, len(body)))  # (no parameters, 8 registers)
+    names = b"".join(n.encode() + b"\x00" for n in DS_POOL)
+    head = bytes([co.A_CONSTANT_POOL]) + struct.pack("<HH", len(names) + 2, len(DS_POOL)) + names
+    script = head + ds_push(1) + co._as_branch(co.A_IF, len(func) + len(body)) + func + body + b"\x00"
+    tags = b""
+    for code, data in ((co.DO_INIT_ACTION, b"\x01\x00\x00"), (co.DO_INIT_ACTION, b"\x02\x00" + script), (0, b"")):
+        tags += struct.pack("<HI", (code << 6) | 0x3F, len(data)) + data if len(data) >= 0x3F else \
+            struct.pack("<H", (code << 6) | len(data)) + data
+    frame = b"\x00" + struct.pack("<HH", 24 << 8, 1)
+    return b"GFX\x08" + struct.pack("<I", 8 + len(frame) + len(tags)) + frame + tags
 
 
 class AS2:
@@ -294,6 +371,51 @@ class AS2:
         return stack[-1] if stack else None
 
 
+def native(name):
+    """A whole number menu_options.c names (an enum's NAME = N), which drags the bar beside SettingsScene's panel."""
+    with open(os.path.join(os.path.dirname(os.path.abspath(co.__file__)), "..", "ws7", "recomp", "overrides", "mods",
+                           "menu_options.c")) as f:
+        return int(re.search(r"\b%s = (\d+)" % name, f.read()).group(1))
+
+
+def as_constants(script):
+    """{NAME: n} of a script's pushes of a register, a pool name and a whole number, as a class sets its constants
+    (r.NAME = n), the first push of each NAME."""
+    pool, out = co._as_pool(script) or [], {}
+    for _, op, body, stop in co._as_actions(script):
+        if op != co.A_PUSH or script[body] != co.P_REGISTER or script[body + 2] != co.P_POOL:
+            continue
+        name, kind = pool[script[body + 3]], script[body + 4] if body + 4 < stop else None
+        if kind == co.P_INT:
+            out.setdefault(name, struct.unpack_from("<i", script, body + 5)[0])
+        elif kind == co.P_DOUBLE:  # (the high half first)
+            out.setdefault(name, struct.unpack("<d", script[body + 9:body + 13] + script[body + 5:body + 9])[0])
+    return out
+
+
+def settings_scene(rows, focus, entry_y=100, height=50, description=150):
+    """A SettingsScene as the game's lays out ROWS (the one at FOCUS with its description), and what it was asked."""
+    calls, drawn = [], []
+
+    def populate(this):  # the game's PopulateButtons: rows from mEntryInitialPosY, the description's height after one
+        calls.append(this["mEntryInitialPosY"])
+        this["mEntryHeight"] = height
+        this["mEntryCurrentPosY"] = this["mEntryInitialPosY"] + (description if focus is not None else 0)
+    proto = {"PopulateButtons": populate}
+    cls = {"prototype": proto, "BACKGROUND_X": 70, "BACKGROUND_Y": 40, "BACKGROUND_WIDTH": 600,
+           "BACKGROUND_HEIGHT": 640}
+    buttons = {"b%d" % i: {"States": {"Focus": i == focus}} for i in range(rows)}
+    clips = {k: {} for k in buttons}
+
+    def attach(this, linkage, name, depth):  # (what was attached, in DRAWN)
+        drawn.append((linkage, name, depth))
+        return {"linkage": linkage}
+    scene = {"__proto__": proto, "mEntryInitialPosY": entry_y, "mSortedData": [{"objId": k} for k in buttons],
+             "mDataObj": {"Buttons": buttons}, "mButtons": clips, "getNextHighestDepth": lambda this: 7 + len(drawn),
+             "attachMovie": attach}
+    variables = {"rs": {"views": {"optionsmenu": {"controls": {"SettingsScene": cls}}}}}
+    return scene, proto, variables, calls, drawn
+
 
 def method(body, registers, params=()):
     """A method of a class's script with BODY, and PARAMS: (its register, its name) each."""
@@ -333,12 +455,13 @@ def make_songs_list(edited=False, pool=SONGS_POOL, bar=True, registers=10, more=
 
 
 def make_cache(path, startup=STARTUP, mission=MISSION, coder="lzma1", main=MAIN, notices=NOTICES, songs_list=None,
-               songs_7z=None):
+               songs_7z=None, options=OPTIONS):
     a = make_7z([("jsonloadlist.txt", b"list"), ("manifests/other.json", b"{}")], coder)
     n = make_7z([("localization/maingame.csv", notices.encode()), ("sparkactionmap.actionmap", b"m")], coder)
     b = make_7z([("manifests/ui_menu_pillar_main.database.json", main.encode("latin-1")),  # not UTF-8, as the game's
                  ("manifests/ui_menu_pillar_mission.database.json", mission.encode()),
                  ("manifests/ui_menu_pillar_startup.database.json", startup.encode()),
+                 ("manifests/ui_menu_pillar_options.database.json", options.encode()),
                  ("manifests/zz.json", b"z" * 70000)], coder)
     archives = [("cache0.7z", a), ("cache4.7z", n), ("cache7.7z", b)]
     if songs_list is not None:
@@ -414,6 +537,55 @@ class Edits(unittest.TestCase):
         self.assertEqual(rows[-2].split(","), ["37359", co.MULTIPLAYER, co.MULTIPLAYER, "", co.MULTIPLAYER, "", "", "", ""])
         self.assertNotIn(",", co.MULTIPLAYER)
         self.assertIsNone(co.edit_notice(co.edit_notice(table)))
+
+    def test_options(self):
+        out = co.edit_options(OPTIONS)
+        i = out.index('"AdvancedDisplaySettings"')
+        for bid, lrow, label, drow, desc, order in co.MENU_OPTIONS:  # in its Buttons, before the game's own, its fields
+            j = out.index('"%s":' % bid)
+            self.assertTrue(i < j < out.index('"visualQuality":', i))
+            self.assertIn('"ID": "%s"' % bid, out)
+            self.assertIn('"Label": "$[%s]%s"' % (lrow, label), out)
+            self.assertIn('"Description" : "$[%s]%s"' % (drow, desc.replace("{C}", ",")), out)
+            self.assertIn('"SortOrder" : %d' % order, out)
+        self.assertNotIn("\r\r", out)
+        self.assertEqual(out.count("\n"), out.count("\r\n"))  # the file's own line ends
+        self.assertEqual(out.index('"subtitles"'), OPTIONS.index('"subtitles"'))  # another menu's left as it is
+        self.assertIsNone(co.edit_options(out))
+        self.assertIsNone(co.edit_options('{ "PlaySettings" : {} }'))
+
+    def test_bar_matches_the_native_drag(self):
+        """menu_options.c drags the bar the overlay puts beside SettingsScene's panel: the same numbers."""
+        self.assertEqual((native("BAR_GAP"), native("THUMB_LEAST")), (co.SETTINGS_BAR_GAP, co.THUMB_LEAST))
+        # SettingsScene's own BACKGROUND_X, _Y, _WIDTH and 720 less twice _Y, as the test's scene has them
+        scene, proto, variables, _, _ = settings_scene(1, 0)
+        cls = variables["rs"]["views"]["optionsmenu"]["controls"]["SettingsScene"]
+        self.assertEqual((native("PANEL_X"), native("PANEL_Y"), native("PANEL_W"), native("PANEL_H")),
+                         (cls["BACKGROUND_X"], cls["BACKGROUND_Y"], cls["BACKGROUND_WIDTH"], cls["BACKGROUND_HEIGHT"]))
+
+    def test_options_match_the_native_table(self):
+        """The buttons are the ones menu_options.c gives a control to, in its order."""
+        with open(os.path.join(os.path.dirname(os.path.abspath(co.__file__)), "..", "ws7", "recomp", "overrides",
+                               "mods", "menu_options.c")) as f:
+            src = f.read()
+        table = src[src.index("static option g_opts[] = {"):]
+        ids = re.findall(r'^\s*\{"(rs\w+)",', table[:table.index("};")], re.M)
+        self.assertEqual(ids, [o[0] for o in co.MENU_OPTIONS])
+        self.assertEqual(len({o[1] for o in co.MENU_OPTIONS} | {o[3] for o in co.MENU_OPTIONS}),
+                         2 * len(co.MENU_OPTIONS))  # every row its own
+
+    def test_text_rows(self):
+        out = co.edit_maingame(NOTICES)
+        rows = out.split("\r\n")
+        for _, lrow, label, drow, desc, _ in co.MENU_OPTIONS:
+            for row, text in ((lrow, label), (drow, desc)):
+                r = [x for x in rows if x.startswith(row + ",")]
+                self.assertEqual(len(r), 1)
+                self.assertEqual(r[0].split(","), [row] + [text] * 7 + [""])
+            self.assertGreater(int(lrow), 37382)  # after the game's own rows
+        self.assertTrue(out.endswith("\r\n"))
+        self.assertIsNone(co.edit_maingame(out))
+        self.assertEqual(co.edit_text_rows(co.edit_text_rows(NOTICES)), None)
 
     def test_notice(self):
         out = co.edit_notice(NOTICES)
@@ -546,6 +718,7 @@ class Overlay(TmpDir):
         names = co.make(game)
         self.assertEqual(names, ["localization/maingame.csv", "manifests/ui_menu_pillar_main.database.json",
                                  "manifests/ui_menu_pillar_mission.database.json",
+                                 "manifests/ui_menu_pillar_options.database.json",
                                  "manifests/ui_menu_pillar_startup.database.json"])
         self.assertEqual(read(os.path.join(game, "cache.psarc")), before)  # never written
         ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
@@ -562,7 +735,7 @@ class Overlay(TmpDir):
 
         # a cache that has the entries already (a modded one): no overlay, an earlier one removed
         make_cache(os.path.join(game, "cache.psarc"), co.edit_startup(STARTUP), co.edit_mission(MISSION), "lzma2",
-                   co.edit_main(MAIN), co.edit_notice(NOTICES))
+                   co.edit_main(MAIN), co.edit_maingame(NOTICES), options=co.edit_options(OPTIONS))
         self.assertEqual(co.make(game), [])
         self.assertFalse(os.path.exists(os.path.join(game, "Update")))
 
@@ -570,7 +743,7 @@ class Overlay(TmpDir):
         game = os.path.join(self.tmp, "game")
         os.makedirs(game)
         make_cache(os.path.join(game, "cache.psarc"), mission=co.edit_mission(MISSION), main=co.edit_main(MAIN),
-                   notices=co.edit_notice(NOTICES))
+                   notices=co.edit_maingame(NOTICES), options=co.edit_options(OPTIONS))
         self.assertEqual(co.make(game), ["manifests/ui_menu_pillar_startup.database.json"])
 
     def test_songs_list(self):
@@ -625,6 +798,115 @@ class Overlay(TmpDir):
                 co.make(game)
         self.assertFalse(os.path.exists(os.path.join(game, "Update")))
 
+    def test_display_settings(self):
+        """A locked row's color: the choice made one of four, and the branches, the function and the lengths around it
+        kept right; once only."""
+        movie = make_display_settings()
+        out = co.edit_display_settings(movie)
+        self.assertIsNotNone(out)
+        self.assertIsNone(co.edit_display_settings(out))
+        self.assertEqual(struct.unpack_from("<I", out, 4)[0], len(out))
+        (_, _, old_end), (_, body, end) = [t for t in co._swf_tags(out) if t[0] == co.DO_INIT_ACTION]
+        script = out[body + 2:end]
+        for text in ("Locked", "GREY_CLR", "GREY_CLR_HILITE"):
+            self.assertIn(co._as_text(text), script)
+        acts = co._as_actions(script)
+        starts = {a for a, _, _, _ in acts} | {len(script)}
+        func = [(stop, struct.unpack_from("<H", script, stop - 2)[0]) for _, op, _, stop in acts
+                if op == co.A_DEFINE_FUNCTION2]
+        self.assertEqual(len(func), 1)
+        body_start, size = func[0]
+        branches = [(stop + struct.unpack_from("<h", script, b)[0], a) for a, op, b, stop in acts
+                    if op in (co.A_IF, co.A_JUMP)]
+        for target, _ in branches:
+            self.assertIn(target, starts)
+        ends = [t for t, a in branches if t == body_start + size]
+        self.assertEqual(len(ends), 2)  # the one over the function, and the body's own forward one
+        self.assertIn((body_start, max(a for _, a in branches)), branches)  # the backward one, to the body's start
+        self.assertEqual(script[body_start + size], 0)  # (the script's end follows the body)
+        self.assertIsNone(co.edit_display_settings(make_display_settings(into=True)))  # a branch into the choice
+        self.assertIsNone(co.edit_display_settings(make_songs_list()))  # not the menu's movie
+
+    def test_list_scroll(self):
+        """SettingsScene's PopulateButtons wrapped: the focused row and its description inside the panel, the rows
+        outside hidden, a bar for a list longer than the panel; a list that fits as it was."""
+        pool = ["rs"]
+
+        def run(rows, focus):
+            scene, proto, variables, calls, drawn = settings_scene(rows, focus)
+            vm = AS2(pool, variables)
+            vm.run(co._scroll_install(pool))
+            vm.run(co._scroll_install(pool))  # (once: a second run leaves it)
+            vm.call(vm.member(proto, "PopulateButtons"), scene, [])
+            visible = [scene["mButtons"]["b%d" % i].get("_visible") for i in range(rows)]
+            return scene, calls, drawn, visible
+
+        scene, calls, drawn, visible = run(4, 1)  # 4 rows and a description fit the panel: 40 + 640 - 24 - 100 = 556
+        self.assertEqual((scene["rsScroll"], calls, scene["mEntryInitialPosY"]), (0, [100], 100))
+        self.assertEqual(visible, [True] * 4)
+        self.assertEqual(drawn, [])  # no bar
+
+        scene, calls, drawn, visible = run(14, 0)  # 14 rows: 850 high, at most 294 scrolled
+        self.assertEqual((scene["rsScroll"], calls), (0, [100]))
+        self.assertEqual(visible, [True] * 8 + [False] * 6)  # row 7 at 150 + 350, its bottom 550
+        self.assertEqual(drawn, [("scrollBar_trackUp", "rsTrack", 7), ("scrollBar_thumbDown", "rsThumb", 8)])
+        track, thumb = scene["rsTrack"], scene["rsThumb"]
+        self.assertEqual((track["_x"], track["_y"], track["_height"], track["_visible"]), (678, 40, 640, True))
+        self.assertEqual((thumb["_x"], thumb["_y"], thumb["_height"], thumb["_visible"]), (678, 40, 100, True))
+
+        scene, calls, drawn, visible = run(14, 13)  # the last row: its description's bottom at the panel's
+        self.assertEqual((scene["rsScroll"], calls, scene["mEntryInitialPosY"]), (294, [100, 100 - 294], 100))
+        self.assertEqual(visible, [False] * 6 + [True] * 8)  # row 6 at 300 - 294
+        self.assertEqual(scene["rsThumb"]["_y"], 40 + 640 - 100)  # the thumb at the bottom
+
+        scene, proto, variables, calls, drawn = settings_scene(14, 9)  # the focus down, then up: the least scroll
+        vm = AS2(pool, variables)
+        vm.run(co._scroll_install(pool))
+        vm.call(vm.member(proto, "PopulateButtons"), scene, [])
+        self.assertEqual(scene["rsScroll"], 9 * 50 + 50 + 150 - 556)  # its description's bottom at the panel's: 94
+        for i, button in enumerate(scene["mDataObj"]["Buttons"].values()):
+            button["States"]["Focus"] = i == 1
+        vm.call(vm.member(proto, "PopulateButtons"), scene, [])
+        self.assertEqual(scene["rsScroll"], 50)  # its top at the list's
+        self.assertAlmostEqual(scene["rsThumb"]["_y"], 40 + 540 / 13)  # at row 1 of 0-13
+        scene["mSortedData"][4:] = []  # a list that fits again: the bar hidden
+        vm.call(vm.member(proto, "PopulateButtons"), scene, [])
+        self.assertEqual((scene["rsScroll"], scene["rsTrack"]["_visible"], scene["rsThumb"]["_visible"]),
+                         (0, False, False))
+
+    def test_display_settings_overlay(self):
+        """The menu's movie of static.psarc, edited, in the overlay as it is."""
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        make_cache(os.path.join(game, "cache.psarc"))
+        with open(os.path.join(game, "static.psarc"), "wb") as f:
+            f.write(co.write_psarc([(co.DISPLAY_SETTINGS, make_display_settings())]))
+        self.assertIn(co.DISPLAY_SETTINGS, co.make(game))
+        ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+        self.assertEqual(ps.read(co.DISPLAY_SETTINGS), co.edit_display_settings(make_display_settings()))
+        ps.close()
+
+    def test_learn_play_without_the_options(self):
+        """Learn & Play's overlay: the same edits but RS Re-ARMed's options in Adv Display Settings (their buttons,
+        texts and movie edit), whose native half is the Mac game's only."""
+        game = os.path.join(self.tmp, "game")
+        os.makedirs(game)
+        make_cache(os.path.join(game, "cache.psarc"))
+        with open(os.path.join(game, "static.psarc"), "wb") as f:
+            f.write(co.write_psarc([(co.DISPLAY_SETTINGS, make_display_settings())]))
+        mac = co.make(game)
+        self.assertTrue({co.OPTIONS, co.DISPLAY_SETTINGS} <= set(mac))
+        names = co.make(game, "learn-play")
+        self.assertEqual(names, [n for n in mac if n not in (co.OPTIONS, co.DISPLAY_SETTINGS)])
+        self.assertIn(co.NOTICES, names)
+        ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
+        self.assertNotIn(co.DISPLAY_SETTINGS, ps.names)
+        notices = [co.SevenZip(ps.read(n)).read(x) for n in ps.names if n.endswith(".7z")
+                   for x in co.SevenZip(ps.read(n)).names() if x.lower() == co.NOTICES]
+        ps.close()
+        self.assertEqual(notices, [co.edit_notice(NOTICES).encode()])  # the notices, not the options' rows
+        self.assertRaises(ValueError, co.make, game, "windows")
+
     def test_static_movies(self):
         """The lists of static.psarc: each menu movie with the list's script, edited, in the overlay as it is."""
         game = os.path.join(self.tmp, "game")
@@ -654,7 +936,7 @@ class Overlay(TmpDir):
 
         # a cache with every edit made already: the movies alone
         make_cache(os.path.join(game, "cache.psarc"), co.edit_startup(STARTUP), co.edit_mission(MISSION), "lzma2",
-                   co.edit_main(MAIN), co.edit_notice(NOTICES))
+                   co.edit_main(MAIN), co.edit_maingame(NOTICES), options=co.edit_options(OPTIONS))
         with open(static, "wb") as f:
             f.write(co.write_psarc([("gfxassets/views/td_songlist.gfx", movie)]))
         self.assertEqual(co.make(game), ["gfxassets/views/td_songlist.gfx"])
@@ -736,6 +1018,7 @@ class RealCache(unittest.TestCase):
             data, names = co.build(cache)
             if data is None:
                 continue  # a cache with the entries already
+            self.assertIn(co.OPTIONS, [x.lower() for x in names])  # Adv Display Settings' buttons, and their texts
             tmp = tempfile.mkdtemp(prefix="overlay-real-")
             self.addCleanup(shutil.rmtree, tmp, True)
             p = os.path.join(tmp, "o.psarc")
@@ -757,6 +1040,18 @@ class RealCache(unittest.TestCase):
                 self.assertIn("gfxassets/views/td_songlist.gfx", movies)
                 for d in movies.values():
                     self.assertIsNone(co.edit_songs_list(d))
+                shown = movies[co.DISPLAY_SETTINGS]  # Adv Display Settings: a locked row greyed, the list scrolled
+                self.assertIsNone(co.edit_display_settings(shown))
+                for text in ("GREY_CLR_HILITE", "rsPopulateButtons"):
+                    self.assertIn(co._as_text(text), shown)
+                # SettingsScene's panel, where menu_options.c drags its bar: its height 720 less twice its top
+                panel = [k for c, b, e in co._swf_tags(shown) if c == co.DO_INIT_ACTION
+                         for k in [as_constants(shown[b + 2:e])] if "BACKGROUND_X" in k]
+                self.assertEqual(len(panel), 1)
+                k = panel[0]
+                self.assertEqual((k["BACKGROUND_X"], k["BACKGROUND_Y"], k["BACKGROUND_WIDTH"],
+                                  k["BACKGROUND_HEIGHT"] - 2 * k["BACKGROUND_Y"]),
+                                 tuple(native(n) for n in ("PANEL_X", "PANEL_Y", "PANEL_W", "PANEL_H")))
                 nsp = movies["gfxassets/views/nsp_songlist.gfx"]  # Nonstop Play's songs, which had no bar
                 pools = [(co._as_pool(nsp[b + 2:e]) or [], nsp[b + 2:e]) for c, b, e in co._swf_tags(nsp)
                          if c == co.DO_INIT_ACTION]

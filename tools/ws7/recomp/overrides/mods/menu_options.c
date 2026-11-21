@@ -12,7 +12,8 @@
 //                                               our buttons' CurrentSettingValue, the value the list's "CURRENT
 //                                               SETTING:" line shows, and those that can't be changed now locked,
 //                                               greyed by the overlay's edit of the movie, with why (locked: the
-//                                               other renderer's, Low Latency at a fixed rate, the session's switches)
+//                                               other renderer's, Low Latency at a fixed rate, MetalFX with nothing
+//                                               upscaled, the session's switches)
 //   AdvancedDisplaySettings, menu_press_slot    a press on one of our buttons ("Buttons.<id>.States"): the edited
 //                                               setting is ours and Edit Setting opens, as for the game's own (not
 //                                               for a locked one); any other press is the game's

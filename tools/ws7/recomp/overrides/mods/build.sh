@@ -27,9 +27,10 @@ $CC -c "$here/mods_shared.c" -o "$out/obj/mods/mods_shared.o"
 $CC -c "$here/framerate.c" -o "$out/obj/mods/framerate.o"
 # this edition's own, apart from the game's tables: the FFT setups the game's import thunks ask for
 $CC -c "$here/fftsetup.c" -o "$out/obj/mods/fftsetup.o"
-# RS Re-ARMed's options in the Adv Display Settings menu, the methods in front of the game's
+# RS Re-ARMed's options in the Adv Display Settings menu, the methods in front of the game's (their shared part reads
+# a switch as the shell does: rsp_scale.h)
 $CC -c "$here/menu_options.c" -o "$out/obj/mods/menu_options.o"
-$CC -c "$here/menu_options_common.c" -o "$out/obj/mods/menu_options_common.o"
+$CC -I"$root/shims/platform/include" -c "$here/menu_options_common.c" -o "$out/obj/mods/menu_options_common.o"
 rm -f "$out/lib/liboverrides_mods.a"
 ar rcs "$out/lib/liboverrides_mods.a" "$out/obj/mods/mods.o" "$out/obj/mods/mods_shared.o" "$out/obj/mods/framerate.o" \
     "$out/obj/mods/fftsetup.o" "$out/obj/mods/menu_options.o" "$out/obj/mods/menu_options_common.o"

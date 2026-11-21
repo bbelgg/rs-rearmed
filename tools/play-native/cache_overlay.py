@@ -728,18 +728,20 @@ MENU_OPTIONS = [
     ("rsRenderScale", "38919", "RENDER SCALE", "38920",
      "Draws the game at a lower resolution and scales it up to the screen{C} for less graphics work and a softer "
      "picture. Takes effect the next time the game starts.", 17),
+    ("rsSharpening", "38925", "SHARPENING", "38926",
+     "Sharpens the picture on the screen{C} after any upscaling. Takes effect the next time the game starts.", 18),
     ("rsAntiAliasing", "38905", "ANTI-ALIASING", "38906",
      "Smooths the edges of the 3D scene with MSAA. Lower settings improve performance. Takes effect the next time "
-     "the game starts.", 18),
+     "the game starts.", 19),
     ("rsTextureFiltering", "38907", "TEXTURE FILTERING", "38908",
      "Keeps textures sharp when seen at an angle. 1X is the game's own. Takes effect the next time the game starts.",
-     19),
+     20),
     ("rsColor", "38909", "COLOR", "38910",
      "SRGB shows the game's colors as it made them. VIVID leaves them unmatched{C} more saturated on a wide-color "
-     "screen. Takes effect the next time the game starts.", 20),
+     "screen. Takes effect the next time the game starts.", 21),
     ("rsPerformanceOverlay", "38923", "PERFORMANCE OVERLAY", "38924",
      "Shows Apple's Metal performance HUD over the game (macOS 13 and later): its frame rate{C} frame times and "
-     "memory. Takes effect the next time the game starts.", 21),
+     "memory. Takes effect the next time the game starts.", 22),
 ]
 TEXT_COLUMNS = 8  # the table's languages after a row's id
 # Learn & Play has Metal only: its list leaves out the renderer's choice and the OpenGL engine (menu_options_common.c,

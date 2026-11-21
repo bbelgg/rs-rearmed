@@ -9,6 +9,7 @@
 #import <Foundation/Foundation.h>
 #import <Metal/Metal.h>
 #import <QuartzCore/CAMetalLayer.h>
+#include <TargetConditionals.h>
 #include <OpenGL/gl.h>
 #include <OpenGL/glext.h>
 #include <pthread.h>
@@ -17,6 +18,24 @@
 #include <stdint.h>
 
 #include "gl_api.h"
+
+// Managed storage is a Mac GPU's with memory of its own; iOS has none (all memory is shared), and no
+// didModifyRange: to sync it.
+#if TARGET_OS_OSX
+#define RSM_BUF_MANAGED MTLResourceStorageModeManaged
+#define RSM_TEX_MANAGED MTLStorageModeManaged
+#define RSM_DID_MODIFY(buf, range) [(buf) didModifyRange:(range)]
+#else
+#define RSM_BUF_MANAGED 0
+#define RSM_TEX_MANAGED MTLStorageModeShared
+#define RSM_DID_MODIFY(buf, range) ((void)(buf), (void)(range))
+#endif
+// MetalFX's upscaler: in the Mac and the iOS device SDKs, not the iOS simulator's
+#if __has_include(<MetalFX/MetalFX.h>)
+#define RSM_HAVE_METALFX 1
+#else
+#define RSM_HAVE_METALFX 0
+#endif
 #include "rs_gfx.h"
 #include "rsmtl_gfx.h"
 #include "msl/msl_xlat.h"

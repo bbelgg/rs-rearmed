@@ -46,8 +46,8 @@ void *rsm_pack_ptr(RSMContext *ctx, void *p, size_t bytes) {
     // The GPU may still read the range: the buffer gets new storage first.
     if (rsm_buffer_gpu_overlap(ctx, b, (size_t)p, bytes))
         rsm_buffer_rename(ctx, b, (size_t)p, bytes);
-    if (ctx->buf_opts & MTLResourceStorageModeManaged)
-        [b->mtl didModifyRange:NSMakeRange((size_t)p, bytes)];
+    if (ctx->buf_opts & RSM_BUF_MANAGED)
+        RSM_DID_MODIFY(b->mtl, NSMakeRange((size_t)p, bytes));
     return (uint8_t *)b->mtl.contents + (size_t)p;
 }
 
@@ -89,7 +89,7 @@ static bool rsm_buffer_gpu_overlap(RSMContext *ctx, RSMBuffer *b, size_t off, si
     if (!rsm_in_flight(ctx, b->last_use))
         return false;
     b->streamed = true;
-    if (ctx->buf_opts & MTLResourceStorageModeManaged)
+    if (ctx->buf_opts & RSM_BUF_MANAGED)
         return true;  // managed storage syncs whole ranges at commit: no writes under the GPU
     size_t end = off + len;
     if (b->rd_hi > b->rd_lo && off < b->rd_hi && b->rd_lo < end && rsm_in_flight(ctx, b->rd_serial))
@@ -189,8 +189,8 @@ static void *rsm_bound_buffer_(__unsafe_unretained RSMContext *ctx, GLenum targe
 #define rsm_bound_buffer(ctx, target) ((__bridge RSMBuffer *)rsm_bound_buffer_((ctx), (target)))
 
 static void rsm_buffer_modified(RSMContext *ctx, RSMBuffer *b, size_t off, size_t len) {
-    if (ctx->buf_opts & MTLResourceStorageModeManaged)
-        [b->mtl didModifyRange:NSMakeRange(off, len)];
+    if (ctx->buf_opts & RSM_BUF_MANAGED)
+        RSM_DID_MODIFY(b->mtl, NSMakeRange(off, len));
 }
 
 // A write into a buffer the GPU may still read: switch to a fresh MTLBuffer with
@@ -1156,6 +1156,50 @@ static void rsm_bc_decode(const uint8_t *blk, MTLPixelFormat fmt, uint8_t out[16
     }
 }
 
+// A GPU that samples no BC (DXT) textures (an iPhone's or an iPad's A-series): each DXT upload is decoded into an
+// RGBA8 texture instead (rsm_bc_expand), at four times the memory. Every Mac GPU samples them.
+static bool rsm_bc_native(RSMContext *ctx) {
+#if TARGET_OS_OSX
+    (void)ctx;
+    return true;
+#else
+    static int told;
+    bool on = false;
+    if (@available(iOS 16.4, *))
+        on = ctx->dev.supportsBCTextureCompression;
+    if (!on && !told++)
+        rsm_log("this GPU samples no BC (DXT) textures: they are decoded to RGBA8 as they are uploaded");
+    return on;
+#endif
+}
+
+// fmt (a BC format) as the RGBA8 format its blocks decode to
+static void rsm_bc_as_rgba(rsm_texfmt *f) {
+    bool srgb = f->fmt == MTLPixelFormatBC1_RGBA_sRGB || f->fmt == MTLPixelFormatBC2_RGBA_sRGB ||
+                f->fmt == MTLPixelFormatBC3_RGBA_sRGB;
+    f->fmt = srgb ? MTLPixelFormatRGBA8Unorm_sRGB : MTLPixelFormatRGBA8Unorm;
+    f->compressed = false;
+}
+
+// A w x h region of BC blocks (pitch bytes a row of blocks) as RGBA8 rows of w * 4 bytes; malloc'd
+static uint8_t *rsm_bc_expand(const uint8_t *src, MTLPixelFormat bc, int w, int h, size_t pitch) {
+    uint8_t *out = malloc((size_t)w * (size_t)h * 4);
+    if (!out)
+        return NULL;
+    size_t bb = rsm_fmt_bytes(bc);
+    for (int by = 0; by < (h + 3) / 4; by++)
+        for (int bx = 0; bx < (w + 3) / 4; bx++) {
+            uint8_t px[16][4];
+            rsm_bc_decode(src + (size_t)by * pitch + (size_t)bx * bb, bc, px);
+            for (int i = 0; i < 16; i++) {
+                int x = bx * 4 + (i & 3), y = by * 4 + (i >> 2);
+                if (x < w && y < h)
+                    memcpy(out + ((size_t)y * (size_t)w + (size_t)x) * 4, px[i], 4);
+            }
+        }
+    return out;
+}
+
 // --- Textures ---------------------------------------------------------------------
 RSMTexture *rsm_texture(RSMContext *ctx, GLuint name) {
     RSMTexture *t = rsm_get(&ctx->textures, name);
@@ -1726,6 +1770,7 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
+    MTLPixelFormat bc = f.fmt;
     size_t pitch = (size_t)(width + 3) / 4 * rsm_fmt_bytes(f.fmt);
     size_t need = pitch * (size_t)((height + 3) / 4);
     if ((size_t)imageSize < need) {
@@ -1734,11 +1779,21 @@ void rsmtl_glCompressedTexImage2D(GLenum target, GLint level, GLenum internalfor
     }
     if (ctx->pixel_unpack_buffer && !(data = rsm_unpack_ptr(ctx, data, need)))
         return;
+    bool decode = !rsm_bc_native(ctx);
+    if (decode)
+        rsm_bc_as_rgba(&f);
     @autoreleasepool {
         if (!rsm_tex_define(ctx, t, level, internalformat, &f, width, height) || !data)
             return;
         if (level == 0)
             RSM_TEX_UPLOADED(t, internalformat, 0, 0, width, height, data, need);
+        if (decode) {
+            uint8_t *rgba = rsm_bc_expand(data, bc, width, height, pitch);
+            if (rgba)
+                rsm_tex_write(ctx, t, level, face, 0, 0, width, height, rgba, (size_t)width * 4);
+            free(rgba);
+            return;
+        }
         rsm_tex_write(ctx, t, level, face, 0, 0, width, height, data, pitch);
     }
 }
@@ -1754,7 +1809,11 @@ void rsmtl_glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, 
         rsm_error(ctx, GL_INVALID_VALUE);
         return;
     }
-    if (!t->mtl || !rsm_fmt_compressed(t->fmt) || level >= t->levels || !(t->defined & (1u << level)) ||
+    // a DXT texture this GPU can't sample is RGBA8 here, decoded at each upload (rsm_bc_native)
+    rsm_texfmt bcf;
+    bool decoded = t->mtl && !rsm_fmt_compressed(t->fmt) && rsm_is_dxt(t->internal) &&
+                   rsm_choose_format(t->internal, 0, &bcf);
+    if (!t->mtl || !(rsm_fmt_compressed(t->fmt) || decoded) || level >= t->levels || !(t->defined & (1u << level)) ||
         (xoffset & 3) || (yoffset & 3)) {
         rsm_error(ctx, GL_INVALID_OPERATION);
         return;
@@ -1767,7 +1826,8 @@ void rsmtl_glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, 
         return;
     }
     (void)format;
-    size_t pitch = (size_t)(width + 3) / 4 * rsm_fmt_bytes(t->fmt);
+    MTLPixelFormat bc = decoded ? bcf.fmt : t->fmt;
+    size_t pitch = (size_t)(width + 3) / 4 * rsm_fmt_bytes(bc);
     size_t need = pitch * (size_t)((height + 3) / 4);
     if ((size_t)imageSize < need) {
         rsm_error(ctx, GL_INVALID_VALUE);
@@ -1776,6 +1836,13 @@ void rsmtl_glCompressedTexSubImage2D(GLenum target, GLint level, GLint xoffset, 
     if (!width || !height || !(data = rsm_unpack_ptr(ctx, data, need)))
         return;
     @autoreleasepool {
+        if (decoded) {
+            uint8_t *rgba = rsm_bc_expand(data, bc, width, height, pitch);
+            if (rgba)
+                rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, rgba, (size_t)width * 4);
+            free(rgba);
+            return;
+        }
         rsm_tex_write(ctx, t, level, face, xoffset, yoffset, width, height, data, pitch);
     }
 }

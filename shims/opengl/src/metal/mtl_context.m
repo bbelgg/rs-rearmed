@@ -4,7 +4,9 @@
 
 #include <ImageIO/ImageIO.h>
 #include <mach/mach_time.h>
+#if __has_include(<MetalFX/MetalFX.h>)
 #import <MetalFX/MetalFX.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -209,6 +211,12 @@ static void rsm_note_completed(RSMContext *ctx, uint64_t s) {
 // went on the screen (flags 1: it never did), and 'U', a command buffer's time on the GPU from its start to
 // its end (flags 1: the frame's last, the one with the present). The handlers run on Metal's own queues.
 void rs_gl_frametime_mark(int kind, uint64_t t0, uint64_t t1, uint64_t x, unsigned flags);
+#if !TARGET_OS_OSX
+// iOS has no nsgl_hook.m (it hooks the Mac game's NSOpenGL), so no log to write to: the marks go nowhere
+void rs_gl_frametime_mark(int kind, uint64_t t0, uint64_t t1, uint64_t x, unsigned flags) {
+    (void)kind, (void)t0, (void)t1, (void)x, (void)flags;
+}
+#endif
 static bool rsm_ft_on(void) {
     static int on = -1;  // idempotent
     if (on < 0) {
@@ -429,8 +437,8 @@ static RSMContext *rsm_create(int w, int h, CAMetalLayer *layer) {
     pthread_mutex_init(&ctx->lock, &a);
     pthread_mutexattr_destroy(&a);
     bool unified = dev.hasUnifiedMemory;
-    ctx->buf_opts = unified ? MTLResourceStorageModeShared : MTLResourceStorageModeManaged;
-    ctx->tex_storage = unified ? MTLStorageModeShared : MTLStorageModeManaged;
+    ctx->buf_opts = unified ? MTLResourceStorageModeShared : RSM_BUF_MANAGED;
+    ctx->tex_storage = unified ? MTLStorageModeShared : RSM_TEX_MANAGED;
     ctx->w = w > 0 ? w : 1;
     ctx->h = h > 0 ? h : 1;
     ctx->layer = layer;
@@ -573,6 +581,7 @@ static void rsm_upscale_setup(RSMContext *ctx) {
     const char *e = getenv("RS_METAL_UPSCALE");
     if (e && *e == '0')
         return;
+#if RSM_HAVE_METALFX
     if (@available(macOS 13.0, *)) {
         if (![MTLFXSpatialScalerDescriptor supportsDevice:ctx->dev])
             return;
@@ -606,6 +615,7 @@ static void rsm_upscale_setup(RSMContext *ctx) {
         if (told++ < 4)
             rsm_log("upscaling %dx%d to %dx%d with MetalFX (RS_METAL_UPSCALE)", ctx->w, ctx->h, ctx->out_w, ctx->out_h);
     }
+#endif
 }
 
 // Present into the drawable: the framebuffer as it is, or upscaled.
@@ -616,6 +626,7 @@ static void rsm_present_frame(RSMContext *ctx, id<MTLTexture> drawable) {
     }
     if (!ctx->fx_tried)
         rsm_upscale_setup(ctx);
+#if RSM_HAVE_METALFX
     if (@available(macOS 13.0, *)) {
         id<MTLFXSpatialScaler> s = ctx->fx_scaler;
         if (s && ctx->fx_out.width == drawable.width && ctx->fx_out.height == drawable.height) {
@@ -626,6 +637,7 @@ static void rsm_present_frame(RSMContext *ctx, id<MTLTexture> drawable) {
             return;
         }
     }
+#endif
     rsm_present_draw(ctx, drawable, ctx->def_color, ctx->linear_sampler);
 }
 
@@ -756,11 +768,13 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];
             if (d) {
                 rsm_present_frame(ctx, d.texture);
+#if !TARGET_OS_SIMULATOR  // the iOS simulator's drawables say nothing of when they were shown
                 if (rsm_ft_on())
                     [d addPresentedHandler:^(id<MTLDrawable> shown) {
                       uint64_t t = shown.presentedTime > 0 ? rsm_ft_ticks(shown.presentedTime) : 0;
                       rs_gl_frametime_mark('P', t ? t : mach_absolute_time(), t ? t : mach_absolute_time(), 0, !t);
                     }];
+#endif
                 [rsm_cmd(ctx) presentDrawable:d];
             }
         }

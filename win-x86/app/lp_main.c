@@ -49,9 +49,15 @@
 //   logs/        last-run.log and previous-run.log (stderr; LP_LOG_TO overrides it)
 //   mods/        every .dylib here is loaded at the start, as on the Mac (mods_guard, rc_mods.c)
 // Nothing there is in the bundle, so a reinstall keeps it, and the bundle's signature stays whole.
+//
+// iPhone and iPad (ios/, experimental): the executable, the image and the DLLs are all in <app>, and LP_HOME is the
+// app's Documents folder, which the Finder and the Files app show; ios/deploy_lp.sh copies the game files, the saves
+// and the settings into it. No mods: iOS loads no library that isn't signed into the app. The app's own main
+// (ios/app) runs lp_main on a thread of its own, and UIKit has the main thread.
 // The Metal disk cache is the app's own too (RS_METAL_CACHE_DIR, default
 // ~/Library/Caches/rs-rearmed/learn-play/metal), beside the Mac edition's .../rs-rearmed/metal.
 #include <CoreFoundation/CoreFoundation.h>
+#include <TargetConditionals.h>
 #include <dirent.h>
 #include <dlfcn.h>
 #include <errno.h>
@@ -116,6 +122,13 @@ static void mkdir_p(const char *path) {
 }
 
 // A message box before anything else runs (the app has no window yet), then quit.
+#if TARGET_OS_IPHONE
+void lp_ios_fail(const char *msg);  // ios/app: an alert, then quit
+static void fail_alert(const char *msg) {
+  fprintf(stderr, "lp: %s\n", msg);
+  lp_ios_fail(msg);
+}
+#else
 static void fail_alert(const char *msg) {
   fprintf(stderr, "lp: %s\n", msg);
   CFStringRef t = CFStringCreateWithCString(0, "RS Re-ARMed Learn & Play", kCFStringEncodingUTF8);
@@ -126,6 +139,7 @@ static void fail_alert(const char *msg) {
   if (m) CFRelease(m);
   exit(1);
 }
+#endif
 
 // A game on another drive: the copy is on that drive too and game/ is a link to it (gamefiles.py). 1 with
 // MSG when the link leads nowhere: that drive not connected, or the copy on it gone.
@@ -218,7 +232,11 @@ static void metal_cache_default(void) {
 
 static int in_bundle(void) {
   size_t n = strlen(exe_dir);
+#if TARGET_OS_IPHONE
+  static const char tail[] = ".app";
+#else
   static const char tail[] = ".app/Contents/MacOS";
+#endif
   return n >= sizeof tail && !strcmp(exe_dir + n - (sizeof tail - 1), tail);
 }
 
@@ -226,6 +244,8 @@ static void user_home(char *home, size_t n) {
   const char *h = getenv("LP_HOME");
   if (h && *h)
     snprintf(home, n, "%s", h);
+  else if (TARGET_OS_IPHONE)
+    snprintf(home, n, "%s/Documents", getenv("HOME") ? getenv("HOME") : "/tmp");
   else
     snprintf(home, n, "%s/Library/Application Support/RS Re-ARMed/learn-play", getenv("HOME") ? getenv("HOME") : "/tmp");
 }
@@ -250,6 +270,11 @@ static int netguard_loaded(void) {
 
 static void mods_guard(char **argv) {
   static char dflt[PATH_MAX], guard[PATH_MAX], log[PATH_MAX];
+  if (TARGET_OS_IPHONE) {  // no library from outside the app loads, and no inserted guard
+    (void)argv;
+    mods_message = "[rc] mods not loaded: none on iPhone and iPad";
+    return;
+  }
   if (in_bundle()) {
     char home[PATH_MAX];
     user_home(home, sizeof home);
@@ -295,6 +320,7 @@ static int installed_defaults(void) {
   size_t n = strlen(exe_dir);
   char res[PATH_MAX], home[PATH_MAX];
   snprintf(res, sizeof res, "%.*s/Resources", (int)(n - strlen("/MacOS")), exe_dir);
+  if (TARGET_OS_IPHONE) snprintf(res, sizeof res, "%s", exe_dir);  // a flat bundle
   dflt_env_in("LP_IMAGE", res, "lp_game.exe");
   dflt_env_in("LP_DLL_DIR", res, "dlls");
   user_home(home, sizeof home);
@@ -322,6 +348,9 @@ static int installed_defaults(void) {
       fail_alert("macOS is not letting RS Re-ARMed Learn & Play read the game files. In System Settings, open "
                  "Privacy & Security, then Files & Folders, turn on Removable Volumes (or the folder) for RS "
                  "Re-ARMed Learn & Play, and start it again.");
+    if (access(m, F_OK) != 0 && TARGET_OS_IPHONE)
+      fail_alert("RS Re-ARMed Learn & Play has no copy of the game files. Copy them from a Mac with ios/deploy_lp.sh "
+                 "(or into the app's folder in the Finder or the Files app: game/, with game/.rearmed/manifest.json).");
     if (access(m, F_OK) != 0)
       fail_alert(access(meta, F_OK) == 0
                      ? "The copy of the game files is incomplete (a copy or refresh was stopped). Open the RS "
@@ -422,7 +451,13 @@ static int warm_shaders(void) {
   return rs_gfx_warm_only(max_s > 0 ? max_s : 3600, 0.5, stdout);
 }
 
+// iOS: the app's main (ios/app) runs this on a thread of its own; non-zero is a start that failed, which the app
+// says before it quits.
+#if TARGET_OS_IPHONE
+int lp_main(int argc, char **argv) {
+#else
 int main(int argc, char **argv) {
+#endif
   char self[PATH_MAX];
   uint32_t sz = sizeof self;
   if (_NSGetExecutablePath(self, &sz) || !realpath(self, exe_dir)) snprintf(exe_dir, sizeof exe_dir, ".");
@@ -518,7 +553,9 @@ int main(int argc, char **argv) {
 
   // the guest runs on a thread with a large host stack: translated code nests deeper there than
   // the x86 code did on its own stack
-  run_arg r = {entry, 0};
+  // static: on iOS lp_main returns (its thread ends) while the game's thread still reads it
+  static run_arg r;
+  r.entry = entry;
   pthread_attr_t at;
   pthread_attr_init(&at);
   pthread_attr_setstacksize(&at, 256u << 20);
@@ -533,6 +570,8 @@ int main(int argc, char **argv) {
     return 1;
   }
   pthread_detach(t);
+#if !TARGET_OS_IPHONE
   lp_window_loop();  // AppKit on the main thread; the game's thread exits the process
+#endif
   return 0;
 }

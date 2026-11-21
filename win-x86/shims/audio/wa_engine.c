@@ -599,8 +599,13 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
   s->dev_rate = use_rate(ep->dev, fmt->rate);
   if (s->dev_rate <= 0) s->dev_rate = fmt->rate;
 
+#if TARGET_OS_IPHONE
+  // iOS: the session's route is the device (ios/compat/rs_hal_ios.m), which RemoteIO plays and records
+  AudioComponentDescription d = {kAudioUnitType_Output, kAudioUnitSubType_RemoteIO, kAudioUnitManufacturer_Apple, 0, 0};
+#else
   AudioComponentDescription d = {kAudioUnitType_Output, kAudioUnitSubType_HALOutput, kAudioUnitManufacturer_Apple, 0,
                                  0};
+#endif
   AudioComponent comp = AudioComponentFindNext(NULL, &d);
   if (!comp || AudioComponentInstanceNew(comp, &s->unit) != noErr) goto fail;
   UInt32 one = 1, zero = 0;
@@ -615,10 +620,12 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
   if (capture && cap > s->period_frames) cap = s->period_frames;
   if (capture && cap > 128) cap = 128;
   s->io_frames = rs_audio_set_device_buffer(ep->dev, cap, who);
+#if !TARGET_OS_IPHONE
   AudioObjectID dev = ep->dev;
   if (AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &dev,
                            sizeof dev) != noErr)
     goto fail;
+#endif
   AudioStreamBasicDescription c = {0};
   c.mFormatID = kAudioFormatLinearPCM;
   c.mFormatFlags = kAudioFormatFlagIsFloat | kAudioFormatFlagIsPacked;

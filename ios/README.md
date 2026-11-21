@@ -62,9 +62,23 @@ is what `~/Library/Application Support/RS Re-ARMed/learn-play` is on the Mac: `g
 
 ## Playing
 
-- One finger is the mouse: a touch moves the pointer there and holds the left button until it lifts.
-- A two-finger tap is Escape (back).
-- A keyboard works as on the Mac.
+The touch screen alone plays the game; no keyboard or mouse is needed.
+
+| Touch | Does |
+|---|---|
+| One finger | the mouse: a touch moves the pointer there and holds the left button until it lifts. The game's menus, lists, sliders and the hints at the bottom of a screen ("ESC Back") take a tap |
+| Two fingers up or down | the mouse wheel: a list moves a row every few millimetres, fingers up bringing up what is below |
+| Two-finger tap | Escape: back, and in a song the pause menu |
+| The key bar | the keys the game's screens name, in two columns at the right edge: KEYBOARD, ENTER, ESC, SPACE, DELETE (Skip Tuner), CTRL (Path/Input), SHIFT (the song search), MORE; the arrows, TAB and ALT. A button is the key held while it is touched |
+| Three-finger tap | shows or hides the key bar until the next screen |
+| KEYBOARD | iOS's keyboard, for the song search (SHIFT first) and a profile's name; its Return is ENTER and puts it away |
+| MORE | the app's menu: the song folder |
+
+The key bar is up in the menus and goes away while a song, Session Mode or a Guitarcade game is played, so the
+picture is the game's alone; the pause menu (a two-finger tap) brings it back. A keyboard works as on the Mac.
+
+From the title to a song: ENTER (title), ENTER (profile), LEARN A SONG, the song, Play Song, then DELETE (Skip Tuner)
+and ENTER on "Yes, continue without tuning"; in the song a two-finger tap pauses, and EXIT leaves it.
 - Audio: the session's route. A class-compliant USB interface or the Real Tone Cable plugged in is the input, with one
   entry per channel as on the Mac; without one, the built-in microphone. The output is the speaker, headphones or the
   interface.
@@ -78,6 +92,5 @@ them otherwise, as on the Mac ([the switches](../docs/windows/INSTALL.md#setting
 
 ## Status
 
-See [docs/windows/PLAN.md](../docs/windows/PLAN.md) (iPhone and iPad). Open: a touch layout of its own (the game's
-menus by touch, the note highway's controls), audio interfaces tested (an HX Stomp, the cable), mods (iOS loads no
+See [docs/windows/PLAN.md](../docs/windows/PLAN.md) (iPhone and iPad). Open: audio interfaces tested (an HX Stomp, the cable), mods (iOS loads no
 library from outside the app: they would have to be built into it), a controller.

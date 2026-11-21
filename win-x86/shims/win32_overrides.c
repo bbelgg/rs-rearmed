@@ -654,3 +654,21 @@ void w32_pump(rc_ctx *c) {
   memcpy(c->r, saved, sizeof saved);
   fprintf(stderr, "lp: the game's resolution %ux%u -> %dx%d, the window's\n", ow, oh, w, h);
 }
+
+// The current menu's name ("LearnASong_Game", "MainMenu", ...) into out, "" with none; the game thread's, once a
+// frame at most (the iOS app's touch controls follow it). RSMods' path, rearmed-mods' rsm_menu: the UI manager's
+// current menu, its name an efd string (inline when its data pointer is its own buffer).
+int lp_current_menu(char *out, int n) {
+  out[0] = 0;
+  uint32_t mgr = RC_ADDR(ui_manager) ? ld32(RC_ADDR(ui_manager)) : 0;
+  uint32_t m = mgr ? ld32(mgr + RC_OFF(ui_current_menu)) : 0;
+  if (!m || n < 2) return 0;
+  uint32_t s = m + RC_OFF(menu_name);
+  uint32_t p = ld32(s + RC_OFF(efd_str_inline)) == s + RC_OFF(efd_str_size) ? s : ld32(s);
+  if (!p) return 0;
+  const char *h = RC32_H(p);
+  int i = 0;
+  for (; i < n - 1 && h[i] >= 0x20 && h[i] < 0x7f; i++) out[i] = h[i];
+  out[i] = 0;
+  return i;
+}

@@ -8,11 +8,13 @@
 // windowed device is shown the same way); the back buffer is fitted to it keeping its shape, and libRSOpenGL scales
 // a back buffer smaller than the screen's pixels up to them (MetalFX), as on the Mac.
 //
-// Input, for now (a touch layout of its own is open work, docs/windows/PLAN.md):
-//   one finger      the mouse: a touch moves the pointer there and holds the left button until it lifts
-//   two-finger tap  Escape (back)
-//   three-finger tap  the app's menu: the song folder
-//   a keyboard      the keys, as on the Mac (UIKit's HID usages to the Mac's key codes, win32_input.c from there)
+// Input (ios/README.md, Playing):
+//   one finger        the mouse: a touch moves the pointer there and holds the left button until it lifts
+//   two-finger swipe  the mouse wheel (a list's rows)
+//   two-finger tap    Escape (back, the pause menu)
+//   the key bar       the keys the menus name, at the right edge, hidden while a song or a game is played
+//   three-finger tap  shows or hides the key bar; its MORE button is the app's menu (the song folder)
+//   a keyboard        the keys, as on the Mac (UIKit's HID usages to the Mac's key codes, win32_input.c from there)
 //
 // Songs from outside the app (custom songs AirDropped to the Files app's Downloads, say): a folder the player picks once
 // (the menu's Song Folder), and any .psarc opened with the app (AirDrop, Files, the share sheet), are copied into
@@ -48,8 +50,13 @@ void w32_input_focus(int active);
 void w32_input_key(int mac_keycode, int down, uint32_t ch);
 void w32_input_mouse_move(int32_t x, int32_t y, int32_t dx, int32_t dy);
 void w32_input_mouse_button(int button, int down);
+void w32_input_mouse_wheel(int32_t delta);
 void w32_input_view_height(int32_t h);
 void w32_input_script(void);
+int lp_current_menu(char *out, int n);  // win32_overrides.c
+int rc_hook_add_name(const char *name, int (*pre)(void *, void *), void (*post)(void *, void *), void *user);
+
+static void follow_menus(void);  // the key bar follows the game's menus (below)
 
 static int g_argc;
 static char **g_argv;
@@ -150,12 +157,13 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
     layer.backgroundColor = UIColor.blackColor.CGColor;
     layer.drawableSize = CGSizeMake(w, h);
     if (rsp_fps()) layer.maximumDrawableCount = 2;
-    [g_view.layer addSublayer:layer];
+    [g_view.layer insertSublayer:layer atIndex:0];  // under the key bar
     g_layer = layer;
     g_bw = w;
     g_bh = h;
   });
   w32_input_script();
+  follow_menus();
   rs_gfx_context *ctx = rs_gfx_create_layer((__bridge void *)layer, w, h);
   if (ctx)
     on_main(^{
@@ -243,12 +251,40 @@ static void touch_at(UIView *v, CGPoint p) {
   w32_input_mouse_move(x, y, 0, 0);
 }
 
-static UITouch *g_finger;  // the touch that is the mouse
+// The finger that is the mouse. Its button goes down a moment after the touch (PRESS_MS), so that the first finger of
+// a two-finger gesture that lands a little before the second clicks nothing; a tap shorter than that is a click
+// of its own (CLICK_MS down).
+enum { PRESS_MS = 60, CLICK_MS = 50 };
+static UITouch *g_finger;
+static int g_pressed;  // the button is down for g_finger
+
+static void after_ms(int ms, dispatch_block_t b) {
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)ms * NSEC_PER_MSEC), dispatch_get_main_queue(), b);
+}
+
+// a second finger came, or a gesture took over: the mouse lets go where it was
+static void finger_drop(void) {
+  if (g_finger && g_pressed) w32_input_mouse_button(0, 0);
+  g_finger = nil;
+  g_pressed = 0;
+}
+
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-  if (g_finger || event.allTouches.count != 1) return;
-  g_finger = touches.anyObject;
-  touch_at(self, [g_finger locationInView:self]);
-  w32_input_mouse_button(0, 1);
+  // A finger whose end never came (a sheet the app put over the game took it) is let go here: the first touch
+  // of a new gesture is the only one on the screen.
+  if (event.allTouches.count != 1 || (g_finger && g_finger.phase != UITouchPhaseEnded &&
+                                      g_finger.phase != UITouchPhaseCancelled && [event.allTouches containsObject:g_finger])) {
+    finger_drop();
+    return;
+  }
+  finger_drop();
+  UITouch *t = g_finger = touches.anyObject;
+  touch_at(self, [t locationInView:self]);
+  after_ms(PRESS_MS, ^{
+    if (g_finger != t || g_pressed) return;
+    g_pressed = 1;
+    w32_input_mouse_button(0, 1);
+  });
 }
 - (void)touchesMoved:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
   if (g_finger && [touches containsObject:g_finger]) touch_at(self, [g_finger locationInView:self]);
@@ -256,25 +292,45 @@ static UITouch *g_finger;  // the touch that is the mouse
 - (void)touchesEnded:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
   if (!g_finger || ![touches containsObject:g_finger]) return;
   touch_at(self, [g_finger locationInView:self]);
-  w32_input_mouse_button(0, 0);
+  if (g_pressed) {
+    w32_input_mouse_button(0, 0);
+  } else {  // a quick tap: a click
+    w32_input_mouse_button(0, 1);
+    after_ms(CLICK_MS, ^{ w32_input_mouse_button(0, 0); });
+  }
   g_finger = nil;
+  g_pressed = 0;
 }
 - (void)touchesCancelled:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
-  if (!g_finger || ![touches containsObject:g_finger]) return;
-  w32_input_mouse_button(0, 0);
-  g_finger = nil;
+  if (g_finger && [touches containsObject:g_finger]) finger_drop();
+}
+
+static void tap_key(int mac, uint32_t ch) {
+  w32_input_key(mac, 1, ch);
+  after_ms(80, ^{ w32_input_key(mac, 0, 0); });
 }
 
 - (void)escape:(UITapGestureRecognizer *)g {
   if (g.state != UIGestureRecognizerStateEnded) return;
-  if (g_finger) {  // the first finger of the two pressed the button: let it go where it was
-    w32_input_mouse_button(0, 0);
-    g_finger = nil;
+  finger_drop();
+  tap_key(0x35, 27);
+}
+
+// Two fingers up or down: the mouse wheel, a step (one row of a list) every WHEEL_PT, at the fingers. Fingers going up
+// bring up what is below, as on the Mac's trackpad with natural scrolling.
+enum { WHEEL_PT = 28 };
+- (void)wheel:(UIPanGestureRecognizer *)g {
+  static CGFloat acc;
+  if (g.state == UIGestureRecognizerStateBegan) {
+    finger_drop();
+    acc = 0;
+    touch_at(self, [g locationInView:self]);
   }
-  w32_input_key(0x35, 1, 27);
-  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 80 * NSEC_PER_MSEC), dispatch_get_main_queue(), ^{
-    w32_input_key(0x35, 0, 0);
-  });
+  if (g.state != UIGestureRecognizerStateBegan && g.state != UIGestureRecognizerStateChanged) return;
+  acc += [g translationInView:self].y;
+  [g setTranslation:CGPointZero inView:self];
+  for (; acc <= -WHEEL_PT; acc += WHEEL_PT) w32_input_mouse_wheel(-120);
+  for (; acc >= WHEEL_PT; acc -= WHEEL_PT) w32_input_mouse_wheel(120);
 }
 
 static void press(NSSet<UIPress *> *presses, int down) {
@@ -302,6 +358,250 @@ static void press(NSSet<UIPress *> *presses, int down) {
 
 static void show_menu(void);  // the app's menu (below)
 
+// --- the keys a menu asks for ---------------------------------------------------------------------
+// The game's menus name keys (ENTER, ESC, SPACE Tools, DELETE Skip Tuner, CTRL Path/Input, SHIFT Search, the arrows on
+// a slider). The key bar has them: two columns of buttons at the screen's right edge, shown in the menus and hidden
+// while a song (or another mode's play) is on, which the game's current menu tells (lp_current_menu); a three-finger
+// tap shows or hides it until the next menu. A button is the key held as long as it is touched. KEYBOARD brings up
+// iOS's keyboard for the song search and a profile's name; MORE is the app's menu.
+static UIView *g_bar;
+static UIView *g_typing;  // the responder that takes iOS's keyboard (LPTyping)
+static int g_playing;     // the current menu is one where a song or a game is played
+static int g_bar_flip;    // the player's three-finger tap since the last menu change
+
+static void bar_update(void) {
+  int show = !g_playing != !g_bar_flip;
+  if (!show && g_typing.isFirstResponder) [g_view becomeFirstResponder];
+  if ((g_bar.alpha > 0) == show) return;
+  g_bar.userInteractionEnabled = show;
+  [UIView animateWithDuration:0.2 animations:^{ g_bar.alpha = show ? 1 : 0; }];
+}
+
+// A menu where the picture is the game's: a song (Learn a Song, Nonstop Play, Score Attack, the two players' songs end
+// in _Game too), Session Mode's band, a Guitarcade game.
+static int playing_menu(const char *m) {
+  static const char *const play[] = {"SessionMode_Game", NULL};
+  size_t n = strlen(m);
+  if (n > 5 && !strcmp(m + n - 5, "_Game")) return 1;
+  for (const char *const *p = play; *p; p++)
+    if (!strcmp(m, *p)) return 1;
+  return 0;
+}
+
+// game_frame's post hook, on the game thread: the current menu, looked at every few frames
+static void frame_post(void *c, void *user) {
+  static unsigned frames;
+  static char seen[64];
+  (void)c;
+  (void)user;
+  if (frames++ % 6) return;
+  char m[64];
+  lp_current_menu(m, sizeof m);
+  if (!strcmp(m, seen)) return;
+  memcpy(seen, m, sizeof seen);
+  int play = playing_menu(m);
+  fprintf(stderr, "lp: menu: %s%s\n", m, play ? " (the key bar hides)" : "");
+  dispatch_async(dispatch_get_main_queue(), ^{
+    g_playing = play;
+    g_bar_flip = 0;
+    bar_update();
+  });
+}
+
+static void follow_menus(void) {
+  static int done;
+  if (done++) return;
+  if (rc_hook_add_name("game_frame", NULL, frame_post, NULL))
+    fprintf(stderr, "lp: no game_frame hook point: the key bar stays up\n");
+}
+
+@interface LPKeyButton : UIButton
+@property(nonatomic) int mac;      // the Mac key code (win32_input.c), -1: an action of the app's
+@property(nonatomic) uint32_t ch;  // the character it types
+@property(nonatomic, copy) void (^action)(void);
+@end
+@implementation LPKeyButton
+@end
+
+static UIImpactFeedbackGenerator *g_haptic;
+
+@interface LPKeyBar : UIView
+@property(nonatomic, strong) NSArray<LPKeyButton *> *outer, *inner;
+@end
+@implementation LPKeyBar
+// touches between the buttons go to the game
+- (UIView *)hitTest:(CGPoint)p withEvent:(UIEvent *)e {
+  UIView *v = [super hitTest:p withEvent:e];
+  return v == self ? nil : v;
+}
+- (void)layoutSubviews {
+  [super layoutSubviews];
+  CGRect safe = UIEdgeInsetsInsetRect(self.bounds, self.safeAreaInsets);
+  CGFloat gap = 6, n = self.outer.count;
+  CGFloat h = fmin(40, floor((safe.size.height - 2 * gap - (n - 1) * gap) / n));
+  CGFloat wo = 66, wi = 46, top = CGRectGetMinY(safe) + (safe.size.height - (n * h + (n - 1) * gap)) / 2;
+  CGFloat xo = CGRectGetMaxX(safe) - gap - wo, xi = xo - gap - wi;
+  for (NSUInteger i = 0; i < self.outer.count; i++) self.outer[i].frame = CGRectMake(xo, top + i * (h + gap), wo, h);
+  for (NSUInteger i = 0; i < self.inner.count; i++) self.inner[i].frame = CGRectMake(xi, top + i * (h + gap), wi, h);
+}
+- (void)down:(LPKeyButton *)b {
+  [g_haptic impactOccurred];
+  if (b.mac >= 0) {
+    finger_drop();
+    w32_input_key(b.mac, 1, b.ch);
+  }
+}
+- (void)up:(LPKeyButton *)b {
+  if (b.mac >= 0) w32_input_key(b.mac, 0, 0);
+}
+- (void)tapped:(LPKeyButton *)b {
+  if (b.action) b.action();
+}
+- (LPKeyButton *)key:(NSString *)title symbol:(NSString *)symbol mac:(int)mac ch:(uint32_t)ch {
+  LPKeyButton *b = [LPKeyButton buttonWithType:UIButtonTypeCustom];
+  b.mac = mac;
+  b.ch = ch;
+  if (symbol)
+    [b setImage:[UIImage systemImageNamed:symbol
+                         withConfiguration:[UIImageSymbolConfiguration configurationWithPointSize:15
+                                                                                           weight:UIImageSymbolWeightSemibold]]
+       forState:UIControlStateNormal];
+  else
+    [b setTitle:title forState:UIControlStateNormal];
+  b.accessibilityLabel = title;
+  b.tintColor = UIColor.whiteColor;
+  b.titleLabel.font = [UIFont systemFontOfSize:12 weight:UIFontWeightBold];
+  b.titleLabel.adjustsFontSizeToFitWidth = YES;
+  [b setTitleColor:UIColor.whiteColor forState:UIControlStateNormal];
+  [b setTitleColor:[UIColor colorWithWhite:1 alpha:0.5] forState:UIControlStateHighlighted];
+  b.backgroundColor = [UIColor colorWithWhite:0 alpha:0.45];
+  b.layer.cornerRadius = 8;
+  b.layer.borderWidth = 1;
+  b.layer.borderColor = [UIColor colorWithWhite:1 alpha:0.35].CGColor;
+  [b addTarget:self action:@selector(down:) forControlEvents:UIControlEventTouchDown];
+  [b addTarget:self
+                action:@selector(up:)
+      forControlEvents:UIControlEventTouchUpInside | UIControlEventTouchUpOutside | UIControlEventTouchCancel];
+  [b addTarget:self action:@selector(tapped:) forControlEvents:UIControlEventTouchUpInside];
+  [self addSubview:b];
+  return b;
+}
+- (LPKeyButton *)action:(NSString *)title symbol:(NSString *)symbol do:(void (^)(void))action {
+  LPKeyButton *b = [self key:title symbol:symbol mac:-1 ch:0];
+  b.action = action;
+  return b;
+}
+- (instancetype)initWithFrame:(CGRect)f {
+  if (!(self = [super initWithFrame:f])) return nil;
+  g_haptic = [[UIImpactFeedbackGenerator alloc] initWithStyle:UIImpactFeedbackStyleLight];
+  self.outer = @[
+    [self action:@"KEYBOARD" symbol:@"keyboard" do:^{
+      if (g_typing.isFirstResponder) [g_view becomeFirstResponder];
+      else [g_typing becomeFirstResponder];
+    }],
+    [self key:@"ENTER" symbol:nil mac:0x24 ch:'\r'],
+    [self key:@"ESC" symbol:nil mac:0x35 ch:27],
+    [self key:@"SPACE" symbol:nil mac:0x31 ch:' '],
+    [self key:@"DELETE" symbol:nil mac:0x75 ch:0],  // forward delete: the game's DELETE (Skip Tuner)
+    [self key:@"CTRL" symbol:nil mac:0x3B ch:0],
+    [self key:@"SHIFT" symbol:nil mac:0x38 ch:0],
+    [self action:@"MORE" symbol:@"ellipsis" do:^{ show_menu(); }],
+  ];
+  self.inner = @[
+    [self key:@"UP" symbol:@"chevron.up" mac:0x7E ch:0],
+    [self key:@"DOWN" symbol:@"chevron.down" mac:0x7D ch:0],
+    [self key:@"LEFT" symbol:@"chevron.left" mac:0x7B ch:0],
+    [self key:@"RIGHT" symbol:@"chevron.right" mac:0x7C ch:0],
+    [self key:@"TAB" symbol:nil mac:0x30 ch:'\t'],
+    [self key:@"ALT" symbol:nil mac:0x3A ch:0],
+  ];
+  return self;
+}
+@end
+
+// iOS's keyboard: each character typed is its key on a Mac keyboard (US layout) with that character, one at a time,
+// as a typist's are; Return is Return and puts the keyboard away.
+static int char_key(unichar c) {
+  static const char *const rows = "asdfhgzxcv\0bqweryt123465=97-80]ou[ip\0lj'k;\\,/nm.\0\0`";
+  static const char shifted[] = "!@#$%^&*()_+{}|:\"<>?~", plain[] = "1234567890-=[]\;',./`";
+  if (c >= 'A' && c <= 'Z') c += 'a' - 'A';
+  const char *s = c < 0x80 ? strchr(shifted, (int)c) : NULL;
+  if (s && c) c = (unichar)plain[s - shifted];
+  if (c == ' ') return 0x31;
+  for (int i = 0; i < 51; i++)
+    if (rows[i] && rows[i] == c) return i;
+  return -1;
+}
+
+static NSMutableArray<NSNumber *> *g_typed;  // key << 32 | character
+static int g_typing_on;
+static void type_next(void) {
+  if (!g_typed.count) {
+    g_typing_on = 0;
+    return;
+  }
+  g_typing_on = 1;
+  uint64_t v = g_typed.firstObject.unsignedLongLongValue;
+  [g_typed removeObjectAtIndex:0];
+  int mac = (int)(v >> 32);
+  w32_input_key(mac, 1, (uint32_t)v);
+  after_ms(50, ^{
+    w32_input_key(mac, 0, 0);
+    after_ms(50, ^{ type_next(); });
+  });
+}
+static void type_key(int mac, uint32_t ch) {
+  if (!g_typed) g_typed = [NSMutableArray array];
+  [g_typed addObject:@((uint64_t)mac << 32 | ch)];
+  if (!g_typing_on) type_next();
+}
+
+@interface LPTyping : UIView <UIKeyInput>
+@property(nonatomic) UITextAutocorrectionType autocorrectionType;
+@property(nonatomic) UITextAutocapitalizationType autocapitalizationType;
+@property(nonatomic) UITextSpellCheckingType spellCheckingType;
+@property(nonatomic) UITextSmartQuotesType smartQuotesType;
+@property(nonatomic) UITextSmartDashesType smartDashesType;
+@property(nonatomic) UITextSmartInsertDeleteType smartInsertDeleteType;
+@property(nonatomic) UIKeyboardType keyboardType;
+@property(nonatomic) UIReturnKeyType returnKeyType;
+@end
+@implementation LPTyping
+- (instancetype)initWithFrame:(CGRect)f {
+  if (!(self = [super initWithFrame:f])) return nil;
+  self.autocorrectionType = UITextAutocorrectionTypeNo;
+  self.autocapitalizationType = UITextAutocapitalizationTypeNone;
+  self.spellCheckingType = UITextSpellCheckingTypeNo;
+  self.smartQuotesType = UITextSmartQuotesTypeNo;
+  self.smartDashesType = UITextSmartDashesTypeNo;
+  self.smartInsertDeleteType = UITextSmartInsertDeleteTypeNo;
+  self.keyboardType = UIKeyboardTypeASCIICapable;
+  self.returnKeyType = UIReturnKeyDone;
+  return self;
+}
+- (BOOL)canBecomeFirstResponder {
+  return YES;
+}
+- (BOOL)hasText {
+  return YES;
+}
+- (void)insertText:(NSString *)text {
+  for (NSUInteger i = 0; i < text.length; i++) {
+    unichar c = [text characterAtIndex:i];
+    if (c == '\n' || c == '\r') {
+      type_key(0x24, '\r');
+      [g_view becomeFirstResponder];
+      continue;
+    }
+    int k = char_key(c);
+    if (k >= 0) type_key(k, c);
+  }
+}
+- (void)deleteBackward {
+  type_key(0x33, 8);  // Backspace
+}
+@end
+
 @interface LPViewController : UIViewController
 @end
 @implementation LPViewController
@@ -318,11 +618,24 @@ static void show_menu(void);  // the app's menu (below)
   menu.cancelsTouchesInView = NO;
   [v addGestureRecognizer:menu];
   [esc requireGestureRecognizerToFail:menu];
+  UIPanGestureRecognizer *wheel = [[UIPanGestureRecognizer alloc] initWithTarget:v action:@selector(wheel:)];
+  wheel.minimumNumberOfTouches = 2;
+  wheel.maximumNumberOfTouches = 2;
+  wheel.cancelsTouchesInView = NO;
+  [v addGestureRecognizer:wheel];
   self.view = v;
   g_view = v;
+  g_typing = [[LPTyping alloc] initWithFrame:CGRectMake(0, 0, 1, 1)];
+  [v addSubview:g_typing];
+  g_bar = [[LPKeyBar alloc] initWithFrame:v.bounds];
+  g_bar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
+  [v addSubview:g_bar];
 }
 - (void)menu:(UITapGestureRecognizer *)g {
-  if (g.state == UIGestureRecognizerStateEnded) show_menu();
+  if (g.state != UIGestureRecognizerStateEnded) return;
+  finger_drop();
+  g_bar_flip = !g_bar_flip;
+  bar_update();
 }
 - (void)viewDidAppear:(BOOL)animated {
   [super viewDidAppear:animated];
@@ -387,7 +700,7 @@ static void import_folder(void) {
     NSError *e = nil;
     NSURL *dir = [NSURL URLByResolvingBookmarkData:bm options:0 relativeToURL:nil bookmarkDataIsStale:&stale error:&e];
     if (!dir || ![dir startAccessingSecurityScopedResource]) {
-      fprintf(stderr, "lp: the song folder can't be read now (%s): choose it again in the menu (three-finger tap)\n",
+      fprintf(stderr, "lp: the song folder can't be read now (%s): choose it again in the menu (the key bar's MORE)\n",
               e ? e.localizedDescription.UTF8String : "no access");
       return;
     }
@@ -434,10 +747,16 @@ static void import_opened(NSURL *u) {
   fprintf(stderr, "lp: song %s opened with the app%s\n", n.UTF8String, done ? ", copied" : "");
 }
 
+static void back_to_game(void);
+
 @interface LPFolderPicker : NSObject <UIDocumentPickerDelegate>
 @end
 @implementation LPFolderPicker
+- (void)documentPickerWasCancelled:(UIDocumentPickerViewController *)p {
+  back_to_game();
+}
 - (void)documentPicker:(UIDocumentPickerViewController *)p didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
+  back_to_game();
   NSURL *dir = urls.firstObject;
   if (!dir) return;
   BOOL scoped = [dir startAccessingSecurityScopedResource];
@@ -451,9 +770,16 @@ static void import_opened(NSURL *u) {
 @end
 static LPFolderPicker *g_picker;
 
+// the game's view takes the keys again once a sheet of the app's has gone
+static void back_to_game(void) {
+  finger_drop();
+  [g_view becomeFirstResponder];
+}
+
 static void show_menu(void) {
   UIViewController *vc = g_window.rootViewController;
   if (vc.presentedViewController) return;
+  finger_drop();
   UIAlertController *m = [UIAlertController
       alertControllerWithTitle:@"Learn & Play"
                        message:@"Songs in the song folder are copied in at every start and return to the app; then "
@@ -474,8 +800,11 @@ static void show_menu(void) {
                                         handler:^(UIAlertAction *x) {
                                           dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0),
                                                          ^{ import_folder(); });
+                                          back_to_game();
                                         }]];
-  [m addAction:[UIAlertAction actionWithTitle:@"Cancel" style:UIAlertActionStyleCancel handler:nil]];
+  [m addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                        style:UIAlertActionStyleCancel
+                                      handler:^(UIAlertAction *x) { back_to_game(); }]];
   m.popoverPresentationController.sourceView = vc.view;  // an iPad's action sheet is a popover
   m.popoverPresentationController.sourceRect = CGRectMake(vc.view.bounds.size.width / 2, vc.view.bounds.size.height / 2, 1, 1);
   [vc presentViewController:m animated:YES completion:nil];

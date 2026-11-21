@@ -238,14 +238,17 @@ edition" is described there. What has not been tested is under [Open issues](#op
 Being looked into, with no promise of if or when:
 
 - **iPhone and iPad** ([ios/README.md](../../ios/README.md), not released): built and run on an iPhone 15 Plus with a free
-  Apple account; the game starts, draws through Metal (BC textures decoded on the CPU there, MetalFX upscaling) and
+  Apple account; the game starts, draws through Metal (BC textures decoded on the CPU there; no MSAA or MetalFX by default) and
   reaches its menus. Played by touch alone (not released): one finger the mouse, two fingers the wheel and Escape, a
   key bar of the keys the menus name that hides while a song is played (the game's current menu, `lp_current_menu`);
-  from the title through the menus, the tuner and a song, its pause menu and Riff Repeater, tried on the iPhone. Left
-  of the touch layout: Session Mode's and the Guitarcade's playing screens hiding the bar (their menu names are a
-  guess until a run logs them), the Tone Designer and the Multiplayer screens by touch, the bar's place on an iPad,
-  a game controller. Left besides: audio interfaces (an HX Stomp, the cable) tested, a song played to the end, memory
-  over a long session, the picture at the screen's own shape, mods built into the app.
+  from the title through the menus, the tuner and a song, its pause menu and Riff Repeater, tried on the iPhone. Guitar
+  input played on the device (not released): an HX Stomp (listed per channel, its DI on channel 5 by `guitar-input.ini`
+  in the app's folder, the game's sound out of the Stomp) and the Real Tone Cable, each calibrated and heard in a song,
+  at a 128-frame I/O buffer. Left of the touch layout: Session Mode's and the Guitarcade's playing screens hiding the
+  bar (their menu names are a guess until a run logs them), the Tone Designer and the Multiplayer screens by touch,
+  the bar's place on an iPad, a game controller. Left besides: a song played to the end, memory over a long session,
+  the picture at the screen's own shape, mods built into the app, an input plugged in while the game runs (the game
+  lists its inputs only at its start).
 
 - **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
 - **Choosing both players' inputs on the Multiplayer screen**, as in the [Mac plan](../mac/PLAN.md#next-work).

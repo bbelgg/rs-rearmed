@@ -23,7 +23,8 @@ it would need an AppKit stand-in first (not yet: [docs/mac/PLAN.md](../docs/mac/
 
 What changed in the shared code for it, all of it compiled out or unchanged on the Mac:
 `win-x86/app/lp_main.c` (the app's folders on iOS, no mods, `lp_main` run from the app's own `main`),
-`win-x86/shims/audio/wa_engine.c` (RemoteIO in place of the HAL unit), `shims/opengl/src/metal` (no managed storage, no
+`win-x86/shims/audio/wa_engine.c` (RemoteIO in place of the HAL unit), `shims/coreaudio/rs_audio_input.c`
+(`guitar-input.ini` in the app's folder), `shims/opengl/src/metal` (no managed storage, no
 MetalFX in the simulator), and `LP_CFLAGS` in `win-x86/build/translate.sh` and `build_modules.sh`.
 
 ## Requirements
@@ -79,9 +80,32 @@ picture is the game's alone; the pause menu (a two-finger tap) brings it back. A
 
 From the title to a song: ENTER (title), ENTER (profile), LEARN A SONG, the song, Play Song, then DELETE (Skip Tuner)
 and ENTER on "Yes, continue without tuning"; in the song a two-finger tap pauses, and EXIT leaves it.
-- Audio: the session's route. A class-compliant USB interface or the Real Tone Cable plugged in is the input, with one
-  entry per channel as on the Mac; without one, the built-in microphone. The output is the speaker, headphones or the
-  interface.
+
+### Audio
+
+The session's route, at 48 kHz with a 128-frame I/O buffer (2.7 ms). Plug the interface or the cable in
+before starting the game: the game lists its inputs once, at its start (a device plugged in later takes the game's
+sound, not its guitar input, until the game is started again).
+- A class-compliant USB interface is the input and the output, as one device, with an entry per channel as on the
+  Mac: an HX Stomp is listed as "HX Stomp channel 1" to "channel 8", and its DI is channel 5. As the game lists ten
+  inputs and the touch layout can't yet pick every entry, the channel can be set instead in `guitar-input.ini` in the
+  app's folder (the Files app), as on the Mac ([Guitar input](../docs/windows/INSTALL.md#guitar-input)); the interface
+  is then one entry:
+
+  ```ini
+  [HX Stomp]
+  Channel=5
+  ```
+
+  Measured on an iPhone 15 Plus: 1.5 ms of input and 1.0 ms of output latency from iOS on top of the buffers.
+- The Real Tone Cable is "Rocksmith USB Guitar Adapter", the name the game knows; the sound then comes from the
+  speaker (iOS adds 15.6 ms there) or from headphones.
+- Without either, the built-in microphone and the speaker.
+- The sound comes from the interface when one is plugged in: iOS routes a USB interface's input and output together
+  and ignores the speaker override while it is there, so the game's sound can't be on the phone's speaker with the
+  guitar on the interface. Use the interface's own outputs or headphones.
+- If the game doesn't list the interface, unplug it and plug it in again (or start the game again): `RS_AUDIO_LOG=1`
+  in `options.env` logs the route iOS gives (`[rs-audio] ios:` lines, with every input it offers).
 
 ### Picture and heat
 
@@ -92,5 +116,5 @@ them otherwise, as on the Mac ([the switches](../docs/windows/INSTALL.md#setting
 
 ## Status
 
-See [docs/windows/PLAN.md](../docs/windows/PLAN.md) (iPhone and iPad). Open: audio interfaces tested (an HX Stomp, the cable), mods (iOS loads no
+See [docs/windows/PLAN.md](../docs/windows/PLAN.md) (iPhone and iPad). Open: mods (iOS loads no
 library from outside the app: they would have to be built into it), a controller.

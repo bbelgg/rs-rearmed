@@ -225,6 +225,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
 
 Being looked into, with no promise of if or when:
 
+- **iPhone and iPad**: Learn & Play runs there ([its plan](../windows/PLAN.md#next-work)); the Mac game calls AppKit
+  itself, which iOS lacks, so it would need a stand-in for the parts it uses on UIKit first.
 - **RSMods**: more of [RSMods](https://github.com/Lovrom8/RSMods)' features on RS Re-ARMed.
 - **7-string charts**: left are the tuner on the low B and a seven-row diagram, each looked at on its own.
 - **Choosing both players' inputs on the Multiplayer screen**: each picks through their own profile today. The game's

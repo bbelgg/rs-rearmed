@@ -385,6 +385,13 @@ same dylib then runs in the Mac edition, and one built without it is left out, w
 only with the network guard in the process, which logs to `logs/netguard.log`. How mods hook the game:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods); what a mod can't do here yet: [Known issues](#known-issues).
 
+## iPhone and iPad
+
+Experimental, built from a clone: the same game, seam and renderer compiled for iOS, in an app you sign with your own
+Apple account and install from this Mac, with the game files, saves and settings copied from this install. The steps,
+what works and what doesn't: [ios/README.md](../../ios/README.md). Custom songs AirDropped to the device (they land in
+the Files app's Downloads) are copied in from a song folder the app is given once, or by opening them with the app.
+
 ## Update and uninstall
 
 - **Update**: open the installer. It offers a newer release at its start, and **Update Now** replaces the

@@ -237,6 +237,11 @@ edition" is described there. What has not been tested is under [Open issues](#op
 
 Being looked into, with no promise of if or when:
 
+- **iPhone and iPad** ([ios/README.md](../../ios/README.md), not released): built and run on an iPhone 15 Plus with a free
+  Apple account; the game starts, draws through Metal (BC textures decoded on the CPU there, MetalFX upscaling) and
+  reaches its menus. Left: a touch layout of its own, audio interfaces (an HX Stomp, the cable) tested, a song played
+  to the end, memory over a long session, the picture at the screen's own shape, mods built into the app.
+
 - **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
 - **Choosing both players' inputs on the Multiplayer screen**, as in the [Mac plan](../mac/PLAN.md#next-work).
 - **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note

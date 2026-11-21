@@ -1,0 +1,341 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		5948B56B65610323503ECCB1 /* lp_ios_app.m in Sources */ = {isa = PBXBuildFile; fileRef = 1DC42F76BE82DF375526E8FF /* lp_ios_app.m */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		1DC42F76BE82DF375526E8FF /* lp_ios_app.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = lp_ios_app.m; sourceTree = "<group>"; };
+		27C9EF31C10F31E9B337983E /* LearnPlay.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = LearnPlay.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		333F6676396B2E185330342C /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		67C84F69D3176C59E7FD33E2 /* LearnPlay.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = LearnPlay.entitlements; sourceTree = "<group>"; };
+		"TEMP_CE71239F-14A5-45B5-989A-CFBC4EA4C7D0" /* LearnPlay.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = LearnPlay.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		C44C1974BFDDB8ACBB16DB3C = {
+			isa = PBXGroup;
+			children = (
+				DFB296A31363F1423CB3E970 /* app */,
+				CBB7EEA8226D959E1C16B4E6 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		CBB7EEA8226D959E1C16B4E6 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				27C9EF31C10F31E9B337983E /* LearnPlay.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		DFB296A31363F1423CB3E970 /* app */ = {
+			isa = PBXGroup;
+			children = (
+				333F6676396B2E185330342C /* Info.plist */,
+				67C84F69D3176C59E7FD33E2 /* LearnPlay.entitlements */,
+				1DC42F76BE82DF375526E8FF /* lp_ios_app.m */,
+			);
+			path = app;
+			sourceTree = "<group>";
+		};
+		"TEMP_9B6E91FB-AB77-4E66-BAB0-C37F18B941CB" /* ios */ = {
+			isa = PBXGroup;
+			children = (
+				"TEMP_CE71239F-14A5-45B5-989A-CFBC4EA4C7D0" /* LearnPlay.xcconfig */,
+			);
+			path = ios;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		8C27041E287FD7F38DD94497 /* LearnPlay */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 08A67DF77909CF9BC829B4AF /* Build configuration list for PBXNativeTarget "LearnPlay" */;
+			buildPhases = (
+				D6DC5EED8B7C21E5D0518E1E /* Sources */,
+				63D52ABE6AF4F32293B6CF66 /* The game image and the DLLs */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = LearnPlay;
+			packageProductDependencies = (
+			);
+			productName = LearnPlay;
+			productReference = 27C9EF31C10F31E9B337983E /* LearnPlay.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		5FB7CF92B0856B39951604C8 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					8C27041E287FD7F38DD94497 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 3C68382A0709A232A26B7437 /* Build configuration list for PBXProject "LearnPlay" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = C44C1974BFDDB8ACBB16DB3C;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = CBB7EEA8226D959E1C16B4E6 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				8C27041E287FD7F38DD94497 /* LearnPlay */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		63D52ABE6AF4F32293B6CF66 /* The game image and the DLLs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "The game image and the DLLs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "[ -d \"$LP_IOS_BUNDLE\" ] || { echo \"error: no $LP_IOS_BUNDLE: run ios/build_lp.sh first\"; exit 1; }\ncp -R \"$LP_IOS_BUNDLE\"/. \"$TARGET_BUILD_DIR/$CONTENTS_FOLDER_PATH/\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D6DC5EED8B7C21E5D0518E1E /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5948B56B65610323503ECCB1 /* lp_ios_app.m in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		11C690284FF7251EF531DA31 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(LP_IOS_ENTITLEMENTS)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = "LP_VERSION=\\\"$(LP_VERSION)\\\"";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/compat $(SRCROOT)/../win-x86/app $(SRCROOT)/../shims/opengl/src $(SRCROOT)/../shims/platform/include $(LP_IOS_BUILD)/obj/gl/inc";
+				INFOPLIST_FILE = app/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = "$(LP_IOS_LIBS) -lc++ -lz -framework Foundation -framework CoreFoundation -framework Metal -framework QuartzCore -framework AudioToolbox -framework AVFAudio -framework CoreAudio -framework ImageIO -framework UniformTypeIdentifiers -framework UIKit";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = "$(LP_IOS_LIBS) -lc++ -lz -framework Foundation -framework CoreFoundation -framework Metal -framework QuartzCore -framework AudioToolbox -framework AVFAudio -framework CoreAudio -framework ImageIO -framework UniformTypeIdentifiers -framework UIKit -weak_framework MetalFX";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.rsrearmed.learnplay.$(DEVELOPMENT_TEAM)";
+				PRODUCT_NAME = LearnPlay;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		40E211081F12A1CC217473BF /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_CE71239F-14A5-45B5-989A-CFBC4EA4C7D0" /* LearnPlay.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Debug;
+		};
+		5C17EC12634008A9BAA0125C /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CODE_SIGN_ENTITLEMENTS = "$(LP_IOS_ENTITLEMENTS)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
+				GCC_PREPROCESSOR_DEFINITIONS = "LP_VERSION=\\\"$(LP_VERSION)\\\"";
+				HEADER_SEARCH_PATHS = "$(SRCROOT)/compat $(SRCROOT)/../win-x86/app $(SRCROOT)/../shims/opengl/src $(SRCROOT)/../shims/platform/include $(LP_IOS_BUILD)/obj/gl/inc";
+				INFOPLIST_FILE = app/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = "$(LP_IOS_LIBS) -lc++ -lz -framework Foundation -framework CoreFoundation -framework Metal -framework QuartzCore -framework AudioToolbox -framework AVFAudio -framework CoreAudio -framework ImageIO -framework UniformTypeIdentifiers -framework UIKit";
+				"OTHER_LDFLAGS[sdk=iphoneos*]" = "$(LP_IOS_LIBS) -lc++ -lz -framework Foundation -framework CoreFoundation -framework Metal -framework QuartzCore -framework AudioToolbox -framework AVFAudio -framework CoreAudio -framework ImageIO -framework UniformTypeIdentifiers -framework UIKit -weak_framework MetalFX";
+				PRODUCT_BUNDLE_IDENTIFIER = "io.github.rsrearmed.learnplay.$(DEVELOPMENT_TEAM)";
+				PRODUCT_NAME = LearnPlay;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		7E21E3636D6B52DF8D596E46 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = "TEMP_CE71239F-14A5-45B5-989A-CFBC4EA4C7D0" /* LearnPlay.xcconfig */;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		08A67DF77909CF9BC829B4AF /* Build configuration list for PBXNativeTarget "LearnPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				5C17EC12634008A9BAA0125C /* Debug */,
+				11C690284FF7251EF531DA31 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		3C68382A0709A232A26B7437 /* Build configuration list for PBXProject "LearnPlay" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				40E211081F12A1CC217473BF /* Debug */,
+				7E21E3636D6B52DF8D596E46 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = 5FB7CF92B0856B39951604C8 /* Project object */;
+}

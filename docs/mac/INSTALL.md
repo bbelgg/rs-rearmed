@@ -564,6 +564,11 @@ clang -arch arm64 -dynamiclib -undefined dynamic_lookup -Itools/ws7/recomp/runti
 reading, their size and date, and names in a folder's listing (`rc_file.h`, which `rc_mod.h` includes). Mods made
 for the original game that change its files may work as before: a modified `cache.psarc` is used as it is.
 
+## iPhone and iPad
+
+Not yet: the Mac game calls macOS's AppKit itself, which iOS doesn't have. Learn & Play runs on iOS
+([its section](../windows/INSTALL.md#iphone-and-ipad), [ios/README.md](../../ios/README.md)).
+
 ## Update and uninstall
 
 - **Update**: open the installer. It asks GitHub for the newest release at every start (the installer does; the

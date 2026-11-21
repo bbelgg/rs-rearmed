@@ -97,6 +97,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Metal renderer, shaders prepared at install | ✅ | ✅ |
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |
 | Installer app and install script | ✅ | ✅ |
+| iPhone and iPad (experimental, built from a clone: [ios/README.md](ios/README.md)) | ❌ not yet | ⚠️ |
 | The game and your DLC downloaded by Steam, with nothing installed in Steam | ⚠️ when the game isn't installed in Steam; ✅ an installed game is used as it is | ✅ |
 | Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs)) | ✅ the display's frame rate, about the CPU of the original under Rosetta: 10 points of a core and 0.3 GB more than the Mac edition ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 

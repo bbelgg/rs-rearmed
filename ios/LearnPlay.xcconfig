@@ -1,0 +1,4 @@
+// The project's settings from ios/build_lp.sh: the libraries to link, the build folder, the signing team. Found
+// here when the build is in the repository's build/ (the default); ios/build_lp.sh passes its own as well.
+LP_IOS_ENTITLEMENTS = app/LearnPlay.entitlements
+#include? "../build/ios/lp-device/lp.xcconfig"

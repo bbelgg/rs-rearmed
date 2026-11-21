@@ -3,10 +3,11 @@
 // game on a thread of its own once the window is up and the microphone has been asked for, and the game's thread
 // runs the game as on the Mac.
 //
-// The screen is the game's desktop (lp_screen_size): the screen in landscape, in points (RS_METAL_RETINA=1: in
-// pixels) at RS_METAL_SCALE's percentage, as the Mac edition's main screen. The game always has the whole screen (a
-// windowed device is shown the same way); the back buffer is fitted to it keeping its shape, and libRSOpenGL scales
-// a back buffer smaller than the screen's pixels up to them (MetalFX), as on the Mac.
+// The screen is the game's desktop (lp_screen_size): the screen in landscape at its own shape, 720 pixels high
+// (RS_METAL_RETINA=1: in its pixels) at RS_METAL_SCALE's percentage; an iPhone 15 Plus's is 1561x720. The game always
+// has the whole screen: a windowed device of another size is asked to take the desktop's (lp_request_resolution, as
+// the Mac app does for a resized window), so it draws at the screen's shape with no bars; until it has, the back
+// buffer is fitted to the screen keeping its shape. libRSOpenGL scales the frame up to the screen's pixels.
 //
 // Input (ios/README.md, Playing):
 //   one finger        the mouse: a touch moves the pointer there and holds the left button until it lifts
@@ -57,6 +58,7 @@ int lp_current_menu(char *out, int n);  // win32_overrides.c
 int rc_hook_add_name(const char *name, int (*pre)(void *, void *), void (*post)(void *, void *), void *user);
 
 static void follow_menus(void);  // the key bar follows the game's menus (below)
+static void bar_poke(void);      // a touch: the key bar back if it faded (below)
 
 static int g_argc;
 static char **g_argv;
@@ -70,7 +72,12 @@ static int retina(void) {
   const char *e = getenv("RS_METAL_RETINA");
   return e && *e && *e != '0';
 }
-static double game_scale(CGFloat backing) { return (retina() ? backing : 1) * rsp_metal_scale(); }
+// The game's pixels per point: the screen's pixels with RS_METAL_RETINA=1, else as many as make it 720 high (about
+// the work of the 1280x720 the Mac's copy of Rocksmith.ini has), never more than the screen has; at RS_METAL_SCALE.
+#define LP_IOS_HEIGHT 720.0
+static double game_scale(CGFloat backing, CGFloat pts_h) {
+  return (retina() ? backing : fmin(backing, LP_IOS_HEIGHT / pts_h)) * rsp_metal_scale();
+}
 
 // the screen in landscape, in points, and its pixels per point
 static void screen_info(CGSize *pts, CGFloat *backing) {
@@ -88,9 +95,9 @@ void lp_screen_size(int *w, int *h) {
     CGSize pts;
     CGFloat backing;
     screen_info(&pts, &backing);
-    double sc = game_scale(backing);
-    cw = (int)(pts.width * sc);
-    ch = (int)(pts.height * sc);
+    double sc = game_scale(backing, pts.height);
+    cw = (int)lround(pts.width * sc) & ~1;
+    ch = (int)lround(pts.height * sc) & ~1;
   }
   *w = cw;
   *h = ch;
@@ -114,7 +121,7 @@ static void set_output(int w, int h) {
   CGFloat backing;
   screen_info(&pts, &backing);
   int ow, oh;
-  if (g_ctx && lp_output_size(w, h, backing, game_scale(backing), pts.width, pts.height, &ow, &oh))
+  if (g_ctx && lp_output_size(w, h, backing, game_scale(backing, pts.height), pts.width, pts.height, &ow, &oh))
     rs_gfx_set_output_size(g_ctx, ow, oh);
 }
 
@@ -123,7 +130,9 @@ void lp_window_style(uint32_t hwnd, uint32_t style) {
   (void)hwnd;
   (void)style;
 }
-void d3d9_platform_windowed(int windowed) { (void)windowed; }
+static int g_windowed = 1;  // the device being made is windowed (d3d9_platform_windowed)
+void d3d9_platform_windowed(int windowed) { g_windowed = windowed; }
+void lp_request_resolution(uint32_t hwnd, int w, int h);  // win32_overrides.c: at the game's next PeekMessage
 
 void d3d9_platform_resize(uint32_t hwnd, int w, int h) {
   (void)hwnd;
@@ -174,6 +183,13 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
   lp_screen_size(&dw, &dh);
   fprintf(stderr, "lp: window for HWND 0x%x: back buffer %dx%d (screen %dx%d at %d%%): %s\n", hwnd, w, h, dw, dh,
           (int)lround(rsp_metal_scale() * 100), ctx ? "Metal layer" : "no layer context, offscreen");
+  // The whole screen: a windowed device of another size (the Mac copy's Rocksmith.ini says 1280x720) takes the
+  // screen's, as a window the Mac's player resizes does; the game then keeps it in Rocksmith.ini. Its full-screen
+  // modes are the desktop's size already.
+  if (ctx && any_shape() && g_windowed && (w != dw || h != dh)) {
+    lp_request_resolution(hwnd, dw, dh);
+    fprintf(stderr, "lp: %dx%d asked for as the game's resolution: the screen's shape\n", dw, dh);
+  }
   return ctx ? ctx : rs_gfx_create_offscreen(w, h);
 }
 
@@ -270,6 +286,7 @@ static void finger_drop(void) {
 }
 
 - (void)touchesBegan:(NSSet<UITouch *> *)touches withEvent:(UIEvent *)event {
+  bar_poke();
   // A finger whose end never came (a sheet the app put over the game took it) is let go here: the first touch
   // of a new gesture is the only one on the screen.
   if (event.allTouches.count != 1 || (g_finger && g_finger.phase != UITouchPhaseEnded &&
@@ -368,13 +385,38 @@ static UIView *g_bar;
 static UIView *g_typing;  // the responder that takes iOS's keyboard (LPTyping)
 static int g_playing;     // the current menu is one where a song or a game is played
 static int g_bar_flip;    // the player's three-finger tap since the last menu change
+static int g_bar_idle;    // faded: no touch for LP_BAR_IDLE seconds
+static double g_bar_touched;
+#define LP_BAR_IDLE 5.0
 
 static void bar_update(void) {
-  int show = !g_playing != !g_bar_flip;
+  int show = (!g_playing != !g_bar_flip) && !g_bar_idle;
   if (!show && g_typing.isFirstResponder) [g_view becomeFirstResponder];
   if ((g_bar.alpha > 0) == show) return;
   g_bar.userInteractionEnabled = show;
   [UIView animateWithDuration:0.2 animations:^{ g_bar.alpha = show ? 1 : 0; }];
+}
+
+// The bar fades after LP_BAR_IDLE seconds without a touch, on any screen (a highway the menu names don't tell, Riff
+// Repeater's, the Guitarcade's), and comes back at the next touch, which goes to the game as well; a new menu brings
+// it back too. On the screens where a song is played it isn't there at all.
+static void bar_poke(void) {
+  g_bar_touched = CACurrentMediaTime();
+  if (!g_bar_idle) return;
+  g_bar_idle = 0;
+  bar_update();
+}
+static void bar_idle_watch(void) {
+  g_bar_touched = CACurrentMediaTime();
+  [NSTimer scheduledTimerWithTimeInterval:1
+                                  repeats:YES
+                                    block:^(NSTimer *t) {
+                                      if (g_bar_idle || g_typing.isFirstResponder ||
+                                          CACurrentMediaTime() - g_bar_touched < LP_BAR_IDLE)
+                                        return;
+                                      g_bar_idle = 1;
+                                      bar_update();
+                                    }];
 }
 
 // A menu where the picture is the game's: a song (Learn a Song, Nonstop Play, Score Attack, the two players' songs end
@@ -404,6 +446,8 @@ static void frame_post(void *c, void *user) {
   dispatch_async(dispatch_get_main_queue(), ^{
     g_playing = play;
     g_bar_flip = 0;
+    g_bar_idle = 0;
+    g_bar_touched = CACurrentMediaTime();
     bar_update();
   });
 }
@@ -445,6 +489,7 @@ static UIImpactFeedbackGenerator *g_haptic;
   for (NSUInteger i = 0; i < self.inner.count; i++) self.inner[i].frame = CGRectMake(xi, top + i * (h + gap), wi, h);
 }
 - (void)down:(LPKeyButton *)b {
+  bar_poke();
   [g_haptic impactOccurred];
   if (b.mac >= 0) {
     finger_drop();
@@ -630,11 +675,14 @@ static void type_key(int mac, uint32_t ch) {
   g_bar = [[LPKeyBar alloc] initWithFrame:v.bounds];
   g_bar.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
   [v addSubview:g_bar];
+  bar_idle_watch();
 }
 - (void)menu:(UITapGestureRecognizer *)g {
   if (g.state != UIGestureRecognizerStateEnded) return;
   finger_drop();
   g_bar_flip = !g_bar_flip;
+  g_bar_idle = 0;
+  g_bar_touched = CACurrentMediaTime();
   bar_update();
 }
 - (void)viewDidAppear:(BOOL)animated {

@@ -75,7 +75,8 @@ The touch screen alone plays the game; no keyboard or mouse is needed.
 | KEYBOARD | iOS's keyboard, for the song search (SHIFT first) and a profile's name; its Return is ENTER and puts it away |
 | MORE | the app's menu: the song folder |
 
-The key bar is up in the menus and goes away while a song, Session Mode or a Guitarcade game is played, so the
+The key bar fades after 5 seconds without a touch on any screen and comes back at the next one (which goes to the
+game too). It is up in the menus and goes away at once while a song, Session Mode or a Guitarcade game is played, so the
 picture is the game's alone; the pause menu (a two-finger tap) brings it back. A keyboard works as on the Mac.
 
 From the title to a song: ENTER (title), ENTER (profile), LEARN A SONG, the song, Play Song, then DELETE (Skip Tuner)
@@ -108,6 +109,11 @@ sound, not its guitar input, until the game is started again).
   in `options.env` logs the route iOS gives (`[rs-audio] ios:` lines, with every input it offers).
 
 ### Picture and heat
+
+The game fills the screen at the screen's own shape: its desktop is the screen 720 pixels high (an iPhone 15 Plus's
+is 1561x720), and the app asks the game for that resolution at its start, as the Mac app does for a resized window;
+the game keeps it in Rocksmith.ini. `RS_METAL_RETINA=1` makes it the screen's own pixels (2796x1290 there: more heat),
+`RS_METAL_SCALE=N` fewer.
 
 A phone's GPU gets less to do than a Mac's by default: no MSAA (`RS_METAL_MSAA=1`), no MetalFX upscaling
 (`RS_METAL_UPSCALE=0`), the game's own texture filtering (`RS_METAL_ANISO=1`). `options.env` in the app's folder sets

@@ -20,6 +20,7 @@
 #   RS_NINJA     ninja (default: the one next to the Python, else ninja on PATH)
 #   LP_JOBS      parallelism (default: hw.ncpu)
 #   LP_MODULES   the modules to build (default: all five)
+#   LP_CFLAGS    extra compiler flags for the generated C (the iOS build's target and SDK: ios/build_lp.sh)
 set -eu
 here=$(cd "$(dirname "$0")" && pwd)
 root=$(cd "$here/../.." && pwd)
@@ -51,7 +52,7 @@ for m in $mods; do
   echo "=== $m ==="
   mkdir -p "$out/$m"
   "$py" -I "$recomp/build/gen_image_pe.py" "$out/in/$m.dll" "$out/$m" --module $m \
-    --jobs "$jobs" --cflags=-w --opt=-O2
+    --jobs "$jobs" --cflags="-w ${LP_CFLAGS:-}" --opt=-O2
   "$ninja" -C "$out/$m" -j "$jobs"
 done
 echo "=== modules in $out ==="

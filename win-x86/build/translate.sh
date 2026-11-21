@@ -12,6 +12,7 @@
 #   LP_WRAPPERS  wrapper table at the image base (default: IMAGE without .exe + .wrappers.tsv)
 #   LP_IAT       optional: an iat_resolved.json to replace imports.c with (gen_iat_imports.py);
 #                unset, imports.c comes from the image's own import directory
+#   LP_CFLAGS    extra compiler flags for the generated C (the iOS build's target and SDK: ios/build_lp.sh)
 #   RC_TARGET_DIR  the game's tables as tools/targets/targets.py gen --target win-x86 writes them; unset, this
 #                script makes them beside GEN_DIR (target/)
 set -eu
@@ -59,7 +60,7 @@ echo "=== Translating $img → $gen (jobs=$jobs) ==="
 "$py" -I "$recomp/build/gen_image_pe.py" "$img" "$gen" \
   --jobs "$jobs" \
   --obj-dir "$obj" \
-  --cflags="-w" \
+  --cflags="-w ${LP_CFLAGS:-}" \
   --opt="-O2 -mno-outline" \
   --target win-x86 \
   $skip $wrappers

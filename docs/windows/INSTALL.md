@@ -209,7 +209,11 @@ The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
 ### The title logo
 
 As in the [Mac edition](../mac/INSTALL.md#the-title-logo), except that the build makes the logo, not the install:
-a refresh that brings a new `static.psarc` removes it, and the next build makes it again.
+a refresh that brings a new `static.psarc` removes it, and the next build makes it again. The branding switch
+(`RS_REARMED=0`, or off in the installer's Settings and switches…) shows the game's own title (`Rocksmith 2014 Learn & Play`) as the logo and app name too, in
+the Dock, the menu and the window title; the window title changes at the next start, the Dock and menu names at
+the next install. A tile already kept in the Dock keeps the name it was added with: remove it and add the app
+again for the new name.
 
 ## Where things are
 
@@ -356,7 +360,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
 | `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the lists' scroll bars as the game has them ([Game files](#game-files)) |
 | `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the build, no logo is made |
+| `RS_REARMED=0` | on | the game's own title as the logo and app name ([The title logo](#the-title-logo)); set for the build, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
 | `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_MENU_RETRY=0` | on | a menu asked for before the game's file index has its file is not asked for again, as in the original: the screen can stay white for good |

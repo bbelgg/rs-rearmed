@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>RS Re-ARMed</string>
+	<string>Rocksmith2014</string>
 	<key>CFBundleExecutable</key>
 	<string>Rocksmith2014</string>
 	<key>CFBundleIconFile</key>

@@ -910,6 +910,10 @@ int rsp_clipboard_text(char *buf, size_t size) {  // 0x1001861d0
 }
 
 void rsp_shell_load(rsp_shell *out) {
+  // The branding (RS_REARMED=0 keeps the game's own) in the window title and the menu below.
+  const char *rearmed_env = getenv("RS_REARMED");
+  int branded = !(rearmed_env && !strcmp(rearmed_env, "0"));
+  NSString *appName = branded ? @"RS Re-ARMed" : @"Rocksmith 2014";
   // MainMenu.nib: NSWindowTemplate {{320, 229}, {1280, 720}}, style 15,
   // buffered, "Rocksmith 2014", min size {800, 622}, content min {800, 600};
   // content view OpenGLView {1280, 720}; connections AppDelegate.delegate/window,
@@ -920,7 +924,7 @@ void rsp_shell_load(rsp_shell *out) {
                           NSWindowStyleMaskMiniaturizable | NSWindowStyleMaskResizable
                   backing:NSBackingStoreBuffered
                     defer:NO];
-  [w setTitle:@"Rocksmith 2014 Re-ARMed " RSP_VERSION];
+  [w setTitle:branded ? @"Rocksmith 2014 Re-ARMed " RSP_VERSION : @"Rocksmith 2014"];
   [w setMinSize:NSMakeSize(800, 622)];
   [w setContentMinSize:NSMakeSize(800, 600)];
   [w setReleasedWhenClosed:NO];
@@ -936,9 +940,10 @@ void rsp_shell_load(rsp_shell *out) {
   mc->openGLView = v;
 
   NSMenu *bar = [[NSMenu alloc] initWithTitle:@"AMainMenu"];
-  NSMenuItem *appItem = [[NSMenuItem alloc] initWithTitle:@"Rocksmith 2014" action:NULL keyEquivalent:@""];
-  NSMenu *appMenu = [[NSMenu alloc] initWithTitle:@"Rocksmith 2014"];
-  [appMenu addItemWithTitle:@"Quit Rocksmith 2014" action:@selector(terminate:) keyEquivalent:@"q"];
+  // The menu's name, with the window title above.
+  NSMenuItem *appItem = [[NSMenuItem alloc] initWithTitle:appName action:NULL keyEquivalent:@""];
+  NSMenu *appMenu = [[NSMenu alloc] initWithTitle:appName];
+  [appMenu addItemWithTitle:[@"Quit " stringByAppendingString:appName] action:@selector(terminate:) keyEquivalent:@"q"];
   [appItem setSubmenu:appMenu];
   [bar addItem:appItem];
   [NSApp setMainMenu:bar];

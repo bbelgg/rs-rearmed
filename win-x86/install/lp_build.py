@@ -41,6 +41,9 @@ ROOT = os.path.normpath(os.path.join(HERE, "..", ".."))
 RECOMP = os.path.join(ROOT, "tools", "ws7", "recomp")
 WINBUILD = os.path.join(ROOT, "win-x86", "build")
 APP_NAME = "RS Re-ARMed Learn & Play"
+ORIGINAL_NAME = "Rocksmith 2014 Learn & Play"  # RS_REARMED=0: the game's own Dock and menu name
+APP_SHORT_NAME = "RS Re-ARMed LP"
+ORIGINAL_SHORT_NAME = "Rocksmith 2014 LP"  # RS_REARMED=0: the game's own short bundle and menu name
 BUNDLE_ID = "io.github.bbelgg.rs-rearmed.learn-play"
 EXE = "rs2014_lp"
 TARGET = "win-x86"  # tools/targets
@@ -730,12 +733,39 @@ def make_icns(exe, dest, run=subprocess.run):
         os.remove(tmp)
 
 
-def info_plist(version, icon):
+def display_name(home=None):
+    """The branding (RS_REARMED=0 keeps the game's own): the Dock and menu name, with the title logo and as
+    the Mac install names it. The environment wins, else the installed settings.env, else the Re-ARMed one."""
+    env = os.environ.get("RS_REARMED")
+    if env is not None and env != "":
+        return ORIGINAL_NAME if env == "0" else APP_NAME
+    if home:
+        try:
+            with open(os.path.join(home, "settings.env")) as f:
+                for raw in f:
+                    line = "".join(raw.split())
+                    if not line or line.startswith("#"):
+                        continue
+                    if line == "RS_REARMED=0":
+                        return ORIGINAL_NAME
+                    if line == "RS_REARMED=1":
+                        return APP_NAME
+        except OSError:
+            pass
+    return APP_NAME
+
+
+def info_plist(version, icon, file_name=APP_NAME, bundle_name=APP_SHORT_NAME):
     p = {
+        "CFBundleDevelopmentRegion": "en",
         "CFBundleExecutable": EXE,
         "CFBundleIdentifier": BUNDLE_ID,
-        "CFBundleName": "RS Re-ARMed LP",
-        "CFBundleDisplayName": APP_NAME,
+        # The menu's name: AppKit stamps this over the title the game sets, so install_app rewrites it
+        # with the branding, as the Mac install rewrites the game bundle's.
+        "CFBundleName": bundle_name,
+        # The bundle's file name: the Dock and Finder only show the localized display name (written by
+        # install_app) when this matches it.
+        "CFBundleDisplayName": file_name,
         "CFBundlePackageType": "APPL",
         "CFBundleShortVersionString": version,
         "CFBundleVersion": version,
@@ -797,8 +827,19 @@ def install_app(work, game, app=None, home=None, run=subprocess.run, say=None):
     icon = make_icns(os.path.join(out, "lp_game.exe"), os.path.join(res, "RS2014.icns"), run)
     with open(os.path.join(ROOT, "VERSION")) as f:
         version = f.readline().strip()
+    name = display_name(home)
+    file_name = os.path.splitext(os.path.basename(app))[0]
+    bundle_name = APP_SHORT_NAME if name == APP_NAME else ORIGINAL_SHORT_NAME
     with open(os.path.join(new, "Contents", "Info.plist"), "wb") as f:
-        plistlib.dump(info_plist(version, icon), f)
+        plistlib.dump(info_plist(version, icon, file_name, bundle_name), f)
+    # The Dock and Finder's name: this localized string (shown only when CFBundleDisplayName above is
+    # the bundle's file name). Only under the release's own file name: an app installed under another name
+    # (a test install such as ... Test.app) keeps showing its own file name.
+    if file_name == APP_NAME:
+        lproj = os.path.join(res, "en.lproj")
+        os.makedirs(lproj)
+        with open(os.path.join(lproj, "InfoPlist.strings"), "w") as f:
+            f.write('"CFBundleDisplayName" = "%s";\n' % name.replace("\\", "\\\\").replace('"', '\\"'))
     # From a drive without extended attributes, cp leaves "._" files that break the seal.
     for d, _, files in os.walk(new):
         for f in files:

@@ -1,0 +1,5 @@
+/* The Dock and Finder show this localized string, but only when the Info.plist
+   CFBundleDisplayName is the bundle's file name (Rocksmith2014): on a mismatch
+   they ignore this string and show that file name. The install rewrites this
+   value for RS_REARMED=0. */
+"CFBundleDisplayName" = "RS Re-ARMed";

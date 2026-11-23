@@ -101,9 +101,10 @@ if [[ ${RS_REARMED:-1} != 0 && ! -f "$home/game/static.psarc.rearmed" ]]; then
 fi
 rm -rf "$home/game/Rocksmith2014.app.new"
 cp -R "$app" "$home/game/Rocksmith2014.app.new"
-for r in RS2014.icns en.lproj; do  # the original app's icon and strings
-    [[ -e "$RS_GAME_APP/Contents/Resources/$r" ]] && cp -R "$RS_GAME_APP/Contents/Resources/$r" "$home/game/Rocksmith2014.app.new/Contents/Resources/"
-done
+# The original app's icon. Its localized strings stay out: ours below carry the display name.
+if [[ -e "$RS_GAME_APP/Contents/Resources/RS2014.icns" ]]; then
+    cp -R "$RS_GAME_APP/Contents/Resources/RS2014.icns" "$home/game/Rocksmith2014.app.new/Contents/Resources/"
+fi
 # From a drive without extended attributes (exFAT, FAT), cp copies the "._" file macOS keeps next to each file.
 find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
 # Builds from before CFBundleIconFile was in app/Info.plist: add it (the Dock icon).
@@ -111,6 +112,28 @@ plist="$home/game/Rocksmith2014.app.new/Contents/Info.plist"
 if ! /usr/libexec/PlistBuddy -c 'Print :CFBundleIconFile' "$plist" >/dev/null 2>&1; then
     plutil -insert CFBundleIconFile -string RS2014.icns "$plist"
 fi
+# The branding (RS_REARMED=0 keeps the game's own): the Dock and menu names, with the title logo. The
+# environment wins, else the installed settings.env, else the Re-ARMed one. The Dock and Finder show
+# the localized string below only when CFBundleDisplayName is the bundle's file name (Rocksmith2014):
+# writing the branding there instead makes them ignore the string and show the file name. The menu's
+# name is CFBundleName: AppKit stamps it over the title the game sets, so it is rewritten too (the menu
+# and Dock names apply at the next install; the window title at the next start).
+rearmed=1
+if [[ ${RS_REARMED:-} == 0 ]]; then
+    rearmed=0
+elif [[ -z ${RS_REARMED:-} && -f "$home/settings.env" ]]; then
+    while IFS= read -r line || [[ -n $line ]]; do
+        line=${line//[[:space:]]/}
+        [[ -z $line || $line == \#* ]] && continue
+        case $line in RS_REARMED=0) rearmed=0; break ;; RS_REARMED=1) break ;; esac
+    done < "$home/settings.env"
+fi
+[[ $rearmed == 1 ]] && appname="RS Re-ARMed" || appname="Rocksmith 2014"
+plutil -replace CFBundleDisplayName -string Rocksmith2014 "$plist"
+plutil -replace CFBundleName -string "$appname" "$plist"
+mkdir -p "$home/game/Rocksmith2014.app.new/Contents/Resources/en.lproj"
+printf '"CFBundleDisplayName" = "%s";\n' "$appname" \
+    > "$home/game/Rocksmith2014.app.new/Contents/Resources/en.lproj/InfoPlist.strings"
 # Re-sign: the files added above are outside the build's signature, which broke the bundle's seal.
 codesign --force -s - "$home/game/Rocksmith2014.app.new/Contents/MacOS/Rocksmith2014" 2>/dev/null || true
 find "$home/game/Rocksmith2014.app.new" -name '._*' -delete
@@ -152,6 +175,13 @@ cat > "$launcher/Contents/Info.plist" <<EOF
 </dict>
 </plist>
 EOF
+# The launcher's shown name follows the branding too ($appname, set with the game bundle's above): its file
+# name stays RS Re-ARMed.app (the installer, the uninstall notes and players' habits assume it), while the
+# Finder, Launchpad and Spotlight show this localized string. CFBundleDisplayName above stays the file name
+# so they honour it.
+mkdir -p "$launcher/Contents/Resources/en.lproj"
+printf '"CFBundleDisplayName" = "%s";\n' "$appname" \
+    > "$launcher/Contents/Resources/en.lproj/InfoPlist.strings"
 codesign --force -s - "$launcher" 2>/dev/null || true
 # Let the Finder and the Dock pick up the new bundles and their icons.
 lsregister=/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister

@@ -48,7 +48,7 @@ How the Mac launcher runs the game, every launch:
   `launchctl setenv`) overrides its
   `[Audio] LatencyBuffer`.
 - **The title logo.** `static.psarc` is linked to `static.psarc.rearmed` when it is there
-  (`tools/loadscreen`; `RS_REARMED=0` for the original).
+  (`tools/loadscreen`; `RS_REARMED=0` for the original logo and the game's own title as the Dock and menu name).
 - The game is started with `open -n -a … --env …`: exec'ing it from the launcher leaves it without a
   window when the launcher was opened from the Finder.
 

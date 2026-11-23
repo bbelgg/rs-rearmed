@@ -1468,7 +1468,8 @@ class InstallerWindow: NSWindow {
         modsButton.target = self
         modsButton.action = #selector(showOptions)
         modsButton.toolTip = "Set the game's options, such as custom songs or the output buffer. Takes effect the next "
-            + "time the game starts; nothing to reinstall."
+            + "time the game starts; nothing to reinstall, except the branding's Dock, menu and launcher names, "
+            + "which need another install."
         modsButton.translatesAutoresizingMaskIntoConstraints = false
         content.addSubview(modsButton)
 
@@ -2303,7 +2304,8 @@ class InstallerWindow: NSWindow {
 
 // The built-in mods a player can switch off: KEY=0 lines in each edition's settings.env, which its launcher reads
 // at every start (tools/play-native/launch.sh; Learn & Play: win-x86/app/lp_settings.c), so a change needs no
-// reinstall. The keys are switches of docs/mac/INSTALL.md and docs/windows/INSTALL.md, "Settings and switches",
+// reinstall, except the branding's Dock, menu and launcher names, which the installs write (the window title
+// follows at the next start). The keys are switches of docs/mac/INSTALL.md and docs/windows/INSTALL.md, "Settings and switches",
 // and the same list as both launchers' (tools/play-native/test_settings.py checks it); nothing that touches the
 // offline layer can be set this way. No file is every mod on, as before there was one. Every other switch the
 // sheet offers goes to options.env beside it (optionSpecs, readOptions, saveOptions).
@@ -2335,8 +2337,13 @@ let builtInMods: [BuiltInMod] = [
                detail: "Off: the page crashes on such a song, as in the original game."),
     BuiltInMod(key: "RS_MODS_FRAME_RATE", title: "Calibration and the tuner the same at any frame rate",
                detail: "Off: they count in frames, as in the original game, which goes wrong above 60 Hz."),
-    BuiltInMod(key: "RS_REARMED", title: "Re-ARMed title logo",
-               detail: "Off: the game's own logo."),
+    BuiltInMod(key: "RS_REARMED", title: "RS Re-ARMed branding",
+               detail: "Off: the game's own title as the logo and app name, in the Dock, the menu, the window title and the launcher's icon. "
+                   + "The window title changes at the next start; the Dock, menu and launcher names at the next install, "
+                   + "so Build & Install again for a new name.",
+               lpDetail: "Off: the game's own title as the logo and app name, in the Dock, the menu and the window title. "
+                   + "The window title changes at the next start; the Dock and menu names at the next install, "
+                   + "so Build & Install again for a new name."),
 ]
 
 // The mods an edition's settings.env switches off, read as the launchers read it: whitespace ignored, # a comment,
@@ -2669,7 +2676,9 @@ final class OptionsSheet: NSObject {
         stack.addArrangedSubview(title)
         stack.setCustomSpacing(6, after: title)
         let intro = label("Set what you want. A change takes effect the next time the game starts, with "
-                          + "nothing to reinstall. Empty fields and Default popups are the game's own settings.", size: 12)
+                          + "nothing to reinstall, except the branding's Dock, menu and launcher names, which wait for "
+                          + "the next install: Build & Install again for a new name. Empty fields and Default popups are "
+                          + "the game's own settings.", size: 12)
         stack.addArrangedSubview(intro)
         stack.setCustomSpacing(6, after: intro)
         let warning = label("The defaults are what RS Re-ARMed is tested with. Changing these can have unexpected "

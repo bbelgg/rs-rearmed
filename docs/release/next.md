@@ -10,3 +10,9 @@ notes and empties this file. -->
   saves them, for the next start. The other renderer's rows are greyed, as are those a switch set with `launchctl
   setenv` holds (SET FOR THIS SESSION), and the longer list scrolls, with a scroll bar that can be dragged. Before,
   they could be set in the installer only.
+- **Mac: mods reach the note counts as the game does** (for mod authors: `game_root_state`, `game_state_current`,
+  `game_components`, `components_list`, `component_entry_size`, `component_entry_component`, `component_type`; the
+  counts are the component of the running game whose type is `note_stats_type`). The earlier path
+  (`song_menu_game`, `song_game_player`, `player_note_stats`) reached the counts in some runs and nothing in others,
+  so rearmed-mods' Show Current Accuracy could stay empty; those names are kept. Learn & Play's counts are reached as
+  before, and the new names are unsupported there.

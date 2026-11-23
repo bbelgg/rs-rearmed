@@ -1184,6 +1184,8 @@ ak_seek_on_event_name                                            0x100ab3160  sy
 ak_query_objects_name                                            0x100af0960  sysv  int(const char *, uint32_t *, void *)
 ak_source_play_position                                          0x100ab33a0  sysv  int(uint32_t, int *, bool)
 ui_manager                                                       0x1018ef7c8  data  void *  # 0x100365e30 returns it
+game_root                                                        0x1018e9f48  data  void *  # 0x100271870 returns it; 0x100271890 takes the game that runs now from it (game_root_state, game_state_current)
+note_stats_type                                                  0x1013ecbe0  data  uint32_t  # 111000: GameComponentRepetitionLAS's constructor 0x10024f980 hands it to the component's (0x10024f98d); the counts are 0x10024f980's object, counted at 0x1002542c5 and 0x100254464
 game_color_manager                                               0x1018fa868  data  void *  # set by its init at 0x1006e8d02, cleared by 0x1006e8d10, its destructor
 detection_service                                                0x1018e8da0  data  void *  # set by its constructor 0x10021ab70, cleared by its destructors 0x10021abb0 and 0x10021abd0
 nicamera_vtable                                                  0x101841d60  data  void *[]

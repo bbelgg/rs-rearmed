@@ -120,6 +120,13 @@ tone_change_busy                  0x82    # 0x1352632 (cmpb $1); set at 0x135264
 song_menu_game                    unsupported  read in runs: +0x2c +0x78 +0x24 reached the counts in two runs, not in a third (+0x78 empty); ui_note_stats_* is RSMods' path
 song_game_player                  unsupported  as song_menu_game
 player_note_stats                 unsupported  as song_menu_game
+game_root_state                   unsupported  Learn & Play's counts are reached by RSMods' path (ui_note_stats_0)
+game_state_current                unsupported  as game_root_state
+game_components                   unsupported  as game_root_state
+components_list                   unsupported  as game_root_state
+component_entry_size              unsupported  as game_root_state
+component_entry_component         unsupported  as game_root_state
+component_type                    unsupported  as game_root_state
 note_stats_hits                   0x30    # a hit 0xfd4459 (addl); the streak +0x34; RSMods' LearnASongNoteData
 note_stats_misses                 0x40    # a miss 0xfd4a82 (addl); the miss streak +0x44, the streak cleared (+0x34)
 note_stats_track                  0xc     # 0xfd4a79: [this + 0xc] after a miss, where the Mac reads +0x10 (0x10025449b)

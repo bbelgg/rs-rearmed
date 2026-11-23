@@ -119,7 +119,7 @@ ni_step_active                    0x38    # 0x100ea8e20
 ni_get_rtti_slot                  0x3     # the two destructors, DeleteThis, GetRTTI
 ni_camera_frustum                 0x168   # NiCamera::SetViewFrustum 0x100e438c0
 ni_camera_far                     0x17c
-game_color_table                  0x690   # read in a run: the same colors as Learn & Play's at +0x350
+game_color_table                  0x690   # 0x1006eacc0: GetColour 0x1006eac80 reads [manager + bank * 0x540 + kind * 0x30 + string * 8 + 0x690]; read in a run: the same colors as Learn & Play's at +0x350
 song_search_key                   0x2c    # `/`: this game's binding, seen in the song lists (docs/mac/TESTING.md)
 song_search_key2                  0x2c
 detection_service_detector        0x18    # Player 1's: made for input 0 by its init (0x10021acc1); +0x20 is Player 2's (input 2)
@@ -128,9 +128,16 @@ detection_instrument              0x1300  # set at 0x10021bda0 from the input's 
 detection_note                    0x70c   # 0x10022dd05: compared with the note asked for
 detection_note_bass               0x704   # 0x10022dcf9
 tone_change_busy                  0xfe    # 0x1002bebed: a byte a player; set at 0x1002bec04, cleared at 0x1002bd602
-song_menu_game                    0x58    # read in runs: the same object from LearnASong_Game and _Pause, ScoreAttack_Game and _Pause
-song_game_player                  0x18    # read in runs
-player_note_stats                 0x30    # read in runs: the counts below, in Learn a Song and Score Attack
+song_menu_game                    0x58    # read in runs, and no fixed place: what it leads to is a list whose order differs from run to run, so +0x18 below was the counts' holder in some runs and not in others (2026-11-23: empty, or another object). The game's route is game_root's
+song_game_player                  0x18    # read in runs: see song_menu_game
+player_note_stats                 0x30    # read in runs: see song_menu_game
+game_root_state                   0x18    # 0x100271890: [root + 0x18], handed to 0x100269870
+game_state_current                0x80    # 0x100269879: [state + 0x80], the game object the callers test for GRGame_PlaySong_GE (0x1018f1c80: 0x1006c8269, 0x10044f1b2, 0x1007cd36e); read in a run: the song's, playing and paused
+game_components                   0x20    # 0x1003b314f: the game object's own setup adds its components to [game + 0x20] (0x1002570e0)
+components_list                   0x8     # 0x100257104: the vector at +0x8 (end +0x10, capacity +0x18)
+component_entry_size              0x10    # 0x10025711c: an entry is 16 bytes, a u32 and the component
+component_entry_component         0x8     # 0x100257171: [end - 8]; the lookup 0x1002571d1 reads [entry + 8]
+component_type                    0xc     # 0x10023dfdf: the base constructor 0x10023dfa0 (component, type, owner); the owner at +0x10
 note_stats_hits                   0x40    # a hit 0x1002542c5 (incl); the streak +0x44
 note_stats_misses                 0x50    # a miss 0x100254464 (incl); the miss streak +0x54, the streak cleared
 note_stats_track                  0x10    # 0x10025449b: [this + 0x10] after a miss; read in runs: the track below

@@ -142,9 +142,16 @@ detection_instrument        # pitch detection: u32 instrument, 2 = bass
 detection_note              # pitch detection: s32 the note played (MIDI), a guitar's
 detection_note_bass         # pitch detection: s32 the note played (MIDI), a bass's
 tone_change_busy            # the tone system: a byte a player, a tone change under way (tone_change waits on it)
-song_menu_game              # a song's menu, playing or paused (Learn a Song, Score Attack): the song's game object
-song_game_player            # the song's game object: Player 1's
-player_note_stats           # the player: the note counts (RSMods' LearnASongNoteData)
+song_menu_game              # a song's menu, playing or paused: the first step of a path to the note counts that was read in runs and does not hold (game_root is the game's own)
+song_game_player            # that path's second step
+player_note_stats           # that path's third: the note counts (RSMods' LearnASongNoteData)
+game_root_state             # the game root (game_root): its state
+game_state_current          # the state: the game that runs now, the song's game object while a song plays (GRGame_PlaySong_GE)
+game_components             # a game object: its components' container
+components_list             # the container: its std::vector of entries (std_vector_begin, std_vector_end)
+component_entry_size        # the size of an entry of that vector
+component_entry_component   # an entry: its component
+component_type              # a component: u32, its type's number (note_stats_type for the note counts); its owner is at note_stats_track
 note_stats_hits             # note counts: s32 notes hit
 note_stats_misses           # note counts: s32 notes missed
 note_stats_track            # note counts: the player's track, the object with the song's times

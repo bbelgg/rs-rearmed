@@ -49,8 +49,10 @@ into the notes as it stands. -->
   changed how Player 2's saved input is found. New in 1.18.0 and not tried: Learn & Play at a render scale other than
   50% (the Mac edition was played at 75% and 50%), a mod on Learn & Play's guitar input with a guitar, a cable or an
   interface (the game heard a mod's changes with the Mac's microphone as the input), and each of the 24 lists opened
-  and dragged (the profiles, Nonstop Play's songs and the Tone Designer's lists were, in both editions). The stuck
-  tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+  and dragged (the profiles, Nonstop Play's songs and the Tone Designer's lists were, in both editions). New in 1.19.0
+  and not tried in the runs made for the release, which went to the note highway in each edition: the Mac edition's
+  rows in ADV DISPLAY SETTINGS (opening the menu, changing a row, the next start with it), and the installer app,
+  which was not opened. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**

@@ -111,8 +111,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
   (`tools/targets/win-x86/edits.map`, `mids.map`); the points that are the Mac's own are `none` here.
 - **What the game names for mods**: as the Mac edition. The palette textures are BGRA here, so their hashes differ
   from the Mac's; the note the game hears and the note counts are reached as RSMods reaches them on this game (the
-  counts from the UI manager, in Score Attack by its own names; the Mac's names for its game's own route,
-  `game_root_state` to `component_type`, are unsupported here, not released); the hooks on the tone change and the
+  counts from the UI manager, in Score Attack by its own names); the Mac's names for its game's own route,
+  `game_root_state` to `component_type`, are unsupported here (new in 1.19.0); the hooks on the tone change and the
   song lists' names are wrapped at the functions RSMods patches.
 - **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native at 64 frames, as on the Mac. Its open
   work is kept with it.

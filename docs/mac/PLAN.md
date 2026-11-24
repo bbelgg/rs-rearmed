@@ -48,7 +48,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
-- **In the game's menu** (not released): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
+- **In the game's menu** (new in 1.19.0): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
   game's own rows, saved where the installer saves them, for the next start; the other renderer's rows are greyed, as
   are those a switch set for the session (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar
   that can be dragged ([INSTALL.md](INSTALL.md#settings-and-switches)).
@@ -118,13 +118,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **What the game names for mods** (in `tools/targets`, the same names in both editions): the colors of notes and the
   highway, through the [render API](METAL.md#render-api-shimsincluders_renderh) on Metal by the game's small palette
   textures, and of the strings, in the game's own color table; the note the game hears (Player 1's pitch detection,
-  guitar and bass); Player 1's hits and misses and the track's grey-note time, in Learn a Song and Score Attack (not
-  released: reached as the game's own code reaches them, from the game root's running game to its component of the
-  note counts' type, `game_root_state` to `component_type`; the earlier path from the song's menu, `song_menu_game`,
-  did not hold from run to run and keeps its names); and hooks on the tone change (`tone_change`, for clearing the
-  wait behind a stuck tone), on the song lists' names (`song_list_name`) and on decoded song audio (`ak_src_submit`:
-  each Wwise source's decoded block on its way to the mixer, with the source's file and position, and the game's
-  Vorbis codebooks).
+  guitar and bass); Player 1's hits and misses and the track's grey-note time, in Learn a Song and Score Attack, reached
+  as the game's own code reaches them, from the game root's running game to its component of the note counts' type,
+  `game_root_state` to `component_type` (new in 1.19.0); the earlier path from the song's menu, `song_menu_game`, did
+  not hold from run to run and keeps its names; and hooks on the tone change (`tone_change`, for clearing the wait
+  behind a stuck tone), on the song lists' names (`song_list_name`) and on decoded song audio (`ak_src_submit`: each
+  Wwise source's decoded block on its way to the mixer, with the source's file and position, and the game's Vorbis
+  codebooks).
 - **Your own plug-in** (rearmed-mods' ToneHost add-on): played with Helix Native, with the game's gear mapped onto it.
   Its open work is kept with it.
 

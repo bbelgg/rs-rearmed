@@ -66,7 +66,7 @@ done
 $CC -w -c "$tgt/rc_target.c" -o "$obj/rt/rc_target.o"
 
 echo "===== App ====="
-$CC -Wall -I"$root/win-x86/shims" -c "$root/win-x86/app/lp_main.c" -o "$obj/lp_main.o"
+$CC -Wall -I"$root/win-x86/shims" -I"$root/shims/platform/include" -c "$root/win-x86/app/lp_main.c" -o "$obj/lp_main.o"
 # The network guard: Learn & Play has no socket of its own to guard, but a mod is native code. The app loads
 # it before any mod (lp_main.c), and without it loads no mods; the same library as the Mac edition's.
 clang -arch arm64 -dynamiclib -O1 -mmacosx-version-min=11.0 -o "$out/libnetguard.dylib" "$root/tools/ws8/netguard/netguard.c"

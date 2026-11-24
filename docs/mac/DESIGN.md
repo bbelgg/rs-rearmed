@@ -397,21 +397,22 @@ What each does:
   `mods_shared.c`, one rule for both editions). A movie the overlay doesn't hold opens as before, through a mod's
   own hook too (rearmed-mods serves three).
 - **RS Re-ARMed's options in ADV DISPLAY SETTINGS** (this edition's; `RS_MODS_OVERLAY=0` leaves the menu as it is).
-  The overlay adds a button for each of ten switches to the menu's definition
+  The overlay adds a button for each of twelve switches to the menu's definition
   (`manifests/ui_menu_pillar_options.database.json`), with their labels and descriptions as new rows of the game's
-  text table (38901-38920, the English in every language), and the game lists, sorts and shows them with its own. The
+  text table (38901-38924, the English in every language), and the game lists, sorts and shows them with its own. The
   menu's code knows only the game's settings, so `tools/ws7/recomp/overrides/mods/menu_options.c` puts a native
   function in front of five of its methods, in the classes' vtables at the first frame: the list's refresh (each row's
-  current value, and the other renderer's rows locked, as are those the session sets: a switch whose value in the
-  environment isn't `options.env`'s, since the launcher passes the file's lines and prefers the session's, or an
-  `RS_GL_BACKEND` set neither by the launcher, for an OpenGL `renderer` file, nor by the shell's own restart
-  (`rsp_renderer_env_given`)), a press (Edit Setting opened on the switch), Edit Setting's build (a checkbox, or a
-  notched slider as the game makes VISUAL QUALITY's) and its input (a change written to `options.env`, the renderer to
-  `renderer`). The menu's movie (`gfxassets/views/displaysettings.gfx` of `static.psarc`, through the same hook as the
-  lists) gets two edits: a locked row's label in the movie's own greys, and the list, now longer than its panel,
-  scrolled with the focus (SettingsScene's PopulateButtons wrapped), with the game's own scroll bar beside it. The
-  menu has no code to drag that bar, so the fifth native function, in front of the list's input, does: a press on the
-  bar starts a drag, and the game's own Up and Down move the focus to the row under the pointer.
+  current value, and the rows that can't apply locked, with why as their value: the other renderer's, Low Latency at a
+  fixed frame rate, and those the session sets: a switch whose value in the environment isn't `options.env`'s, since
+  the launcher passes the file's lines and prefers the session's, or an `RS_GL_BACKEND` set neither by the launcher,
+  for an OpenGL `renderer` file, nor by the shell's own restart (`rsp_renderer_env_given`)), a press (Edit Setting
+  opened on the switch), Edit Setting's build (a checkbox, or a notched slider as the game makes VISUAL QUALITY's) and
+  its input (a change written to `options.env`, the renderer to `renderer`). The menu's movie
+  (`gfxassets/views/displaysettings.gfx` of `static.psarc`, through the same hook as the lists) gets two edits: a
+  locked row's label in the movie's own greys, and the list, now longer than its panel, scrolled with the focus
+  (SettingsScene's PopulateButtons wrapped), with the game's own scroll bar beside it. The menu has no code to drag
+  that bar, so the fifth native function, in front of the list's input, does: a press on the bar starts a drag, and
+  the game's own Up and Down move the focus to the row under the pointer.
 - **Song ownership during a mount** (shared, a pre hook on `steam_dlc_owned`). The game checks an archive's AppID
   against the list it made once at start from `GetDLCCount`, so `RS_STEAM_DLC` can't answer for a song added later.
   While the install steps run the hook answers yes (each edition's mounting loop says when they do): an archive in

@@ -41,6 +41,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
   original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed
   mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original.
 - **Retina, colour and a sharper picture**: as the Mac edition, the renderer being shared.
+- **Performance overlay and low latency** (not released): `RS_METAL_HUD` and `RS_METAL_DRAWABLES`, as the Mac edition,
+  from the same header (`shims/platform/include/rsp_layer.h`); compiled, not run yet.
 - **The tuner's red peg** (new in 1.18.0): as the Mac edition, from the renderer's rule for a draw that samples its
   own target ([DESIGN.md](DESIGN.md#direct3d-9)). Before it the tuner also turned purple with a back buffer of
   1102x717 or 1104x718, in 9 of 10 runs at those sizes; with the rule five runs at 1102x717 and one at 1470x956

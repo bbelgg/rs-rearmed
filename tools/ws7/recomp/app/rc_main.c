@@ -49,6 +49,7 @@
 #include "rc_abi.h"
 #include "rc_hook.h"
 #include "rc_rt.h"
+#include "rsp_layer.h"
 #include "rsp_platform.h"
 #include "rsp_renderer.h"
 #include "seam.h"
@@ -285,6 +286,8 @@ int main(int argc, char **argv, char **envp, char **apple) {
     else gargv[gargc++] = argv[i];
   }
   gargv[gargc] = 0;
+  // Before anything starts Metal: RS_METAL_HUD's, with Metal only (RS_GL_BACKEND=gl: this start is OpenGL's).
+  rsp_layer_env(rsp_renderer_parse(getenv("RS_GL_BACKEND")) == RSP_GFX_GL);
   // 0. the network guard, then the renderer, before anything heavy: each may start this process again
   // (DYLD_INSERT_LIBRARIES, RS_GL_BACKEND).
   if (!init_only && !bind_only) {

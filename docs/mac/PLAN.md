@@ -39,6 +39,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
+- **Performance overlay and low latency** (not released): `RS_METAL_HUD=1` shows Apple's Metal Performance HUD over
+  the game (macOS 13 and later), and `RS_METAL_DRAWABLES=2` queues two frames for the screen instead of three with
+  vsync, each shown a refresh sooner ([INSTALL.md](INSTALL.md#settings-and-switches)).
 - **The tuner's red peg** (new in 1.18.0): the game lights the peg of the string it listens to in red, with a glow it
   blurs by draws that sample the texture they draw into. Metal gave such a draw the last frame's picture, so the
   peg stayed grey; now it gets a copy of what was drawn before it
@@ -48,11 +51,12 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
-- **In the game's menu** (new in 1.19.0): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
-  game's own rows, saved where the installer saves them, for the next start; the other renderer's rows are greyed, as
-  are those a switch set for the session (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar
-  that can be dragged ([INSTALL.md](INSTALL.md#settings-and-switches)).
-  Learn & Play's are set in the installer only ([its plan](../windows/PLAN.md#status)).
+- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY not released): OPTIONS → ADV DISPLAY
+  SETTINGS lists twelve of the picture switches after the game's own rows, saved where the installer saves them, for the
+  next start; the other renderer's rows are greyed, as are those a switch set for the session (`launchctl setenv`)
+  holds, and the longer list scrolls, with a scroll bar that can be dragged
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play's are set in the installer only
+  ([its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

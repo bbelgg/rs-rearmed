@@ -4,6 +4,7 @@
 // links and runs against the system OpenGL.framework when it is built without libRSOpenGL (then
 // the backend is always GL).
 #import "rsp_present.h"
+#include "rsp_layer.h"
 #include "rsp_renderer.h"
 #include "rsp_scale.h"
 
@@ -110,15 +111,7 @@ int rsp_mtl_retina(void) {
   return v;
 }
 
-int rsp_mtl_drawables(int swap_interval) {
-  static int forced = -1;
-  if (forced < 0) {
-    const char *e = getenv("RS_METAL_DRAWABLES");
-    int n = e && *e ? atoi(e) : 0;
-    forced = n == 2 || n == 3 ? n : 0;
-  }
-  return forced ? forced : swap_interval ? 3 : 2;
-}
+int rsp_mtl_drawables(int swap_interval) { return rsp_layer_drawables(swap_interval != 0); }
 
 // Frame thread or before the first frame: the layer's sync settings for `swap`.
 static void apply_swap(rsp_mtl *m, int swap) {
@@ -187,6 +180,7 @@ rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
   CGFloat scale;
   view_size(view, &w, &h, &scale);
   layer.contentsScale = scale;
+  rsp_layer_show_hud(layer);
   // Layer-hosting: AppKit never draws into it; the drawable is scaled to the bounds.
   [view setLayer:layer];
   [view setWantsLayer:YES];

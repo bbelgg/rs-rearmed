@@ -70,6 +70,7 @@
 #include "lp_settings.h"
 #include "rc32.h"
 #include "rc_hook.h"
+#include "rsp_layer.h"
 #include "win32_shims.h"
 
 // The 64-bit runtime pieces linked here (rc_tramp, rc_setjmp, rc_thread) look functions up by
@@ -441,6 +442,7 @@ int main(int argc, char **argv) {
     snprintf(options, sizeof options, "%s/options.env", home);
     lp_options_apply(options);
   }
+  rsp_layer_env(0);  // (before anything starts Metal: RS_METAL_HUD; Learn & Play has no OpenGL renderer)
   mods_guard(argv);  // may start this process again: before the log is turned over
   int installed = installed_defaults();
   const char *image = dflt_env("LP_IMAGE", "lp_game.exe");

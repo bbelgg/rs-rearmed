@@ -49,10 +49,11 @@ into the notes as it stands. -->
   changed how Player 2's saved input is found. New in 1.18.0 and not tried: Learn & Play at a render scale other than
   50% (the Mac edition was played at 75% and 50%), a mod on Learn & Play's guitar input with a guitar, a cable or an
   interface (the game heard a mod's changes with the Mac's microphone as the input), and each of the 24 lists opened
-  and dragged (the profiles, Nonstop Play's songs and the Tone Designer's lists were, in both editions). New in 1.19.0
-  and not tried in the runs made for the release, which went to the note highway in each edition: the Mac edition's
-  rows in ADV DISPLAY SETTINGS (opening the menu, changing a row, the next start with it), and the installer app,
-  which was not opened. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+  and dragged (the profiles, Nonstop Play's songs and the Tone Designer's lists were, in both editions). New in 1.20.0
+  and not tried: the next start with a row of ADV DISPLAY SETTINGS changed, in either edition (the rows were opened,
+  LOW LATENCY changed and saved, the scroll bar dragged and a row clicked, with a mouse driven by a test mod, in each
+  edition), the trackpad on a real trackpad in this release's runs, the Metal HUD in Learn & Play since its release
+  build, and the installer app, which was not opened. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**
@@ -77,4 +78,4 @@ into the notes as it stands. -->
 - This edition reads PC song archives (`*_p.psarc`), so a Mac-only custom song collection doesn't load. Official
   DLC has both kinds.
 - Two crashes have been seen once each and not reproduced.
-- It uses more memory than the Mac edition (1.5 GB against 1.2 GB) and more CPU (about 10 points of a core in a song).
+- It uses more memory than the Mac edition (1.4 GB against 1.3 GB) and more CPU (about 7-8 points of a core in a song).

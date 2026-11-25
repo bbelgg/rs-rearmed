@@ -44,7 +44,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed
   mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original.
 - **Retina, colour and a sharper picture**: as the Mac edition, the renderer being shared.
-- **Performance overlay and low latency** (not released): `RS_METAL_HUD` and `RS_METAL_DRAWABLES`, as the Mac edition,
+- **Performance overlay and low latency** (new in 1.20.0): `RS_METAL_HUD` and `RS_METAL_DRAWABLES`, as the Mac edition,
   from the same header (`shims/platform/include/rsp_layer.h`); compiled, not run yet.
 - **The tuner's red peg** (new in 1.18.0): as the Mac edition, from the renderer's rule for a draw that samples its
   own target ([DESIGN.md](DESIGN.md#direct3d-9)). Before it the tuner also turned purple with a back buffer of
@@ -53,7 +53,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Render scale** (new in 1.18.0): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
   sees and a resized window at N%. Played full screen on a 1470x956 Retina screen to a song's note highway: 50% (a
   735x478 frame) is fine.
-- **In the game's menu** (not released): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
+- **In the game's menu** (new in 1.20.0): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
   game's own rows, as the Mac edition's twelve without RENDERER and MULTITHREADED GL ENGINE (this edition has Metal
   only), saved to `options.env` for the next start ([INSTALL.md](INSTALL.md#settings-and-switches)). Played on a test
   build: the rows, their values, FRAME RATE's slider, ANY WINDOW SHAPE's checkbox, LOW LATENCY greyed at a fixed

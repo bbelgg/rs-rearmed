@@ -67,7 +67,7 @@ The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-AR
 checks the copy is complete (telling a drive that is not connected from an incomplete copy), links `static.psarc` to the
 title logo or the original, keeps the game's `Rocksmith.ini` offline ([Online services](#online-services)), passes the
 built-in mods switched off in `settings.env` (only its nine switches) and the other switches set in `options.env` (only
-its 36; a value in the environment wins over either), seeds the
+its 38; a value in the environment wins over either), seeds the
 offline Steam saves once, and starts the game with the network guard inserted (`open -n -a`). Nothing of Steam's is read
 while the game runs, except `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves
 are there.

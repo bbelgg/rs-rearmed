@@ -10,8 +10,9 @@
 //   RS_MODS_BYPASS=0   RSBypass off: the .sng signature check is enforced, and an archive's AppID is asked of the
 //                      game's DLC list during a mount too (default on)
 //   RS_MODS_FIXES=0    rsmacfixes off: the path-MD5 cache, batched DLC mounting, the number-table hash, the
-//                      open-file limit, and the Mac's keyboard keys and thread priority; every overridden
-//                      function then behaves exactly like the original (default on)
+//                      open-file limit, and the Mac's keyboard keys, thread priority and FFT setups (fftsetup.c,
+//                      through the import thunks); every overridden function then behaves exactly like the original
+//                      (default on)
 //   RS_MODS_INTRO=0    the intro screens (logos, legal screens, intro video) play at start-up (default:
 //                      skipped, the game goes straight to the title screen)
 //   RS_MODS_BUDGET_MS  per-frame budget of the batched DLC mounting (default 50; 0 = one per frame)

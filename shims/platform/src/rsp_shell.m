@@ -753,7 +753,8 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 // The process goes on until rsp_exit at the end of OpenGLView's dealloc (the display link stops, the Metal
 // cache is written: up to 2 s), and a timer that fired in that time retained a freed object (a crash in
 // objc_retain, before customEventTimer: could look at rsp_quitting). The same for a customEventTimer: or
-// mouseMoved: the main thread was already in. The process ends there, so the memory is not missed.
+// mouseMoved: the main thread was already in; one that starts after it returns at once (rsp_quitting). The
+// process ends there, so the memory is not missed.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wobjc-missing-super-calls"
 - (void)dealloc {  // 0x100185950
@@ -798,6 +799,8 @@ static NSScreen *rsp_window_screen(NSWindow *w) {
 }
 
 - (void)mouseMoved:(NSEvent *)e {  // 0x100185b40
+  // (not in the original: once dealloc has begun the quit, openGLView may be going away, and the game takes no input)
+  if (atomic_load(&rsp_quitting)) return;
   NSPoint p = [openGLView convertPoint:[e locationInWindow] fromView:nil];
   // points -> engine pixels (not in the original: the render scale is 1 unless RS_METAL_RETINA or RS_METAL_SCALE)
   rsp_post_input(RSP_EV_MOUSEMOVE, rsp_mouse_engine_coord(p.x), rsp_mouse_engine_coord(p.y));

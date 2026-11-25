@@ -5,10 +5,13 @@
 //                           display, so a third only adds latency). 2 with vsync is low-latency presentation: a
 //                           frame is on the screen a refresh sooner, and one that is late shows as a repeated one.
 //   RS_METAL_HUD=1          Apple's Metal Performance HUD over the game: its frame rate, frame times and GPU
-//                           memory, with Metal only (the Mac edition's OpenGL renderer has none). MTL_HUD_ENABLED=1
-//                           before Metal starts (rsp_layer_env, first in each main) and the layer's
-//                           developerHUDProperties (rsp_layer_show_hud). Documented for macOS 13 and later, the
-//                           property's (whether MTL_HUD_ENABLED alone shows it on macOS 12 isn't known).
+//                           memory, with Metal only (the Mac edition's OpenGL renderer has none). It's enabled before
+//                           Metal starts (MTL_HUD_ENABLED, rsp_layer_env, first in each main) with RS_METAL_HUD=1
+//                           only: enabled, Metal loads its HUD library (and its menu items), and the HUD costs CPU
+//                           time each frame even hidden. The layer's developerHUDProperties (macOS 13 and later,
+//                           where it's documented: rsp_layer_show_hud) show or hide it, so a game started with it can
+//                           hide it and show it again as it runs (the Mac's Adv Display Settings); one started
+//                           without it has it from its next start.
 //
 // Each edition's presenter applies them to its CAMetalLayer: the Mac's src/rsp_present_metal.m, Learn & Play's
 // win-x86/app/lp_window.m.
@@ -49,9 +52,9 @@ static inline int rsp_layer_hud(void) {
 // as it is (Apple's own switch).
 static inline int rsp_layer_hud_env(int hud, int gl) { return !hud ? 0 : gl ? -1 : 1; }
 
-// First in main, before anything starts Metal: the HUD's own switch for RS_METAL_HUD, with Metal only. GL: the Mac
-// edition's OpenGL renderer, RS_GL_BACKEND=gl as the launcher passes it for OpenGL and main sets it to start again
-// with OpenGL (rsp_renderer.h); Learn & Play's renderer is Metal.
+// First in main, before anything starts Metal: the HUD's own switch for RS_METAL_HUD, with Metal only (never for a
+// start without it: see RS_METAL_HUD above). GL: the Mac edition's OpenGL renderer, RS_GL_BACKEND=gl as the launcher
+// passes it for OpenGL and main sets it to start again with OpenGL (rsp_renderer.h); Learn & Play's renderer is Metal.
 static inline void rsp_layer_env(int gl) {
   int e = rsp_layer_hud_env(rsp_layer_hud(), gl);
   if (e > 0) setenv("MTL_HUD_ENABLED", "1", 1);
@@ -61,10 +64,10 @@ static inline void rsp_layer_env(int gl) {
 #ifdef __OBJC__
 #import <QuartzCore/CAMetalLayer.h>
 
-// The HUD shown on LAYER when RS_METAL_HUD asks for it.
-static inline void rsp_layer_show_hud(CAMetalLayer *layer) {
-  if (!rsp_layer_hud()) return;
-  if (@available(macOS 13.0, *)) layer.developerHUDProperties = @{@"mode" : @"default", @"logging" : @"disabled"};
+// The HUD on LAYER shown, or hidden.
+static inline void rsp_layer_show_hud(CAMetalLayer *layer, int on) {
+  if (@available(macOS 13.0, *))
+    layer.developerHUDProperties = @{@"mode" : on ? @"default" : @"disabled", @"logging" : @"disabled"};
 }
 #endif
 

@@ -718,7 +718,7 @@ MENU_OPTIONS = [
      "starts.", 13),
     ("rsLowLatency", "38921", "LOW LATENCY", "38922",
      "Queues two frames for the screen instead of three: each one shows a refresh sooner{C} and a late one as a "
-     "repeat. Takes effect the next time the game starts.", 14),
+     "repeat. Takes effect at once.", 14),
     ("rsMetalFXUpscaling", "38901", "METALFX UPSCALING", "38902",
      "Scales the picture up to a Retina screen's pixels with MetalFX. Disabling this uses a plain scale{C} improving "
      "performance. Takes effect the next time the game starts.", 15),
@@ -729,25 +729,28 @@ MENU_OPTIONS = [
      "Draws the game at a lower resolution and scales it up to the screen{C} for less graphics work and a softer "
      "picture. Takes effect the next time the game starts.", 17),
     ("rsSharpening", "38925", "SHARPENING", "38926",
-     "Sharpens the picture on the screen{C} after any upscaling. Takes effect the next time the game starts.", 18),
+     "Sharpens the picture on the screen{C} after any upscaling. Takes effect at once.", 18),
     ("rsAntiAliasing", "38905", "ANTI-ALIASING", "38906",
-     "Smooths the edges of the 3D scene with MSAA. Lower settings improve performance. Takes effect the next time "
-     "the game starts.", 19),
+     "Smooths the edges of the 3D scene with MSAA. Lower settings improve performance. Takes effect at once.", 19),
     ("rsTextureFiltering", "38907", "TEXTURE FILTERING", "38908",
-     "Keeps textures sharp when seen at an angle. 1X is the game's own. Takes effect the next time the game starts.",
+     "Keeps textures sharp when seen at an angle. 1X is the game's own. Takes effect at once.",
      20),
     ("rsColor", "38909", "COLOR", "38910",
      "SRGB shows the game's colors as it made them. VIVID leaves them unmatched{C} more saturated on a wide-color "
-     "screen. Takes effect the next time the game starts.", 21),
+     "screen. Takes effect at once.", 21),
     ("rsPerformanceOverlay", "38923", "PERFORMANCE OVERLAY", "38924",
-     "Shows Apple's Metal performance HUD over the game (macOS 13 and later): its frame rate{C} frame times and "
-     "memory. Takes effect the next time the game starts.", 22),
+     "Shows Apple's Metal performance HUD (macOS 13 and later): frame rate{C} frame times and memory. Takes effect "
+     "at once if the game started with it on{C} otherwise the next time it starts.", 22),
 ]
 TEXT_COLUMNS = 8  # the table's languages after a row's id
 # Learn & Play has Metal only: its list leaves out the renderer's choice and the OpenGL engine (menu_options_common.c,
-# mac_only).
+# mac_only). It reads the switches as it starts (no rs_menu_live_switch there), so the rows the Mac changes at once
+# say the next start.
 MAC_ONLY_OPTIONS = ("rsRenderer", "rsMultithreadedGL")
-LP_MENU_OPTIONS = [o for o in MENU_OPTIONS if o[0] not in MAC_ONLY_OPTIONS]
+AT_ONCE, AT_START = "Takes effect at once.", "Takes effect the next time the game starts."
+HUD_AT_ONCE = "Takes effect at once if the game started with it on{C} otherwise the next time it starts."
+LP_MENU_OPTIONS = [o[:4] + (o[4].replace(AT_ONCE, AT_START).replace(HUD_AT_ONCE, AT_START),) + o[5:]
+                   for o in MENU_OPTIONS if o[0] not in MAC_ONLY_OPTIONS]
 
 
 def edit_options(text, options=MENU_OPTIONS):

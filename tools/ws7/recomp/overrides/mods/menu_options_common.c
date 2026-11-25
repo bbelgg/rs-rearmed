@@ -212,12 +212,16 @@ static int session_set(const option *o) {
   return strcmp(v, line) != 0;
 }
 
+// The Mac's menu_options.c sets it to the shell's rsp_live_switch; Learn & Play has none.
+int (*rs_menu_live_switch)(const char *name, const char *value);
+
 void rs_menu_set_choice(option *o, int c) {
   o->now = c;
   const char *v = o->value[c];
   int r = o->env ? save_switch(o->env, c == o->dflt || !*v ? NULL : v) : save_renderer(v);
-  rs_mods_logf("menu options: %s %s%s", o->env ? o->env : "renderer", *v ? v : "(default)",
-               r ? " (not written)" : "");
+  int now = o->env && rs_menu_live_switch && rs_menu_live_switch(o->env, v);
+  rs_mods_logf("menu options: %s %s%s%s", o->env ? o->env : "renderer", *v ? v : "(default)",
+               r ? " (not written)" : "", now ? ", at once" : "");
 }
 
 void rs_menu_opts_init(int lp) {

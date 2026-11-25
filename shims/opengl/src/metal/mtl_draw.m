@@ -87,17 +87,35 @@ void rsm_draw_init(RSMContext *ctx) {
 @implementation RSMMsaa
 @end
 
+// RS_METAL_MSAA's count, asked for (as the process started, or as rsm_set_msaa last set it: a twin of another count
+// is made again, so the change shows from the next frame); -1 before it is read.
+static _Atomic int rsm_msaa_asked = -1;
+
+static int rsm_msaa_value(const char *e) {
+    int n = e && *e ? atoi(e) : 4;
+    return n >= 8 ? 8 : n >= 4 ? 4 : n >= 2 ? 2 : 1;
+}
+
+void rsm_set_msaa(const char *v) { atomic_store(&rsm_msaa_asked, rsm_msaa_value(v)); }
+
 static int rsm_msaa_samples(RSMContext *ctx) {
-    static int v;
-    if (!v) {
-        const char *e = getenv("RS_METAL_MSAA");
-        int n = e && *e ? atoi(e) : 4;
-        n = n >= 8 ? 8 : n >= 4 ? 4 : n >= 2 ? 2 : 1;
+    static int asked = -1, v;  // (the render thread's)
+    int a = atomic_load(&rsm_msaa_asked);
+    if (a < 0) {
+        int was = -1;
+        atomic_compare_exchange_strong(&rsm_msaa_asked, &was, rsm_msaa_value(getenv("RS_METAL_MSAA")));
+        a = atomic_load(&rsm_msaa_asked);
+    }
+    if (a != asked) {
+        int n = a;
         while (n > 1 && ![ctx->dev supportsTextureSampleCount:(NSUInteger)n])
             n >>= 1;
+        asked = a;
         v = n;
         if (n > 1)
             rsm_log("MSAA %dx on the game's screen-sized targets with depth (RS_METAL_MSAA)", n);
+        else
+            rsm_log("MSAA off (RS_METAL_MSAA)");
     }
     return v;
 }
@@ -396,8 +414,9 @@ static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     // MSAA (above): the twins, when every target it loads has one that is up to date
     RSMMsaa *mc = nil, *md = nil;
     int samples = 1;
-    if (ctx->pass_msaa_shape) {
-        int n = rsm_msaa_samples(ctx);
+    // The shape was decided at the bind; the count may have changed since (rsm_set_msaa), to off as well.
+    int n = ctx->pass_msaa_shape ? rsm_msaa_samples(ctx) : 1;
+    if (n > 1) {
         mc = rsm_msaa_twin(ctx, color, n);
         md = rsm_msaa_twin(ctx, depth, n);
         bool ok = mc && md && (mc->valid || (pc & GL_COLOR_BUFFER_BIT)) && (md->valid || (pc & GL_DEPTH_BUFFER_BIT)) &&
@@ -1331,7 +1350,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                 mt = instead;
             __unsafe_unretained id<MTLSamplerState> ms = ctx->present_sampler;
             if (t && t->mtl) {
-                if (!t->sampler)
+                if (!t->sampler || t->sampler_gen != rsm_aniso_gen())
                     rsm_texture_sampler(ctx, t);
                 ms = t->sampler;
                 t->last_use = ctx->serial;
@@ -1416,17 +1435,28 @@ void rsmtl_glDrawElementsInstancedARB(GLenum mode, GLsizei count, GLenum type, c
 // --- Present -------------------------------------------------------------------------------
 // RS_METAL_SHARPEN=N, 0-100: the present sharpens the frame by N% (rsm_sharpen_fs's k, at most 0.5), after any
 // upscaling, at the drawable's own pixels. 0 or unset: none.
+static _Atomic int rsm_sharpen_v = -1;  // its percent: as the process started, or as rsm_set_sharpen last set it
+
+static int rsm_sharpen_value(const char *e) {
+    int n = e && *e ? atoi(e) : 0;
+    return n < 0 ? 0 : n > 100 ? 100 : n;
+}
+
+void rsm_set_sharpen(const char *v) {
+    int n = rsm_sharpen_value(v);
+    if (atomic_exchange(&rsm_sharpen_v, n) != n)
+        rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", n);
+}
+
 static float rsm_sharpen(void) {
-    static float k = -1;
-    if (k < 0) {
-        const char *e = getenv("RS_METAL_SHARPEN");
-        int n = e && *e ? atoi(e) : 0;
-        n = n < 0 ? 0 : n > 100 ? 100 : n;
-        k = (float)n / 200.0f;
-        if (n)
-            rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", n);
+    int n = atomic_load(&rsm_sharpen_v);
+    if (n < 0) {
+        int was = -1, v = rsm_sharpen_value(getenv("RS_METAL_SHARPEN"));
+        if (atomic_compare_exchange_strong(&rsm_sharpen_v, &was, v) && v)
+            rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", v);
+        n = atomic_load(&rsm_sharpen_v);
     }
-    return k;
+    return (float)n / 200.0f;
 }
 
 void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src, id<MTLSamplerState> smp) {

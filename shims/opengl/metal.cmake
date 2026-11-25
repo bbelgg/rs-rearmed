@@ -47,7 +47,7 @@ set(ogl_metal_cases
   fbo pass_targets render_to_texture depth_texture cube_map dxt bgra luminance texture_1d mipmaps alpha_test polygon_mode subdata_in_flight
   map_buffer readback_orientation tex_subimage unpack_alignment uniforms rebind_attrib queries errors object_lifetime
   mip_redefine fbo_mipmap orphans restart_index stream_subdata stencil_clear_ref pbo_bounds key_reuse packed_float
-  own_target
+  own_target msaa_switch
   api)
 # Programs need the translator (msl.cmake's rsmsl).
 if(TARGET rsmsl)

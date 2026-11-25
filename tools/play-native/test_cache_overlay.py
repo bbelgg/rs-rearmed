@@ -912,6 +912,11 @@ class Overlay(TmpDir):
         for o in co.LP_MENU_OPTIONS:
             self.assertIn('"%s":' % o[0], options)
         self.assertEqual(len(co.LP_MENU_OPTIONS), len(co.MENU_OPTIONS) - 2)
+        # (its switches are read as it starts: none of its rows takes effect at once)
+        self.assertEqual([o[0] for o in co.LP_MENU_OPTIONS if "at once" in o[4]], [])
+        self.assertTrue(any(co.AT_ONCE in o[4] for o in co.MENU_OPTIONS))
+        hud = next(o[4] for o in co.MENU_OPTIONS if o[0] == "rsPerformanceOverlay")  # (at once only if it started on)
+        self.assertTrue(hud.endswith(co.HUD_AT_ONCE))
         self.assertRaises(ValueError, co.make, game, "windows")
 
     def test_static_movies(self):

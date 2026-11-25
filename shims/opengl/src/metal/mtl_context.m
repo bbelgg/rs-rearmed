@@ -5,6 +5,7 @@
 #include <ImageIO/ImageIO.h>
 #include <mach/mach_time.h>
 #import <MetalFX/MetalFX.h>
+#import <QuartzCore/CATransaction.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -403,13 +404,42 @@ static void rsm_init_state(RSMContext *ctx) {
 // The game's colours are sRGB, as the screens it was made for. An untagged layer goes to the display as it is,
 // so a wide-gamut (P3) screen, such as a Mac's own, showed them more saturated than meant. Tagged sRGB, macOS
 // matches them to the display. RS_METAL_COLORS=vivid leaves the layer untagged: the look before.
+// As the process started, or as rsmtl_gfx_set_switch last set it (the next present sets the layer's then).
+static _Atomic int rsm_vivid = -1;
+static _Atomic unsigned rsm_colors_g;
+
+static int rsm_vivid_value(const char *e) { return e && !strcmp(e, "vivid"); }
+
 static void rsm_layer_colors(CAMetalLayer *layer) {
-    const char *e = getenv("RS_METAL_COLORS");
-    if (e && !strcmp(e, "vivid"))
-        return;
-    CGColorSpaceRef cs = CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    int v = atomic_load(&rsm_vivid);
+    if (v < 0) {
+        int was = -1;
+        atomic_compare_exchange_strong(&rsm_vivid, &was, rsm_vivid_value(getenv("RS_METAL_COLORS")));
+        v = atomic_load(&rsm_vivid);
+    }
+    CGColorSpaceRef cs = v ? NULL : CGColorSpaceCreateWithName(kCGColorSpaceSRGB);
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
     layer.colorspace = cs;
-    CGColorSpaceRelease(cs);
+    [CATransaction commit];
+    if (cs)
+        CGColorSpaceRelease(cs);
+}
+
+int rsmtl_gfx_set_switch(const char *name, const char *value) {
+    if (!strcmp(name, "RS_METAL_SHARPEN"))
+        rsm_set_sharpen(value);
+    else if (!strcmp(name, "RS_METAL_MSAA"))
+        rsm_set_msaa(value);
+    else if (!strcmp(name, "RS_METAL_ANISO"))
+        rsm_set_aniso(value);
+    else if (!strcmp(name, "RS_METAL_COLORS")) {
+        atomic_store(&rsm_vivid, rsm_vivid_value(value));
+        atomic_fetch_add(&rsm_colors_g, 1);
+    } else
+        return 0;
+    rsm_log("%s=%s from now on", name, *value ? value : "(its default)");
+    return 1;
 }
 
 static RSMContext *rsm_create(int w, int h, CAMetalLayer *layer) {
@@ -752,6 +782,10 @@ void rsmtl_gfx_present(rs_gfx_context *c) {
         rsm_snapshot(ctx);
         rsm_end_pass(ctx);
         rsm_texlog_frame();
+        if (ctx->layer && ctx->colors_gen != atomic_load(&rsm_colors_g)) {
+            ctx->colors_gen = atomic_load(&rsm_colors_g);
+            rsm_layer_colors(ctx->layer);
+        }
         if (ctx->layer) {
             id<CAMetalDrawable> d = [ctx->layer nextDrawable];
             if (d) {

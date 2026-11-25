@@ -256,7 +256,10 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   Left and Right change it, and Backspace goes back to the list. Each change is a `menu options:` line in the log,
   with the switch and its value. A switch set with `launchctl setenv` to another value than `options.env`'s (for the
   renderer, `RS_GL_BACKEND`) greys its row, which says the value and SET FOR THIS SESSION, with a `menu options:`
-  line at the start.
+  line at the start. With the mouse (a 1280x720 window, engine pixels as the movie's): the list's scroll bar is at x 686
+  from y 40 to 680, a press there and a move drag the focus along it, and a press on a row (x 250) opens it; Esc
+  while the button is held, then the release and Return on ADV DISPLAY SETTINGS, gives a list that doesn't follow
+  the pointer.
 - **Quitting**: Esc on the main menu, Return on "Are you sure you want to quit?" goes to the title; Esc there
   and Return on EXIT GAME? is a normal quit, which saves the profile.
 

@@ -318,8 +318,9 @@ WINDOW SHAPE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCA
 COLOR and PERFORMANCE OVERLAY (the Mac edition's twelve without RENDERER and MULTITHREADED GL ENGINE). A change is
 written to `options.env`, as the installer writes it, and takes effect the next time the game starts. A switch set for
 the login session (`launchctl setenv`) still wins over it, so its row shows the session's value, greyed, with SET FOR
-THIS SESSION; LOW LATENCY is greyed at a fixed FRAME RATE. The list scrolls with the focus, and its scroll bar can be
-dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
+THIS SESSION; LOW LATENCY is greyed at a fixed FRAME RATE, unless
+`RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row can then take out. The list scrolls with the
+focus, and its scroll bar can be dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
 
 ```
 RS_MODS_INTRO=0

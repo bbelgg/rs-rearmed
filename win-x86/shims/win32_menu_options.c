@@ -210,6 +210,9 @@ static void set_loc(frame *f, uint32_t obj, const char *name, const char *text) 
 typedef rs_menu_option option;
 static uint32_t g_id[32], g_name[32];  // each option's id and its fixed string, in the guest
 static int g_ready;
+// A press on the list's scroll bar is being dragged (menu_ads_input); the list made again ends one whose release went
+// to another menu, as the Mac's my_refresh does.
+static int g_dragging;
 
 static size_t index_of(const option *o) { return (size_t)(o - rs_menu_opts); }
 
@@ -262,6 +265,7 @@ void RC_WFN(menu_edit_input)(rc_ctx *c);
 void RC_FN(menu_ads_refresh)(rc_ctx *c) {
   uint32_t menu = (uint32_t)c->r[ECX];
   RC_WFN(menu_ads_refresh)(c);
+  g_dragging = 0;
   if (!ready(c)) return;
   frame f;
   frame_open(&f, c);
@@ -363,7 +367,6 @@ void RC_FN(menu_edit_input)(rc_ctx *c) {
 
 // --- dragging the list's scroll bar (the Mac's my_ads_input) -----------------------------------------------------
 enum { EV_UP = 0xb, EV_DOWN = 0xc, EV_BUTTON = 0x1f, EV_POINTER = 0x22 };  // a: 0 press, 1 release
-static int g_dragging;
 
 static void ads_key(frame *f, uint32_t menu, uint32_t player, uint32_t event) {  // a press and release
   for (uint32_t a = 0; a < 2; a++) {

@@ -7,8 +7,8 @@ notes and empties this file. -->
 
 - **ADV DISPLAY SETTINGS has Low Latency and Performance Overlay (Mac):** LOW LATENCY and PERFORMANCE OVERLAY are
   among RS Re-ARMed's rows in the game's menu (Metal only), for the two switches below; LOW LATENCY is greyed at a fixed
-  frame rate (DISPLAY RATE ONLY). Before, the menu had ten of the switches, and these two were set in the installer
-  only.
+  frame rate (DISPLAY RATE ONLY), except while `RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row
+  can then take out. Before, the menu had ten of the switches, and these two were set in the installer only.
 - **ADV DISPLAY SETTINGS has RS Re-ARMed's picture switches in Learn & Play too:** FRAME RATE, ANY WINDOW SHAPE,
   LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, ANTI-ALIASING, TEXTURE FILTERING, COLOR and
   PERFORMANCE OVERLAY are rows of the game's own menu, saved for the next start as the installer saves them. Before,

@@ -255,7 +255,9 @@ const char *rs_menu_locked(const option *o) {
   const option *renderer = rs_menu_opt_of_id("rsRenderer"), *fps = rs_menu_opt_of_id("rsFrameRate");
   int r = renderer ? rs_menu_choice(renderer) : METAL - 1;
   if (o->only && o->only - 1 != r) return o->only == METAL ? "METAL ONLY" : "OPENGL ONLY";
-  if (!strcmp(o->id, "rsLowLatency") && fixed_rate(fps)) return "DISPLAY RATE ONLY";
+  // (one whose switch has a value it has no choice for, RS_METAL_DRAWABLES=3, stays open: the row is the way to
+  // take it out)
+  if (!strcmp(o->id, "rsLowLatency") && o->now >= 0 && fixed_rate(fps)) return "DISPLAY RATE ONLY";
   return o->session ? RS_MENU_SESSION : NULL;
 }
 

@@ -511,7 +511,8 @@ login session (`launchctl setenv`; for the renderer, `RS_GL_BACKEND`) still wins
 so its row shows the session's value, greyed, with SET FOR THIS SESSION, until it is unset (`launchctl unsetenv`) and
 the game started again. One set to the value `options.env` has can't be told apart: its row can be changed, but the
 session's value is the one used. The other renderer's rows are greyed too, and LOW LATENCY at a fixed FRAME RATE, where
-two frames are queued anyway. The list scrolls with the focus, and its scroll bar can be dragged. They come with the
+two frames are queued anyway (unless `RS_METAL_DRAWABLES` has a value the row has no choice for, such as 3: the row
+stays open, to take it out). The list scrolls with the focus, and its scroll bar can be dragged. They come with the
 menu overlay (`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with `RS_MODS_OVERLAY=0`. Learn & Play lists
 ten of them, without RENDERER and MULTITHREADED GL ENGINE ([its switches](../windows/INSTALL.md#settings-and-switches)).
 

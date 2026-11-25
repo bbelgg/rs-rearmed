@@ -158,6 +158,9 @@ static option *opt_current(void) { return rs_menu_opt_named(RC_LD(const char *, 
 
 // --- the methods in front of the game's ---------------------------------------------------------------------------
 static uint64_t g_refresh, g_press, g_build, g_input;  // the game's own (slid addresses)
+// A press on the list's scroll bar is being dragged (my_ads_input). The list made again ends one whose release went
+// to another menu (Esc while the button was held), so a reopened list doesn't follow the pointer.
+static int g_dragging;
 
 static uint64_t call1(uint64_t fn, uint64_t a) {
   const uint64_t args[] = {a};
@@ -184,6 +187,7 @@ static void set_session_value(uint64_t btn, const option *o) {
 // movie greys the row) with why as their value (the session's: its value too).
 static uint64_t my_refresh(uint64_t menu) {
   uint64_t r = call1(g_refresh, menu);
+  g_dragging = 0;
   uint64_t defn = RC_LD(uint64_t, menu + RC_OFF(menu_definition));
   for (size_t i = 0; defn && i < NOPTS; i++) {
     const option *o = &g_opts[i];
@@ -282,7 +286,6 @@ static uint64_t my_input(uint64_t menu, uint64_t player, uint64_t event, uint64_
 enum { EV_UP = 0xb, EV_DOWN = 0xc, EV_BUTTON = 0x1f, EV_POINTER = 0x22 };  // a: 0 press, 1 release
 
 static uint64_t g_ads_input;
-static int g_dragging;
 
 static void ads_key(uint64_t menu, uint64_t player, uint64_t event) {  // a press and release, as the keys make them
   for (uint64_t a = 0; a < 2; a++) {

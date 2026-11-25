@@ -512,8 +512,8 @@ so its row shows the session's value, greyed, with SET FOR THIS SESSION, until i
 the game started again. One set to the value `options.env` has can't be told apart: its row can be changed, but the
 session's value is the one used. The other renderer's rows are greyed too, and LOW LATENCY at a fixed FRAME RATE, where
 two frames are queued anyway. The list scrolls with the focus, and its scroll bar can be dragged. They come with the
-menu overlay (`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with `RS_MODS_OVERLAY=0`. Learn & Play doesn't
-have them yet ([its plan](../windows/PLAN.md#status)).
+menu overlay (`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with `RS_MODS_OVERLAY=0`. Learn & Play lists
+ten of them, without RENDERER and MULTITHREADED GL ENGINE ([its switches](../windows/INSTALL.md#settings-and-switches)).
 
 Each row is a switch set away from its default, and what that does. Everything is compiled into the app; the
 `RS_METAL_` switches are for the Metal renderer.

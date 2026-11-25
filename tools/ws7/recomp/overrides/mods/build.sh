@@ -29,9 +29,10 @@ $CC -c "$here/framerate.c" -o "$out/obj/mods/framerate.o"
 $CC -c "$here/fftsetup.c" -o "$out/obj/mods/fftsetup.o"
 # RS Re-ARMed's options in the Adv Display Settings menu, the methods in front of the game's
 $CC -c "$here/menu_options.c" -o "$out/obj/mods/menu_options.o"
+$CC -c "$here/menu_options_common.c" -o "$out/obj/mods/menu_options_common.o"
 rm -f "$out/lib/liboverrides_mods.a"
 ar rcs "$out/lib/liboverrides_mods.a" "$out/obj/mods/mods.o" "$out/obj/mods/mods_shared.o" "$out/obj/mods/framerate.o" \
-    "$out/obj/mods/fftsetup.o" "$out/obj/mods/menu_options.o"
+    "$out/obj/mods/fftsetup.o" "$out/obj/mods/menu_options.o" "$out/obj/mods/menu_options_common.o"
 
 # the crypto module with the DSA verifier renamed (the wrapper in mods.c calls it)
 $CC $SH -DRC_FN_rsg_cryptopp_dsa_sha1_verify=rs_crypto_dsa_verify -c "$ov/gen/crypto.c" -o "$out/obj/crypto_mods/crypto.o"

@@ -53,10 +53,12 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Render scale** (new in 1.18.0): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
   sees and a resized window at N%. Played full screen on a 1470x956 Retina screen to a song's note highway: 50% (a
   735x478 frame) is fine.
-- **In the game's menu**: not yet. The Mac edition's ADV DISPLAY SETTINGS lists the picture switches
-  ([Mac plan](../mac/PLAN.md#status)) through native functions in front of the Mac game's own menu code
-  (`menu_options.c`). This game's haven't been matched, so its overlay leaves the options out, and they are set in the
-  installer.
+- **In the game's menu** (not released): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
+  game's own rows, as the Mac edition's twelve without RENDERER and MULTITHREADED GL ENGINE (this edition has Metal
+  only), saved to `options.env` for the next start ([INSTALL.md](INSTALL.md#settings-and-switches)). Played on a test
+  build: the rows, their values, FRAME RATE's slider, ANY WINDOW SHAPE's checkbox, LOW LATENCY greyed at a fixed
+  frame rate and a change saved and set back. Not tried: dragging the list's scroll bar with the mouse, a switch set
+  for the session, the installed app's next start with a changed row.
 
 **Built-in fixes** (the Mac edition's, on this game's own functions and with the same switches:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))
@@ -249,9 +251,6 @@ Being looked into, with no promise of if or when:
 
 - **Parity**: the checks the Mac port has had that are left here: long sessions, and guitar latency against it.
 - **Choosing both players' inputs on the Multiplayer screen**, as in the [Mac plan](../mac/PLAN.md#next-work).
-- **The picture switches in the game's menu**, as the Mac edition's: the Windows game's functions and vtables that
-  `menu_options.c` takes (`tools/targets/win-x86`, unsupported for now), then the overlay's options for this edition
-  too (`LP_EDITS` in `cache_overlay.py`).
 - **Performance** ([PERFORMANCE.md](PERFORMANCE.md#opportunities-by-expected-payoff)), by expected payoff: the note
   detection and the Wwise thread, where relaxing more functions gave nothing and what is left is the threads' own work
   or not safe to relax; the D3D9 layer's bookkeeping; zero-copy dynamic buffers; the index-range scan of the draw-time

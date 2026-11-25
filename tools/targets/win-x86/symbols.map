@@ -1317,30 +1317,30 @@ tuning_store_song_select2    0x011c6474 code -  # the Mac copies Play_SetPlayerT
 tuning_store_song_select3    0x011c6474 code -  # as tuning_store_song_select2
 tuning_store_guitarcade3     0x01187cac code -  # the Mac's third copy; here the one of tuning_store_guitarcade
 # --- Seven-String Guitar: end
-# --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c)
-menu_current_setting                                             unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_ads_vtable                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_ads_vtable_copy                                             unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_edit_vtable                                                 unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_ads_refresh                                                 unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_ads_input                                                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_ads_press                                                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_edit_build                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_edit_input                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_screens                                                     unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_push                                                        unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_find                                                        unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_get_number                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_get_bool                                                    unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_set_text                                                    unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_set_bool                                                    unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_set_number                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_key_free                                                    unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-loc_text                                                         unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-ui_checkbox_class                                                unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-ui_slider_class                                                  unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-efd_free_flag                                                    unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_set_array                                                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-json_array_add                                                   unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_slider_xscale                                               unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
-menu_slider_yscale                                               unsupported  not yet: Learn & Play's menus are the Windows game's own code (docs/windows/PLAN.md)
+# --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c; here win-x86/shims/win32_menu_options.c)
+menu_current_setting                                             0x1e6958c    data      const char *  # the edited setting's name: the press 0x117c9c0 stores "Brightness" (0x117ca23), Edit Setting's build interns it as the control's key (0x117d871) and compares it (0x13e72e0)
+menu_ads_vtable                                                  0x1d2ffe0    data      void *[66]  # UIMenu_AdvancedDisplaySettings (slot 2's name object 0x1e710cc); one destructor slot, so a Mac slot from 10 on is one lower
+menu_ads_vtable_copy                                             0x1d32a30    data      void *[66]  # UIMenu_DisplaySettings: the same functions as menu_ads_vtable in the four slots, only its name (slot 2) differs
+menu_edit_vtable                                                 0x1d32bb0    data      void *[66]  # UIMenu_EditSetting (name object 0x1e710d4)
+menu_ads_refresh                                                 0x0117b850   thiscall  bool(void *menu)  # slot 0x31: the buttons by name (+0x214, 24-byte strings), CurrentSettingValue; eax = 1, plain ret
+menu_ads_input                                                   0x01208a50   thiscall  void(void *menu, int player, int event, int a, int b, int c, int d, int e)  # slot 0x11: the Mac's arguments, ret 0x1c; the base input 0x1149c00 first
+menu_ads_press                                                   0x0117c9c0   thiscall  void(void *menu)  # slot 0x36: compares +0x1fc with "buttons.<id>.states" (0x117c9fe), stores the setting and pushes EditSetting (0x117ca77); plain ret
+menu_edit_build                                                  0x0117d830   thiscall  bool(void *menu)  # slot 0x2c: the setting's object (0x1402df0 with the interned menu_current_setting), then a control by name; eax = 1, plain ret
+menu_edit_input                                                  0x011812e0   thiscall  void(void *menu, int player, int event, int a, int b, int c, int d, int e)  # slot 0x11: ret 0x1c; the focus +0x5c's class against the slider and checkbox classes (0x11813b0)
+menu_screens                                                     unsupported             # inlined: *(ui_manager + ui_current_menu) (0x117ca5c, 0x117ca6a)
+menu_push                                                        0x012ed4e0   thiscall  void(void *screens, const void *cls, const void *alias, void *owner)  # the Mac's out is an owner pointer by value here, the press passes 0 (0x117ca64); ret 0xc
+json_find                                                        0x01409680   custom    void *(void *object@ecx, const char *name@eax)  # member slot 6 then the object slot 0x17 (0x1409688..0x14096ab); plain ret, the result borrowed
+json_get_number                                                  unsupported             # inlined: the member (json_node_member_slot), its number (json_node_number_slot), the double at json_number_value (0x12d7d11)
+json_get_bool                                                    unsupported             # inlined: the member (json_node_member_slot), its bool (json_node_bool_slot), the byte at +8 (0xf81ec7..0xf81eef)
+json_set_text                                                    0x01402e60   custom    void(void **out@edi, void *object, void **key, const char *text)  # ret 0xc; a text value of the interned text (vtable 0x1d5a298), *out with a reference ("Component" 0x117e9fc)
+json_set_bool                                                    0x01402d30   custom    void(void **out@edi, void *object, void **key, int value)  # ret 0xc; the true or false singleton (0x1e7239c, 0x1e723a8)
+json_set_number                                                  0x01402d90   custom    void(void **out@eax, void *object, void **key, double value)  # ret 0x10; num_intern then json_object_set
+json_key_free                                                    0x013fcae0   custom    void(void *key@esi)  # the key word itself, not its place (the Mac's takes void **); callers test it for 0 first; plain ret
+loc_text                                                         0x0111e1b0   custom    void(void *out@esi, const void *in@eax)  # 24-byte strings; localize_texts(out, *service_holder, 1, text) inside (0x111e1ba..0x111e1ce)
+ui_checkbox_class                                                0x1e70f8c    data      void *  # {"UIComponent_CheckBox", parent}: the edit input's class test (0x1181435)
+ui_slider_class                                                  0x1e70fe4    data      void *  # {"UIComponent_Slider", parent}: the edit input's class test (0x1181406)
+efd_free_flag                                                    0x1ee18e1    data      uint8_t  # set around every inlined free (0x13fcbe9, 0x1340205); efd_str_destroy sets it itself
+json_set_array                                                   0x01402ca0   stdcall   void(void *object, void **out, void **key)  # ret 0xc; out second, not first as on the Mac; an empty array (vtable 0x1d59b80) set and returned with a reference
+json_array_add                                                   0x013f81d0   custom    bool(void *array, void *value@esi)  # ret 4; the array takes its own reference (0x117faaa)
+menu_slider_xscale                                               0x1da5f48    data      double  # 80.0: Visual Quality's XScale (0x117f9b9)
+menu_slider_yscale                                               0x1da5d88    data      double  # 90.0: Visual Quality's YScale (0x117f9ff)

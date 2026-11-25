@@ -30,8 +30,9 @@ for f in "$shims"/win32_*.c "$shims"/d3d9/*.c "$shims"/audio/wa_*.c "$root/shims
   $CC -I"$root/shims/coreaudio" -I"$root/shims/platform/include" -c "$f" -o "$obj/shims/$(basename "$f" .c).o"
 done
 # the built-in fixes' part that is the Mac's source (overrides/mods: mods_shared.c, the switches, the log and the start;
-# framerate.c, the frame rate fixes): built as a mod is, by the game's names at run time
-for f in mods_shared framerate; do
+# framerate.c, the frame rate fixes; menu_options_common.c, Adv Display Settings' options): built as a mod is, by the
+# game's names at run time
+for f in mods_shared framerate menu_options_common; do
   clang -arch arm64 -O2 -g -Wall -I"$runtime" -I"$root/tools/ws7/recomp/overrides" -c "$mods/$f.c" -o "$obj/shims/$f.o"
 done
 # the overlay API for mods, the Mac's (shims/include/rs_overlay.h): linked as an object, as only mods call it

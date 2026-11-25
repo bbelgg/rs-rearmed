@@ -23,13 +23,9 @@
 //                                               Value (the choice it shows) set
 //   AdvancedDisplaySettings, menu_input_slot    before the game's: a drag of the list's scroll bar (below)
 //
-// An option is an RS Re-ARMed switch (the renderer: its file). Its value is the one this run started with (the
-// launcher passes options.env), and a change is written to options.env, the file the installer's Settings and
-// switches... writes, so the two never differ; the default takes its line out. It takes effect when the game next
-// starts. A switch set for the session (launchctl setenv; for the renderer RS_GL_BACKEND) wins over the file at
-// every start, as it does over the installer's page, so its row shows the session's value, locked ("SET FOR THIS
-// SESSION": session_set). RS_MODS_OVERLAY=0: none of this, the menu as the game has it. Mac only for now: Learn &
-// Play's menus are the Windows game's own code, and its overlay leaves the options out (docs/windows/PLAN.md).
+// The options themselves, their switches and files and why one is locked, are one source with Learn & Play's
+// (menu_options_common.c; its methods: win-x86/shims/win32_menu_options.c). RS_MODS_OVERLAY=0: none of this, the menu
+// as the game has it.
 #include <math.h>
 #include <stdatomic.h>
 #include <stdio.h>
@@ -38,6 +34,7 @@
 #include <strings.h>
 #include <unistd.h>
 
+#include "menu_options.h"
 #include "mods.h"
 #include "rc_hook.h"
 #include "rc_rt.h"
@@ -145,211 +142,19 @@ static void set_loc(uint64_t obj, const char *name, const char *text) {  // "$[r
   gstr_free(&t);
 }
 
-// --- the options ------------------------------------------------------------------------------------------------
-// A checkbox has two choices, off and on (its switch 0 or 1; Low Latency's none or 2), shown as the game's own Off and
-// On; a slider has one notch for each of its choices. Each choice is a value of the switch ("" none) and the text it
-// shows. The order of the buttons is cache_overlay.py's MENU_OPTIONS (their ids match).
-#define CHOICES 6
-typedef struct {
-  const char *id;   // the button's ID in the definition, and the setting's name
-  const char *env;  // its switch, or NULL for the renderer's file
-  int slider;       // 0: a checkbox
-  int only;         // the renderer it's for: METAL, OPENGL, or 0 both
-  int n, dflt;      // the choices, and which one is the default (without the switch)
-  const char *value[CHOICES], *text[CHOICES];
-  const char *path;  // "buttons.<id>.states"
-  const char *name;  // its fixed string, what menu_current_setting holds while Edit Setting edits it
-  int now;           // the choice this run has (-1: a value of the switch no choice has)
-  int session;       // the session sets its switch (session_set): locked
-} option;
-
-#define OFF_ON {"0", "1"}, {"$[31679]", "$[31678]"}  // the game's own Off and On
-enum { METAL = 1, OPENGL };                         // the renderer's choices, after 0
-static option g_opts[] = {
-    {"rsFrameRate", "RS_FPS", 1, 0, 4, 0, {"", "30", "60", "120"}, {"DISPLAY", "30", "60", "120"}, NULL, NULL, 0},
-    {"rsAnyWindowShape", "RS_WINDOW_ANY_SHAPE", 0, 0, 2, 1, OFF_ON, NULL, NULL, 0},
-    {"rsRenderer", NULL, 1, 0, 2, 0, {"metal", "opengl"}, {"METAL", "OPENGL"}, NULL, NULL, 0},
-    {"rsMultithreadedGL", "RS_GL_MTENGINE", 0, OPENGL, 2, 0, OFF_ON, NULL, NULL, 0},
-    {"rsLowLatency", "RS_METAL_DRAWABLES", 0, METAL, 2, 0, {"", "2"}, {"$[31679]", "$[31678]"}, NULL, NULL, 0},
-    {"rsMetalFXUpscaling", "RS_METAL_UPSCALE", 0, METAL, 2, 1, OFF_ON, NULL, NULL, 0},
-    {"rsFullRetina", "RS_METAL_RETINA", 0, METAL, 2, 0, OFF_ON, NULL, NULL, 0},
-    {"rsRenderScale", "RS_METAL_SCALE", 1, METAL, 4, 3, {"50", "75", "90", ""}, {"50%", "75%", "90%", "100%"}, NULL,
-     NULL, 0},
-    {"rsAntiAliasing", "RS_METAL_MSAA", 1, METAL, 4, 2, {"1", "2", "4", "8"}, {"OFF", "2X", "4X", "8X"}, NULL, NULL,
-     0},
-    {"rsTextureFiltering", "RS_METAL_ANISO", 1, METAL, 5, 4, {"1", "2", "4", "8", "16"},
-     {"1X", "2X", "4X", "8X", "16X"}, NULL, NULL, 0},
-    {"rsColor", "RS_METAL_COLORS", 1, METAL, 2, 0, {"", "vivid"}, {"SRGB", "VIVID"}, NULL, NULL, 0},
-    {"rsPerformanceOverlay", "RS_METAL_HUD", 0, METAL, 2, 0, OFF_ON, NULL, NULL, 0},
-};
-#define NOPTS (sizeof g_opts / sizeof *g_opts)
-
-// The game's own compare is in any case (it has "buttons.<id>.states"; a press gives "Buttons.<id>.States").
-static option *opt_of_path(const char *path) {
-  for (size_t i = 0; i < NOPTS; i++)
-    if (path && !strcasecmp(path, g_opts[i].path)) return &g_opts[i];
-  return NULL;
-}
-static option *opt_current(void) {
-  const char *cur = RC_LD(const char *, RC_GA(menu_current_setting));
-  for (size_t i = 0; i < NOPTS; i++)
-    if (cur && (cur == g_opts[i].name || !strcmp(cur, g_opts[i].id))) return &g_opts[i];
-  return NULL;
-}
-
-static const char *home(void) {
-  const char *h = getenv("RS_NATIVE_HOME");
-  return h && *h ? h : NULL;
-}
-
-// A checkbox whose switch is 0 or 1, a toggle as the launchers read it (not Low Latency's none or 2).
-static int is_toggle(const option *o) { return !o->slider && !strcmp(o->value[1], "1"); }
-
-// The choice a value of the option's switch is: a toggle's off when it starts with 0, n, N, f or F (as the launchers
-// read toggles), another checkbox's (Low Latency's) and a slider's by its value in any case; the default without one,
-// -1 for another value.
-static int choice_of(const option *o, const char *v) {
-  if (!v || !*v) return o->dflt;
-  if (is_toggle(o)) return !strchr("0nNfF", v[0]);
-  for (int i = 0; i < o->n; i++)
-    if (!strcasecmp(v, o->value[i])) return i;
-  return -1;
-}
-// A renderer's name as the shell reads it (rsp_renderer_parse: any case, white space around it): METAL - 1 or
-// OPENGL - 1, -1 for anything else.
-static int renderer_named(const char *s) {
-  char v[8], more[2];
-  if (!s || sscanf(s, " %7s %1s", v, more) != 1) return -1;
-  if (!strcasecmp(v, "metal")) return METAL - 1;
-  return !strcasecmp(v, "gl") || !strcasecmp(v, "opengl") ? OPENGL - 1 : -1;
-}
-static int renderer_file(const option *o) {  // the renderer's choice in its file
-  char path[1024], v[32] = "";
-  if (!home()) return o->dflt;
-  snprintf(path, sizeof path, "%s/renderer", home());  // the renderer's file (docs/mac/INSTALL.md, Renderer)
-  FILE *f = fopen(path, "r");
-  if (f) {
-    if (fscanf(f, "%31s", v) != 1) v[0] = 0;
-    fclose(f);
-  }
-  if (!strcasecmp(v, "gl")) return OPENGL - 1;  // as the launcher and the game read the file: gl is OpenGL too
-  return choice_of(o, v);
-}
-static int choice_now(const option *o) {
-  if (o->env) return choice_of(o, getenv(o->env));
-  return o->session ? renderer_named(getenv("RS_GL_BACKEND")) : renderer_file(o);
-}
-static const char *choice_text(const option *o, int c) {
-  if (c >= 0 && c < o->n) return o->text[c];
-  const char *v = o->env ? getenv(o->env) : NULL;
-  return v && *v ? v : o->text[o->dflt];
-}
-
-// options.env with KEY's line set to KEY=VALUE, or taken out (VALUE NULL): the other lines kept as they are.
-static int save_switch(const char *key, const char *value) {
-  if (!home()) return -1;
-  char path[1024], part[1100];
-  snprintf(path, sizeof path, "%s/options.env", home());
-  snprintf(part, sizeof part, "%s.part", path);
-  FILE *in = fopen(path, "r"), *out = fopen(part, "w");
-  if (!out) {
-    if (in) fclose(in);
-    return -1;
-  }
-  size_t klen = strlen(key);
-  int done = 0;
-  char line[4096];
-  while (in && fgets(line, sizeof line, in)) {
-    const char *p = line;
-    while (*p == ' ' || *p == '\t') p++;
-    if (!strncmp(p, key, klen) && (p[klen] == '=' || p[klen] == ' ' || p[klen] == '\t')) {
-      if (!done && value) fprintf(out, "%s=%s\n", key, value);
-      done = 1;
-      continue;
-    }
-    fputs(line, out);
-  }
-  if (!done && value) fprintf(out, "%s=%s\n", key, value);
-  if (in) fclose(in);
-  int ok = !ferror(out);
-  if (fclose(out) || !ok || rename(part, path)) {
-    unlink(part);
-    return -1;
-  }
-  return 0;
-}
-static int save_renderer(const char *value) {
-  if (!home()) return -1;
-  char path[1024], part[1100];
-  snprintf(path, sizeof path, "%s/renderer", home());
-  snprintf(part, sizeof part, "%s.part", path);
-  FILE *f = fopen(part, "w");
-  if (!f) return -1;
-  int ok = fprintf(f, "%s\n", value) > 0;
-  if (fclose(f) || !ok || rename(part, path)) {
-    unlink(part);
-    return -1;
-  }
-  return 0;
-}
-
-// --- the session's switches ------------------------------------------------------------------------------------
-// The launcher passes options.env's lines as the game's environment, but a switch set for the session (launchctl
-// setenv) wins over the file's line (launch.sh, options_env), and the game also has the session's variables the file
-// doesn't name. So the session sets a switch when the environment has it with a value options.env's line doesn't
-// have, or the file has no line for it. Each run asks once, at its start (a change made in the menu is in the file
-// only). For the renderer: an RS_GL_BACKEND from outside the game (rsp_renderer_env_given: not the shell's own
-// restart), except the gl the launcher passes for a renderer file of OpenGL. One the file has the same can't be told
-// apart.
-
-// options.env's value for KEY as the launcher reads it: the first line KEY=VALUE with a value (for a toggle, 0 or 1),
-// the ends' white space taken off both; "" without one.
-static void file_value(const char *key, int toggle, char *out, size_t n) {
-  char path[1024], line[4096];
-  out[0] = 0;
-  if (!home()) return;
-  snprintf(path, sizeof path, "%s/options.env", home());
-  FILE *f = fopen(path, "r");
-  if (!f) return;
-  while (fgets(line, sizeof line, f)) {
-    char *k = line, *eq = strchr(line, '='), *v, *e;
-    if (!eq) continue;
-    *eq = 0;
-    v = eq + 1;
-    while (*k == ' ' || *k == '\t') k++;
-    for (e = eq; e > k && strchr(" \t", e[-1]); e--) e[-1] = 0;
-    while (*v == ' ' || *v == '\t') v++;
-    for (e = v + strlen(v); e > v && strchr(" \t\r\n\v\f", e[-1]); e--) e[-1] = 0;
-    if (strcmp(k, key) || !*v || (toggle && strcmp(v, "0") && strcmp(v, "1"))) continue;
-    snprintf(out, n, "%s", v);
-    break;
-  }
-  fclose(f);
-}
-
+// --- the options (menu_options_common.c, one source with Learn & Play) ----------------------------------------
+typedef rs_menu_option option;
+#define g_opts rs_menu_opts
+#define NOPTS rs_menu_nopts
+#define opt_of_path rs_menu_opt_of_path
+#define choice_text rs_menu_choice_text
+#define set_choice rs_menu_set_choice
+#define locked rs_menu_locked
+#define SESSION RS_MENU_SESSION
 // The Mac shell's (shims/platform/include/rsp_renderer.h).
 extern int rsp_renderer_env_given(void) __attribute__((weak_import));
 
-static int session_set(const option *o) {
-  if (!o->env) {
-    int env = renderer_named(getenv("RS_GL_BACKEND"));
-    if (env < 0 || (rsp_renderer_env_given && !rsp_renderer_env_given())) return 0;
-    return !(env == OPENGL - 1 && renderer_file(o) == OPENGL - 1);
-  }
-  const char *v = getenv(o->env);
-  char line[1024];
-  if (!v || !*v) return 0;
-  file_value(o->env, is_toggle(o), line, sizeof line);
-  return strcmp(v, line) != 0;
-}
-
-static void set_choice(option *o, int c) {
-  o->now = c;
-  const char *v = o->value[c];
-  int r = o->env ? save_switch(o->env, c == o->dflt || !*v ? NULL : v) : save_renderer(v);
-  rs_mods_logf("menu options: %s %s%s", o->env ? o->env : "renderer", *v ? v : "(default)",
-               r ? " (not written)" : "");
-}
+static option *opt_current(void) { return rs_menu_opt_named(RC_LD(const char *, RC_GA(menu_current_setting))); }
 
 // --- the methods in front of the game's ---------------------------------------------------------------------------
 static uint64_t g_refresh, g_press, g_build, g_input;  // the game's own (slid addresses)
@@ -357,35 +162,6 @@ static uint64_t g_refresh, g_press, g_build, g_input;  // the game's own (slid a
 static uint64_t call1(uint64_t fn, uint64_t a) {
   const uint64_t args[] = {a};
   return rc_call_guest(fn, args, 1, NULL, 0, NULL);
-}
-
-static const option *opt_of_id(const char *id) {
-  for (size_t i = 0; i < NOPTS; i++)
-    if (!strcmp(g_opts[i].id, id)) return &g_opts[i];
-  return NULL;
-}
-static int choice(const option *o) { return o->now >= 0 ? o->now : o->dflt; }
-
-// Whether the game starts next at a fixed frame rate: the Frame Rate slider's choice, or for a rate it has no notch for
-// (90 or 144, which the installer allows) RS_FPS as the shell reads it (rsp_fps_value: a whole number from 1 to 1000).
-static int fixed_rate(const option *fps) {
-  if (fps->now >= 0) return fps->now != fps->dflt;
-  const char *v = getenv(fps->env);
-  if (!v) return 0;
-  char *end;
-  long n = strtol(v, &end, 10);
-  return !*end && n >= 1 && n <= 1000;
-}
-
-// Why an option can't be changed now, as its row says it (NULL: it can), by the choices the game starts with next:
-// an option of one renderer while the other is chosen; Low Latency with a fixed frame rate, whose presents are not
-// held for the display and have the two drawables already; a switch the session sets (session_set).
-static const char SESSION[] = "SET FOR THIS SESSION";
-static const char *locked(const option *o) {
-  const option *renderer = opt_of_id("rsRenderer"), *fps = opt_of_id("rsFrameRate");
-  if (o->only && o->only - 1 != choice(renderer)) return o->only == METAL ? "METAL ONLY" : "OPENGL ONLY";
-  if (!strcmp(o->id, "rsLowLatency") && fixed_rate(fps)) return "DISPLAY RATE ONLY";
-  return o->session ? SESSION : NULL;
 }
 
 // A row the session sets: its value, and that it is the session's ("8X, SET FOR THIS SESSION").
@@ -496,16 +272,14 @@ static uint64_t my_input(uint64_t menu, uint64_t player, uint64_t event, uint64_
 }
 
 // --- dragging the list's scroll bar ------------------------------------------------------------------------------
-// The overlay's edit of SettingsScene puts the game's own scroll bar beside the panel (cache_overlay.py: BAR_GAP and
-// THUMB_LEAST there, SettingsScene's BACKGROUND_* in the movie: the same numbers as here, a test says). The game's
+// The overlay's edit of SettingsScene puts the game's own scroll bar beside the panel (its numbers: menu_options.h).
+// The game's
 // lists drag theirs in their own input (ListScene's thumb: the row whose place the pointer is at, the focus moved
 // there); Adv Display Settings' has no such code, so its input has this in front of it: a press on the bar starts
 // a drag, the game's own Up and Down move the focus to the row under the pointer as the bar shows rows (the thumb's
 // middle), and the release ends it. Neither reaches the game, so a row isn't clicked. Its events: the pointer's
 // place in the game's resolution, the movie's 1280 x 720 scaled to it (as its hit test has it).
 enum { EV_UP = 0xb, EV_DOWN = 0xc, EV_BUTTON = 0x1f, EV_POINTER = 0x22 };  // a: 0 press, 1 release
-enum { STAGE_W = 1280, STAGE_H = 720, PANEL_X = 70, PANEL_W = 600, PANEL_Y = 40, PANEL_H = 640 };
-enum { BAR_GAP = 8, THUMB_LEAST = 100, BAR_REACH = 24 };  // (BAR_REACH: the bar's width and some, to press it)
 
 static uint64_t g_ads_input;
 static int g_dragging;
@@ -544,9 +318,7 @@ static int ads_rows(uint64_t menu, int *focus) {
 static void drag_to(uint64_t menu, uint64_t player, double y) {
   int focus, n = ads_rows(menu, &focus);
   if (n < 2 || focus < 0) return;
-  double thumb = fmax((double)PANEL_H / n, THUMB_LEAST);
-  double f = (y - PANEL_Y - thumb / 2) / (PANEL_H - thumb);
-  int row = (int)lround((f < 0 ? 0 : f > 1 ? 1 : f) * (n - 1));
+  int row = rs_menu_bar_row(n, y);
   for (; focus < row; focus++) ads_key(menu, player, EV_DOWN);
   for (; focus > row; focus--) ads_key(menu, player, EV_UP);
 }
@@ -557,9 +329,8 @@ static uint64_t my_ads_input(uint64_t menu, uint64_t player, uint64_t event, uin
     int w = 0, h = 0;
     OV_GUEST(get_resolution, (uint64_t)(uintptr_t)&w, (uint64_t)(uintptr_t)&h);
     double x = w > 0 ? (double)(int)b * STAGE_W / w : -1, y = h > 0 ? (double)(int)c * STAGE_H / h : -1;
-    int was = g_dragging, bar = PANEL_X + PANEL_W + BAR_GAP;
-    if (event == EV_BUTTON)
-      g_dragging = a == 0 && x >= bar - BAR_REACH / 4 && x < bar + BAR_REACH && y >= PANEL_Y && y < PANEL_Y + PANEL_H;
+    int was = g_dragging;
+    if (event == EV_BUTTON) g_dragging = a == 0 && rs_menu_on_bar(x, y);
     if (g_dragging) drag_to(menu, player, y);
     if (g_dragging || was) return 0;
   }
@@ -583,18 +354,10 @@ static int before_frame(rc_ctx *c, void *user) {
   (void)user;
   static atomic_int done;
   if (atomic_exchange(&done, 1) || !rs_mods_cfg.overlay) return 0;
-  for (size_t i = 0; i < NOPTS; i++) {
-    option *o = &g_opts[i];
-    char path[96];
-    snprintf(path, sizeof path, "buttons.%s.states", o->id);
-    o->path = strdup(path);
-    o->name = (const char *)(uintptr_t)OV_GUEST(fixed_string_create, (uint64_t)(uintptr_t)o->id);
-    o->session = session_set(o);
-    o->now = choice_now(o);
-    if (o->session)
-      rs_mods_logf("menu options: %s=%s set for this session, its row locked", o->env ? o->env : "RS_GL_BACKEND",
-                   getenv(o->env ? o->env : "RS_GL_BACKEND"));
-  }
+  rs_menu_renderer_env_given = rsp_renderer_env_given;
+  rs_menu_opts_init(0);
+  for (size_t i = 0; i < NOPTS; i++)
+    g_opts[i].name = (const char *)(uintptr_t)OV_GUEST(fixed_string_create, (uint64_t)(uintptr_t)g_opts[i].id);
   uint64_t ads = RC_GA(menu_ads_vtable), copy = RC_GA(menu_ads_vtable_copy), edit = RC_GA(menu_edit_vtable);
   uint64_t refresh = RC_A(RC_ADDR(menu_ads_refresh)), press = RC_A(RC_ADDR(menu_ads_press));
   int n = put(ads, RC_SLOT(menu_refresh), refresh, (uint64_t)(uintptr_t)my_refresh, &g_refresh) +

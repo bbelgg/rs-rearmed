@@ -9,6 +9,10 @@ notes and empties this file. -->
   among RS Re-ARMed's rows in the game's menu (Metal only), for the two switches below; LOW LATENCY is greyed at a fixed
   frame rate (DISPLAY RATE ONLY). Before, the menu had ten of the switches, and these two were set in the installer
   only.
+- **ADV DISPLAY SETTINGS has RS Re-ARMed's picture switches in Learn & Play too:** FRAME RATE, ANY WINDOW SHAPE,
+  LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, ANTI-ALIASING, TEXTURE FILTERING, COLOR and
+  PERFORMANCE OVERLAY are rows of the game's own menu, saved for the next start as the installer saves them. Before,
+  Learn & Play's were set in the installer only.
 - **A performance overlay:** `RS_METAL_HUD=1`, Performance overlay in the installer, shows Apple's Metal HUD over the
   game (macOS 13 and later): its frame rate, frame times and GPU memory. Before, there was none.
 - **Low-latency presentation:** `RS_METAL_DRAWABLES=2`, Low-latency presentation in the installer (under Advanced),

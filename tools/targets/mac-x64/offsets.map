@@ -357,6 +357,7 @@ chord_render_template        0x40  # chord render object: its chord template (0x
 guitar_fretgrid              0x18  # Rnd_Guitar: FretGrid (the plan's section 3, the guitar ctor 0x10019e740) - reused, high
 json_node_member_slot        0x6  # JSON value vtable: an object's member by name (0x1001063a0: [vtbl+0x30], called by the serializer 0x1007d614d "Frets")
 json_node_number_slot        0x14  # JSON value vtable: its number object (the serializer 0x1007d627c: [vtbl+0xa0], then the double at +0x10, 0x1000f9190)
+json_node_bool_slot          unsupported  not read here: json_get_bool reads a member's bool (menu_options.c)
 json_node_object_slot        0x16  # JSON value vtable: the object (dictionary) it is (0x1007d613b, 0x1007d6470: [vtbl+0xb0])
 json_node_add_ref_slot       0x0  # JSON value vtable: AddRef (0x1007d6173: call [rax])
 json_node_release_slot       0x1  # JSON value vtable: Release (0x1007d67a0: [vtbl+8])

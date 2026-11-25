@@ -396,7 +396,9 @@ What each does:
   calls for every movie, opens `patchupdate/gfxassets/views/<name>.gfx` first (`rs_mods_overlay_name` in
   `mods_shared.c`, one rule for both editions). A movie the overlay doesn't hold opens as before, through a mod's
   own hook too (rearmed-mods serves three).
-- **RS Re-ARMed's options in ADV DISPLAY SETTINGS** (this edition's; `RS_MODS_OVERLAY=0` leaves the menu as it is).
+- **RS Re-ARMed's options in ADV DISPLAY SETTINGS** (`RS_MODS_OVERLAY=0` leaves the menu as it is; Learn & Play has
+  ten of them, [its design](../windows/DESIGN.md)). The options, their switches and files and why a row is locked are
+  one source with Learn & Play (`menu_options_common.c`); the rest of `menu_options.c` is this game's.
   The overlay adds a button for each of twelve switches to the menu's definition
   (`manifests/ui_menu_pillar_options.database.json`), with their labels and descriptions as new rows of the game's
   text table (38901-38924, the English in every language), and the game lists, sorts and shows them with its own. The

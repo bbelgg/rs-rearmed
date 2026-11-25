@@ -284,8 +284,12 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   with the same `menu:` names: the profile list, Nonstop Play's SONG LIST EDITOR, and the Tone Designer's
   categories and gear behind EDIT TONE, a slot and CHANGE. The same care with keys in a screen's first seconds,
   and the key's name is `esc` here too.
-- **RS Re-ARMed's options in ADV DISPLAY SETTINGS**: the Mac edition's only for now ([PLAN.md](PLAN.md#status)), so
-  there is nothing of theirs to test here.
+- **ADV DISPLAY SETTINGS** (RS Re-ARMed's options): Space on the main menu, Down three times to OPTIONS, Return,
+  Down three times to ADV DISPLAY SETTINGS, Return. RS Re-ARMed's rows come after the game's own six (FRAME RATE is
+  Down six times); Return on one opens it, Left and Right move a slider, Return ticks a checkbox, and Esc goes back to
+  the list. Each change is a `[rs-mods] menu options:` line in the log, with the switch and its value; the menu's first
+  opening logs `menu options: 10 in Adv Display Settings`. A build started without the app writes `options.env` to
+  `LP_HOME` only when it is set.
 - **Tools** (Space on the main menu): OPTIONS (Down 3), VISUAL SETTINGS (Down 2), VENUE MODE (Down 7), Return,
   Return on On: from then on a song opens a portal to a venue about 30 s in, with or without a guitar. Esc four
   times to the menu. The rooms of Session Mode are reverbs, not venues.

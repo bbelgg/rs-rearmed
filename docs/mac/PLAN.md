@@ -62,8 +62,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   SETTINGS lists twelve of the picture switches after the game's own rows, saved where the installer saves them, for the
   next start; the other renderer's rows are greyed, as are those a switch set for the session (`launchctl setenv`)
   holds, and the longer list scrolls, with a scroll bar that can be dragged
-  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play's are set in the installer only
-  ([its plan](../windows/PLAN.md#status)).
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists ten of them (not released;
+  [its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

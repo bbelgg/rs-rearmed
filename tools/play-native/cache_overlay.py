@@ -35,11 +35,12 @@ same edit, and the overlay holds them as they are, beside the archives (plan_mov
 the game's lists have no bar at all, Nonstop Play's songs among them: the edit also gives each of those one, where
 the lists with a bar have theirs (_edit_bar_shown).
 
-In the Mac edition, Adv Display Settings also lists RS Re-ARMed's picture switches: the overlay adds their buttons to
+In both editions, Adv Display Settings also lists RS Re-ARMed's picture switches: the overlay adds their buttons to
 the menu (manifests/ui_menu_pillar_options.database.json) and their texts to the game's (edit_maingame), and its movie
 (gfxassets/views/displaysettings.gfx of static.psarc) greys a row that can't be used and scrolls its list, which no
 longer fits (edit_display_settings). The rest is native (tools/ws7/recomp/overrides/mods/menu_options.c), on the Mac
-game's own menu code, so Learn & Play's overlay leaves these out (LP_EDITS).
+game's own menu code; Learn & Play's list leaves out the renderer and the OpenGL engine (LP_MENU_OPTIONS), and its
+native half is win-x86/shims/win32_menu_options.c.
 
 This makes those edits in the user's own copies of the files and packs each archive that holds them, rewritten
 with only those files changed, into the patch container the engine mounts at start when it is there,
@@ -741,12 +742,16 @@ MENU_OPTIONS = [
      "memory. Takes effect the next time the game starts.", 21),
 ]
 TEXT_COLUMNS = 8  # the table's languages after a row's id
+# Learn & Play has Metal only: its list leaves out the renderer's choice and the OpenGL engine (menu_options_common.c,
+# mac_only).
+MAC_ONLY_OPTIONS = ("rsRenderer", "rsMultithreadedGL")
+LP_MENU_OPTIONS = [o for o in MENU_OPTIONS if o[0] not in MAC_ONLY_OPTIONS]
 
 
-def edit_options(text):
-    """Adv Display Settings' definition with RS Re-ARMed's buttons (MENU_OPTIONS) first among its own, laid out as
+def edit_options(text, options=MENU_OPTIONS):
+    """Adv Display Settings' definition with RS Re-ARMed's buttons (OPTIONS) first among its own, laid out as
     the game's; None when it has them already or has no such menu."""
-    if '"%s":' % MENU_OPTIONS[0][0] in text:
+    if '"%s":' % options[0][0] in text:
         return None
     at = text.find(OPTIONS_MENU)
     at = text.find('"Buttons"', at) if at >= 0 else -1
@@ -761,15 +766,15 @@ def edit_options(text):
         '%s\t"State": "up",%s%s\t"SortOrder" : %d,%s%s\t"Component": "RSButton"%s%s},'
         % (nl, ind, bid, nl, ind, nl, ind, bid, nl, ind, lrow, label, nl, ind, drow, desc.replace("{C}", ","), nl,
            ind, nl, ind, order, nl, ind, nl, ind)
-        for bid, lrow, label, drow, desc, order in MENU_OPTIONS)
+        for bid, lrow, label, drow, desc, order in options)
     return text[:at + 1] + entries + text[at + 1:]
 
 
-def edit_text_rows(text):
-    """The text table with MENU_OPTIONS' rows added where missing; None when it has them all."""
+def edit_text_rows(text, options=MENU_OPTIONS):
+    """The text table with OPTIONS' rows added where missing; None when it has them all."""
     nl = "\r\n" if "\r\n" in text else "\n"
     rows = []
-    for _, lrow, label, drow, desc, _ in MENU_OPTIONS:
+    for _, lrow, label, drow, desc, _ in options:
         for row, t in ((lrow, label), (drow, desc)):
             if not re.search(r"^%s," % row, text, re.M):
                 rows.append(row + "," + ",".join([t] * (TEXT_COLUMNS - 1) + [""]))
@@ -779,11 +784,21 @@ def edit_text_rows(text):
     return body + nl.join(rows) + nl
 
 
-def edit_maingame(text):
+def edit_maingame(text, options=MENU_OPTIONS):
     """The text table's edits: the notices (edit_notice) and RS Re-ARMed's rows (edit_text_rows)."""
     out = edit_notice(text) or text
-    out = edit_text_rows(out) or out
+    out = edit_text_rows(out, options) or out
     return None if out == text else out
+
+
+def edit_options_lp(text):
+    """Learn & Play's edit_options: its own list (LP_MENU_OPTIONS)."""
+    return edit_options(text, LP_MENU_OPTIONS)
+
+
+def edit_maingame_lp(text):
+    """Learn & Play's edit_maingame: the rows of its own list (LP_MENU_OPTIONS)."""
+    return edit_maingame(text, LP_MENU_OPTIONS)
 
 
 def edit_notice(text):
@@ -1399,8 +1414,9 @@ EDITS = {STARTUP: edit_startup, MISSION: edit_mission, MAIN: edit_main, NOTICES:
          OPTIONS: edit_options}
 BYTE_EDITS = {SONGS_LIST: edit_songs_list}  # (a movie, not text)
 MOVIE_EDITS = {DISPLAY_SETTINGS: edit_display_settings}  # a static.psarc movie's own edit, after the lists'
-# Learn & Play's: without RS Re-ARMed's options in Adv Display Settings, whose native half is the Mac game's only
-LP_EDITS = dict({k: f for k, f in EDITS.items() if k != OPTIONS}, **{NOTICES: edit_notice})
+# Learn & Play's: its own list of RS Re-ARMed's options in Adv Display Settings (LP_MENU_OPTIONS; the native half is
+# win-x86/shims/win32_menu_options.c)
+LP_EDITS = dict(EDITS, **{OPTIONS: edit_options_lp, NOTICES: edit_maingame_lp})
 EDITIONS = ("mac", "learn-play")
 
 
@@ -1408,7 +1424,7 @@ def edits_of(edition):
     """(text edits, static.psarc movies' own edits) of EDITION's overlay."""
     if edition not in EDITIONS:
         raise ValueError("no such edition: %s" % edition)
-    return (EDITS, MOVIE_EDITS) if edition == "mac" else (LP_EDITS, {})
+    return (EDITS, MOVIE_EDITS) if edition == "mac" else (LP_EDITS, MOVIE_EDITS)
 
 
 def edit_file(name, data, edits=EDITS):

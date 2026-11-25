@@ -47,3 +47,12 @@ num_hash wrap
 dlc_job_preview
 dlc_job_request
 dlc_worker_flush
+# RS Re-ARMed's options in Adv Display Settings (win32_menu_options.c), the counterpart of the Mac's methods in front
+# of the game's (overrides/mods/menu_options.c, which sets them in the vtables): the list's values, a press on one of
+# ours, Edit Setting's control and its change, the scroll bar's drag. Each calls the original for what isn't ours;
+# RS_MODS_OVERLAY=0: the originals only.
+menu_ads_refresh wrap
+menu_ads_press wrap
+menu_ads_input wrap
+menu_edit_build wrap
+menu_edit_input wrap

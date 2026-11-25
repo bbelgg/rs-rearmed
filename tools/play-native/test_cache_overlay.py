@@ -372,9 +372,9 @@ class AS2:
 
 
 def native(name):
-    """A whole number menu_options.c names (an enum's NAME = N), which drags the bar beside SettingsScene's panel."""
+    """A whole number menu_options.h names (an enum's NAME = N), which drags the bar beside SettingsScene's panel."""
     with open(os.path.join(os.path.dirname(os.path.abspath(co.__file__)), "..", "ws7", "recomp", "overrides", "mods",
-                           "menu_options.c")) as f:
+                           "menu_options.h")) as f:
         return int(re.search(r"\b%s = (\d+)" % name, f.read()).group(1))
 
 
@@ -555,7 +555,7 @@ class Edits(unittest.TestCase):
         self.assertIsNone(co.edit_options('{ "PlaySettings" : {} }'))
 
     def test_bar_matches_the_native_drag(self):
-        """menu_options.c drags the bar the overlay puts beside SettingsScene's panel: the same numbers."""
+        """menu_options.h drags the bar the overlay puts beside SettingsScene's panel: the same numbers."""
         self.assertEqual((native("BAR_GAP"), native("THUMB_LEAST")), (co.SETTINGS_BAR_GAP, co.THUMB_LEAST))
         # SettingsScene's own BACKGROUND_X, _Y, _WIDTH and 720 less twice _Y, as the test's scene has them
         scene, proto, variables, _, _ = settings_scene(1, 0)
@@ -564,13 +564,15 @@ class Edits(unittest.TestCase):
                          (cls["BACKGROUND_X"], cls["BACKGROUND_Y"], cls["BACKGROUND_WIDTH"], cls["BACKGROUND_HEIGHT"]))
 
     def test_options_match_the_native_table(self):
-        """The buttons are the ones menu_options.c gives a control to, in its order."""
+        """The buttons are the ones menu_options_common.c gives a control to, in its order."""
         with open(os.path.join(os.path.dirname(os.path.abspath(co.__file__)), "..", "ws7", "recomp", "overrides",
-                               "mods", "menu_options.c")) as f:
+                               "mods", "menu_options_common.c")) as f:
             src = f.read()
-        table = src[src.index("static option g_opts[] = {"):]
+        table = src[src.index("rs_menu_option rs_menu_opts[] = {"):]
         ids = re.findall(r'^\s*\{"(rs\w+)",', table[:table.index("};")], re.M)
         self.assertEqual(ids, [o[0] for o in co.MENU_OPTIONS])
+        mac_only = re.findall(r'^\s*\{"(rs\w+)",.*, 1\},$', table[:table.index("};")], re.M)
+        self.assertEqual(tuple(mac_only), co.MAC_ONLY_OPTIONS)  # Learn & Play's list leaves the same out
         self.assertEqual(len({o[1] for o in co.MENU_OPTIONS} | {o[3] for o in co.MENU_OPTIONS}),
                          2 * len(co.MENU_OPTIONS))  # every row its own
 
@@ -886,9 +888,9 @@ class Overlay(TmpDir):
         self.assertEqual(ps.read(co.DISPLAY_SETTINGS), co.edit_display_settings(make_display_settings()))
         ps.close()
 
-    def test_learn_play_without_the_options(self):
-        """Learn & Play's overlay: the same edits but RS Re-ARMed's options in Adv Display Settings (their buttons,
-        texts and movie edit), whose native half is the Mac game's only."""
+    def test_learn_play_options(self):
+        """Learn & Play's overlay: the same edits, with its own list of RS Re-ARMed's options in Adv Display Settings
+        (no renderer or OpenGL engine: it has Metal only)."""
         game = os.path.join(self.tmp, "game")
         os.makedirs(game)
         make_cache(os.path.join(game, "cache.psarc"))
@@ -897,14 +899,19 @@ class Overlay(TmpDir):
         mac = co.make(game)
         self.assertTrue({co.OPTIONS, co.DISPLAY_SETTINGS} <= set(mac))
         names = co.make(game, "learn-play")
-        self.assertEqual(names, [n for n in mac if n not in (co.OPTIONS, co.DISPLAY_SETTINGS)])
-        self.assertIn(co.NOTICES, names)
+        self.assertEqual(names, mac)
         ps = co.Psarc(os.path.join(game, "Update", "patcharchives.psarc"))
-        self.assertNotIn(co.DISPLAY_SETTINGS, ps.names)
-        notices = [co.SevenZip(ps.read(n)).read(x) for n in ps.names if n.endswith(".7z")
-                   for x in co.SevenZip(ps.read(n)).names() if x.lower() == co.NOTICES]
+        self.assertEqual(ps.read(co.DISPLAY_SETTINGS), co.edit_display_settings(make_display_settings()))
+        inner = {x.lower(): co.SevenZip(ps.read(n)).read(x) for n in ps.names if n.endswith(".7z")
+                 for x in co.SevenZip(ps.read(n)).names()}
         ps.close()
-        self.assertEqual(notices, [co.edit_notice(NOTICES).encode()])  # the notices, not the options' rows
+        self.assertEqual(inner[co.NOTICES], co.edit_maingame(NOTICES, co.LP_MENU_OPTIONS).encode())
+        options = inner[co.OPTIONS].decode()
+        for bid in co.MAC_ONLY_OPTIONS:
+            self.assertNotIn('"%s":' % bid, options)
+        for o in co.LP_MENU_OPTIONS:
+            self.assertIn('"%s":' % o[0], options)
+        self.assertEqual(len(co.LP_MENU_OPTIONS), len(co.MENU_OPTIONS) - 2)
         self.assertRaises(ValueError, co.make, game, "windows")
 
     def test_static_movies(self):

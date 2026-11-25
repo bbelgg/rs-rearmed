@@ -371,6 +371,7 @@ chord_render_template
 guitar_fretgrid
 json_node_member_slot
 json_node_number_slot
+json_node_bool_slot
 json_node_object_slot
 json_node_add_ref_slot
 json_node_release_slot

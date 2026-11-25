@@ -60,12 +60,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
-- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY not released): OPTIONS → ADV DISPLAY
-  SETTINGS lists twelve of the picture switches after the game's own rows, saved where the installer saves them, for the
-  next start; the other renderer's rows are greyed, as are those a switch set for the session (`launchctl setenv`)
-  holds, and the longer list scrolls, with a scroll bar that can be dragged
-  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists ten of them (not released;
-  [its plan](../windows/PLAN.md#status)).
+- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY new in 1.20.0; SHARPENING and the rows
+  taking effect at once not released): OPTIONS → ADV DISPLAY SETTINGS lists thirteen of the picture switches after the
+  game's own rows, saved where the installer saves them, five of them taking effect at once (PERFORMANCE OVERLAY too, in
+  a game started with it); a row that can't apply is greyed with why, as is one a switch set for the session
+  (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar that can be dragged
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists eleven of them, for the next start (new in
+  1.20.0; [its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

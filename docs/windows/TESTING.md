@@ -288,7 +288,7 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   Down three times to ADV DISPLAY SETTINGS, Return. RS Re-ARMed's rows come after the game's own six (FRAME RATE is
   Down six times); Return on one opens it, Left and Right move a slider, Return ticks a checkbox, and Esc goes back to
   the list. Each change is a `[rs-mods] menu options:` line in the log, with the switch and its value; the menu's first
-  opening logs `menu options: 10 in Adv Display Settings`. A build started without the app writes `options.env` to
+  opening logs `menu options: 11 in Adv Display Settings`. A build started without the app writes `options.env` to
   `LP_HOME` only when it is set. With the mouse, as in the Mac edition ([its page](../mac/TESTING.md)): the scroll bar
   at x 686, a row at x 250 (a press opens it), and Esc while the button is held leaves no drag behind.
 - **Tools** (Space on the main menu): OPTIONS (Down 3), VISUAL SETTINGS (Down 2), VENUE MODE (Down 7), Return,

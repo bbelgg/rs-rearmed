@@ -55,12 +55,13 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Render scale** (new in 1.18.0): `RS_METAL_SCALE=N`, as the Mac edition, from the same header: the desktop the game
   sees and a resized window at N%. Played full screen on a 1470x956 Retina screen to a song's note highway: 50% (a
   735x478 frame) is fine.
-- **In the game's menu** (new in 1.20.0): OPTIONS → ADV DISPLAY SETTINGS lists ten of the picture switches after the
-  game's own rows, as the Mac edition's twelve without RENDERER and MULTITHREADED GL ENGINE (this edition has Metal
-  only), saved to `options.env` for the next start ([INSTALL.md](INSTALL.md#settings-and-switches)). Played on a test
-  build: the rows, their values, FRAME RATE's slider, ANY WINDOW SHAPE's checkbox, LOW LATENCY greyed at a fixed
-  frame rate and a change saved and set back. Not tried: dragging the list's scroll bar with the mouse, a switch set
-  for the session, the installed app's next start with a changed row.
+- **In the game's menu** (new in 1.20.0; SHARPENING not released): OPTIONS → ADV DISPLAY SETTINGS lists eleven of the
+  picture switches after the game's own rows, as the Mac edition's thirteen without RENDERER and MULTITHREADED GL ENGINE
+  (this edition has Metal only), saved to `options.env` for the next start
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Played on a test build: the rows, their values, FRAME RATE's slider,
+  ANY WINDOW SHAPE's checkbox, LOW LATENCY greyed at a fixed frame rate and a change saved and set back. Not tried:
+  dragging the list's scroll bar with the mouse, a switch set for the session, the installed app's next start with a
+  changed row.
 
 **Built-in fixes** (the Mac edition's, on this game's own functions and with the same switches:
 [DESIGN.md](DESIGN.md#built-in-fixes-and-mods))

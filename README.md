@@ -101,7 +101,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | OpenGL renderer and automatic fallback | ✅ | ❌ none planned |
 | Installer app and install script | ✅ | ✅ |
 | The game and your DLC downloaded by Steam, with nothing installed in Steam | ⚠️ when the game isn't installed in Steam; ✅ an installed game is used as it is | ✅ |
-| Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs)) | ✅ the display's frame rate, about the CPU of the original under Rosetta: 10 points of a core and 0.3 GB more than the Mac edition ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
+| Performance | ✅ the display's frame rate, about a sixth less CPU than the original under Rosetta ([details](docs/mac/PERFORMANCE.md#measured-runs)) | ✅ the display's frame rate, about the CPU of the original under Rosetta: 7-8 points of a core and 0.1 GB more than the Mac edition ([details](docs/windows/PERFORMANCE.md#toward-the-mac-edition)) |
 
 ¹ Learn & Play reads the PC song archives (`*_p.psarc`), the Mac game the Mac ones (`*_m.psarc`). Official DLC has
 both, and the installer has Steam fetch what your account owns; custom songs often exist for one platform only.

@@ -5,21 +5,23 @@ Retina screen or a 75 Hz 2560x1440 external display. The Mac port's: [Mac perfor
 
 ## Summary
 
-The current figures are the [measured runs](#measured-runs) on 1.13.0's code: a song, full screen on the Mac's
-own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods loaded.
+The current figures are the [measured runs](#measured-runs) of 2026-11-25 on the code after 1.19.0: a song, full screen
+on the Mac's own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods
+loaded.
 
 | Song | Learn & Play | |
 |---|---|---|
 | Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Start-up and first play](#start-up-and-first-play)). `RS_FPS=N` fixes a rate |
-| CPU | 52.0-53.6% of a core, 8.66-8.93 ms a frame | game thread 32.6-33.3, Wwise 7.2-7.5, note detection 5.8-6.3 |
-| Memory footprint | 1.51-1.52 GB | 1.28-1.36 GB on a 1x display without MSAA, upscaling and mods |
+| CPU | 51.7-53.5% of a core, 8.61-8.91 ms a frame | game thread 34.4-35.4, Wwise 7.3-7.4, note detection 4.4-4.5 |
+| Memory footprint | 1.38-1.39 GB | 1.28-1.36 GB on a 1x display without MSAA, upscaling and mods |
 
-- **Since those runs** the note detection's spectrum loop is relaxed: one run at 50.4% of a core with that thread at
-  4.4 points ([Where the CPU goes](#where-the-cpu-goes)).
-- **Against the Mac edition**: 10 points of a core more, 1.7 ms a frame, and 0.29 GB more
+- **Against the Mac edition**: 7-8 points of a core more, 1.2 ms a frame, and 0.11 GB more
   ([Toward the Mac edition](#toward-the-mac-edition)).
-- **Against the original Mac game under Rosetta**: about the same CPU (the original 51.0% of a core), with a better
-  picture and half the audio buffer ([Mac](../mac/PERFORMANCE.md#against-rosetta)).
+- **Against 1.13.0's runs** (2026-11-10: 52.0-53.6%, 1.51-1.52 GB): the note detection 1.5 points lower since its
+  spectrum loop was relaxed, and 0.13 GB less since the per-frame leak was fixed; the Mac reads about two points higher
+  than it did that day ([Mac](../mac/PERFORMANCE.md#measured-runs)).
+- **Against the original Mac game under Rosetta** (2026-11-10): about the same CPU (the original 51.0% of a core), with a
+  better picture and half the audio buffer ([Mac](../mac/PERFORMANCE.md#against-rosetta)).
 - The memory order (a fence with each guest access) costs about 1 ms a frame ([Memory order](#memory-order)).
 - **The start**: the title is up in about 7 s, and the shaders are prepared at install in 16.5 s
   ([Shader preparation](#shader-preparation)).
@@ -41,8 +43,9 @@ own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the ga
 ## Measured runs
 
 The setup and the table of both editions are in the [Mac edition's](../mac/PERFORMANCE.md#measured-runs); this
-edition's figures are in the [Summary](#summary). Its frames are the steadier: p99 17.7-17.8 ms against the Mac
-edition's 19.4-19.7, and a third as many over 20 ms (10 to 13 in a run). In `LP_THREAD_CPU`'s log the game thread is
+edition's figures are in the [Summary](#summary). Its frames are the steadier: p99 17.6-17.7 ms against the Mac
+edition's 17.7-19.6, and fewer over 20 ms (7 to 9 in a run, the Mac edition's 16 to 47); no frame went on the screen
+late in either. In `LP_THREAD_CPU`'s log the game thread is
 `w32 game`, the Wwise thread `w32 thread 1a823c0` and the note detection `w32 thread 149ab10`.
 
 With the renderer's own times in the log, one more run: all 9,001 frames went on the screen one refresh apart. The GPU's
@@ -197,10 +200,10 @@ Mac edition's takes 0.8 s ([PLAN.md](PLAN.md#open-issues)).
 
 ## Toward the Mac edition
 
-On the same song, screen and settings this edition takes 52.0-53.6% of a core where the Mac edition takes 41.7-43.1%, and
-1.5 GB where it takes 1.2 GB ([measured runs](../mac/PERFORMANCE.md#measured-runs)): 10 points of a core,
-1.7 ms a frame, and 0.29 GB. By thread: the game thread about 6 points more, the note detection 3.5 (under 2 since its
-spectrum loop was relaxed), the Wwise thread 1.5, the others about the same. Where it is, by what the profiles show
+On the same song, screen and settings this edition takes 51.7-53.5% of a core where the Mac edition takes 44.4-45.9%,
+and 1.38-1.39 GB where it takes 1.26-1.28 GB ([measured runs](../mac/PERFORMANCE.md#measured-runs)): 7-8 points of a
+core, 1.2 ms a frame, and 0.11 GB. By thread: the game thread about 5.5 points more, the note detection 2, the Wwise
+thread 1.5, the others about the same. Where it is, by what the profiles show
 (the shares are the earlier route's, below):
 
 - the Wwise and note detection threads. Fences take a good part: 0.5 ms a frame of these two threads went without them.

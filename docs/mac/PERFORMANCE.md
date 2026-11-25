@@ -6,20 +6,23 @@ macOS 27), on its own 60 Hz Retina screen or a 75 Hz 2560x1440 external display.
 
 ## Summary
 
-The current figures are the [measured runs](#measured-runs) on 1.13.0's code: a song, full screen on the Mac's
-own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods loaded.
+The current figures are the [measured runs](#measured-runs) of 2026-11-25 on the code after 1.19.0: a song, full screen
+on the Mac's own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the game's High quality, mods
+loaded.
 
 | Song | Mac | |
 |---|---|---|
 | Frame rate | 59.9-60.0 fps | the display's rate; 74.9 fps on a 75 Hz display ([Start-up and first play](#start-up-and-first-play)). `RS_FPS=N` fixes a rate |
-| CPU | 41.7-43.1% of a core, 6.97-7.18 ms a frame | game thread 26.7-27.7, Wwise 5.8, note detection 2.5-2.7 |
-| Memory footprint | 1.22-1.23 GB | 0.80-0.81 GB on a 1x display without MSAA, upscaling and mods |
+| CPU | 44.4-45.9% of a core, 7.39-7.66 ms a frame | game thread 28.6-30.2, Wwise 5.8, note detection 2.5-2.6 |
+| Memory footprint | 1.26-1.28 GB | 0.80-0.81 GB on a 1x display without MSAA, upscaling and mods |
 | GPU | about 9.7 ms of work a frame, 58% of a 60 Hz refresh | a quarter of it the upscaler |
 
-- **Against the original under Rosetta**: about a sixth less CPU (the original 51.0% of a core and 0.93 GB), with a better
-  picture and half the audio buffer ([Against Rosetta](#against-rosetta)).
-- **Against Learn & Play**: Learn & Play takes 10 points of a core more, 1.7 ms a frame, and 0.29 GB more
+- **Against the original under Rosetta** (2026-11-10, on that day's figures): about a sixth less CPU (the original 51.0%
+  of a core and 0.93 GB), with a better picture and half the audio buffer ([Against Rosetta](#against-rosetta)).
+- **Against Learn & Play**: Learn & Play takes 7-8 points of a core more, 1.2 ms a frame, and 0.11 GB more
   ([Against the Windows port](#against-the-windows-port)).
+- **Against 1.13.0**: the same CPU. The 1.13.0 app, measured the same day on the same bench, took 44.4-44.6%; the
+  figures of 2026-11-10 (41.7-43.1%) were lower because the Mac was ([Measured runs](#measured-runs)).
 - **Metal against OpenGL**: about 5% less CPU per frame ([Renderer](#renderer)).
 - **The start**: the title is up in 7.4-7.8 s ([Start-up and first play](#start-up-and-first-play)).
 - The compiler switches (ThinLTO, PGO, `-O3`) change little ([Build options](#build-options)).
@@ -41,32 +44,45 @@ own screen with MetalFX upscaling, 4x MSAA and 16x anisotropic filtering, the ga
 
 ## Measured runs
 
-Three runs of each edition in turn after a warm-up of each (2026-11-10): full screen at 1470x956 points and 60 Hz with
-MetalFX upscaling to 2940x1912 and 4x MSAA. Builds of 1.13.0's code, rearmed-mods 0.11.0 with the same `RSMods.ini` in
-both, Song Stems on. `VisualQuality=2` with every effect on, `LatencyBuffer=1`, Venue Mode on, 147 and 150 archives in
-`dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's microphone and no guitar; 150 s
+Three runs of each edition in turn after a warm-up of each (2026-11-25): full screen at 1470x956 points and 60 Hz with
+MetalFX upscaling to 2940x1912 and 4x MSAA. Builds of the code after 1.19.0 (f0491ff), rearmed-mods 0.11.0 with the same
+`RSMods.ini` in both, Song Stems on. Every switch of the picture set the same in both: `RS_METAL_MSAA=4`,
+`RS_METAL_ANISO=16`, `RS_METAL_UPSCALE=1`, `RS_METAL_SCALE=100`, `RS_METAL_DRAWABLES=3`, `RS_METAL_HUD=0`,
+`RS_METAL_COLORS` sRGB, `RS_METAL_RETINA=0`, `RS_WINDOW_ANY_SHAPE=1`, no `RS_FPS`; the game's files differ only in Learn
+& Play's Windows audio keys. `VisualQuality=2` with every effect on, `LatencyBuffer=1`, Venue Mode on, 149 and 150
+archives in `dlc`. Cherub Rock, Lead, Override to Max, a profile on DIRECT CONNECT with the Mac's microphone and no guitar; 150 s
 from 45 s after the note highway came up, about 9,000 frames a run.
 
 | Song | Mac | Learn & Play |
 |---|---|---|
-| Frame rate | 59.9-60.0 | 59.9-60.0 |
-| Frame interval, median | 16.61-16.64 ms | 16.66-16.67 ms |
-| p95 | 18.7-18.9 ms | 17.3-17.4 ms |
-| p99 | 19.4-19.7 ms | 17.7-17.8 ms |
-| Frames over 20 ms | 27, 38, 62 | 10, 12, 13 |
-| Frames over 50 ms | 0-1 | 0-1 |
-| Game frame, median | 4.22-4.33 ms | not logged |
-| CPU (% of a core) | 41.7, 43.1, 43.1 | 52.0, 52.8, 53.6 |
-| CPU per frame | 6.97-7.18 ms | 8.66-8.93 ms |
-| game thread | 26.7-27.7 | 32.6-33.3 |
-| Wwise thread | 5.8 | 7.2-7.5 |
-| note detection | 2.5-2.7 | 5.8-6.3 |
-| GPU | 89% | 90% |
-| Footprint | 1.22-1.23 GB | 1.51-1.52 GB |
+| Frame rate | 60.0 | 60.0 |
+| Frames on the screen late | 0 | 0 |
+| Frame interval, median | 16.65-16.66 ms | 16.66 ms |
+| p95 | 17.4-18.5 ms | 17.2 ms |
+| p99 | 17.7-19.6 ms | 17.6-17.7 ms |
+| Frames over 20 ms | 44, 47, 16 | 9, 9, 7 |
+| Frames over 33 ms | 0-1 | 0 |
+| Game frame, median | 4.58-4.95 ms | not logged |
+| CPU (% of a core) | 44.5, 44.4, 45.9 | 53.5, 51.7, 51.7 |
+| CPU per frame | 7.39-7.66 ms | 8.61-8.91 ms |
+| game thread | 28.6-30.2 | 34.4-35.4 |
+| Wwise thread | 5.8 | 7.3-7.4 |
+| note detection | 2.5-2.6 | 4.4-4.5 |
+| GPU | 88-89% | 90% |
+| GPU, a frame's start to end | 14.2-14.5 ms | 14.7-14.8 ms |
+| Footprint | 1.26-1.28 GB | 1.38-1.39 GB |
+| Footprint's growth | 1.1-1.3 MB a minute | 0.2-0.5 MB a minute |
 
-Learn & Play takes 10 points of a core more than this edition, 1.7 ms a frame, and 0.29 GB more memory; its note
-detection has come down since ([its file](../windows/PERFORMANCE.md#where-the-cpu-goes)). The stems helper used no
-CPU: the song's backing track was in its cache from the warm-up. Not looked at: whether the venue showed, with no notes
+Learn & Play takes 7-8 points of a core more than this edition, 1.2 ms a frame, and 0.11 GB more memory. The stems
+helper used no CPU: the song's backing track was in its cache from the warm-up.
+
+**Against the runs of 2026-11-10** (1.13.0's code, the same bench but for the pinned picture switches): this edition took
+41.7-43.1% of a core then (game thread 26.7-27.7, game frame 4.22-4.33 ms, 1.22-1.23 GB), Learn & Play 52.0-53.6%
+(note detection 5.8-6.3, 1.51-1.52 GB). The 1.13.0 app, run again on 2026-11-25 on the same bench (two runs), took
+44.4-44.6% (game thread 28.2-28.3, game frame 4.49-4.53 ms), as much as the code after 1.19.0: the Mac reads about two
+points higher than it did (macOS 27.2.1 since; the harness's other load was 1.1-1.7 cores, with the Claude app open),
+and the code didn't change it. Learn & Play's note detection is lower since its spectrum loop was relaxed, and its
+footprint since its per-frame leak was fixed ([its file](../windows/PERFORMANCE.md#where-the-cpu-goes)). Not looked at: whether the venue showed, with no notes
 played.
 
 **What the screen got** (one more run of each with the renderer's own times in the log: `P`, a frame on the screen, and
@@ -140,8 +156,9 @@ are 1.4% of the thread here and 1.9% there.
 
 ### Against Rosetta
 
-The original game under Rosetta beside the [measured runs](#measured-runs) of both editions: the same Mac and
-screen, Cherub Rock, 150 s from about 45 s into the song, one run.
+The original game under Rosetta beside the measured runs of both editions made the same days (2026-11-10, 1.13.0's
+code): the same Mac and screen, Cherub Rock, 150 s from about 45 s into the song, one run. The Mac reads about two points
+higher now ([Measured runs](#measured-runs)), so compare within this table.
 
 | Song | Original under Rosetta | Mac | Learn & Play |
 |---|---|---|---|
@@ -201,8 +218,8 @@ the game was seen linking: [its Shader preparation](../windows/PERFORMANCE.md#sh
 
 ### Against the Windows port
 
-On the same song, screen and settings Learn & Play takes 52.0-53.6% of a core where this edition takes 41.7-43.1%, and
-1.5 GB where this takes 1.2 GB ([Measured runs](#measured-runs)). Where its extra time is:
+On the same song, screen and settings Learn & Play takes 51.7-53.5% of a core where this edition takes 44.4-45.9%, and
+1.38-1.39 GB where this takes 1.26-1.28 GB ([Measured runs](#measured-runs)). Where its extra time is:
 [Where the CPU goes](#where-the-cpu-goes) and [Toward the Mac edition](../windows/PERFORMANCE.md#toward-the-mac-edition).
 
 ## Start-up and first play

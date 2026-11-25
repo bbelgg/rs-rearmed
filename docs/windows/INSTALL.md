@@ -313,15 +313,16 @@ the other on/off switches, and `KEY=value` for the rest: other lines are ignored
 has is passed on and does nothing), and the top of `logs/last-run.log` says what was used. The Mac edition has
 its own files, read the same way. 
 
-**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists eleven of the switches after the game's own rows: FRAME RATE,
-ANY WINDOW SHAPE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, SHARPENING, ANTI-ALIASING,
-TEXTURE FILTERING, COLOR and PERFORMANCE OVERLAY (the Mac edition's thirteen without RENDERER and MULTITHREADED GL
-ENGINE). A change is written to `options.env`, as the installer writes it, and takes effect the next time the game
-starts (the Mac edition takes five of them at once). A switch set for the login session (`launchctl setenv`) still wins
-over it, so its row shows the session's value, greyed, with SET FOR THIS SESSION; LOW LATENCY is greyed at a fixed
-FRAME RATE, unless `RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row can then take out, and
-METALFX UPSCALING with nothing upscaled. The list scrolls with the
-focus, and its scroll bar can be dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
+**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists eleven of the switches after the game's own rows: FRAME RATE, ANY
+WINDOW SHAPE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, SHARPENING, ANTI-ALIASING, TEXTURE
+FILTERING, COLOR and PERFORMANCE OVERLAY (the Mac edition's thirteen without RENDERER and MULTITHREADED GL ENGINE). A
+change is written to `options.env`, as the installer writes it. SHARPENING, ANTI-ALIASING, TEXTURE FILTERING and COLOR
+take effect at once, as in the Mac edition, the others the next time the game starts (the Mac edition also takes LOW
+LATENCY at once, and PERFORMANCE OVERLAY in a game started with it). A switch set for the login session
+(`launchctl setenv`) still wins over it, so its row shows the session's value, greyed, with SET FOR THIS SESSION; LOW
+LATENCY is greyed at a fixed FRAME RATE, unless `RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row
+can then take out, and METALFX UPSCALING with nothing upscaled. The list scrolls with the focus, and its scroll bar can
+be dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
 
 ```
 RS_MODS_INTRO=0

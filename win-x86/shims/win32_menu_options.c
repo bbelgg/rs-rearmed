@@ -29,6 +29,7 @@
 #include "rc_abi.h"
 #include "menu_options.h"
 #include "mods_shared.h"
+#include "rs_gfx.h"
 
 enum { EAX = 0, ECX = 1, EDX = 2, EBX = 3, ESP = 4, EBP = 5, ESI = 6, EDI = 7 };
 
@@ -222,6 +223,10 @@ static int ready(rc_ctx *c) {
   g_ready = -1;
   if (!rs_mods_cfg.overlay || rs_menu_nopts > sizeof g_id / sizeof *g_id) return 0;
   rs_menu_opts_init(1);
+  // A change taking effect at once where it can, as on the Mac: Sharpening, Anti-Aliasing, Texture Filtering and
+  // Color are libRSOpenGL's (from the next frame); it takes no other. Low Latency and the Performance Overlay are the
+  // window's layer's, set once as the game starts (lp_window.m): those at the next start.
+  rs_menu_live_switch = rs_gfx_set_switch;
   frame f;
   frame_open(&f, c);
   for (size_t i = 0; i < rs_menu_nopts; i++) {

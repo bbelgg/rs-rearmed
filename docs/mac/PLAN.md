@@ -65,8 +65,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   game's own rows, saved where the installer saves them, five of them taking effect at once (PERFORMANCE OVERLAY too, in
   a game started with it); a row that can't apply is greyed with why, as is one a switch set for the session
   (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar that can be dragged
-  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists eleven of them, for the next start (new in
-  1.20.0; [its plan](../windows/PLAN.md#status)).
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists eleven of them (new in 1.20.0), four taking
+  effect at once (not yet run there; [its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

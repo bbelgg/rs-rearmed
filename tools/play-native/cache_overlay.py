@@ -744,12 +744,14 @@ MENU_OPTIONS = [
 ]
 TEXT_COLUMNS = 8  # the table's languages after a row's id
 # Learn & Play has Metal only: its list leaves out the renderer's choice and the OpenGL engine (menu_options_common.c,
-# mac_only). It reads the switches as it starts (no rs_menu_live_switch there), so the rows the Mac changes at once
-# say the next start.
+# mac_only). The renderer's switches take effect at once there too (win32_menu_options.c's rs_menu_live_switch), but
+# LOW LATENCY and PERFORMANCE OVERLAY are its window's layer's, set as it starts (lp_window.m): those say the next start.
 MAC_ONLY_OPTIONS = ("rsRenderer", "rsMultithreadedGL")
+LP_AT_START = ("rsLowLatency", "rsPerformanceOverlay")
 AT_ONCE, AT_START = "Takes effect at once.", "Takes effect the next time the game starts."
 HUD_AT_ONCE = "Takes effect at once if the game started with it on{C} otherwise the next time it starts."
-LP_MENU_OPTIONS = [o[:4] + (o[4].replace(AT_ONCE, AT_START).replace(HUD_AT_ONCE, AT_START),) + o[5:]
+LP_MENU_OPTIONS = [o[:4] + (o[4].replace(AT_ONCE, AT_START).replace(HUD_AT_ONCE, AT_START) if o[0] in LP_AT_START
+                            else o[4],) + o[5:]
                    for o in MENU_OPTIONS if o[0] not in MAC_ONLY_OPTIONS]
 
 

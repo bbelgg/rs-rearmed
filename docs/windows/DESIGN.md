@@ -479,12 +479,15 @@ What differs, fix by fix:
   RENDERER or MULTITHREADED GL ENGINE: Metal only). The overlay's edits are the same, the menu's definition and text
   rows for this edition's list (`LP_MENU_OPTIONS`) and the same movie edit, since this game's `displaysettings.gfx` is
   byte for byte the Mac game's. The options themselves, their switches and files and why a row is locked, are one source
-  (`overrides/mods/menu_options_common.c`). The native half is `win-x86/shims/win32_menu_options.c`: the same five
-  methods as the Mac's, matched in this game (`tools/targets/win-x86`), but as `wrap` lines of the win32 override module
-  rather than vtable slots, so each runs in front of the translated method whoever calls it. The game's helpers it calls
-  differ in their calls, as the tables say: several take register arguments, a JSON key is one word, the game's string
-  is 24 bytes, and `json_get_number`, `json_get_bool`, `menu_screens` and `get_resolution` are inlined here, so they are
-  made from the same pieces the game's own code uses. A change is written to `options.env` in `LP_HOME`.
+  (`overrides/mods/menu_options_common.c`). A change takes effect at once where the renderer can take it, as on the Mac:
+  SHARPENING, ANTI-ALIASING, TEXTURE FILTERING and COLOR go to libRSOpenGL's `rs_gfx_set_switch` (looked up at run time,
+  as the Mac's shell does); LOW LATENCY and PERFORMANCE OVERLAY are the window's layer's, set as the game starts, so the
+  next start. The native half is `win-x86/shims/win32_menu_options.c`: the same five methods as the Mac's, matched in
+  this game (`tools/targets/win-x86`), but as `wrap` lines of the win32 override module rather than vtable slots, so
+  each runs in front of the translated method whoever calls it. The game's helpers it calls differ in their calls, as
+  the tables say: several take register arguments, a JSON key is one word, the game's string is 24 bytes, and
+  `json_get_number`, `json_get_bool`, `menu_screens` and `get_resolution` are inlined here, so they are made from the
+  same pieces the game's own code uses. A change is written to `options.env` in `LP_HOME`.
 - **Song ownership during a mount**: the shared hook, which this edition's mounting loop tells when its steps run.
   `RS_MODS_BYPASS=0` also brings back the song-key table, which hides custom songs here whatever their AppID.
 - **Title logo.** The same `tools/loadscreen` and layout as the Mac edition's. `lp_install.py build` makes

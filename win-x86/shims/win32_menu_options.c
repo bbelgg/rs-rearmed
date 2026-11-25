@@ -63,7 +63,11 @@ static void frame_open(frame *f, rc_ctx *c) {
 }
 static void frame_close(frame *f) {
   rc_ctx *c = f->c;
+  // (ecx and edx too: rc32_call sets them, and menu_ads_input passes its event on to the game's thiscall after a
+  // frame, ecx the menu)
   c->r[EAX] = f->r[EAX];
+  c->r[ECX] = f->r[ECX];
+  c->r[EDX] = f->r[EDX];
   c->r[EBX] = f->r[EBX];
   c->r[ESP] = f->r[ESP];
   c->r[EBP] = f->r[EBP];

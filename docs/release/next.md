@@ -14,3 +14,4 @@ notes and empties this file. -->
 - **Low-latency presentation:** `RS_METAL_DRAWABLES=2`, Low-latency presentation in the installer (under Advanced),
   queues two frames for the screen instead of three, so each is shown a refresh sooner. Before, only the Mac edition
   read it, and the installer didn't offer it.
+- **Lists scroll with the trackpad and the mouse wheel.** On the Mac, neither moved a list before; on Learn & Play, a trackpad swipe moved one row an event whatever its size. Both editions now move the same rows for the same swipe.

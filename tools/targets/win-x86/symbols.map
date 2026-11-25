@@ -1116,6 +1116,7 @@ path_md5                                                         unsupported  in
 dlc_update                                                       0x01449310  thiscall  -  # the per-frame update: win32_overrides.c replaces it, the batched mount runs on it
 key_down                                                         unsupported  Mac-only: the Mac game's stand-in for the keyboard device; Windows reads DirectInput and the window messages
 key_up                                                           unsupported  Mac-only: the Mac game's stand-in for the keyboard device; Windows reads DirectInput and the window messages
+mouse_wheel                                                      unsupported  Mac-only: the Mac mouse device's wheel setter; Learn & Play's device fills its wheel from DirectInput
 thread_set_priority                                              unsupported  inlined at each thread's start (LTCG): `if thread+0x14 != N: SetThreadPriority(thread+0x20, ...)`, e.g. 0x106b4eb, 0x163cc0e; LP_QOS does the job here
 sng_verify                                                       0x019bfeb0  cdecl     _Bool(const uint8_t *, uint32_t, const char *)  # same function as rsg_cryptopp_dsa_sha1_verify, as on the Mac
 

@@ -588,6 +588,7 @@ engine_nimain_begin                                              0x100e34310  co
 camera_set_frustum                                               0x100e438c0  sysv  void(void *camera, const void *frustum)
 key_down                                                         0x101135520  sysv  -
 key_up                                                           0x101135560  sysv  -
+mouse_wheel                                                      0x101135940  sysv  -
 engine_nimain_end                                                0x101146090  code  -
 LuaScriptFactory_QueryInterface                                  0x10114ff10  sysv  -
 LuaScriptFactory_QueryInterface_const                            0x10114ff70  sysv  -

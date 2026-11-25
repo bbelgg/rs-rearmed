@@ -59,6 +59,7 @@
 #include "lp_screen.h"
 #include "rs_gfx.h"
 #include "rsp_fps.h"
+#include "rsp_platform.h"
 #include "rsp_scale.h"
 #include "rsp_layer.h"
 
@@ -442,9 +443,21 @@ static void input_monitor(void) {
         w32_input_key(k, mod_key_down(k, e.modifierFlags), 0);
         return e;
       }
-      case NSEventTypeScrollWheel:
-        if (e.scrollingDeltaY) w32_input_mouse_wheel((int32_t)(e.scrollingDeltaY > 0 ? 120 : -120));
+      case NSEventTypeScrollWheel: {
+        // The trackpad reports pixels: accumulate them into steps, one row each,
+        // as the Mac edition's shell does (rsp_scroll_steps); a wheel notch is
+        // one row outright, as before.
+        if ([e hasPreciseScrollingDeltas]) {
+          static double scroll_accum = 0;  // one window per process, as the Mac shell's
+          if ([e phase] == NSEventPhaseBegan) scroll_accum = 0;  // a new gesture starts clean
+          int a = 0;
+          int steps = rsp_scroll_steps([e scrollingDeltaY], &scroll_accum, &a);
+          for (int i = 0; i < steps; i++) w32_input_mouse_wheel(a ? 120 : -120);
+        } else if (e.scrollingDeltaY) {
+          w32_input_mouse_wheel((int32_t)(e.scrollingDeltaY > 0 ? 120 : -120));
+        }
         return e;
+      }
       default: {
         NSPoint p = [g_view convertPoint:e.locationInWindow fromView:nil];
         int inside = NSPointInRect(p, g_view.bounds);

@@ -36,6 +36,9 @@ for f in mods_shared framerate; do
 done
 # the overlay API for mods, the Mac's (shims/include/rs_overlay.h): linked as an object, as only mods call it
 $CC -I"$root/shims/platform/include" -c "$root/shims/platform/src/rsp_overlay.c" -o "$obj/rsp_overlay.o"
+# the trackpad accumulator the scroll handler shares with the Mac shell (rsp_scroll_steps):
+# in the archive, pulled in by lp_window.o's reference to it
+$CC -I"$root/shims/platform/include" -c "$root/shims/platform/src/rsp_logic.c" -o "$obj/shims/rsp_logic.o"
 rm -f "$obj/win32_shims.a"
 ar rcs "$obj/win32_shims.a" "$obj/shims"/*.o
 echo "=== steam_api (offline) ==="

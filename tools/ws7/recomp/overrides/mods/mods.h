@@ -31,6 +31,7 @@ void RC_FN(dlc_update)(rc_ctx *c);  // DLC coordinator per-frame update (batched
 void RC_FN(asset_loader_thread)(rc_ctx *c);  // the asset loader thread's loop (its pause, while archives are mounted)
 void RC_FN(key_down)(rc_ctx *c);  // game keyboard: key down
 void RC_FN(key_up)(rc_ctx *c);  // game keyboard: key up
+void RC_FN(mouse_wheel)(rc_ctx *c);  // mouse device: wheel set (and the menus' wheel field)
 void RC_FN(thread_set_priority)(rc_ctx *c);  // thread class SetPriority
 void RC_FN(sng_verify)(rc_ctx *c);  // DSA verify (the SNG caller is bypassed)
 

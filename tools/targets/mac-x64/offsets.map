@@ -9,6 +9,11 @@ service_manager_quit              0x144   # ServiceManager: u8 quit flag
 service_manager_state             0x40    # ServiceManager: u32 state (game_frame 0x10017a030)
 game_config_vsync                 0x3c    # config block: u32 vsync
 input_sink_full_char              -0x28   # input_sink's frame (frame pointer relative): the full character
+mouse_wheel_axis                  0x78    # mouse device: the wheel the menus read each frame (0x100b9509b)
+mouse_state_vec                   0x118   # mouse device: the per-frame state vector the wheel setter writes (its begin)
+mouse_state_end                   0x120   # mouse device: the per-frame state vector's end
+mouse_state_wheel                 0x18    # a per-frame state: the wheel field the setter broadcasts
+mouse_state_size                  0x60    # a per-frame state's size
 thread_priority_index             0x20    # engine thread: int32 priority index
 thread_pthread                    0x30    # engine thread: pthread_t
 path_obj_refs                     0x28    # interned path object: int refcount

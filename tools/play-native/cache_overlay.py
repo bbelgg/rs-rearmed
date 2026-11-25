@@ -1463,7 +1463,7 @@ def plan_movies(static_path, edition="mac"):
     out = {}
     try:
         ps = Psarc(static_path) if static_path else None
-    except (Unsupported, OSError):
+    except Exception:  # (any damage: these are optional)
         return out
     if ps is None:
         return out
@@ -1477,7 +1477,7 @@ def plan_movies(static_path, edition="mac"):
                 edited = edit_songs_list(data)
                 if low in movie_edits:
                     edited = movie_edits[low](edited or data) or edited
-            except Unsupported:
+            except Exception:  # (a damaged movie or archive entry: passed by)
                 continue
             if edited is not None:
                 out[low] = edited

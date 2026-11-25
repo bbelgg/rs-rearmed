@@ -41,6 +41,9 @@ def main(argv):
     bad, ds = run.preflight(cfg)
     print("preflight:", bad, flush=True)
     d = os.path.join(out, name)
+    if os.path.exists(d):  # (a run's samples.json is the one file soak_report.py needs: never written over)
+        print("soak: %s exists already" % d, file=sys.stderr)
+        return 1
     g = run.Game(cfg, name, d, 30)
     CTRL = "lpctrl" if name == "lp" else "ctrl"
     GAME, TUNER, MAIN, PAUSE = "NonStopPlay_Game", "NonStopPlay_PreSongTuner", "NonStopPlay_Main", "NonStopPlay_Pause"
@@ -258,9 +261,10 @@ def main(argv):
         summary = {"error": str(err)}
         note("STOPPED: %s" % err)
     finally:
-        with open(os.path.join(d, "samples.json"), "w") as f:
-            json.dump({"summary": summary, "samples": samples, "events": events,
-                       "t0_unix": T0[0], "edition": name, "path": path, "minutes": minutes}, f, indent=1)
+        if os.path.isdir(d):  # (a refused start makes no folder: its message stands)
+            with open(os.path.join(d, "samples.json"), "w") as f:
+                json.dump({"summary": summary, "samples": samples, "events": events,
+                           "t0_unix": T0[0], "edition": name, "path": path, "minutes": minutes}, f, indent=1)
         g.quit()
         print("done:", d, flush=True)
     return 1 if "error" in summary or summary.get("ended_early") else 0

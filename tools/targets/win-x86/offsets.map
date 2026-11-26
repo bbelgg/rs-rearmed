@@ -411,6 +411,8 @@ sng_note_time                0xc  # SNG note: float time (0x13217b0)
 sng_note_sustain             0x3c  # SNG note: float sustain (0x13217b0)
 headstock_seg_values         0x0  # a segment's params: its value pointers from the start (not read: 4-byte guests)
 guitar_string_size           0x110  # string object: bytes (its allocation in the GuitarStrings ctor)
+# tuner and pitch fixes (rs7string beta.4)
+detection_floor             0x11f4  # detection: s32, the raw candidate floor MIDI, 24 from Play_Detector_Reset (0x105cbf3); read at 0x105ff40, 0x10602a3, 0x1060e47 (rs7string's kDetFloor)
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt           0xc0    # ServiceManager holder (*0x1ee0bfc): float frame time, whole milliseconds / 1000, at most 1/15 (the frame tick 0x133e880 writes it at 0x133ea36)

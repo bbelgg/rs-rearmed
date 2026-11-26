@@ -179,6 +179,9 @@ seven_pd2_chord   0x10011130c  (void *eval@rbx, uint8_t result@rax)  # PD2 Mac: 
 seven_pd4_sustain 0x1001118c3  (void *eval@rbx, uint8_t result@rax)  # PD4 Mac: 0x100111830 (LP 0x13f7480's call of 0x13f7bb0), al after string 5
 seven_pd5_eval    0x10011314f  (void *eval@rsi, int extreme@rax)  # PD5 Mac: 0x100113040 (LP 0x13f7bf0), the extreme slide distance in eax at its end (its caller reads eax only)
 
+# tuner camera pan (rs7string beta.4)
+seven_tf2           0x10052a1e0  (void *session@r14, uint8_t lefty@[rbp-0x58], float y@[rbp-0x38])  # TF2 the tuner camera pose 0x10052a000 (TF1's), the overview offset table's path (table 0x101954ac0; [rax+0x84] == 0, 0x10052a1d1 jumps here): the camera's world y along the neck, before the table's addps
+
 # plain
 plain_pp_sngd  0x1001eb84a  (const uint8_t *src@rdi, uint32_t len@rsi, uint8_t *out@r8, uint32_t out_len@r9, uint8_t ok@rax) -> done=0x1001eb84f  # PP_SNGD the song file loader 0x1001eb6a0's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, SysV: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
 

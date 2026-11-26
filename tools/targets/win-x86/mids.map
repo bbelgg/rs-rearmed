@@ -7,8 +7,8 @@ seven_gke           0x01117711  (void *profile@esi, void *other@edi) -> differ=0
 seven_gkm           0x0111729b  (void *manager@ebx, int player@[ebp+0x0c])                             # GKM
 seven_gkl           0x012fdbbb  (int count@ecx, int player@[esp+0x0c])                                 # GKL
 seven_gkt           0x011375d6  (int player@esi, void *tuning@[ebp+0x08], uint32_t caller@[ebp+0x04])  # GKT
-seven_gkh1          0x0110f86d  (uint8_t count@eax)                                                    # GKH1
-seven_gkh2          0x0110fa23  (uint8_t count@eax)                                                    # GKH2
+seven_gkh1          0x0110f86d  (uint8_t count@eax, void *info@ebx)                                    # GKH1 (info: wave2 P1, its +0x0 is the instrument class: a bass loads at most four meshes)
+seven_gkh2          0x0110fa23  (uint8_t count@eax, void *info@edx)                                    # GKH2 (info: wave2 P1; edx = [ebp-0x40])
 seven_gia1          0x01113ccc  (void *info@eax)                                                       # GIA1
 seven_gsc1          0x01113cea  (void *strings@eax, void *guitar@esi)                                  # GSC1
 seven_info_counts   0x0110c381  (void *info@ecx)                                                       # (new)
@@ -204,6 +204,10 @@ seven_pubbc_scale    0x0110df49  (void *owner@[ebp+0x8], int32_t span@[ebx+0x1c]
 seven_pubbc_setscale none  Learn & Play injects the scale call itself (seven_pubbc_scale)
 # tuner camera pan (rs7string beta.4)
 seven_tf2           0x01133e85  (void *session@edi, uint8_t lefty@[ebp-0x44], float y@[ebp-0x24])  # TF2 (Steam 0x5B297F) the tuner camera pose 0x1133ba0 (TF1's), the start of the overview offset table's path (table 0x1e70c68; the other, 0x1e70de8, is the [edx+0x58] path): the camera's world y along the neck, before that table's offset is added
+
+# wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
+seven_gkb             0x0111523d  (void *profile@esi)                                                    # GKB GuitarProfile_Load 0x1115091, the bass branch's store of its peg word (after `mov [esi+0x38], 4`; Steam 0x593D33's twin): the extended bass's count
+seven_gkp             0x01115244  (void *profile@esi)                                                    # GKP GuitarProfile_Load after both branches' peg-word stores (the guitar's `jmp 0x1115244` and the bass's fall-through): the peg word of 8 strings and of an extended bass
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

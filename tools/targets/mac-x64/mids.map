@@ -127,8 +127,8 @@ seven_gke           0x1001a5d36  (void *profile@r14, void *other@r12) -> differ=
 seven_gkm           0x1001a594f  (void *manager@rdi, int player@rsi)                         # GKM: RebuildIfProfileChanged 0x1001a5920 after its player check
 seven_gkl           0x100391027  (int count@rax, int player@[rbp-0x14])                       # GKL: Lua GetGuitarStringCount 0x100390fb0, the count before it is pushed
 seven_gkt           0x10053af0b  (int player@rbx, void *tuning@[rbp-0x30], uint64_t caller@[rbp+0x8])  # GKT: SetPlayerTargetTuning 0x10053aea0 after the store
-seven_gkh1          0x10019957b  (uint8_t count@rax)                                         # GKH1: Rnd_Headstock_LoadStringMeshes 0x1001993b0, first count load
-seven_gkh2          0x1001997fd  (uint8_t count@rax)                                         # GKH2: the loop's count reload
+seven_gkh1          0x10019957b  (uint8_t count@rax, void *info@r12)                                         # GKH1: Rnd_Headstock_LoadStringMeshes 0x1001993b0, first count load
+seven_gkh2          0x1001997fd  (uint8_t count@rax, void *info@r12)                                         # GKH2: the loop's count reload
 seven_gia1          0x10019e7b3  (void *info@r14)                                            # GIA1: guitar ctor after the InstrumentInfo ctor
 seven_gsc1          0x10019e7ce  (void *strings@r14, void *guitar@rbx)                       # GSC1: guitar ctor after the GuitarStrings ctor
 seven_info_counts   0x100194f3a  (void *info@rdi)                                            # the end of the per-string modes 0x100194ec0 (tail-jumped from the profile copy 0x1001a9de0)
@@ -203,6 +203,10 @@ seven_frg3_scale      none  the Mac calls Entity_SetScale from the C (seven_frg3
 seven_frg2_setscale   0x1006547a2  (void *obj@rbx)  # FRG2 the glow update 0x100654510 (LP 0xf8b7e0), a bar placed (the join after both ways of placing it): Entity_SetScale(entity, 1, k)
 seven_frg2b_setscale  0x1006548c9  (void *obj@rbx)  # FRG2B the same update, a bar moved: the same
 seven_frg3_setscale   0x100654d53  (void *obj@rbx)  # FRG3 the glow box's update 0x100654bc0 (LP 0xf8c4a0), after its first placement's Entity_SetTranslation
+
+# wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
+seven_gkb             none  the Mac's GKC point follows both branches' common store: the bass's count is written there
+seven_gkp             0x1001a1dbb  (void *profile@r13)                                                  # GKP GuitarProfile_Load 0x1001a1be0 after `mov [r13+0x4a], cx` (the peg word; both branches): the peg word of 8 strings and of an extended bass
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840

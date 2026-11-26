@@ -413,6 +413,8 @@ seven_fretgrid_wire_head
 seven_fretgrid_wire_rec
 seven_fretgrid_wire_state
 seven_marker_player
+instrument_type
+seven_profile_pegs
 detect_target_string
 detect_target_fret
 tuner_entity_release_slot

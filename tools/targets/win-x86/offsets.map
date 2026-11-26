@@ -405,6 +405,8 @@ seven_fretgrid_wire_head     0xa0  # fret-wire row: the header before record 0
 seven_fretgrid_wire_rec      0x30  # fret-wire record
 seven_fretgrid_wire_state    0x8  # fret-wire record: u32 state, 2 = settled
 seven_marker_player        0x6c  # the neck's finger marker manager (the owner of the marker update and the marker function): its player (session at session_guitar)
+instrument_type             0x0   # InstrumentInfo: int, the instrument class (the profile's +0x18, copied at 0x110c2c0): 1 guitar, 2 bass (wave2 P1)
+seven_profile_pegs          0x3a  # guitar profile: u16, the peg pool's request (GuitarProfile_Load 0x11151c7 / 0x111523d store 6 / 4 there; read at 0x1117a8e) (wave2 P1)
 detect_target_string         0x10  # the target note: u8 its string (0x13f5265)
 detect_target_fret           0x11  # the target note: u8 its fret (0x13f525f)
 tuner_entity_release_slot    0x2  # the vtable slot the tuner's dtor releases picks and letters with (0x112f91d)

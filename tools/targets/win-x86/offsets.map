@@ -416,6 +416,8 @@ rangefx_end                 0x10    # fret range glow effect (Rnd_FretRangeFx_In
 rangefx_pieces              0x6c    # fret range glow effect: its box, then its four bars, a pointer each (0xf8d9cb, 0xf8d9f5, 0xf8da28, 0xf8da56, 0xf8da89)
 fxpiece_hash                0xc     # a glow piece (box, bar): u32 its effect hash (0xf8d9d1)
 fxpiece_entity              0x10    # a glow piece: its entity, nil until the piece is first placed (0xf8b9f3, 0xf8c4fc)
+# tuner and pitch fixes (rs7string beta.4)
+detection_floor             0x11f4  # detection: s32, the raw candidate floor MIDI, 24 from Play_Detector_Reset (0x105cbf3); read at 0x105ff40, 0x10602a3, 0x1060e47 (rs7string's kDetFloor)
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt           0xc0    # ServiceManager holder (*0x1ee0bfc): float frame time, whole milliseconds / 1000, at most 1/15 (the frame tick 0x133e880 writes it at 0x133ea36)

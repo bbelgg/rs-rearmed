@@ -176,6 +176,8 @@ seven_pubfa
 seven_pubgf
 seven_pubbc_scale
 seven_pubbc_setscale
+# tuner camera pan (rs7string beta.4)
+seven_tf2
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

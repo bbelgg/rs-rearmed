@@ -79,7 +79,7 @@ mkdir -p "$logs" "$HOME_DIR/steam"
 # KEY=0 or KEY=1, every other key as KEY=value with the ends' whitespace ignored so values may hold spaces.
 # Same first-counts and environment-wins rules, "[options] ..." log lines, and the same three-way agreement.
 settings_keys=(RS_MODS_BYPASS RS_MODS_FIXES RS_MODS_INTRO RS_MODS_AUTOSAVE RS_MODS_OVERLAY RS_MODS_MULTIPLAYER
-    RS_MODS_GUITARCADE_SKIP RS_MODS_FRAME_RATE RS_REARMED)
+    RS_MODS_GUITARCADE_SKIP RS_MODS_MENU_RETRY RS_MODS_ARRANGEMENTS RS_MODS_FRAME_RATE RS_REARMED)
 settings_env() {  # FILE -> settings_args (--env K=V for open, the value used) and settings_log; K set here
     settings_args=() settings_log=()
     local line k v seen=" "

@@ -236,7 +236,7 @@ steps: `build-msl-corpus.sh --pairs`, `msl_verify --translate-only`, `merge_corp
 
 **The warm-up**: `--warm-shaders` in `lp_main.c`, before anything of the game is loaded, calls `rs_gfx_warm_only`, the loop the Mac
 app runs ([METAL.md](../mac/METAL.md#safe-load)). There is no safe load: its reason on the Mac is the loading screen's race with a
-fast-load `cache.psarc` and a busy CPU, and after the warm-up nothing here keeps the CPU busy while the game loads
+fast-load `cache.psarc` and a busy CPU (the [loading-screen fix](#built-in-fixes-and-mods) covers the race itself), and after the warm-up nothing here keeps the CPU busy while the game loads
 ([PERFORMANCE.md](PERFORMANCE.md#shader-preparation)). A program the list doesn't have is compiled when the game first draws with
 it, kept in the disk cache and warmed from the manifest at the next start.
 
@@ -462,7 +462,14 @@ What differs, fix by fix:
   the hook reads the count and picks where the function goes on instead of changing it.
 - **Skip Tuner in the Guitarcade**: the shared hook, with this game's mid point. The game makes the same test and
   keeps its answer in a local, where the Mac's is in a register.
-- **Loading-screen fix.** Not needed here ([Shader corpus](#shader-corpus)).
+- **Loading-screen fix**: the shared fix, with this game's points. The game has the same race: its request to the
+  asset locator takes the movie in `eax` and the id as two words on the stack (the Mac's takes a pointer to the id), so
+  the replay sets `eax` in the thread's context and calls the request by its address
+  (`menu_movie_request_reg`; a call by name does not do a `custom` function). The safe load of the Mac's Metal is not
+  here ([Shader corpus](#shader-corpus)): after the warm-up nothing keeps the CPU busy while the game loads, but the
+  index can be late for other reasons too (a fast-load `cache.psarc`, a busy machine), which the fix covers.
+- **Learn a Song with more than five arrangements**: the shared fix, with this game's mid point `las_alt_slot`: the
+  slots filled so far are a local at `[esp+0x6c]` here, where the Mac's is `[rbp-0x348]`.
 - **Direct Connect choice**: the same overlay, made by the same `tools/play-native/cache_overlay.py`. The archives' key
   comes from the unpacked code image, which the build step hands to the copy (`gamefiles.key_from_image`).
   `frontend_open_file` is a native function here: the original's lower-casing of the path is behind a packer stub. For a

@@ -421,3 +421,7 @@ ui_class_slot                 0x3
 ui_class_parent               0x8
 ui_checkbox_checked           0xb0
 ui_slider_value               0xb8
+
+# Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+menu_movie_uri                    0xe0    # GFxMovieModel: the URI string, read by the request (0x100b7094f: [rbx+0xf8], [rbx+0xe0], size word at 0xf0, inline pointer at 0xf8)
+file_index_name                   -0x498  # the index writer 0x100496b20: the string of the file's name and extension (rbp-0x498, its size word at rbp-0x488), destroyed first at its tail 0x100497827

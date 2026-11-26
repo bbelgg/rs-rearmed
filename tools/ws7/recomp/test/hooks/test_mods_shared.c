@@ -28,7 +28,8 @@ const char rc_target_id[] = "test";
 
 // --- the target's tables: the hook points of the fixes, each game's own convention and field offsets, and what
 // the fixes call and read in the game by name: its functions at ADDR, its data at DATA
-enum { INTRO, OWNED, BIND, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY, FSEXISTS = 14, MIDS = 16 };
+enum { INTRO, OWNED, BIND, FRAME, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY, FSEXISTS = 14, MIDS = 16,
+       REQUEST = 24 };
 #define ADDR(k) (0x401000u + 0x100u * (k))
 #define DATA 0x402000u
 enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0, D_SIZE = 0x100 };
@@ -36,17 +37,18 @@ enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 
 const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x10}, {"boot_intro_playing", 0x2d},
                                              {"boot_intro_state", 0x60}, {"boot_phase", 0x48},
                                              {"boot_phase3_steps", 10}, {"boot_step", 0x28}, {"efd_str_inline", 0x14},
-                                             {"efd_str_size", 0x10}, {"fs_exists_slot", 6}, {"input_slot", 0xc},
-                                             {0, 0}};
+                                             {"efd_str_size", 0x10}, {"file_index_name", -0x38}, {"fs_exists_slot", 6},
+                                             {"input_slot", 0xc}, {"menu_movie_uri", 0x8c}, {0, 0}};
 // stdcall bool(void *boot), thiscall bool(void *steam, int app), and custom void(int input@eax, int force=0)
 const rc_hook_name rc_target_hooks[] = {
     {"boot_intro_update", ADDR(INTRO), 1, 0, RC_CC_STDCALL, 'b', 4, 1, {{'p', 0}}},
     {"steam_dlc_owned", ADDR(OWNED), 2, 0, RC_CC_THISCALL, 'b', 4, 2, {{'p', ~1}, {'i', 0}}},
     {"input_bind", ADDR(BIND), 3, 0, RC_CC_CUSTOM, 'v', -1, 2, {{'i', ~0}, {'c', 0, 0}}},
+    {"game_frame", ADDR(FRAME), 4, 0, RC_CC_CDECL, 'b', 0, 0, {{0}}},  // (the real one hides its manager argument)
     {0, 0, 0},
 };
 int rc_hook_code_pops(int index) {
-  static const short pops[NPOINTS] = {4, 4, 0};
+  static const short pops[NPOINTS] = {4, 4, 0, 0};
   return pops[index];
 }
 #define CC(cc) RC_CC_##cc
@@ -54,11 +56,12 @@ int rc_hook_code_pops(int index) {
 const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x18}, {"boot_intro_playing", 0x39},
                                              {"boot_intro_state", 0x78}, {"boot_phase", 0x58},
                                              {"boot_phase3_steps", 12}, {"boot_step", 0x34}, {"efd_str_inline", 0x18},
-                                             {"efd_str_size", 0x10}, {"fs_exists_slot", 7}, {"input_slot", 0x14},
-                                             {0, 0}};
+                                             {"efd_str_size", 0x10}, {"file_index_name", -0x498}, {"fs_exists_slot", 7},
+                                             {"input_slot", 0x14}, {"menu_movie_uri", 0xe0}, {0, 0}};
 const rc_hook_name rc_target_hooks[] = {{"boot_intro_update", ADDR(INTRO), ADDR(INTRO)},
                                         {"steam_dlc_owned", ADDR(OWNED), ADDR(OWNED)},
-                                        {"input_bind", ADDR(BIND), ADDR(BIND)}, {0, 0, 0}};
+                                        {"input_bind", ADDR(BIND), ADDR(BIND)},
+                                        {"game_frame", ADDR(FRAME), ADDR(FRAME)}, {0, 0, 0}};
 #define CC(cc) RC_CC_SYSV
 #endif
 const rc_target_value rc_target_symbols[] = {
@@ -66,15 +69,21 @@ const rc_target_value rc_target_symbols[] = {
     {"input_binding", DATA + D_BINDING, -1},     {"input_by_name", ADDR(BYNAME), CC(STDCALL)},
     {"input_key_direct", DATA + D_KEY_DIRECT, -1}, {"input_key_mic", DATA + D_KEY_MIC, -1},
     {"input_manager", ADDR(MANAGER), CC(CDECL)}, {"input_mode", ADDR(MODE), CC(CDECL)},
-    {"input_profile_string", ADDR(PROFILE), CC(CDECL)}, {0, 0, 0}};
-const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), 0};
+    {"input_profile_string", ADDR(PROFILE), CC(CDECL)},
+#ifdef RC_GUEST32
+    {"menu_movie_request_reg", ADDR(REQUEST), RC_CC_CUSTOM},  // the movie in eax, the id on the stack, `ret 8`
+#else
+    {"menu_movie_request", ADDR(REQUEST), RC_CC_SYSV},  // (movie, a pointer to the id's words)
+#endif
+    {0, 0, 0}};
+const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), ADDR(FRAME), 0};
 const int rc_hook_npoints = NPOINTS;
 // The mid points the fixes here hook, with their values where each game has them. Skip Tuner's answer: the low
 // byte of a register, a local below the frame pointer. The batched mounting's four: registers on the Mac; in
 // Learn & Play an argument above the frame pointer too, and at the file question the path and the answer in one
 // register, the game's call not yet made.
 #define SKIP_LOCAL (-0x1d)
-enum { M_SKIP, M_REQUEST, M_RESPONSE, M_MOUNT, M_EXISTS };
+enum { M_SKIP, M_REQUEST, M_RESPONSE, M_MOUNT, M_EXISTS, M_ASKED, M_LOCATE, M_LOCATED, M_INDEXED, M_ALT };
 #ifdef RC_GUEST32
 const rc_mid_name rc_target_mids[] = {
     {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', RC_MID_MEM | 5, SKIP_LOCAL}}, 0, {0}, 0},
@@ -84,6 +93,12 @@ const rc_mid_name rc_target_mids[] = {
     {"fs_mount", ADDR(MIDS + 2), 0, 2, {{"path", 'p', RC_MID_MEM | 5, 8}, {"fs", 'p', 0, 0}}, 0, {0}, 0},
     {"fs_exists", ADDR(MIDS + 3), 0, 3, {{"fs", 'p', 1, 0}, {"path", 'p', 0, 0}, {"found", 'b', 0, 0}}, 1,
      {"answered"}, 0},
+    {"menu_request", ADDR(MIDS + 4), 0, 3,
+     {{"movie", 'p', 6, 0}, {"id_lo", 'i', RC_MID_MEM | 5, 8}, {"id_hi", 'i', RC_MID_MEM | 5, 12}}, 0, {0}, 0},
+    {"menu_locate", ADDR(MIDS + 5), 0, 0, {{0}}, 0, {0}, 0},
+    {"menu_located", ADDR(MIDS + 6), 0, 1, {{"accepted", 'b', 0, 0}}, 0, {0}, 0},
+    {"file_indexed", ADDR(MIDS + 7), 0, 1, {{"frame", 'p', 5, 0}}, 0, {0}, 0},
+    {"las_alt_slot", ADDR(MIDS + 8), 0, 1, {{"filled", 'i', RC_MID_MEM | 4, 0x6c}}, 1, {"latch"}, 0},
     {0}};
 #else
 const rc_mid_name rc_target_mids[] = {
@@ -93,6 +108,12 @@ const rc_mid_name rc_target_mids[] = {
     {"fs_mount", ADDR(MIDS + 2), 0, 2, {{"path", 'p', 7, 0}, {"fs", 'p', 6, 0}}, 0, {0}, 0},
     {"fs_exists", ADDR(MIDS + 3), 0, 3, {{"fs", 'p', 7, 0}, {"path", 'p', 6, 0}, {"found", 'b', 0, 0}}, 1,
      {"answered"}, 0},
+    {"menu_request", ADDR(MIDS + 4), 0, 3,
+     {{"movie", 'p', 7, 0}, {"id_lo", 'i', RC_MID_MEM | 6, 0}, {"id_hi", 'i', RC_MID_MEM | 6, 4}}, 0, {0}, 0},
+    {"menu_locate", ADDR(MIDS + 5), 0, 0, {{0}}, 0, {0}, 0},
+    {"menu_located", ADDR(MIDS + 6), 0, 1, {{"accepted", 'b', 0, 0}}, 0, {0}, 0},
+    {"file_indexed", ADDR(MIDS + 7), 0, 1, {{"frame", 'p', 5, 0}}, 0, {0}, 0},
+    {"las_alt_slot", ADDR(MIDS + 8), 0, 1, {{"filled", 'i', RC_MID_MEM | 5, -0x348}}, 1, {"latch"}, 0},
     {0}};
 #endif
 #define OFF(name) ((uint32_t)rc_off(name))
@@ -223,6 +244,9 @@ static void *game_by_name(void *manager, const char *name) {
   return input_name && !strcmp(name, input_name) ? input_obj : 0;
 }
 
+// The game's request for a menu movie (the white loading screen's resend): what it was given, and its answer
+static void game_request(const void *movie, uint32_t lo, uint32_t hi);
+
 // A file system object's question, has it this file: the whole file system's, and three archives', which answer
 // for a path from where they are mounted. Each counts what it was asked.
 #define ARCHIVES 3
@@ -281,9 +305,15 @@ static void f_destroy(rc_ctx *c) {  // thiscall: the string in ecx
 static void f_fs_exists(rc_ctx *c) {  // thiscall: the object in ecx, the path on the stack, `ret 4`
   ret32(c, game_fs_exists(as_host((uint32_t)c->r[1]), as_host(arg32(c, 0))), 4);
 }
+static void f_request(rc_ctx *c) {  // custom: the movie in eax, the id's words on the stack, `ret 8`
+  uint32_t movie = (uint32_t)c->r[0];
+  game_request(as_host(movie), arg32(c, 0), arg32(c, 1));
+  ret32(c, 0, 8);
+}
 rc_fn rc32_lookup(uint32_t g) {
   return g == ADDR(MODE) ? f_mode : g == ADDR(PROFILE) ? f_profile : g == ADDR(MANAGER) ? f_manager
-       : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : g == ADDR(FSEXISTS) ? f_fs_exists : 0;
+       : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : g == ADDR(FSEXISTS) ? f_fs_exists
+       : g == ADDR(REQUEST) ? f_request : 0;
 }
 int rc32_tls_images(const rc32_tls_image **out) {
   *out = 0;
@@ -310,6 +340,12 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
       CHECK_EQ(nint, 1);
       game_str_destroy(as_host(ints[0]));
       return 0;
+    case ADDR(REQUEST): {
+      CHECK_EQ(nint, 2);
+      const uint32_t *id = as_host(ints[1]);
+      game_request(as_host(ints[0]), id[0], id[1]);
+      return 0;
+    }
   }
   return 0;
 }
@@ -324,7 +360,8 @@ uint64_t ov_vcall_n(uint64_t obj, int slot, const uint64_t *args, int nargs) {
 
 static const char *const SWITCHES[] = {"RS_MODS_LOG", "RS_MODS_BYPASS", "RS_MODS_FIXES", "RS_MODS_INTRO",
                                        "RS_MODS_OVERLAY", "RS_MODS_AUTOSAVE", "RS_MODS_MULTIPLAYER",
-                                       "RS_MODS_BUDGET_MS", "RS_MODS_FRAME_RATE", "RS_MODS_GUITARCADE_SKIP"};
+                                       "RS_MODS_BUDGET_MS", "RS_MODS_FRAME_RATE", "RS_MODS_GUITARCADE_SKIP",
+                                       "RS_MODS_MENU_RETRY", "RS_MODS_ARRANGEMENTS"};
 static void no_switches(void) {
   for (size_t k = 0; k < sizeof SWITCHES / sizeof *SWITCHES; k++) unsetenv(SWITCHES[k]);
 }
@@ -336,7 +373,7 @@ static void switches(void) {
   const rs_mods_config *c = rs_mods_config_get();
   CHECK(c == &rs_mods_cfg);
   CHECK(c->bypass && c->fixes && c->intro && c->overlay && c->autosave && c->multiplayer && !c->log);
-  CHECK(c->guitarcade_skip);
+  CHECK(c->guitarcade_skip && c->menu_retry && c->arrangements);
   CHECK(c->budget_s == 0.050);
   static const char *const off[] = {"0", "no", "No", "false", "False"}, *const on[] = {"1", "yes", "on", "2", ""};
   for (int k = 0; k < 5; k++) {
@@ -353,9 +390,11 @@ static void switches(void) {
   setenv("RS_MODS_LOG", "1", 1);
   setenv("RS_MODS_BUDGET_MS", "8", 1);
   setenv("RS_MODS_GUITARCADE_SKIP", "0", 1);
+  setenv("RS_MODS_MENU_RETRY", "0", 1);
+  setenv("RS_MODS_ARRANGEMENTS", "no", 1);
   rs_mods_reload_config();
   CHECK(!c->intro && !c->bypass && c->log && c->fixes && c->overlay && c->autosave && c->multiplayer);
-  CHECK(!c->guitarcade_skip);
+  CHECK(!c->guitarcade_skip && !c->menu_retry && !c->arrangements);
   CHECK(c->budget_s == 0.008);
   setenv("RS_MODS_BUDGET_MS", "0", 1);  // a step a frame, as the original
   rs_mods_reload_config();
@@ -385,7 +424,8 @@ static void log_lines(void) {
 }
 
 // The start: it reads the switches itself, adds the hooks of the fixes that are here and says what is on. The
-// frame rate fixes find none of their points in this test's tables; Skip Tuner finds its one.
+// frame rate fixes find none of their points in this test's tables; Skip Tuner, the menu movie request and the
+// arrangements find theirs.
 static void start(void) {
   no_switches();
   setenv("RS_MODS_LOG", "1", 1);
@@ -397,6 +437,8 @@ static void start(void) {
   CHECK_EQ(logged_lines("[rs-mods] fixes on, bypass on, overlay on, intro skip on, autosave off, budget 20 ms"), 1);
   CHECK_EQ(logged_lines("[rs-mods] frame rate: on, 0 of 8 points"), 1);
   CHECK_EQ(logged_lines("[rs-mods] Guitarcade Skip Tuner: on"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] menu movie request again: on"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song alternate arrangements: on"), 1);
   CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point") +
            logged_lines("[rs-mods] no hook point for Player 2's saved input"), 0);
   CHECK(!strstr(logged, "no points for"));  // the batched mounting's four mid points
@@ -407,6 +449,7 @@ static void start(void) {
 static const uint32_t RET = 0x12345678;
 static rc_ctx *ctx;
 static uint8_t *obj;       // the game's object, as the host sees it
+static uint8_t *vtable_of_movies;  // the first word of the menu movies of the tests below
 static int orig_ran;
 static uint32_t orig_arg;  // what the original was given, where its convention has it (the low word)
 #ifdef RC_GUEST32
@@ -480,6 +523,24 @@ static void call_bind(uint32_t input) {
   CHECK_EQ((uint32_t)ctx->r[4], sp + 4);
   CHECK_EQ(ctx->r[6], ESI);
 }
+// cdecl, no argument: a frame; al = the game does not quit
+static void o_frame(rc_ctx *c) {
+  uint32_t sp = (uint32_t)c->r[4];
+  orig_ran++;
+  c->r[0] = 0xffffff00u;
+  c->ret_to = rd(sp);
+  c->r[4] = sp + 4;
+}
+static void call_frame(void) {
+  uint32_t sp = esp0 - 256;
+  ctx->r[4] = sp;
+  ctx->ret_to = 0;
+  wr(sp, RET);
+  orig_ran = 0;
+  rc_hook_call(FRAME, ctx, o_frame);
+  CHECK_EQ(ctx->ret_to, RET);
+  CHECK_EQ(orig_ran, 1);
+}
 #define OBJ_AS_GIVEN obj_guest
 #else
 static uint64_t stack_[16];
@@ -533,6 +594,20 @@ static void call_bind(uint32_t input) {
   rc_hook_call(BIND, ctx, o_bind);
   CHECK_EQ(ctx->r[4], (uint64_t)(uintptr_t)&stack_[9]);
 }
+static void o_frame(rc_ctx *c) {
+  orig_ran++;
+  c->r[0] = 0;
+  c->r[4] += 8;
+}
+static void call_frame(void) {
+  ctx->r[4] = (uint64_t)(uintptr_t)&stack_[8];
+  stack_[8] = RET;
+  orig_ran = 0;
+  rc_hook_call(FRAME, ctx, o_frame);
+  CHECK_EQ(ctx->r[4], (uint64_t)(uintptr_t)&stack_[9]);
+  CHECK_EQ(orig_ran, 1);
+}
+rc_ctx *rc_thread_ctx(void) { return ctx; }  // the runtime's (rc_thread.c): this test's one context
 #define OBJ_AS_GIVEN ((uint32_t)(uintptr_t)obj)
 #endif
 
@@ -1265,6 +1340,238 @@ static void mounting_edges(void) {
   rs_mods_reload_config();
 }
 
+// --- the white loading screen: a menu movie's request that the locator refuses is asked again when its file is
+// indexed. The game's request is the function behind game_request: it runs the mid points as the game's does (its
+// start, the locator call and its answer), and the answer is the test's. The points are driven here as the game
+// would reach them.
+static int request_calls, locator_accepts;  // requests made through the game's function; its answer to the next
+static const void *request_movie;
+static uint32_t request_id[2];
+static uint8_t *mid_frame;                  // a block standing for the frame of the points: ebp / rbp is 0x600 into it
+#define MID_FRAME (mid_frame + 0x600)
+static void set_frame(void) { ctx->r[5] = as_game(MID_FRAME); }
+static void put_string(uint8_t *str, const char *text) {  // a game string behind a pointer at its start
+  size_t n = strlen(text);
+  uint8_t *heap = game_alloc((uint32_t)n + 1);
+  memcpy(heap, text, n + 1);
+  put_ptr(str, heap);
+  put_ptr(str + rc_off("efd_str_size"), heap + n);
+  put_ptr(str + rc_off("efd_str_inline"), heap + n + 1);
+}
+// A movie object: its first word, and its URI (null: none, the string empty)
+static uint8_t *menu_movie(const char *name) {
+  uint8_t *m = game_alloc(0x200);
+  put_ptr(m, vtable_of_movies);
+  put_string(m + rc_off("menu_movie_uri"), name ? name : "");
+  return m;
+}
+static void mid_asked(const void *movie, uint32_t lo, uint32_t hi) {
+  uint32_t fl = 0, words[2] = {lo, hi};
+  set_frame();
+#ifdef RC_GUEST32
+  ctx->r[6] = as_game(movie);
+  memcpy(MID_FRAME + 8, words, 8);
+#else
+  ctx->r[7] = as_game(movie);
+  ctx->r[6] = as_game(words);
+#endif
+  CHECK_EQ((uint32_t)rc_mid_call(M_ASKED, ctx, &fl), 0);
+}
+static void mid_locate(void) {
+  uint32_t fl = 0;
+  set_frame();
+  CHECK_EQ((uint32_t)rc_mid_call(M_LOCATE, ctx, &fl), 0);
+}
+static void mid_located(int accepted) {
+  uint32_t fl = 0;
+  set_frame();
+  ctx->r[0] = 0x55aa5500u | (uint32_t)(accepted ? 1 : 0);  // al is the answer
+  CHECK_EQ((uint32_t)rc_mid_call(M_LOCATED, ctx, &fl), 0);
+}
+// the indexing thread's: a file was indexed, its name and extension in the writer's local
+static void mid_indexed(const char *file) {
+  uint32_t fl = 0;
+  set_frame();
+  put_string(MID_FRAME + rc_off("file_index_name"), file);
+  CHECK_EQ((uint32_t)rc_mid_call(M_INDEXED, ctx, &fl), 0);
+}
+// the request as the game makes it: asked, the locator called, answered
+static void request_mids(const void *movie, uint32_t lo, uint32_t hi, int accepted) {
+  mid_asked(movie, lo, hi);
+  mid_locate();
+  mid_located(accepted);
+}
+static void game_request(const void *movie, uint32_t lo, uint32_t hi) {
+  request_calls++;
+  request_movie = movie;
+  request_id[0] = lo, request_id[1] = hi;
+  request_mids(movie, lo, hi, locator_accepts);
+}
+static int frames_ask(void) {  // the requests a frame makes
+  int before = request_calls;
+  call_frame();
+  return request_calls - before;
+}
+
+static void menu_retry(void) {
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  mid_frame = game_alloc(0x800);
+  vtable_of_movies = game_alloc(16);
+  uint8_t *movie = menu_movie("urn:application:x-shockwave-flash:titlescreen");
+  // the game's request: the locator says no. Nothing is asked again before the file is indexed
+  log_start();
+  request_mids(movie, 7, 9, 0);
+  log_stop();
+  CHECK_EQ(logged_lines("[rs-mods] menu load: 'titlescreen' was rejected (not indexed yet); waiting for the "
+                        "indexer"), 1);
+  CHECK_EQ(frames_ask(), 0);
+  mid_indexed("cache.xml");
+  mid_indexed("titlescreen2.gfx");  // a name that goes on
+  mid_indexed("titlescre.gfx");
+  CHECK_EQ(frames_ask(), 0);
+  // its file is indexed (any case, any extension): the next frame asks once, with the id the game gave, and the
+  // movie goes with its answer. In Learn & Play's form the movie is in eax and the id's words are on the stack.
+  request_calls = 0;
+  locator_accepts = 1;
+  mid_indexed("TitleScreen.GFX");
+  log_start();
+  CHECK_EQ(frames_ask(), 1);
+  log_stop();
+  CHECK(request_movie == movie);
+  CHECK(request_id[0] == 7 && request_id[1] == 9);
+  CHECK_EQ(logged_lines("[rs-mods] menu load: 'titlescreen' is indexed now; asking again (request 2)"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] menu load: 'titlescreen' accepted after 2 requests"), 1);
+  CHECK_EQ(frames_ask(), 0);  // accepted: it is not in the table, and a later file of its name asks nothing
+  mid_indexed("titlescreen.gfx");
+  CHECK_EQ(frames_ask(), 0);
+
+  // refused again: it waits for the next file of that name, once each
+  uint8_t *other = menu_movie("urn:application:x-shockwave-flash:mainmenu");
+  request_mids(other, 1, 2, 0);
+  locator_accepts = 0;
+  mid_indexed("mainmenu.gfx");
+  log_start();
+  CHECK_EQ(frames_ask(), 1);
+  CHECK_EQ(frames_ask(), 0);
+  log_stop();
+  CHECK_EQ(logged_lines("[rs-mods] menu load: 'mainmenu' rejected again (request 2)"), 1);
+  locator_accepts = 1;
+  mid_indexed("MAINMENU.gfx");
+  log_start();
+  CHECK_EQ(frames_ask(), 1);
+  log_stop();
+  CHECK_EQ(logged_lines("[rs-mods] menu load: 'mainmenu' accepted after 3 requests"), 1);
+
+  // two movies at once, one file: only its movie is asked
+  uint8_t *a = menu_movie("urn:application:x-shockwave-flash:a");
+  uint8_t *b = menu_movie("urn:application:x-shockwave-flash:b");
+  request_mids(a, 3, 0, 0);
+  request_mids(b, 4, 0, 0);
+  mid_indexed("b.gfx");
+  CHECK_EQ(frames_ask(), 1);
+  CHECK(request_movie == b);
+  mid_indexed("a.gfx");
+  CHECK_EQ(frames_ask(), 1);
+  CHECK(request_movie == a);
+
+  // a movie the game let go (its first word is not what it was): not asked, and out of the table
+  uint8_t *gone = menu_movie("urn:application:x-shockwave-flash:gone");
+  request_mids(gone, 5, 0, 0);
+  memset(gone, 0xdd, 16);
+  mid_indexed("gone.gfx");
+  CHECK_EQ(frames_ask(), 0);
+  put_ptr(gone, vtable_of_movies);
+  mid_indexed("gone.gfx");
+  CHECK_EQ(frames_ask(), 0);
+  // ... or whose name is another by the time (the object's memory used again)
+  uint8_t *reused = menu_movie("urn:application:x-shockwave-flash:old");
+  request_mids(reused, 6, 0, 0);
+  put_string(reused + rc_off("menu_movie_uri"), "urn:application:x-shockwave-flash:new");
+  mid_indexed("old.gfx");
+  CHECK_EQ(frames_ask(), 0);
+
+  // a request that made no locator call (no URI, a movie with a name that was not asked for): nothing is kept or
+  // asked
+  uint8_t *none = menu_movie(0);
+  mid_asked(none, 8, 0);
+  mid_located(0);
+  uint8_t *quiet = menu_movie("urn:application:x-shockwave-flash:quiet");
+  mid_asked(quiet, 8, 0);
+  mid_located(0);  // no mid_locate before: not an answer
+  mid_indexed("quiet.gfx");
+  CHECK_EQ(frames_ask(), 0);
+
+  // RS_MODS_MENU_RETRY=0: the original, nothing kept
+  setenv("RS_MODS_MENU_RETRY", "0", 1);
+  rs_mods_reload_config();
+  uint8_t *off = menu_movie("urn:application:x-shockwave-flash:off");
+  request_mids(off, 9, 0, 0);
+  mid_indexed("off.gfx");
+  CHECK_EQ(frames_ask(), 0);
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  mid_indexed("off.gfx");
+  CHECK_EQ(frames_ask(), 0);  // (it was not kept while the switch was off)
+
+  // the file is never seen indexed: asked again after 5 s, once for each 5 s
+  uint8_t *late = menu_movie("urn:application:x-shockwave-flash:late");
+  request_mids(late, 10, 0, 0);
+  CHECK_EQ(frames_ask(), 0);
+  usleep(5100000);
+  locator_accepts = 1;
+  log_start();
+  CHECK_EQ(frames_ask(), 1);
+  log_stop();
+  CHECK(request_movie == late);
+  CHECK_EQ(logged_lines("[rs-mods] menu load: WARNING 'late' still rejected and its file was not seen being indexed; "
+                        "asking again anyway (fallback 1 of 6)"), 1);
+  CHECK_EQ(frames_ask(), 0);
+  no_switches();
+  rs_mods_reload_config();
+}
+
+// Learn a Song with more than five arrangements: the builder, at each alternate, has the slots it has filled in a
+// local. The movie has four: from the fifth the hook goes to the loop's end, and the first four are the game's.
+static void alt_slots(void) {
+  no_switches();
+  setenv("RS_MODS_LOG", "1", 1);
+  rs_mods_reload_config();
+  uint32_t fl = 0x40;
+  log_start();
+  for (uint32_t filled = 0; filled < 12; filled++) {
+    set_frame();
+#ifdef RC_GUEST32
+    ctx->r[4] = esp0 - 1024;
+    memcpy(RC32_H((uint32_t)ctx->r[4] + 0x6c), &filled, 4);
+#else
+    memcpy(MID_FRAME - 0x348, &filled, 4);
+#endif
+    int go = rc_mid_call(M_ALT, ctx, &fl);
+    CHECK_EQ(go, filled < 4 ? 0 : 1);  // the one continuation, the loop's latch
+    CHECK_EQ(fl, 0x40);
+  }
+  log_stop();
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song: a song with more than five arrangements shows the first four "
+                        "alternates"), 1);  // said once
+  setenv("RS_MODS_ARRANGEMENTS", "0", 1);  // the original
+  rs_mods_reload_config();
+  for (uint32_t filled = 3; filled < 7; filled++) {
+    set_frame();
+#ifdef RC_GUEST32
+    ctx->r[4] = esp0 - 1024;
+    memcpy(RC32_H((uint32_t)ctx->r[4] + 0x6c), &filled, 4);
+#else
+    memcpy(MID_FRAME - 0x348, &filled, 4);
+#endif
+    CHECK_EQ(rc_mid_call(M_ALT, ctx, &fl), 0);
+  }
+  no_switches();
+  rs_mods_reload_config();
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -1304,6 +1611,8 @@ int main(void) {
   ownership();
   saved_input();
   skip_tuner();
+  menu_retry();
+  alt_slots();
   manifests();
   mounting_edges();
   file_questions();

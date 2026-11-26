@@ -526,3 +526,7 @@ json_set_array            # (&out, object, &key): sets an array, empty, and give
 json_array_add            # (array, value): appends a value
 menu_slider_xscale        # double: the size of a notched slider Edit Setting makes (80)
 menu_slider_yscale        # double: its other (90)
+
+# stock-game fixes (overrides/mods/mods_shared.c): the white loading screen's resend
+menu_movie_request      # (movie, const void *id): a menu movie's request to the asset locator; the id is a pointer to its two words (the Mac's form)
+menu_movie_request_reg  # (movie@eax, id_lo, id_hi): the same, the movie in a register and the id on the stack (Learn & Play's form)

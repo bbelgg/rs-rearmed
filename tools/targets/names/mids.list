@@ -176,3 +176,10 @@ manifest_request      # the ManifestManager has asked for a mounted archive's so
 manifest_response     # the ManifestManager is handed the answer to one such request, read or failed
 fs_mount              # an archive is about to join the game's file system: where, and the archive
 fs_exists             # the game asks its file system whether a file is there; a hook may answer in its place
+# --- Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c): the white loading screen
+menu_request          # a menu movie's request to the asset locator: the movie and the request's id, at the function's start
+menu_locate           # the request is about to ask the locator (not when the movie has no name)
+menu_located          # the locator has answered: accepted or not
+file_indexed          # a file is in the local file index (or was already), its lock released: on the indexing threads
+# --- Stock-game fixes: Learn a Song with more than five arrangements
+las_alt_slot          # the Learn a Song page's builder, at an alternate arrangement: the slots filled so far, and where to skip it

@@ -350,10 +350,27 @@ What each does:
   the menu's own whatever the stage: the same warning, then the step on that a finished tuning takes. So the hook only
   makes the test's answer yes. A player whose tuner would not finish could play no game but Gone Wailin', which has no
   tuner.
-- **Loading-screen fix.** With a community fast-load `cache.psarc`, the game's loading can stall for good
-  on the white loading screen when the CPU is busy (a race in the game). With Metal, when `cache.psarc` is
-  not the original, the shell compiles the shaders before the game starts loading and then throttles the
-  compiler ("safe load", [METAL.md](METAL.md#safe-load)).
+- **Loading-screen fix** (`RS_MODS_MENU_RETRY=0` is the original; shared: mid points `menu_request`, `menu_locate`,
+  `menu_located` and `file_indexed` and a `game_frame` hook, with each game's places in its `mids.map`). A menu is a
+  Scaleform movie, and its setup asks the asset locator for the movie's file once. At start-up the file index is still
+  being built by worker threads; a locator that does not have the file yet refuses the request, throws it away and
+  answers no, the request's caller ignores the answer, and the load group waits for a movie that is never made: the
+  white loading screen, for good. It happens with a community fast-load `cache.psarc` when the CPU is busy (the index
+  is late). The fix keeps each refused request (the movie, its id and its file's name), watches the index writer's tail
+  for a file of that name (on the workers: it sets a flag under a short lock and nothing else) and, at the start of
+  the next frame on the game thread, asks again once with the game's own request function and the id it had. If the
+  flag never comes it asks again every 5 s, six times at most, with a warning in the log. An accepted request is
+  forgotten; so is a movie that is not what it was when it was refused (its first word, its name), or one that has
+  waited two minutes. The log has `menu load:` lines. With Metal, when `cache.psarc` is not the original, the shell
+  also compiles the shaders before the game starts loading and then throttles the compiler ("safe load",
+  [METAL.md](METAL.md#safe-load)), which keeps the CPU from being busy for the index.
+- **Learn a Song with more than five arrangements** (`RS_MODS_ARRANGEMENTS=0` is the original; shared: the mid point
+  `las_alt_slot`). The page's builder fills a slot, `altArrangementsP1_slot%d`, for every arrangement of the song but
+  the selected one, and the page's movie has four. A fifth alternate asks Scaleform for a slot it does not have, which
+  leaves a display node with nothing behind it, and the renderer crashes on it when it draws the page. At each alternate
+  the builder has the slots it has filled in a local; with four filled the hook goes on at the loop's end, as the
+  builder does for the selected arrangement, so the page shows the first four alternates and the rest are left out.
+  Songs with five or fewer arrangements are not touched.
 - **Direct Connect choice** (`RS_MODS_OVERLAY=0` reads `cache.psarc` alone). The game code handles a fourth
   button on the cable screen, `othercable` (Direct Connect), and a fourth value of the INPUT slider, but the menu
   data (two JSON files in one of `cache.psarc`'s `cacheN.7z` archives) leaves them out. At each copy or refresh

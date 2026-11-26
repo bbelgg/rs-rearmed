@@ -22,7 +22,7 @@
 // Configuration
 // ------------------------------------------------------------------------------------------------
 rs_mods_config rs_mods_cfg = {.bypass = 1, .fixes = 1, .autosave = 1, .multiplayer = 1, .budget_s = 0.050,
-                              .intro = 1, .overlay = 1, .guitarcade_skip = 1};
+                              .intro = 1, .overlay = 1, .guitarcade_skip = 1, .menu_retry = 1, .arrangements = 1};
 
 int rs_mods_env_on(const char *name, int dflt) {
   const char *v = getenv(name);
@@ -39,6 +39,8 @@ void rs_mods_reload_config(void) {
   rs_mods_cfg.autosave = rs_mods_env_on("RS_MODS_AUTOSAVE", 1);
   rs_mods_cfg.multiplayer = rs_mods_env_on("RS_MODS_MULTIPLAYER", 1);
   rs_mods_cfg.guitarcade_skip = rs_mods_env_on("RS_MODS_GUITARCADE_SKIP", 1);
+  rs_mods_cfg.menu_retry = rs_mods_env_on("RS_MODS_MENU_RETRY", 1);
+  rs_mods_cfg.arrangements = rs_mods_env_on("RS_MODS_ARRANGEMENTS", 1);
   rs_mods_cfg.budget_s = 0.050;
   const char *b = getenv("RS_MODS_BUDGET_MS");
   if (b && *b) {
@@ -654,6 +656,284 @@ static void on_skip_offer(rc_mid_frame *f, void *user) {
   if (rs_mods_cfg.guitarcade_skip && g_skip_offer >= 0) rc_mid_set(f, g_skip_offer, 1);
 }
 
+// ------------------------------------------------------------------------------------------------
+// The white loading screen (RS_MODS_MENU_RETRY=0 is the original). A menu is a Scaleform movie, and the game asks the
+// asset locator for its file, urn:application:x-shockwave-flash:NAME, once, from the movie's setup. At start-up the
+// local file index is still being built by the indexing threads. A locator that does not have the file yet refuses
+// the request, discards it and answers no; the request's caller ignores the answer and nothing asks again, so the
+// load group waits for a movie that is never made and the screen stays white. It takes a start where the index is
+// late (a community fast-load cache.psarc, a busy CPU).
+//
+// The request is the game's own function (menu_movie_request) and takes the movie and the request's id, and the
+// movie's file is the last part of its URI. Four mid points follow one request on the game thread: its start (the
+// movie and the id), the locator call that is about to be made and what it answered (menu_request, menu_locate,
+// menu_located; a movie with no URI makes no call, and what is answered then is not an answer). A rejected request is
+// kept in a table of MENU_SLOTS. The indexing threads end each file at file_indexed: a table entry whose file name that
+// is gets a flag (the threads do nothing else, under a short lock the game thread takes to change the table). The
+// game thread, in front of every frame (the game_frame hook), asks again for each rejected request whose file has been
+// indexed since, once, by the game's own function with the id it first had. If the flag never comes (a path of the
+// index this does not follow) a rejected request is asked again every MENU_FALLBACK_S seconds, MENU_FALLBACK_MAX times
+// at most, with a line in the log. A request that is accepted leaves the table; so does one whose movie is not what
+// it was (its first word, its name) or that has waited MENU_MAX_AGE_S: the game may have let it go.
+//
+// The game's own timing is the earlier of two: the replay happens at a frame's start, not in the load group's update
+// (which is where the request comes from). Nothing else asks in between, and the request only hands the movie to
+// the locator, which answers on the loader thread as it does for any other.
+// ------------------------------------------------------------------------------------------------
+#define MENU_SLOTS 16
+#define MENU_NAME 64
+#define MENU_FALLBACK_S 5.0
+#define MENU_FALLBACK_MAX 6
+#define MENU_MAX_AGE_S 120.0
+
+typedef struct {
+  int used;
+  int rejected;           // the locator said no (else: asked, no answer yet)
+  const void *movie;      // as the game thread saw it (a host pointer)
+  const void *vtable;     // the movie's first word then
+  uint32_t id[2];         // the request's id, its two words
+  char name[MENU_NAME];   // the movie's file, without its extension
+  double born, since;     // when it was first asked, and when it last was rejected or asked again
+  unsigned replays, fallbacks;
+  atomic_int published;   // a file of that name was indexed since (the indexing threads set it)
+} menu_req;
+
+static struct {
+  menu_req q[MENU_SLOTS];
+  unsigned next;          // the slot that goes when all are used
+  atomic_int active;      // entries in use: the indexing threads look no further when it is 0
+  int on;                 // every point is there
+  int m_movie, m_lo, m_hi, m_accepted, m_frame;
+} g_menu;
+static atomic_flag g_menu_lock = ATOMIC_FLAG_INIT;
+// The game thread's: the request now running, from its start to the locator's answer
+static _Thread_local struct {
+  int on, located;
+  const void *movie;
+} t_menu;
+static _Thread_local int t_menu_again;  // the request now running is one of ours
+
+static void menu_lock(void) {
+  while (atomic_flag_test_and_set_explicit(&g_menu_lock, memory_order_acquire)) {}
+}
+static void menu_unlock(void) { atomic_flag_clear_explicit(&g_menu_lock, memory_order_release); }
+
+// A game string's text, copied (the text in place, or behind a pointer at its start); 0 when it does not fit n
+static int game_text(const void *s, char *out, size_t n) {
+  const uint8_t *str = s;
+  int in_place = rc_mod_ptr(str + RC_OFF(efd_str_inline)) == (const void *)(str + RC_OFF(efd_str_size));
+  const char *text = in_place ? (const char *)str : (const char *)rc_mod_ptr(str);
+  if (!text) return 0;
+  size_t len = 0;
+  while (len < n && text[len]) len++;
+  if (len == n) return 0;
+  memcpy(out, text, len + 1);
+  return 1;
+}
+
+// The movie's file: the last part of its URI; 0 for a movie with none
+static int menu_movie_name(const void *movie, char *name, size_t n) {
+  char uri[128];
+  if (!game_text((const uint8_t *)movie + RC_OFF(menu_movie_uri), uri, sizeof uri)) return 0;
+  const char *colon = strrchr(uri, ':'), *part = colon ? colon + 1 : uri;
+  if (!*part || strlen(part) >= n) return 0;
+  strcpy(name, part);
+  return 1;
+}
+
+// 1 when the file (a name and an extension) is the movie's: its name, in any case, and then a dot
+static int menu_name_is(const char *name, const char *file) {
+  size_t i = 0;
+  for (; name[i]; i++)
+    if (tolower((unsigned char)name[i]) != tolower((unsigned char)file[i])) return 0;
+  return name[0] && file[i] == '.';
+}
+
+static menu_req *menu_find(const void *movie) {  // locked
+  for (int k = 0; k < MENU_SLOTS; k++)
+    if (g_menu.q[k].used && g_menu.q[k].movie == movie) return &g_menu.q[k];
+  return NULL;
+}
+static void menu_drop(menu_req *r) {  // locked
+  if (r->used) atomic_fetch_sub(&g_menu.active, 1);
+  r->used = 0;
+}
+
+static void on_menu_request(rc_mid_frame *f, void *user) {
+  (void)user;
+  t_menu.on = 0;
+  if (!g_menu.on || !rs_mods_cfg.menu_retry) return;
+  const void *movie = (const void *)(uintptr_t)rc_mid_get(f, g_menu.m_movie);
+  char name[MENU_NAME];
+  if (!movie || !menu_movie_name(movie, name, sizeof name)) return;
+  t_menu.on = 1, t_menu.located = 0, t_menu.movie = movie;
+  menu_lock();
+  menu_req *r = menu_find(movie);
+  if (!r || !t_menu_again) {  // a request of the game's: tracked from its start
+    if (!r) {
+      for (int k = 0; k < MENU_SLOTS && !r; k++)
+        if (!g_menu.q[k].used) r = &g_menu.q[k];
+      if (!r) menu_drop(r = &g_menu.q[g_menu.next++ % MENU_SLOTS]);  // all used: the oldest is a dead movie by now
+      r->used = 1;
+      atomic_fetch_add(&g_menu.active, 1);
+    }
+    double t = now_s();
+    r->rejected = 0, r->movie = movie, r->vtable = rc_mod_ptr(movie), r->born = r->since = t;
+    r->id[0] = (uint32_t)rc_mid_get(f, g_menu.m_lo), r->id[1] = (uint32_t)rc_mid_get(f, g_menu.m_hi);
+    r->replays = r->fallbacks = 0;
+    atomic_store(&r->published, 0);
+    memcpy(r->name, name, strlen(name) + 1);
+  }
+  menu_unlock();
+}
+
+static void on_menu_locate(rc_mid_frame *f, void *user) {
+  (void)f, (void)user;
+  if (t_menu.on) t_menu.located = 1;
+}
+
+static void on_menu_located(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!t_menu.on || !t_menu.located) return;  // a movie with no URI: nothing was asked
+  t_menu.on = t_menu.located = 0;
+  int accepted = (uint8_t)rc_mid_get(f, g_menu.m_accepted) != 0;
+  char name[MENU_NAME];
+  unsigned replays = 0;
+  menu_lock();
+  menu_req *r = menu_find(t_menu.movie);
+  if (r) {
+    memcpy(name, r->name, sizeof name);
+    replays = r->replays;
+    if (accepted) menu_drop(r);
+    else r->rejected = 1, r->since = now_s();
+  }
+  menu_unlock();
+  if (!r) return;
+  if (!accepted && !replays)
+    rs_mods_logf("menu load: '%s' was rejected (not indexed yet); waiting for the indexer", name);
+  else if (!accepted) rs_mods_logf("menu load: '%s' rejected again (request %u)", name, replays + 1);
+  else if (replays) rs_mods_logf("menu load: '%s' accepted after %u requests", name, replays + 1);
+}
+
+// On the indexing threads (and the loader's), after a file is in the index: what is asked is the game thread's
+static void on_file_indexed(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!g_menu.on || !rs_mods_cfg.menu_retry || !atomic_load(&g_menu.active)) return;
+  const uint8_t *frame = (const uint8_t *)(uintptr_t)rc_mid_get(f, g_menu.m_frame);
+  char file[2 * MENU_NAME];
+  if (!frame || !game_text(frame + RC_OFF(file_index_name), file, sizeof file)) return;
+  menu_lock();
+  for (int k = 0; k < MENU_SLOTS; k++)
+    if (g_menu.q[k].used && menu_name_is(g_menu.q[k].name, file)) atomic_store(&g_menu.q[k].published, 1);
+  menu_unlock();
+}
+
+// The game's request for a movie again. The Mac's takes the movie and a pointer to the id; Learn & Play's has the movie
+// in eax and the id's words on the stack, which a call by name can't do (its prototype is `custom`): eax is set in
+// the thread's context, which the callee's caller-saved registers allow, and put back.
+static void menu_ask_again(const void *movie, const uint32_t id[2]) {
+  if (rc_guest_ptr_size == 8) {
+    static _Thread_local uint32_t *words;
+    if (!words && !(words = rc_guest_alloc(2 * sizeof *words))) return;
+    words[0] = id[0], words[1] = id[1];
+    OV_GUEST(menu_movie_request, (uint64_t)(uintptr_t)movie, (uint64_t)(uintptr_t)words);
+    return;
+  }
+  rc_ctx *c = rc_thread_ctx();
+  const uint64_t eax = c->r[0], args[2] = {id[0], id[1]};
+  c->r[0] = RC_GUEST(movie);
+  rc_call_guest(RC_GA(menu_movie_request_reg), args, 2, 0, 0, 0);
+  c->r[0] = eax;
+}
+
+// One table entry that is due, asked again; 0 when none is
+static int menu_replay_one(void) {
+  menu_req *r = NULL;
+  int indexed = 0;
+  double t = now_s();
+  menu_lock();
+  for (int k = 0; k < MENU_SLOTS; k++) {
+    menu_req *e = &g_menu.q[k];
+    if (e->used && t - e->born > MENU_MAX_AGE_S) menu_drop(e);
+    if (!r && e->used && e->rejected && atomic_exchange(&e->published, 0)) r = e, indexed = 1;
+  }
+  for (int k = 0; k < MENU_SLOTS && !r; k++) {
+    menu_req *e = &g_menu.q[k];
+    if (e->used && e->rejected && e->fallbacks < MENU_FALLBACK_MAX && t - e->since >= MENU_FALLBACK_S)
+      r = e, r->fallbacks++, r->since = t;
+  }
+  menu_unlock();
+  if (!r) return 0;
+  const void *movie = r->movie;
+  char name[MENU_NAME], now_name[MENU_NAME];
+  memcpy(name, r->name, sizeof name);
+  // still the movie it was: the game may have let it go (the first word of a freed object is the allocator's)
+  if (rc_mod_ptr(movie) != r->vtable || !menu_movie_name(movie, now_name, sizeof now_name) || strcmp(name, now_name)) {
+    menu_lock();
+    menu_drop(r);
+    menu_unlock();
+    return 1;
+  }
+  r->replays++;
+  if (indexed) rs_mods_logf("menu load: '%s' is indexed now; asking again (request %u)", name, r->replays + 1);
+  else
+    rs_mods_logf("menu load: WARNING '%s' still rejected and its file was not seen being indexed; asking again anyway "
+                 "(fallback %u of %u)", name, r->fallbacks, MENU_FALLBACK_MAX);
+  t_menu_again = 1;
+  menu_ask_again(movie, r->id);
+  t_menu_again = 0;
+  return 1;
+}
+
+static int before_menu_frame(rc_ctx *c, void *user) {
+  (void)c, (void)user;
+  if (!g_menu.on || !rs_mods_cfg.menu_retry || !atomic_load(&g_menu.active)) return 0;
+  for (int k = 0; k < MENU_SLOTS && menu_replay_one(); k++) {}
+  return 0;
+}
+
+static void menu_points(void) {
+  int request = rc_mid_add_name("menu_request", on_menu_request, NULL);
+  int locate = rc_mid_add_name("menu_locate", on_menu_locate, NULL);
+  int located = rc_mid_add_name("menu_located", on_menu_located, NULL);
+  int indexed = rc_mid_add_name("file_indexed", on_file_indexed, NULL);
+  int frame = rc_hook_add_name("game_frame", before_menu_frame, NULL, NULL);
+  if (request < 0 || locate < 0 || located < 0 || indexed < 0 || frame < 0 || rc_mid_is_none(request) ||
+      rc_mid_is_none(locate) || rc_mid_is_none(located) || rc_mid_is_none(indexed))
+    return;
+  g_menu.m_movie = rc_mid_value(request, "movie"), g_menu.m_lo = rc_mid_value(request, "id_lo");
+  g_menu.m_hi = rc_mid_value(request, "id_hi"), g_menu.m_accepted = rc_mid_value(located, "accepted");
+  g_menu.m_frame = rc_mid_value(indexed, "frame");
+  if (g_menu.m_movie < 0 || g_menu.m_lo < 0 || g_menu.m_hi < 0 || g_menu.m_accepted < 0 || g_menu.m_frame < 0 ||
+      !RC_HAS_OFF(menu_movie_uri) || !RC_HAS_OFF(file_index_name) || !RC_HAS_OFF(efd_str_inline) ||
+      !RC_HAS_OFF(efd_str_size))
+    return;
+  g_menu.on = 1;
+}
+
+// ------------------------------------------------------------------------------------------------
+// Learn a Song with more than five arrangements (RS_MODS_ARRANGEMENTS=0 is the original). The page's builder fills a
+// slot, altArrangementsP1_slot%d, for each arrangement of the song but the selected one, and the movie
+// (las_songoptions.gfx) has four: the selected arrangement and four others. A fifth alternate asks Scaleform for a
+// slot the movie does not have, which leaves a display node with nothing behind it, and the renderer crashes on it
+// (a misaligned 16-byte load) when it draws the page. At each alternate the builder has the slots it has filled so
+// far in a local; with four filled the hook goes on at the loop's end, as the builder does for the selected
+// arrangement. A song with five or fewer arrangements is not touched, and the others show their first four
+// alternates, in the record order.
+// ------------------------------------------------------------------------------------------------
+#define LAS_ALT_SLOTS 4
+static int g_alt_filled = -1, g_alt_latch = -1;  // the point's value and continuation; -1: this game has none
+
+static void on_alt_slot(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!rs_mods_cfg.arrangements || g_alt_filled < 0 || g_alt_latch <= 0) return;
+  if ((uint32_t)rc_mid_get(f, g_alt_filled) < LAS_ALT_SLOTS) return;
+  static atomic_int said;
+  if (!atomic_exchange(&said, 1))
+    rs_mods_logf("Learn a Song: a song with more than five arrangements shows the first four alternates");
+  f->go = g_alt_latch;
+}
+
 void rs_mods_start(void) {
   rs_mods_reload_config();
   if (rc_hook_add_name("boot_intro_update", before_intro_update, NULL, NULL)) rs_mods_logf("no intro hook point");
@@ -672,4 +952,13 @@ void rs_mods_start(void) {
   if (p >= 0 && !rc_mid_is_none(p)) g_skip_offer = rc_mid_value(p, "offer");
   rs_mods_logf("Guitarcade Skip Tuner: %s",
                g_skip_offer < 0 ? "no point for it" : rs_mods_cfg.guitarcade_skip ? "on" : "off");
+  menu_points();
+  rs_mods_logf("menu movie request again: %s", !g_menu.on ? "no points for it" : rs_mods_cfg.menu_retry ? "on" : "off");
+  int alt = rc_mid_add_name("las_alt_slot", on_alt_slot, NULL);
+  if (alt >= 0 && !rc_mid_is_none(alt)) {
+    g_alt_filled = rc_mid_value(alt, "filled");
+    g_alt_latch = rc_mid_cont(alt, "latch");
+  }
+  rs_mods_logf("Learn a Song alternate arrangements: %s",
+               g_alt_filled < 0 || g_alt_latch <= 0 ? "no point for it" : rs_mods_cfg.arrangements ? "on" : "off");
 }

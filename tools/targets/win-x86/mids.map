@@ -197,6 +197,11 @@ seven_frg3_scale      0x00f8c4f7  (void *obj@edi, uint32_t scale_bits@ecx)  # FR
 seven_frg2_setscale   none  Learn & Play injects the scale call itself (seven_frg2_scale)
 seven_frg2b_setscale  none  Learn & Play injects the scale call itself (seven_frg2b_scale)
 seven_frg3_setscale   none  Learn & Play injects the scale call itself (seven_frg3_scale)
+# barre markers over all strings (rs7string PUBFA, PUBGF, PUBBC; the finger marker update 0x110dd80 / its marker 0x110e4b0 / span 0x110e680 are the Steam exe's 0x58c690 / 0x58cdc0 / 0x58cf90)
+seven_pubfa          0x0110e4b0  (uint32_t string@eax, void *template@ecx)  # PUBFA the neck's finger marker 0x110e4b0 (only caller 0x110e44f in the marker loop 0x110e370), its entry before `push ebp`: eax = the string the loop found (al), ecx = the template (a T8); the finger's anchor becomes its lowest string
+seven_pubgf          0x0110e6ab  (void *template@[ebp+0x8], uint32_t finger@edi, uint32_t lo@edx, uint32_t hi@ecx)  # PUBGF the finger span 0x110e680 (only caller 0x110e4d3; stdcall (template, span out), edi = the finger), after its scan of fingers[0..5]: dl = the lowest string, cl = the highest, before `movzx edx, dl`; the span is hi - lo + 1
+seven_pubbc_scale    0x0110df49  (void *owner@[ebp+0x8], int32_t span@[ebx+0x1c], void *entity1@[ebx+0x4], void *entity2@[ebx+0x8], uint32_t scale_bits@ecx)  # PUBBC the finger marker update 0x110dd80 (ebx = the marker, [ebp+8] its owner), the span changed: after the clip is seeked, at the state store `mov [ebx+0x14], 1`; the edit there calls Entity_SetScale(entity, scale_bits) on both capsules unless scale_bits is 0
+seven_pubbc_setscale none  Learn & Play injects the scale call itself (seven_pubbc_scale)
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

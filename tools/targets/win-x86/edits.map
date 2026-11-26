@@ -759,6 +759,12 @@ seven_string   0x011151c7  7:a779f646   +3=07                        # PSQ1 Guit
 seven_string   0x00f8b9f3  3:c4cc09bd  =8b431085c974fc5251e84f393a0083c4045a8b4310   # FRG2 in 0xf8b7e0 (Steam 0x40BAE3), a glow bar placed: the entity [ebx+0x10] scaled
 seven_string   0x00f8bb70  3:c4cc09bd  =8b431085c974fc5251e8d2373a0083c4045a8b4310   # FRG2B in 0xf8b7e0 (Steam 0x40BC60), a glow bar moved: the same
 seven_string   0x00f8c4f7  4:1e76814e  =0fb6471885c974fc5250518b4710e8462e3a0083c404585a   # FRG3 in 0xf8c4a0 (Steam 0x40C5E7), the glow box placed: the entity [edi+0x10] scaled, eax (the byte the game pushes) kept
+# chord note end: the stop-pluck of string 6 (rs7string CLVE; the Mac's GSVB edits cover its callee)
+seven_string   0x01364dfe  3:0d2ccd20   +2=40                        # CLVE the note-end update 0x1364c00, the stop-pluck of a chord string: the bound reads the active count (+0x40)
+seven_string   0x01364e08  4:84a59d6d   +3=40                        # CLVE and the string from the native main[8] (+0x40): string 6 its own object, not the game's ghost 0 (+0x1c)
+
+# barre markers over all strings (rs7string PUBBC)
+seven_string   0x0110df49  7:505ec0d6   =c743140100000085c974fc518b4304e8f313220083c404518b4308e8e713220083c404  # PUBBC finger marker update 0x110dd80, its span changed: Entity_SetScale(capsule, ecx) on the entities [ebx+4], [ebx+8] unless ecx (seven_pubbc_scale) is 0
 
 # plain
 plain_packages  0x010d9fca  11:5e80f013  =837c2468017404837c2468030f852f060000  # PP_SNGF the song file loader 0x10d9f80: its flags check takes 1 (compressed, not encrypted) as it takes 3 and goes on to the signature check; any other value goes to the reject path as before

@@ -404,6 +404,7 @@ nf_adapter_size             0x1c    # the adapter: bytes (the ctor writes +0x0..
 seven_fretgrid_wire_head     0xa0  # fret-wire row: the header before record 0
 seven_fretgrid_wire_rec      0x30  # fret-wire record
 seven_fretgrid_wire_state    0x8  # fret-wire record: u32 state, 2 = settled
+seven_marker_player        0x6c  # the neck's finger marker manager (the owner of the marker update and the marker function): its player (session at session_guitar)
 detect_target_string         0x10  # the target note: u8 its string (0x13f5265)
 detect_target_fret           0x11  # the target note: u8 its fret (0x13f525f)
 tuner_entity_release_slot    0x2  # the vtable slot the tuner's dtor releases picks and letters with (0x112f91d)

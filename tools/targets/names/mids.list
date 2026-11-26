@@ -171,6 +171,11 @@ seven_frg3_scale
 seven_frg2_setscale
 seven_frg2b_setscale
 seven_frg3_setscale
+# barre markers over all strings: the finger marker's anchor, span and capsule scale
+seven_pubfa
+seven_pubgf
+seven_pubbc_scale
+seven_pubbc_setscale
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

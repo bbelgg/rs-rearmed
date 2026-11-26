@@ -21,5 +21,7 @@ notes and empties this file. -->
 - **Learn a Song doesn't crash on a song with more than five arrangements, and its other arrangements scroll:** the
   page shows four of the other arrangements at a time, and the arrow keys and the mouse wheel scroll the rest (Down
   on the last one shown, Up on the first), the first and last entry saying how many are out of sight, "(+3)". Before,
-  the page asked its movie for a slot it hasn't and crashed when it drew. Page Up and Page Down do not scroll. Both
-  editions. `RS_MODS_ARRANGEMENTS=0` is the game's own behaviour. Not yet run in either game.
+  the page asked its movie for a slot it hasn't and crashed when it drew. The co-op page's list of arrangements, which
+  shows about nine and draws the rest invisibly below the panel, shows eight and scrolls the same way, and Enter picks
+  the arrangement in focus. Page Up and Page Down do not scroll. Both editions. `RS_MODS_ARRANGEMENTS=0` is the game's
+  own behaviour. Not yet run in either game.

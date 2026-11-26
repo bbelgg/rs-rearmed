@@ -541,3 +541,5 @@ las_page_vtable         # the Learn a Song page's vtable: a page is that one whe
 menu_focus_up           # (page, steps): a menu's focus step up, by that many buttons, stopping at the first
 menu_focus_down         # (page, steps): the same, down
 arr_record_dtor         # (record): an arrangement record's destructor (a menu page keeps a vector of them)
+arr_coop_vtable         # the co-op arrangement list page's vtable: a page is that one when its first word is its address
+arr_coop_build          # (page): the co-op list page's builder (the page vtable's +0xb0 on Learn & Play)

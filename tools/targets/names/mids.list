@@ -220,3 +220,5 @@ las_alt_root          # the page builder's start, after it took a new view defin
 las_alt_page          # the Learn a Song page's update, after its base update: the page is open (a page opened anew starts at the top of the alternates)
 menu_focus_step_up    # a menu's focus step up (arrow Up, the mouse wheel): the menu and the number of steps, which the page may take over
 menu_focus_step_down  # the same, down
+coop_sort_order       # the co-op arrangement list's builder, an entry's SortOrder (the movie's row) about to be set: the entry's record index; the row, which the page may change
+coop_select           # the co-op list's select handler, about to store the record that was selected: the record, which the page may replace

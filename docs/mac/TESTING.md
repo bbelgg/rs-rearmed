@@ -309,8 +309,12 @@ with `RS_MODS_LOG=1`.
   Down, window 0 -> 1 of 7 alternates`. Enter on a shown entry plays that arrangement (check an entry after a scroll,
   not only before); the header (title, artist) is still there after a scroll and the recommendation buttons still take
   the focus. Leave the page and open it again (or another song): it starts at the top. A song with five or fewer
-  arrangements shows what it did. Report what the log says if a scroll shows nothing or the renderer stops. Not run
-  in the game.
+  arrangements shows what it did. Report what the log says if a scroll shows nothing or the renderer stops.
+  The co-op page (Multiplayer, two players, Learn a Song) lists a song's arrangements in one column; with more than
+  eight (the test song above), it shows eight, the one selected among them, and arrow Down on the last scrolls (`Learn a
+  Song: co-op list scrolled to 1 of 8`); Up from the first goes back; the focus moves one arrangement at a time, and
+  Enter on an arrangement starts that one (`co-op select ... -> record N` is in the log when the game's own choice was
+  another). The start line says `co-op arrangement list: on`. Not run in the game.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the log has `[rs-mods] DLC: N archives mounted in F frames,
   T s` once the profile has loaded, which is the end of the mounting: every archive's package is loaded and every
   song manifest asked for is in by then, and the menu's "Enumerating downloadable content..." goes with it. When

@@ -460,3 +460,5 @@ las_page_records2       # the Learn a Song page: the second player's record vect
 las_page_selected       # the Learn a Song page: the selected record's index, 32 bits
 las_page_slot_counter   # the Learn a Song page: the count the builder raises for each slot, 32 bits
 arr_record_size         # an arrangement record's size
+arr_coop_records        # the co-op arrangement list page: its record vector (begin, end pointers)
+arr_coop_selected       # the co-op arrangement list page: the selected record's index, 32 bits

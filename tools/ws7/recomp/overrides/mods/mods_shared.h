@@ -83,6 +83,8 @@ uint32_t rs_mods_alt_scroll(uint32_t offset, uint32_t alternates, int down, int 
 void rs_mods_alt_label_tag(uint32_t slot, uint32_t offset, uint32_t alternates, char *out, size_t n);
 uint32_t rs_mods_coop_window_for(uint32_t offset, uint32_t count, uint32_t selected);
 int rs_mods_coop_focus_index(const char *focus);
+int rs_mods_coop_in_window(uint32_t index, uint32_t count, uint32_t offset);  // 1: record `index` is shown from `offset`
+uint32_t rs_mods_coop_step(uint32_t index, uint32_t count, int steps);        // the record a focus step moves to (stops at the ends)
 // Batched DLC mounting (RS_MODS_FIXES, RS_MODS_BUDGET_MS): what is one source of it (mods_shared.c says what it is
 // for). Each edition's dlc_update runs the install steps and waits for a mount in its game's own way; all of these
 // are the game thread's, called from there:

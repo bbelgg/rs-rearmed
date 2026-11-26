@@ -453,3 +453,5 @@ las_page_records2       0x394   # the second player's (0x11be864, the page's des
 las_page_selected       0x3a0   # the selected record's index (0x11bf52a); the Mac's 0x530
 las_page_slot_counter   0x3a4   # raised by the builder for each slot it fills (0x11bff7e); the Mac's 0x534
 arr_record_size         0xfc    # an arrangement record (0x11bf5da); the Mac's 0x180
+arr_coop_records        0x370   # the co-op arrangement list page's records, begin and end (0x11c6e43); the Mac's 0x4e0
+arr_coop_selected       0x37c   # the selected record's index (0x11c6e58, 0x11c82cf); the Mac's 0x4f8

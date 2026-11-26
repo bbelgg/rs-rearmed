@@ -332,8 +332,8 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   files; the same log lines, and the scroll of the page's other arrangements (arrow Down on the last of four, Up on
   the first; the mouse wheel). The retry's replay is the one place the games differ (the movie goes in `eax` here), so a
   `menu load: ... accepted after 2 requests` line here is the check that the call works; the scroll's `eax` call is the
-  member lookup by name, `Learn a Song: Down, window 0 -> 1 of 7 alternates` and a redrawn page the check of that. Not
-  run in the game.
+  member lookup by name, `Learn a Song: Down, window 0 -> 1 of 7 alternates` and a redrawn page the check of that. The
+  co-op page's list scrolls too (the Mac edition's check). Not run in the game.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the Mac edition's lines and checks
   ([Mac testing](../mac/TESTING.md#unattended-runs)): `[rs-mods] DLC: N archives mounted in F frames, T s`, with
   `, their songs in the lists S s later` when the song manifests came after the last archive, and `DLC: A of the

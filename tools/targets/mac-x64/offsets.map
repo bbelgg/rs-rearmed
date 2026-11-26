@@ -447,3 +447,5 @@ las_page_records2       0x518   # the second player's (the page's destructor 0x1
 las_page_selected       0x530   # the selected record's index (0x100339434); Learn & Play's 0x3a0
 las_page_slot_counter   0x534   # raised by the builder for each slot it fills (0x100339e0c); Learn & Play's 0x3a4
 arr_record_size         0x180   # an arrangement record (0x1003394a6: lea rax,[rax+2*rax]; shl rax,7); Learn & Play's 0xfc
+arr_coop_records        0x4e0   # the co-op arrangement list page's records, begin and end (0x10073ef8a, 0x10073f23a); Learn & Play's 0x370
+arr_coop_selected       0x4f8   # the selected record's index (0x10073efc8, 0x10074080b); Learn & Play's 0x37c

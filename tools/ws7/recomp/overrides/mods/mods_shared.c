@@ -959,7 +959,6 @@ static struct {
   int v_text;                                     // las_alt_label's
   int v_root;                                     // las_alt_root's
   int v_open;                                     // las_alt_page's
-  int v_up_page, v_up_steps, v_dn_page, v_dn_steps;  // the focus steps'
   uint8_t *mem;                                   // LAS_MEM_SIZE of guest memory, made when first needed
   const void *page;                               // the page las_alt_page saw last
   double tick;                                    // and when
@@ -968,8 +967,14 @@ static struct {
   uint32_t building;                              // the slot (1..4) the builder fills now, 0 outside a shown record
   void *shown;                                    // inside a rebuild: the root on screen (referenced), merged by ALTR
   uint8_t spare[6 * 8];                           // the builder's focus lists, kept for its next run
-  int busy;                                       // inside our own scroll: the focus steps are the game's
 } g_las;
+// The menu class's focus steps (the Learn a Song page's and the co-op list's), and whether a scroll of ours is running:
+// then the steps are the game's
+static struct {
+  int on;                                         // both points are there
+  int v_up_page, v_up_steps, v_dn_page, v_dn_steps;
+  int busy;
+} g_steps;
 
 // --- the page and the game's nodes, as each game has them: a guest word is the game's pointer width
 static size_t psz(void) { return (size_t)rc_guest_ptr_size; }
@@ -1036,12 +1041,12 @@ static void las_clear(uint8_t *vec) {
 // The focus lists the builder refills from its nodes ("arrangement3", "playSong") while the lists in use hold the
 // movie's ids from page entry ("Buttons.arrangement3.States"): around a rebuild the builder gets the spare pair (cleared
 // and refilled with its own allocator, kept for the next rebuild), the page keeps its own. Before and after the build.
-static void las_swap_focus(const void *page) {
-  uint8_t *lists = field(page, RC_OFF(menu_page_focus_lists)), tmp[sizeof g_las.spare];
+static void las_swap_focus(const void *page, uint8_t *spare) {
+  uint8_t *lists = field(page, RC_OFF(menu_page_focus_lists)), tmp[6 * 8];
   size_t n = 6 * psz();
   memcpy(tmp, lists, n);
-  memcpy(lists, g_las.spare, n);
-  memcpy(g_las.spare, tmp, n);
+  memcpy(lists, spare, n);
+  memcpy(spare, tmp, n);
 }
 
 static int las_page_is(const void *page) {  // the Learn a Song page: its first word is its class's vtable
@@ -1099,13 +1104,13 @@ static void las_rebuild(void *page) {
   }
   uint8_t *states = mem + LAS_MEM_STATES;
   las_take_states(node, states);
-  las_swap_focus(page);
+  las_swap_focus(page, g_las.spare);
   g_las.shown = rc_mod_ptr(field(page, RC_OFF(menu_page_root)));
   las_ref(g_las.shown, 1);
   OV_GUEST(las_build, U64(page));
   las_ref(g_las.shown, 0);
   g_las.shown = NULL;
-  las_swap_focus(page);
+  las_swap_focus(page, g_las.spare);
   las_give_states(rc_mod_ptr(field(page, RC_OFF(menu_page_node))), states);
 }
 
@@ -1118,7 +1123,7 @@ static int las_scroll(void *page, int down, const char *by) {
   if (offset == g_las.offset) return 0;
   char before[64] = "", moved[64] = "";
   void *pg = page;
-  g_las.busy = 1;
+  g_steps.busy = 1;
   g_las.offset = offset;
   las_rebuild(pg);
   game_text(field(pg, RC_OFF(menu_page_focus)), before, sizeof before);
@@ -1126,7 +1131,7 @@ static int las_scroll(void *page, int down, const char *by) {
   game_text(field(pg, RC_OFF(menu_page_focus)), moved, sizeof moved);
   OV_GUEST(menu_focus_down, U64(pg), 1);
   if (!strcmp(before, moved)) OV_GUEST(menu_focus_up, U64(pg), 1);  // the first focusable entry: Up stopped there
-  g_las.busy = 0;
+  g_steps.busy = 0;
   return 1;
 }
 
@@ -1207,23 +1212,47 @@ static void on_alt_page(rc_mid_frame *f, void *user) {
   if (!entered || g_las.offset == 0) return;
   g_las.offset = 0;
   if (las_count(field(page, RC_OFF(las_page_records))) > 0) {
-    g_las.busy = 1;
+    g_steps.busy = 1;
     las_rebuild(page);
-    g_las.busy = 0;
+    g_steps.busy = 0;
   }
 }
 
-// The menu class's focus steps (arrow keys and the mouse wheel, game thread): Down on the last alternate shown / Up on
-// the first scrolls the window while alternates remain beyond it, like the game's own lists, and the step is made no
-// steps long; anything else is the game's step.
+// The menu class's focus steps (arrow keys and the mouse wheel, game thread). On the Learn a Song page: Down on the last
+// alternate shown / Up on the first scrolls the window while alternates remain beyond it, like the game's own lists,
+// and the step is made no steps long; anything else is the game's step. On the co-op list: coop_step.
+static int coop_step(void *page, int steps);
+static int coop_page_is(const void *page);
 static void las_focus_step(rc_mid_frame *f, int down) {
-  if (!g_las.on || g_las.busy || !rs_mods_cfg.arrangements) return;
-  void *page = (void *)(uintptr_t)rc_mid_get(f, down ? g_las.v_dn_page : g_las.v_up_page);
-  if (!las_page_is(page) || !las_focus_is_slot(page, down ? LAS_ALT_SLOTS : 1)) return;
-  if (las_scroll(page, down, down ? "Down" : "Up")) rc_mid_set(f, down ? g_las.v_dn_steps : g_las.v_up_steps, 0);
+  if (!g_steps.on || g_steps.busy || !rs_mods_cfg.arrangements) return;
+  void *page = (void *)(uintptr_t)rc_mid_get(f, down ? g_steps.v_dn_page : g_steps.v_up_page);
+  int steps_v = down ? g_steps.v_dn_steps : g_steps.v_up_steps;
+  if (coop_page_is(page)) {
+    int steps = (int)(uint32_t)rc_mid_get(f, steps_v);
+    if (coop_step(page, down ? steps : -steps)) rc_mid_set(f, steps_v, 0);
+    return;
+  }
+  if (!g_las.on || !las_page_is(page) || !las_focus_is_slot(page, down ? LAS_ALT_SLOTS : 1)) return;
+  if (las_scroll(page, down, down ? "Down" : "Up")) rc_mid_set(f, steps_v, 0);
 }
 static void on_focus_up(rc_mid_frame *f, void *user) { (void)user; las_focus_step(f, 0); }
 static void on_focus_down(rc_mid_frame *f, void *user) { (void)user; las_focus_step(f, 1); }
+
+// The focus step points, once: the menu class's focus steps are one for both pages. 0 when either is missing.
+static int focus_points(void) {
+  static int done = -1;
+  if (done >= 0) return done;
+  int up = rc_mid_add_name("menu_focus_step_up", on_focus_up, NULL);
+  int down = rc_mid_add_name("menu_focus_step_down", on_focus_down, NULL);
+  done = 0;
+  if (up < 0 || down < 0 || rc_mid_is_none(up) || rc_mid_is_none(down)) return 0;
+  g_steps.v_up_page = rc_mid_value(up, "page"), g_steps.v_up_steps = rc_mid_value(up, "steps");
+  g_steps.v_dn_page = rc_mid_value(down, "page"), g_steps.v_dn_steps = rc_mid_value(down, "steps");
+  if (g_steps.v_up_page < 0 || g_steps.v_up_steps < 0 || g_steps.v_dn_page < 0 || g_steps.v_dn_steps < 0) return 0;
+  if (!rc_addr("menu_focus_up") || !rc_addr("menu_focus_down")) return 0;
+  g_steps.on = done = 1;
+  return 1;
+}
 
 // The points, values, names and offsets the scroll needs, all of them or it stays off. `alt` is las_alt_slot's index.
 static int las_points(int alt) {
@@ -1232,18 +1261,12 @@ static int las_points(int alt) {
   int label = rc_mid_add_name("las_alt_label", on_alt_label, NULL);
   int root = rc_mid_add_name("las_alt_root", on_alt_root, NULL);
   int open = rc_mid_add_name("las_alt_page", on_alt_page, NULL);
-  int up = rc_mid_add_name("menu_focus_step_up", on_focus_up, NULL);
-  int down = rc_mid_add_name("menu_focus_step_down", on_focus_down, NULL);
-  if (label < 0 || root < 0 || open < 0 || up < 0 || down < 0 || rc_mid_is_none(label) || rc_mid_is_none(root) ||
-      rc_mid_is_none(open) || rc_mid_is_none(up) || rc_mid_is_none(down))
+  if (label < 0 || root < 0 || open < 0 || rc_mid_is_none(label) || rc_mid_is_none(root) || rc_mid_is_none(open) ||
+      !focus_points())
     return 0;
   g_las.v_text = rc_mid_value(label, "text"), g_las.v_root = rc_mid_value(root, "page");
   g_las.v_open = rc_mid_value(open, "page");
-  g_las.v_up_page = rc_mid_value(up, "page"), g_las.v_up_steps = rc_mid_value(up, "steps");
-  g_las.v_dn_page = rc_mid_value(down, "page"), g_las.v_dn_steps = rc_mid_value(down, "steps");
-  if (g_las.v_page < 0 || g_las.v_record < 0 || g_las.v_text < 0 || g_las.v_root < 0 || g_las.v_open < 0 ||
-      g_las.v_up_page < 0 || g_las.v_up_steps < 0 || g_las.v_dn_page < 0 || g_las.v_dn_steps < 0)
-    return 0;
+  if (g_las.v_page < 0 || g_las.v_record < 0 || g_las.v_text < 0 || g_las.v_root < 0 || g_las.v_open < 0) return 0;
   if (!RC_HAS_OFF(menu_page_root) || !RC_HAS_OFF(menu_page_node) || !RC_HAS_OFF(menu_page_focus) ||
       !RC_HAS_OFF(menu_page_focus_lists) || !RC_HAS_OFF(las_page_records) || !RC_HAS_OFF(las_page_records2) ||
       !RC_HAS_OFF(las_page_selected) || !RC_HAS_OFF(las_page_slot_counter) || !RC_HAS_OFF(arr_record_size) ||
@@ -1251,13 +1274,166 @@ static int las_points(int alt) {
       !RC_HAS_OFF(json_node_release_slot))
     return 0;
   const char *need[] = {"json_object_remove", "json_object_merge", "json_object_set", "las_build", "las_page_vtable",
-                        "menu_focus_up", "menu_focus_down", "arr_record_dtor",
+                        "arr_record_dtor",
                         rc_guest_ptr_size == 8 ? "json_find" : "json_find_ecx",
                         rc_guest_ptr_size == 8 ? "json_key_make" : "json_key_intern"};
   for (size_t k = 0; k < sizeof need / sizeof *need; k++)
     if (!rc_addr(need[k])) return 0;
   return 1;
 }
+
+// ------------------------------------------------------------------------------------------------
+// The co-op arrangement list (after RS Extended Range's coop.cpp). The co-op song page's "other arrangements" list (the
+// page class arr_coop_vtable, builder arr_coop_build) shows every record in one column; about nine fit the panel and
+// the rest are drawn below it, focusable but invisible. The movie keeps one row per entry node and places it by the
+// node's SortOrder (removing nodes left their rows drawn, new nodes were not drawn: rs7string, CONFIRMED there), so
+// every entry stays and only its SortOrder moves. With more than RS_MODS_COOP_ROWS records, coop_sort_order gives the
+// records in a window of that many, from a scroll position, the rows 0.. and the others a row below the panel (the
+// builder's own would be the position). The menu class's focus steps (arrow keys, the mouse wheel) go by record and
+// scroll the window by running the builder again. Enter selects map[position of the focus in the focus list] (page
+// +0x380, filled by the builder with the record index, read by the select handler), but the list is in record order
+// only while the window is at the top, so coop_select takes the record from the focused entry's name
+// ("arrangement<record index>") instead.
+// ------------------------------------------------------------------------------------------------
+#define COOP_SLOTS 2        // a window for each player's page
+#define COOP_HIDDEN_ROW 100 // rows from here on are below the panel
+
+static struct {
+  int on;
+  int v_sort_page, v_sort_record, v_sort_row;  // coop_sort_order's
+  int v_sel_page, v_sel_record;                // coop_select's
+  int rebuilding;                              // a build of ours is running: the page's own window is kept
+  struct {
+    const void *page;                          // the page this slot is the window of
+    uint32_t offset;                           // records above the first shown entry
+    uint8_t spare[6 * 8];                      // the builder's focus lists, kept for its next run
+  } st[COOP_SLOTS];
+} g_coop;
+
+static int coop_page_is(const void *page) {
+  return g_coop.on && page && (uint64_t)(uintptr_t)rc_mod_ptr(page) == RC_GA(arr_coop_vtable);
+}
+static uint32_t coop_count(const void *page) { return las_count(field(page, RC_OFF(arr_coop_records))); }
+static uint32_t coop_selected(const void *page) { return RC_LD(uint32_t, field(page, RC_OFF(arr_coop_selected))); }
+
+// The window of `page`, or null when it has none (a page the game built before this saw it)
+static int coop_find(const void *page) {
+  for (int k = 0; page && k < COOP_SLOTS; k++)
+    if (g_coop.st[k].page == page) return k;
+  return -1;
+}
+// The window of a page being built: the page's own, a free one, or one whose page has gone (its first word is no longer
+// the co-op list's); -1 when both players' pages are live. Its spare focus lists stay: the next page's builder clears
+// and refills them with the game's allocator.
+static int coop_claim(const void *page) {
+  int k = coop_find(page);
+  for (int j = 0; k < 0 && j < COOP_SLOTS; j++)
+    if (!g_coop.st[j].page || !coop_page_is(g_coop.st[j].page)) k = j;
+  if (k >= 0 && g_coop.st[k].page != page) g_coop.st[k].page = page, g_coop.st[k].offset = 0;
+  return k;
+}
+
+// Runs the builder again with the window where it is: the page keeps its focus lists
+static void coop_rebuild(void *page, int k) {
+  las_clear(field(page, RC_OFF(arr_coop_records)));
+  las_swap_focus(page, g_coop.st[k].spare);
+  g_coop.rebuilding = 1;
+  OV_GUEST(arr_coop_build, U64(page));
+  g_coop.rebuilding = 0;
+  las_swap_focus(page, g_coop.st[k].spare);
+}
+
+// The position of record `record`'s entry in the page's focus id list, or -1
+static int coop_position(const void *page, uint32_t record) {
+  const uint8_t *lists = field(page, RC_OFF(menu_page_focus_lists));
+  uint64_t b = ld_word(lists + 3 * psz()), e = ld_word(lists + 4 * psz());
+  size_t size = (size_t)RC_OFF(efd_str_inline) + psz();  // a game string: the room of its in-place text and its two pointers
+  char id[64];
+  for (uint64_t at = b, n = 0; at < e && n < 1024; at += size, n++)
+    if (game_text(RC_HOST(at), id, sizeof id) && rs_mods_coop_focus_index(id) == (int)record) return (int)(n);
+  return -1;
+}
+
+// A focus step of `steps` records (negative: up). The stock steps move through the focus id list, which the movie orders
+// by SortOrder at page entry: in record order only while the window is at the top (CONFIRMED in rs7string). So the step
+// goes by record: scroll the window onto the target record (rebuild), then give the game's step the distance between the
+// two entries in the list. Returns 0 for a step that is the game's own (a list that fits, a focus that is no entry).
+static int coop_step(void *page, int steps) {
+  char focus[64];
+  int k = coop_find(page);
+  uint32_t count = coop_count(page);
+  if (k < 0 || count <= RS_MODS_COOP_ROWS || !game_text(field(page, RC_OFF(menu_page_focus)), focus, sizeof focus)) return 0;
+  int index = rs_mods_coop_focus_index(focus);
+  if (index < 0 || (uint32_t)index >= count) return 0;
+  uint32_t target = rs_mods_coop_step((uint32_t)index, count, steps);
+  uint32_t offset = rs_mods_coop_window_for(g_coop.st[k].offset, count, target);
+  int from = coop_position(page, (uint32_t)index), to = coop_position(page, target), moves = steps;
+  g_steps.busy = 1;
+  if (offset != g_coop.st[k].offset) {
+    rs_mods_logf("Learn a Song: co-op list scrolled to %u of %u", offset, count);
+    g_coop.st[k].offset = offset;
+    coop_rebuild(page, k);
+  }
+  if (from >= 0 && to >= 0) moves = to - from;
+  if (moves > 0) OV_GUEST(menu_focus_down, U64(page), (uint64_t)moves);
+  else if (moves < 0) OV_GUEST(menu_focus_up, U64(page), (uint64_t)-moves);
+  g_steps.busy = 0;
+  return 1;
+}
+
+// The builder, as it sets an entry's SortOrder (its position, the row the movie places it in): a build the game starts
+// itself (page entry) places the window over the selected record; records in the window get their row, the others a row
+// below the panel.
+static void on_coop_sort(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!g_coop.on || !rs_mods_cfg.arrangements) return;
+  void *page = (void *)(uintptr_t)rc_mid_get(f, g_coop.v_sort_page);
+  uint32_t index = (uint32_t)rc_mid_get(f, g_coop.v_sort_record), count;
+  if (!coop_page_is(page)) return;
+  count = coop_count(page);
+  if (index == 0 && !g_coop.rebuilding) {
+    int k = coop_claim(page);
+    if (k >= 0) g_coop.st[k].offset = rs_mods_coop_window_for(0, count, coop_selected(page));
+  }
+  int k = coop_find(page);
+  if (k < 0 || count <= RS_MODS_COOP_ROWS) return;
+  rc_mid_set_f(f, g_coop.v_sort_row,
+               rs_mods_coop_in_window(index, count, g_coop.st[k].offset) ? (double)(index - g_coop.st[k].offset)
+                                                                         : (double)(COOP_HIDDEN_ROW + index));
+}
+
+// The select handler's store of the selected record: the record named by the focused entry
+static void on_coop_select(rc_mid_frame *f, void *user) {
+  (void)user;
+  if (!g_coop.on || !rs_mods_cfg.arrangements) return;
+  void *page = (void *)(uintptr_t)rc_mid_get(f, g_coop.v_sel_page);
+  char focus[64];
+  if (!coop_page_is(page) || !game_text(field(page, RC_OFF(menu_page_focus)), focus, sizeof focus)) return;
+  int index = rs_mods_coop_focus_index(focus);
+  uint32_t record = (uint32_t)rc_mid_get(f, g_coop.v_sel_record);
+  if (index < 0 || (uint32_t)index >= coop_count(page) || (uint32_t)index == record) return;
+  rs_mods_logf("Learn a Song: co-op select %s -> record %d (the list position gave %u)", focus, index, record);
+  rc_mid_set(f, g_coop.v_sel_record, (uint64_t)index);
+}
+
+static int coop_points(void) {
+  int sort = rc_mid_add_name("coop_sort_order", on_coop_sort, NULL);
+  int select = rc_mid_add_name("coop_select", on_coop_select, NULL);
+  if (sort < 0 || select < 0 || rc_mid_is_none(sort) || rc_mid_is_none(select) || !focus_points()) return 0;
+  g_coop.v_sort_page = rc_mid_value(sort, "page"), g_coop.v_sort_record = rc_mid_value(sort, "record");
+  g_coop.v_sort_row = rc_mid_value(sort, "row");
+  g_coop.v_sel_page = rc_mid_value(select, "page"), g_coop.v_sel_record = rc_mid_value(select, "record");
+  if (g_coop.v_sort_page < 0 || g_coop.v_sort_record < 0 || g_coop.v_sort_row < 0 || g_coop.v_sel_page < 0 ||
+      g_coop.v_sel_record < 0)
+    return 0;
+  if (!RC_HAS_OFF(menu_page_focus) || !RC_HAS_OFF(menu_page_focus_lists) || !RC_HAS_OFF(arr_coop_records) ||
+      !RC_HAS_OFF(arr_coop_selected) || !RC_HAS_OFF(arr_record_size) || !RC_HAS_OFF(efd_str_inline) ||
+      !RC_HAS_OFF(efd_str_size) || !rc_addr("arr_coop_vtable") || !rc_addr("arr_coop_build") ||
+      !rc_addr("arr_record_dtor"))
+    return 0;
+  return 1;
+}
+
 
 // The window arithmetic of the scrollable "Other arrangements" list (after RS Extended Range's arrangements.h): the
 // scroll is the points above.
@@ -1279,6 +1455,15 @@ void rs_mods_alt_label_tag(uint32_t slot, uint32_t offset, uint32_t alternates, 
   if (slot == 1 && offset > 0) snprintf(out, n, " (-%u)", (unsigned)offset);
   else if (slot == LAS_ALT_SLOTS && offset + LAS_ALT_SLOTS < alternates)
     snprintf(out, n, " (+%u)", (unsigned)(alternates - offset - LAS_ALT_SLOTS));
+}
+
+int rs_mods_coop_in_window(uint32_t index, uint32_t count, uint32_t offset) {
+  return count <= RS_MODS_COOP_ROWS || (index >= offset && index - offset < RS_MODS_COOP_ROWS);
+}
+
+uint32_t rs_mods_coop_step(uint32_t index, uint32_t count, int steps) {
+  int64_t target = (int64_t)index + steps;
+  return target < 0 || !count ? 0 : target >= (int64_t)count ? count - 1 : (uint32_t)target;
 }
 
 uint32_t rs_mods_coop_window_for(uint32_t offset, uint32_t count, uint32_t selected) {
@@ -1329,9 +1514,11 @@ void rs_mods_start(void) {
     g_alt_latch = rc_mid_cont(alt, "latch");
   }
   g_las.on = g_alt_filled >= 0 && g_alt_latch > 0 && las_points(alt);
+  g_coop.on = coop_points();
   rs_mods_logf("Learn a Song alternate arrangements: %s",
                g_alt_filled < 0 || g_alt_latch <= 0 ? "no point for it"
                : !rs_mods_cfg.arrangements          ? "off"
                : g_las.on                           ? "on, scrolling"
                                                     : "on");
+  rs_mods_logf("co-op arrangement list: %s", !g_coop.on ? "no points for it" : rs_mods_cfg.arrangements ? "on" : "off");
 }

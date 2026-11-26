@@ -385,6 +385,17 @@ What each does:
   A page opened anew starts at the top (`las_alt_page`, the page update). A game whose tables lack a point keeps the
   first four alternates. Page Up and Page Down do not scroll (Learn & Play has them as window messages, the Mac not at
   all).
+  The co-op song page's list of arrangements (a page class of its own, the same menu class under it) shows every record
+  in one column, about nine of them in the panel and the rest focusable but invisible below it. The movie keeps a row
+  for each entry node and places it by the node's `SortOrder`, so the entries all stay and only the order changes:
+  with more than eight records `coop_sort_order` (the builder, as it sets an entry's `SortOrder`) gives the eight in a
+  window their rows 0 to 7 and the others a row below the panel, the window starting over the selected record. The
+  menu class's focus steps go by record: the step scrolls the window onto the target record and runs the builder again
+  (the page keeping its focus lists), then gives the game's own step the distance between the two entries in the page's
+  focus id list, which the movie orders by `SortOrder` at page entry and so is in record order only while the window is at
+  the top. Enter selects the map's entry for the focus's position, which is wrong then: `coop_select` takes the record
+  from the focused entry's name, `arrangement<N>`. Each player's page has a window of its own (two slots, a slot free
+  again when its page's first word is no longer the list's vtable).
 - **Direct Connect choice** (`RS_MODS_OVERLAY=0` reads `cache.psarc` alone). The game code handles a fourth
   button on the cable screen, `othercable` (Direct Connect), and a fourth value of the INPUT slider, but the menu
   data (two JSON files in one of `cache.psarc`'s `cacheN.7z` archives) leaves them out. At each copy or refresh

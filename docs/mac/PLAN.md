@@ -159,7 +159,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   page), and the arrow keys and the wheel scroll the rest, as RS Extended Range's page does (Page Up and Down do not:
   not done). The scroll re-runs the page's builder and handles the movie's nodes, so it is the part of the fix most
   likely to need the game: built and tested against a game of the test's own (both ABIs), its sites matched by their
-  code; not run in either game.
+  code; not run in either game. The co-op page's list (every arrangement in one column, about nine drawn) is windowed to
+  eight the same way, by the entries' sort order.
 - The first play of a song after an install stutters briefly on Metal (pipelines built on first use). A draw that
   waits for a shader compile hurries it; the gain isn't measured.
 - Mods that draw with OpenGL show nothing on Metal; they need the overlay API.

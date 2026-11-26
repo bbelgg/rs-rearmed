@@ -2,6 +2,7 @@
 # may continue at (each target's mids.map: NAME ADDRESS (TYPE value@LOCATION, ...) [-> CONT=ADDRESS, ...];
 # runtime/rc_mid.h). The generated code and the runtime number the points by their place here.
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
+# (wave 2: each fix's points are a block of their own at the end of this section, headed by the fix's name)
 seven_gkc
 seven_gke
 seven_gkm

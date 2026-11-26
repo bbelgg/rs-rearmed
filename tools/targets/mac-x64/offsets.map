@@ -436,3 +436,7 @@ ui_slider_value               0xb8
 # Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 menu_movie_uri                    0xe0    # GFxMovieModel: the URI string, read by the request (0x100b7094f: [rbx+0xf8], [rbx+0xe0], size word at 0xf0, inline pointer at 0xf8)
 file_index_name                   -0x498  # the index writer 0x100496b20: the string of the file's name and extension (rbp-0x498, its size word at rbp-0x488), destroyed first at its tail 0x100497827
+
+# wave3 headstock (the extended headstock: width, a bass's added segments)
+ni_local_rotate                   0x78    # NiAVObject: the local rotation, nine floats (the local NiTransform at +0x74: the identity matrix constructor 0x101309170 writes 9 floats at +4; translation +0x28, scale +0x34 = ni_local_scale)
+headstock_seg_loaded              0x30    # Rnd_Headstock: u8 per segment, loaded (GSHC 0x100199b10: cmp byte [r12+rbx+0x30], 0)

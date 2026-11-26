@@ -7,8 +7,8 @@ seven_gke           0x01117711  (void *profile@esi, void *other@edi) -> differ=0
 seven_gkm           0x0111729b  (void *manager@ebx, int player@[ebp+0x0c])                             # GKM
 seven_gkl           0x012fdbbb  (int count@ecx, int player@[esp+0x0c])                                 # GKL
 seven_gkt           0x011375d6  (int player@esi, void *tuning@[ebp+0x08], uint32_t caller@[ebp+0x04])  # GKT
-seven_gkh1          0x0110f86d  (uint8_t count@eax)                                                    # GKH1
-seven_gkh2          0x0110fa23  (uint8_t count@eax)                                                    # GKH2
+seven_gkh1          0x0110f86d  (uint8_t count@eax, void *info@ebx)                                    # GKH1 (info: wave2 P1, its +0x0 is the instrument class: a bass loads at most four meshes)
+seven_gkh2          0x0110fa23  (uint8_t count@eax, void *info@edx)                                    # GKH2 (info: wave2 P1; edx = [ebp-0x40])
 seven_gia1          0x01113ccc  (void *info@eax)                                                       # GIA1
 seven_gsc1          0x01113cea  (void *strings@eax, void *guitar@esi)                                  # GSC1
 seven_info_counts   0x0110c381  (void *info@ecx)                                                       # (new)
@@ -213,6 +213,9 @@ seven_lt0         0x01132fc0  (void *slot@eax, int index@edx, void *pegs@ecx)  #
 seven_pbh         0x01364952  (int channel@[ebp-0x7c], void *data@[ebp-0x78], float semis@[ebp-0x44], float now@[ebp-0x5c], uint8_t ok@eax)  # PBH Rnd_Note_UpdateInProgress, after the single-note bend read 0x106ad20 (its `add esp,8`; al = read ok, [ebp-0x44] the semitones): the low B of an extended bass holds its last good reading
 seven_s1_bass     none  Learn & Play's seven_s1 is the join the bass branch of 0x13f3d60 goes to: it covers the bass strings 4 / 5 too
 seven_s1b_bass    none  as seven_s1_bass
+# wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
+seven_gkb             0x0111523d  (void *profile@esi)                                                    # GKB GuitarProfile_Load 0x1115091, the bass branch's store of its peg word (after `mov [esi+0x38], 4`; Steam 0x593D33's twin): the extended bass's count
+seven_gkp             0x01115244  (void *profile@esi)                                                    # GKP GuitarProfile_Load after both branches' peg-word stores (the guitar's `jmp 0x1115244` and the bass's fall-through): the peg word of 8 strings and of an extended bass
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

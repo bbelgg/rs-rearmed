@@ -127,8 +127,8 @@ seven_gke           0x1001a5d36  (void *profile@r14, void *other@r12) -> differ=
 seven_gkm           0x1001a594f  (void *manager@rdi, int player@rsi)                         # GKM: RebuildIfProfileChanged 0x1001a5920 after its player check
 seven_gkl           0x100391027  (int count@rax, int player@[rbp-0x14])                       # GKL: Lua GetGuitarStringCount 0x100390fb0, the count before it is pushed
 seven_gkt           0x10053af0b  (int player@rbx, void *tuning@[rbp-0x30], uint64_t caller@[rbp+0x8])  # GKT: SetPlayerTargetTuning 0x10053aea0 after the store
-seven_gkh1          0x10019957b  (uint8_t count@rax)                                         # GKH1: Rnd_Headstock_LoadStringMeshes 0x1001993b0, first count load
-seven_gkh2          0x1001997fd  (uint8_t count@rax)                                         # GKH2: the loop's count reload
+seven_gkh1          0x10019957b  (uint8_t count@rax, void *info@r12)                                         # GKH1: Rnd_Headstock_LoadStringMeshes 0x1001993b0, first count load
+seven_gkh2          0x1001997fd  (uint8_t count@rax, void *info@r12)                                         # GKH2: the loop's count reload
 seven_gia1          0x10019e7b3  (void *info@r14)                                            # GIA1: guitar ctor after the InstrumentInfo ctor
 seven_gsc1          0x10019e7ce  (void *strings@r14, void *guitar@rbx)                       # GSC1: guitar ctor after the GuitarStrings ctor
 seven_info_counts   0x100194f3a  (void *info@rdi)                                            # the end of the per-string modes 0x100194ec0 (tail-jumped from the profile copy 0x1001a9de0)
@@ -212,6 +212,9 @@ seven_lt0         0x10052513a  (void *slot@rax, int index@r12, void *pegs@rdi)  
 seven_pbh         0x10043a657  (int channel@[rbp-0xd4], void *data@[r12+0x38], float semis@[rbp-0x8c], float now@[rbp-0xbc], uint8_t ok@rax)  # PBH Rnd_Note_UpdateInProgress 0x100439ba0 (LP 0x1363..), after its call of the bend read 0x1002329c0 (`test al,al`; [rbp-0x8c] the semitones, [r12+0x38] the SNG note, [rbp-0xbc] the song time): the low B of an extended bass holds its last good reading
 seven_s1_bass     0x10017aa7f  (void *tuning@rcx, int string@rsi, int pitch@rax) -> done=0x10017ab01  # S1 0x10017aa60 (LP 0x13f3d60), the bass branch's `cmp esi,3; ja`: a bass string 4 / 5 takes its base from the callback (pitch = tuning[string] + base, then the fret in edx added at done)
 seven_s1b_bass    0x10017a9af  (void *tuning@rcx, int string@rsi, int pitch@rax) -> done=0x10017aa31  # S1 0x10017a990 (the same function's second copy), its bass branch's `cmp esi,3; ja`: as seven_s1_bass
+# wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
+seven_gkb             none  the Mac's GKC point follows both branches' common store: the bass's count is written there
+seven_gkp             0x1001a1dbb  (void *profile@r13)                                                  # GKP GuitarProfile_Load 0x1001a1be0 after `mov [r13+0x4a], cx` (the peg word; both branches): the peg word of 8 strings and of an extended bass
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840

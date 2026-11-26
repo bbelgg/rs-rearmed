@@ -70,6 +70,18 @@ int rs_mods_overlay_name(const char *path, char *alt, size_t n);
 // (RS_MODS_GUITARCADE_SKIP), the menu movie request asked again (RS_MODS_MENU_RETRY) and Learn a Song's four
 // alternate arrangements (RS_MODS_ARRANGEMENTS).
 void rs_mods_start(void);
+// The window arithmetic of a scrollable "Other arrangements" list (not wired to the page yet). Learn a Song's list
+// has four slots: whether record `index` (not `selected`) is among the four alternates shown from `offset`; the offset
+// after a step (down only while alternates remain below the window, up while some are above); the tag of slot 1..4
+// (" (-N)" with N alternates above, " (+N)" with N below, else empty). The co-op list shows RS_MODS_COOP_ROWS records:
+// the offset that shows `selected` (moved just far enough), and the record number of a focused button named
+// "...arrangement<N>" (-1 if it isn't one).
+#define RS_MODS_COOP_ROWS 8
+int rs_mods_alt_in_window(uint32_t index, uint32_t selected, uint32_t offset);
+uint32_t rs_mods_alt_scroll(uint32_t offset, uint32_t alternates, int down, int up);
+void rs_mods_alt_label_tag(uint32_t slot, uint32_t offset, uint32_t alternates, char *out, size_t n);
+uint32_t rs_mods_coop_window_for(uint32_t offset, uint32_t count, uint32_t selected);
+int rs_mods_coop_focus_index(const char *focus);
 // Batched DLC mounting (RS_MODS_FIXES, RS_MODS_BUDGET_MS): what is one source of it (mods_shared.c says what it is
 // for). Each edition's dlc_update runs the install steps and waits for a mount in its game's own way; all of these
 // are the game thread's, called from there:

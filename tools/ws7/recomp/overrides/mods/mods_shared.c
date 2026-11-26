@@ -934,6 +934,51 @@ static void on_alt_slot(rc_mid_frame *f, void *user) {
   f->go = g_alt_latch;
 }
 
+// The window arithmetic of a scrollable "Other arrangements" list (after RS Extended Range's arrangements.h). Not
+// wired to the page yet: the scroll needs the page's focus steps and a rebuild of its movie nodes, which are not
+// ported (the built-in above shows the first four alternates, which is a window at offset 0).
+int rs_mods_alt_in_window(uint32_t index, uint32_t selected, uint32_t offset) {
+  if (index == selected) return 0;
+  uint32_t rank = index > selected ? index - 1 : index;
+  return rank >= offset && rank - offset < LAS_ALT_SLOTS;
+}
+
+uint32_t rs_mods_alt_scroll(uint32_t offset, uint32_t alternates, int down, int up) {
+  if (down && offset + LAS_ALT_SLOTS < alternates) return offset + 1;
+  if (up && offset > 0) return offset - 1;
+  return offset;
+}
+
+void rs_mods_alt_label_tag(uint32_t slot, uint32_t offset, uint32_t alternates, char *out, size_t n) {
+  if (!n) return;
+  out[0] = 0;
+  if (slot == 1 && offset > 0) snprintf(out, n, " (-%u)", (unsigned)offset);
+  else if (slot == LAS_ALT_SLOTS && offset + LAS_ALT_SLOTS < alternates)
+    snprintf(out, n, " (+%u)", (unsigned)(alternates - offset - LAS_ALT_SLOTS));
+}
+
+uint32_t rs_mods_coop_window_for(uint32_t offset, uint32_t count, uint32_t selected) {
+  if (count <= RS_MODS_COOP_ROWS) return 0;
+  uint32_t last = count - RS_MODS_COOP_ROWS;
+  if (offset > last) offset = last;
+  if (selected < offset) offset = selected;
+  else if (selected >= offset + RS_MODS_COOP_ROWS) offset = selected - RS_MODS_COOP_ROWS + 1;
+  return offset > last ? last : offset;
+}
+
+int rs_mods_coop_focus_index(const char *focus) {
+  const char *p = focus ? strstr(focus, "arrangement") : NULL;
+  if (!p) return -1;
+  p += 11;
+  if (*p < '0' || *p > '9') return -1;
+  long v = 0;
+  for (; *p >= '0' && *p <= '9'; p++) {
+    v = v * 10 + (*p - '0');
+    if (v > 1000000) return -1;
+  }
+  return (int)v;
+}
+
 void rs_mods_start(void) {
   rs_mods_reload_config();
   if (rc_hook_add_name("boot_intro_update", before_intro_update, NULL, NULL)) rs_mods_logf("no intro hook point");

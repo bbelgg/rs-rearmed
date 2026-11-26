@@ -1308,3 +1308,15 @@ menu_slider_yscale                                               0x1013ecf90  da
 # Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 menu_movie_request                                               0x100b708f0  sysv  void(void *movie, const void *id)  # GFxMovieModel's request to the asset locator (rsi: the id's two words, read at 0x100b70a4e); called by the model's setup 0x100b708a4 and by two listeners (0x100b749e7, 0x100b74a7a)
 menu_movie_request_reg                                           unsupported  the Mac's request takes the movie as its first argument and the id by pointer: menu_movie_request
+
+# wave3 alts: the scrollable "Other arrangements" list (built in: overrides/mods/mods_shared.c)
+json_find_ecx            unsupported  the Mac's json_find takes the name as an argument: json_find
+json_object_remove       0x1000fb8f0  sysv  bool(void *object, void **key)  # Learn & Play's 0x1401c00: finds the member by its key, takes it out and releases it (192 callers, e.g. the dotted-path remove 0x1000fc110), al = 1; al = 0 when there is none
+json_object_merge        0x1000fac10  sysv  void(void *target, void *source, int replace)  # Learn & Play's 0x1401330: the source's members into the target (recursive: 0x1000fad51), replace in dl
+las_build                0x100339370  sysv  void(void *page)  # the Learn a Song page's builder, vtable slot 45 (the Windows slot 44 + 1)
+las_page_vtable          0x1017fc918  data  void *[]  # the Learn a Song page's vtable (slot 0 0x100342440, builder 0x100339370, focus steps 0x1002ee890 / 0x1002ee9b0)
+menu_focus_up            0x1002ee890  sysv  void(void *page, int steps)  # the menu class's focus step (vtable slot 56): up in the focus id list (+0x320), stops at the first
+menu_focus_down          0x1002ee9b0  sysv  void(void *page, int steps)  # slot 57: down, stops at the last
+arr_record_dtor          0x10003d030  sysv  void(void *record)  # an arrangement record's destructor (the page's destructor 0x100342490 calls it for each of +0x500 and +0x518's records, 0x180 each)
+arr_coop_vtable          0x10180dd70  data  void *[]  # the co-op arrangement list page's vtable (builder 0x10073eea0, slot 45)
+arr_coop_build           0x10073eea0  sysv  void(void *page)  # the co-op list page's builder

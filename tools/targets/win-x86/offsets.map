@@ -446,3 +446,15 @@ file_index_name                   -0x38   # the index writer 0x101e250 (the Mac'
 # wave3 headstock (the extended headstock: width, a bass's added segments)
 ni_local_rotate                   0x4c    # NiAVObject: the local rotation, nine floats (the constructor 0x1560bdd..: 0x4c..0x6c, translation 0x70, scale 0x7c)
 headstock_seg_loaded              0x18    # Rnd_Headstock: u8 per segment, loaded (GSHC 0x110fbc6: cmp byte [ecx+esi+0x18], 0)
+# wave3 alts: the scrollable "Other arrangements" list (built in: overrides/mods/mods_shared.c)
+menu_page_root          0x1a0   # the menu class: the view definition root, replaced by each build (0x1148580 stores it, from the view +0xe0); the Mac's 0x250
+menu_page_node          0x1c4   # the page's node under the root (0x1148664 stores it); the Mac's 0x290
+menu_page_focus         0x1fc   # the focused button's id, a game string (0x115b1be: lea ebx,[edi+0x1fc]); the Mac's 0x2e8
+menu_page_focus_lists   0x214   # the focus key list (0x214, 0x218, 0x21c) and id list (0x220, 0x224, 0x228) the focus steps move through (0x115b1ac: [edi+0x220]); the Mac's 0x308
+las_page_records        0x388   # the Learn a Song page's records, begin and end (0x11bf5d4, 0x11bf55b); the Mac's 0x500
+las_page_records2       0x394   # the second player's (0x11be864, the page's destructor); the Mac's 0x518
+las_page_selected       0x3a0   # the selected record's index (0x11bf52a); the Mac's 0x530
+las_page_slot_counter   0x3a4   # raised by the builder for each slot it fills (0x11bff7e); the Mac's 0x534
+arr_record_size         0xfc    # an arrangement record (0x11bf5da); the Mac's 0x180
+arr_coop_records        0x370   # the co-op arrangement list page's records, begin and end (0x11c6e43); the Mac's 0x4e0
+arr_coop_selected       0x37c   # the selected record's index (0x11c6e58, 0x11c82cf); the Mac's 0x4f8

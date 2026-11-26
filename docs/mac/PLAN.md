@@ -91,8 +91,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
 - **The white loading screen and Learn a Song's long songs** (not released): a menu movie the game asked the file index
   for too early is asked for again when its file is indexed, and Learn a Song's page shows four alternate arrangements
-  for a song with more than five, which crashed it. Both are one source with Learn & Play; neither has been run in the
-  game yet ([Open issues](#open-issues)).
+  for a song with more than five, which crashed it, and the arrow keys and the wheel scroll the rest. Both are one
+  source with Learn & Play; neither has been run in the game yet ([Open issues](#open-issues)).
 - **Learn a Song's scroll bar** (new in 1.18.0): it can be dragged from anywhere on it, through the menu overlay's copy
   of the song list; the game let it be grabbed only near the top of the list. The same for the game's 24 other lists,
   the Tone Designer's among them, through the overlay's copies of their movies, and the 16 of them that had no bar
@@ -155,9 +155,12 @@ What the edition does today. What has not been tested is under [Open issues](#op
   the menu again once its file is indexed; it is built and tested against a game of the test's own, and the game's
   sites are matched by their code, but it has not been played with such a `cache.psarc` yet: until it has, on a white
   screen quit and start again.
-- A song with more than five arrangements shows the first four alternates on Learn a Song's page (it crashed the
-  page); the others cannot be chosen there. RS Extended Range's page scrolls the list (arrow keys, wheel, Page Up and
-  Down), which needs the page's focus steps and the builder re-run for each scroll: not done.
+- A song with more than five arrangements shows four alternates at a time on Learn a Song's page (it crashed the
+  page), and the arrow keys and the wheel scroll the rest, as RS Extended Range's page does (Page Up and Down do not:
+  not done). The scroll re-runs the page's builder and handles the movie's nodes, so it is the part of the fix most
+  likely to need the game: built and tested against a game of the test's own (both ABIs), its sites matched by their
+  code; not run in either game. The co-op page's list (every arrangement in one column, about nine drawn) is windowed to
+  eight the same way, by the entries' sort order.
 - The first play of a song after an install stutters briefly on Metal (pipelines built on first use). A draw that
   waits for a shader compile hurries it; the gain isn't measured.
 - Mods that draw with OpenGL show nothing on Metal; they need the overlay API.

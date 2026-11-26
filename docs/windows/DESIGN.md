@@ -469,7 +469,13 @@ What differs, fix by fix:
   here ([Shader corpus](#shader-corpus)): after the warm-up nothing keeps the CPU busy while the game loads, but the
   index can be late for other reasons too (a fast-load `cache.psarc`, a busy machine), which the fix covers.
 - **Learn a Song with more than five arrangements**: the shared fix, with this game's mid point `las_alt_slot`: the
-  slots filled so far are a local at `[esp+0x6c]` here, where the Mac's is `[rbp-0x348]`.
+  slots filled so far are a local at `[esp+0x6c]` here, where the Mac's is `[rbp-0x348]`; the scroll of the other
+  arrangements is shared too ([Mac design](../mac/DESIGN.md)), with this game's sites for its points (the page
+  builder 0x11bf440, the page update 0x11beb70, the menu class's focus steps 0x115b1a0 / 0x115b280) and the forms of
+  the game's functions it calls: the member lookup by name takes the name in `eax` (`json_find_ecx`, set in the
+  thread's context before the call), the key maker takes its text in `ecx`, and the others are `thiscall` / `stdcall`.
+  The co-op list's points are the co-op page's builder 0x11c6d40 (the entry's `SortOrder`, an x87 value here, the
+  Mac's `xmm0`) and its select handler 0x11c8260.
 - **Direct Connect choice**: the same overlay, made by the same `tools/play-native/cache_overlay.py`. The archives' key
   comes from the unpacked code image, which the build step hands to the copy (`gamefiles.key_from_image`).
   `frontend_open_file` is a native function here: the original's lower-casing of the path is behind a packer stub. For a

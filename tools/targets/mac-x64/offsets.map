@@ -440,3 +440,15 @@ file_index_name                   -0x498  # the index writer 0x100496b20: the st
 # wave3 headstock (the extended headstock: width, a bass's added segments)
 ni_local_rotate                   0x78    # NiAVObject: the local rotation, nine floats (the local NiTransform at +0x74: the identity matrix constructor 0x101309170 writes 9 floats at +4; translation +0x28, scale +0x34 = ni_local_scale)
 headstock_seg_loaded              0x30    # Rnd_Headstock: u8 per segment, loaded (GSHC 0x100199b10: cmp byte [r12+rbx+0x30], 0)
+# wave3 alts: the scrollable "Other arrangements" list (built in: overrides/mods/mods_shared.c)
+menu_page_root          0x250   # the menu class: the view definition root, replaced by each build (0x10062b1c0 stores it at 0x10062b228, from the view +0x148); Learn & Play's 0x1a0
+menu_page_node          0x290   # the page's node under the root (0x10062b2ad stores it); Learn & Play's 0x1c4
+menu_page_focus         0x2e8   # the focused button's id, a game string (0x1002ee8bb: lea r15,[rbx+0x2e8]); Learn & Play's 0x1fc
+menu_page_focus_lists   0x308   # the focus key list (0x308, 0x310, 0x318) and id list (0x320, 0x328, 0x330) the focus steps move through (0x1002ee8a4: [rbx+0x320]); Learn & Play's 0x214
+las_page_records        0x500   # the Learn a Song page's records, begin and end (0x100339500, 0x100339442); Learn & Play's 0x388
+las_page_records2       0x518   # the second player's (the page's destructor 0x100342490: 0x100342611); Learn & Play's 0x394
+las_page_selected       0x530   # the selected record's index (0x100339434); Learn & Play's 0x3a0
+las_page_slot_counter   0x534   # raised by the builder for each slot it fills (0x100339e0c); Learn & Play's 0x3a4
+arr_record_size         0x180   # an arrangement record (0x1003394a6: lea rax,[rax+2*rax]; shl rax,7); Learn & Play's 0xfc
+arr_coop_records        0x4e0   # the co-op arrangement list page's records, begin and end (0x10073ef8a, 0x10073f23a); Learn & Play's 0x370
+arr_coop_selected       0x4f8   # the selected record's index (0x10073efc8, 0x10074080b); Learn & Play's 0x37c

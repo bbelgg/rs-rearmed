@@ -405,6 +405,10 @@ sng_note_time                0xc  # SNG note: float time (SH 0x100014510 reads [
 sng_note_sustain             0x3c  # SNG note: float sustain (the same reads, +0x3c; LP the same)
 headstock_seg_values         0x8  # a segment's params: its nine value pointers start at +0x8 (Rnd_SetStringShaderParams 0x1001af5e0: g_flickerPhase +0x8 ... g_diffuseColor +0x20, v_positionString +0x28, the last +0x48); Learn & Play 0x0
 guitar_string_size           0x168  # string object size (efd_alloc in the ctor 0x1001b00e7; LP 0x110)
+rangefx_end                 0x14    # fret range glow effect (Rnd_FretRangeFx_Init 0x100657170): four vec3 wire ends from here, world (0x1006577d1, 0x1006577d5, 0x100657814, 0x100657818); Learn & Play 0x10
+rangefx_pieces              0x78    # fret range glow effect: its box, then its four bars, a pointer each (0x1006572a5, 0x100657363, 0x100657425, 0x1006574e7, 0x1006575a9); Learn & Play 0x6c
+fxpiece_hash                0x10    # a glow piece (box, bar): u32 its effect hash (0x1006572b3); Learn & Play 0xc
+fxpiece_entity              0x18    # a glow piece: its entity (0x100654d53, 0x1006547a6); Learn & Play 0x10
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt      0x16c  # the frame tick 0x1000e0330 stores min((ms now - ms before) / 1000, 1/15) here (movss at 0x1000e0520); its getter is 0x1000dd0c0

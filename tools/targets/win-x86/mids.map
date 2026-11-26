@@ -188,6 +188,15 @@ seven_pd5_eval      none  the Mac's unrolled slide-distance function; Learn & Pl
 seven_native_psarc  0x01422da0  (uint32_t magic@eax, uint32_t stored@[ebp-0x70])  # PN1 the PSARC open function 0x1422d10: the byte-swapped header magic, at its `cmp eax, "PSAR"`; stored is where it was just kept ([ebp-0x70], copied into the table of contents buffer): a native package's "PSXR" becomes "PSAR" in both
 seven_native_json   0x01408a90  (void *cursor@[esp+0xc])  # JM1 the JSON parser's entry 0x1408a90 (cdecl: the output, 0, the address of the text pointer; the object and array parsers 0x13f810f, 0x1400f1f call it too): a text with native arrangements is rewritten, the text pointer moved to the new text
 seven_native_sng    0x010da186  (const void *body@[esp+0x24], uint32_t size@[esp+0x2c]) -> fail=0x010da5f9  # XI1 SNG_Song_Load 0x10d9f80 after its inflate checks (cmp [esp+0x6c], ecx; jne), before the first section's parser: the inflated body's memory stream (+0x10 buffer, +0x18 size, at [esp+0x14]); fail is the loader's own failure exit, the target of that jne
+# the fixes of rs7string 1.0.0-beta.4: the song camera, the fret range glow
+seven_cam             0x01114f6a  (void *guitar@esi, uint32_t z_a@[esp+0x18], uint32_t z_b@[esp+0x24], uint32_t z_c@[esp+0x30], uint32_t z_guitar@edx)  # SC1 Rnd_Guitar_SendCameraMarkers 0x1114ed0 (Steam 0x593A1A), before the guitar becomes its info: the four outgoing vectors' z (three on the stack, the guitar's offset z in edx) get the floor's shift
+seven_frg1            0x00f8dbdd  (void *fx@ebx, void *player@[ebp+0xc])  # FRG1 Rnd_FretRangeFx_Init 0xf8d950 (Steam 0x40DCCD), after its four GetFretWireEnd calls: the effect's wire ends move, its pieces are recorded for their scale
+seven_frg2_scale      0x00f8b9f3  (void *obj@ebx, uint32_t scale_bits@ecx)  # FRG2 the glow update 0xf8b7e0 (Steam 0x40BAE3), a bar placed: the start of the scale edit: ecx = the scale's float bits, 0 for no Entity_SetScale
+seven_frg2b_scale     0x00f8bb70  (void *obj@ebx, uint32_t scale_bits@ecx)  # FRG2B the same update (Steam 0x40BC60), a bar moved: the same
+seven_frg3_scale      0x00f8c4f7  (void *obj@edi, uint32_t scale_bits@ecx)  # FRG3 the glow box's update 0xf8c4a0 (Steam 0x40C5E7), the box first placed: the same
+seven_frg2_setscale   none  Learn & Play injects the scale call itself (seven_frg2_scale)
+seven_frg2b_setscale  none  Learn & Play injects the scale call itself (seven_frg2b_scale)
+seven_frg3_setscale   none  Learn & Play injects the scale call itself (seven_frg3_scale)
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

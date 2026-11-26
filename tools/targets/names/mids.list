@@ -163,6 +163,14 @@ seven_pd5_eval
 seven_native_psarc
 seven_native_json
 seven_native_sng
+seven_cam
+seven_frg1
+seven_frg2_scale
+seven_frg2b_scale
+seven_frg3_scale
+seven_frg2_setscale
+seven_frg2b_setscale
+seven_frg3_setscale
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

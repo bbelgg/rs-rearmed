@@ -419,6 +419,10 @@ sng_note_time
 sng_note_sustain
 headstock_seg_values
 guitar_string_size
+rangefx_end
+rangefx_pieces
+fxpiece_hash
+fxpiece_entity
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt           # ServiceManager holder: float, this frame's time in seconds

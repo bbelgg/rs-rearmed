@@ -532,3 +532,12 @@ menu_slider_yscale        # double: its other (90)
 # stock-game fixes (overrides/mods/mods_shared.c): the white loading screen's resend
 menu_movie_request      # (movie, const void *id): a menu movie's request to the asset locator; the id is a pointer to its two words (the Mac's form)
 menu_movie_request_reg  # (movie@eax, id_lo, id_hi): the same, the movie in a register and the id on the stack (Learn & Play's form)
+# wave3 alts: the scrollable "Other arrangements" list (overrides/mods/mods_shared.c)
+json_find_ecx           # (object; the name in eax, set in the thread's context first): json_find in Learn & Play's form
+json_object_remove      # (object, &key): removes a member (a JSON object's), true when it was there
+json_object_merge       # (target, source, replace): merges a node's members into another's, recursively
+las_build               # (page): the Learn a Song page's builder (the page vtable's +0xb0 on Learn & Play)
+las_page_vtable         # the Learn a Song page's vtable: a page is that one when its first word is its address
+menu_focus_up           # (page, steps): a menu's focus step up, by that many buttons, stopping at the first
+menu_focus_down         # (page, steps): the same, down
+arr_record_dtor         # (record): an arrangement record's destructor (a menu page keeps a vector of them)

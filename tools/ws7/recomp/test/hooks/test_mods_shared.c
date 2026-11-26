@@ -2,6 +2,7 @@
 // runtimes (Makefile): the same object, built as a mod is, beside a 64-bit runtime with the Mac's kind of tables
 // and a 32-bit one with Learn & Play's. The tables below are what targets.py generates in a real build, with
 // values of the test's own.
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -29,16 +30,22 @@ const char rc_target_id[] = "test";
 // --- the target's tables: the hook points of the fixes, each game's own convention and field offsets, and what
 // the fixes call and read in the game by name: its functions at ADDR, its data at DATA
 enum { INTRO, OWNED, BIND, FRAME, NPOINTS, MODE = 8, PROFILE, MANAGER, BYNAME, DESTROY, FSEXISTS = 14, MIDS = 16,
-       REQUEST = 24 };
+       REQUEST = 24, G_FIND = 32, G_REMOVE, G_MERGE, G_SET, G_KEY, G_BUILD, G_FUP, G_FDOWN, G_DTOR, G_ADDREF, G_RELEASE };
 #define ADDR(k) (0x401000u + 0x100u * (k))
 #define DATA 0x402000u
-enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0, D_SIZE = 0x100 };
+enum { D_BINDING = 0x10, D_KEY_DIRECT = 0x40, D_KEY_MIC = 0x50, D_TEXT_DIRECT = 0x80, D_TEXT_MIC = 0xa0,
+       D_LAS_VTABLE = 0xc0, D_OTHER_VTABLE = 0xd0, D_NODE_VTABLE = 0xe0, D_SIZE = 0x100 };
 #ifdef RC_GUEST32
 const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x10}, {"boot_intro_playing", 0x2d},
                                              {"boot_intro_state", 0x60}, {"boot_phase", 0x48},
                                              {"boot_phase3_steps", 10}, {"boot_step", 0x28}, {"efd_str_inline", 0x14},
                                              {"efd_str_size", 0x10}, {"file_index_name", -0x38}, {"fs_exists_slot", 6},
-                                             {"input_slot", 0xc}, {"menu_movie_uri", 0x8c}, {0, 0}};
+                                             {"input_slot", 0xc}, {"menu_movie_uri", 0x8c}, {"json_node_add_ref_slot", 0},
+                                             {"json_node_release_slot", 1}, {"menu_page_root", 0x1a0},
+                                             {"menu_page_node", 0x1c4}, {"menu_page_focus", 0x1fc},
+                                             {"menu_page_focus_lists", 0x214}, {"las_page_records", 0x388},
+                                             {"las_page_records2", 0x394}, {"las_page_selected", 0x3a0},
+                                             {"las_page_slot_counter", 0x3a4}, {"arr_record_size", 0xfc}, {0, 0}};
 // stdcall bool(void *boot), thiscall bool(void *steam, int app), and custom void(int input@eax, int force=0)
 const rc_hook_name rc_target_hooks[] = {
     {"boot_intro_update", ADDR(INTRO), 1, 0, RC_CC_STDCALL, 'b', 4, 1, {{'p', 0}}},
@@ -57,7 +64,12 @@ const rc_target_value rc_target_offsets[] = {{"asset_load_name", 0x18}, {"boot_i
                                              {"boot_intro_state", 0x78}, {"boot_phase", 0x58},
                                              {"boot_phase3_steps", 12}, {"boot_step", 0x34}, {"efd_str_inline", 0x18},
                                              {"efd_str_size", 0x10}, {"file_index_name", -0x498}, {"fs_exists_slot", 7},
-                                             {"input_slot", 0x14}, {"menu_movie_uri", 0xe0}, {0, 0}};
+                                             {"input_slot", 0x14}, {"menu_movie_uri", 0xe0}, {"json_node_add_ref_slot", 0},
+                                             {"json_node_release_slot", 1}, {"menu_page_root", 0x250},
+                                             {"menu_page_node", 0x290}, {"menu_page_focus", 0x2e8},
+                                             {"menu_page_focus_lists", 0x308}, {"las_page_records", 0x500},
+                                             {"las_page_records2", 0x518}, {"las_page_selected", 0x530},
+                                             {"las_page_slot_counter", 0x534}, {"arr_record_size", 0x180}, {0, 0}};
 const rc_hook_name rc_target_hooks[] = {{"boot_intro_update", ADDR(INTRO), ADDR(INTRO)},
                                         {"steam_dlc_owned", ADDR(OWNED), ADDR(OWNED)},
                                         {"input_bind", ADDR(BIND), ADDR(BIND)},
@@ -72,9 +84,17 @@ const rc_target_value rc_target_symbols[] = {
     {"input_profile_string", ADDR(PROFILE), CC(CDECL)},
 #ifdef RC_GUEST32
     {"menu_movie_request_reg", ADDR(REQUEST), RC_CC_CUSTOM},  // the movie in eax, the id on the stack, `ret 8`
+    {"json_find_ecx", ADDR(G_FIND), RC_CC_THISCALL},          // (node), the name in eax
+    {"json_key_intern", ADDR(G_KEY), RC_CC_THISCALL},         // (text, &out)
 #else
     {"menu_movie_request", ADDR(REQUEST), RC_CC_SYSV},  // (movie, a pointer to the id's words)
+    {"json_find", ADDR(G_FIND), RC_CC_SYSV},
+    {"json_key_make", ADDR(G_KEY), RC_CC_SYSV},         // (&out, text)
 #endif
+    {"json_object_remove", ADDR(G_REMOVE), CC(STDCALL)}, {"json_object_merge", ADDR(G_MERGE), CC(THISCALL)},
+    {"json_object_set", ADDR(G_SET), CC(STDCALL)},       {"las_build", ADDR(G_BUILD), CC(THISCALL)},
+    {"las_page_vtable", DATA + D_LAS_VTABLE, -1},        {"menu_focus_up", ADDR(G_FUP), CC(THISCALL)},
+    {"menu_focus_down", ADDR(G_FDOWN), CC(THISCALL)},    {"arr_record_dtor", ADDR(G_DTOR), CC(THISCALL)},
     {0, 0, 0}};
 const uint64_t rc_hook_points[] = {ADDR(INTRO), ADDR(OWNED), ADDR(BIND), ADDR(FRAME), 0};
 const int rc_hook_npoints = NPOINTS;
@@ -83,7 +103,8 @@ const int rc_hook_npoints = NPOINTS;
 // Learn & Play an argument above the frame pointer too, and at the file question the path and the answer in one
 // register, the game's call not yet made.
 #define SKIP_LOCAL (-0x1d)
-enum { M_SKIP, M_REQUEST, M_RESPONSE, M_MOUNT, M_EXISTS, M_ASKED, M_LOCATE, M_LOCATED, M_INDEXED, M_ALT };
+enum { M_SKIP, M_REQUEST, M_RESPONSE, M_MOUNT, M_EXISTS, M_ASKED, M_LOCATE, M_LOCATED, M_INDEXED, M_ALT, M_LABEL, M_ROOT,
+       M_OPEN, M_FUP, M_FDOWN };
 #ifdef RC_GUEST32
 const rc_mid_name rc_target_mids[] = {
     {"tuner_skip_offer", ADDR(DESTROY + 1), 0, 1, {{"offer", 'b', RC_MID_MEM | 5, SKIP_LOCAL}}, 0, {0}, 0},
@@ -98,7 +119,13 @@ const rc_mid_name rc_target_mids[] = {
     {"menu_locate", ADDR(MIDS + 5), 0, 0, {{0}}, 0, {0}, 0},
     {"menu_located", ADDR(MIDS + 6), 0, 1, {{"accepted", 'b', 0, 0}}, 0, {0}, 0},
     {"file_indexed", ADDR(MIDS + 7), 0, 1, {{"frame", 'p', 5, 0}}, 0, {0}, 0},
-    {"las_alt_slot", ADDR(MIDS + 8), 0, 1, {{"filled", 'i', RC_MID_MEM | 4, 0x6c}}, 1, {"latch"}, 0},
+    {"las_alt_slot", ADDR(MIDS + 8), 0, 3,
+     {{"filled", 'i', RC_MID_MEM | 4, 0x6c}, {"page", 'p', 3, 0}, {"record", 'i', RC_MID_MEM | 4, 0x44}}, 1, {"latch"}, 0},
+    {"las_alt_label", ADDR(MIDS + 9), 0, 1, {{"text", 'p', 7, 0}}, 0, {0}, 0},
+    {"las_alt_root", ADDR(MIDS + 10), 0, 1, {{"page", 'p', 3, 0}}, 0, {0}, 0},
+    {"las_alt_page", ADDR(MIDS + 11), 0, 1, {{"page", 'p', 7, 0}}, 0, {0}, 0},
+    {"menu_focus_step_up", ADDR(MIDS + 12), 0, 2, {{"page", 'p', 7, 0}, {"steps", 'i', RC_MID_MEM | 5, 8}}, 0, {0}, 0},
+    {"menu_focus_step_down", ADDR(MIDS + 13), 0, 2, {{"page", 'p', 7, 0}, {"steps", 'i', RC_MID_MEM | 5, 8}}, 0, {0}, 0},
     {0}};
 #else
 const rc_mid_name rc_target_mids[] = {
@@ -113,7 +140,13 @@ const rc_mid_name rc_target_mids[] = {
     {"menu_locate", ADDR(MIDS + 5), 0, 0, {{0}}, 0, {0}, 0},
     {"menu_located", ADDR(MIDS + 6), 0, 1, {{"accepted", 'b', 0, 0}}, 0, {0}, 0},
     {"file_indexed", ADDR(MIDS + 7), 0, 1, {{"frame", 'p', 5, 0}}, 0, {0}, 0},
-    {"las_alt_slot", ADDR(MIDS + 8), 0, 1, {{"filled", 'i', RC_MID_MEM | 5, -0x348}}, 1, {"latch"}, 0},
+    {"las_alt_slot", ADDR(MIDS + 8), 0, 3,
+     {{"filled", 'i', RC_MID_MEM | 5, -0x348}, {"page", 'p', 12, 0}, {"record", 'q', 13, 0}}, 1, {"latch"}, 0},
+    {"las_alt_label", ADDR(MIDS + 9), 0, 1, {{"text", 'p', 1, 0}}, 0, {0}, 0},
+    {"las_alt_root", ADDR(MIDS + 10), 0, 1, {{"page", 'p', 15, 0}}, 0, {0}, 0},
+    {"las_alt_page", ADDR(MIDS + 11), 0, 1, {{"page", 'p', 13, 0}}, 0, {0}, 0},
+    {"menu_focus_step_up", ADDR(MIDS + 12), 0, 2, {{"page", 'p', 3, 0}, {"steps", 'i', 12, 0}}, 0, {0}, 0},
+    {"menu_focus_step_down", ADDR(MIDS + 13), 0, 2, {{"page", 'p', 13, 0}, {"steps", 'i', 12, 0}}, 0, {0}, 0},
     {0}};
 #endif
 #define OFF(name) ((uint32_t)rc_off(name))
@@ -273,6 +306,17 @@ static uint32_t game_fs_exists(uint8_t *fs, const char *path) {
   return 0;
 }
 
+// The scrolling Learn a Song page's game (alt_scroll below): what its functions do, whatever the convention
+static void *g_find(uint8_t *node, const char *name);
+static int g_remove(uint8_t *node, uint8_t *key);
+static void g_merge(uint8_t *target, uint8_t *source, uint32_t replace);
+static void g_set(uint8_t *node, uint8_t *key, uint8_t *value);
+static void g_key(const char *text, uint8_t *out);
+static void g_build(uint8_t *page);
+static void g_focus(uint8_t *page, int steps, int down);
+static void g_dtor(uint8_t *record);
+static void g_ref(uint8_t *node, int add);
+
 // --- what the runtimes need of an image: the game's functions above, by each one's convention
 #ifdef RC_GUEST32
 static uint32_t rd(uint32_t g) { uint32_t v; memcpy(&v, RC32_H(g), 4); return v; }
@@ -310,7 +354,41 @@ static void f_request(rc_ctx *c) {  // custom: the movie in eax, the id's words 
   game_request(as_host(movie), arg32(c, 0), arg32(c, 1));
   ret32(c, 0, 8);
 }
+// the scroll game's functions (g_* below): thiscall ones have their object in ecx, stdcall ones everything on the stack
+static void f_find(rc_ctx *c) {  // thiscall (node), the name in eax
+  ret32(c, (uint32_t)as_game(g_find(as_host((uint32_t)c->r[1]), as_host((uint32_t)c->r[0]))), 0);
+}
+static void f_remove(rc_ctx *c) { ret32(c, g_remove(as_host(arg32(c, 0)), as_host(arg32(c, 1))), 8); }
+static void f_merge(rc_ctx *c) {  // thiscall (target), source, replace
+  g_merge(as_host((uint32_t)c->r[1]), as_host(arg32(c, 0)), arg32(c, 1));
+  ret32(c, 0, 8);
+}
+static void f_set(rc_ctx *c) {
+  g_set(as_host(arg32(c, 0)), as_host(arg32(c, 1)), as_host(arg32(c, 2)));
+  ret32(c, 0, 12);
+}
+static void f_key(rc_ctx *c) {  // thiscall (text), &out
+  g_key(as_host((uint32_t)c->r[1]), as_host(arg32(c, 0)));
+  ret32(c, 0, 4);
+}
+static void f_build(rc_ctx *c) { g_build(as_host((uint32_t)c->r[1])); ret32(c, 0, 0); }
+static void f_fup(rc_ctx *c) { g_focus(as_host((uint32_t)c->r[1]), (int)arg32(c, 0), 0); ret32(c, 0, 4); }
+static void f_fdown(rc_ctx *c) { g_focus(as_host((uint32_t)c->r[1]), (int)arg32(c, 0), 1); ret32(c, 0, 4); }
+static void f_dtor(rc_ctx *c) { g_dtor(as_host((uint32_t)c->r[1])); ret32(c, 0, 0); }
+static void f_addref(rc_ctx *c) { g_ref(as_host((uint32_t)c->r[1]), 1); ret32(c, 0, 0); }
+static void f_release(rc_ctx *c) { g_ref(as_host((uint32_t)c->r[1]), 0); ret32(c, 0, 0); }
 rc_fn rc32_lookup(uint32_t g) {
+  if (g == ADDR(G_FIND)) return f_find;
+  if (g == ADDR(G_REMOVE)) return f_remove;
+  if (g == ADDR(G_MERGE)) return f_merge;
+  if (g == ADDR(G_SET)) return f_set;
+  if (g == ADDR(G_KEY)) return f_key;
+  if (g == ADDR(G_BUILD)) return f_build;
+  if (g == ADDR(G_FUP)) return f_fup;
+  if (g == ADDR(G_FDOWN)) return f_fdown;
+  if (g == ADDR(G_DTOR)) return f_dtor;
+  if (g == ADDR(G_ADDREF)) return f_addref;
+  if (g == ADDR(G_RELEASE)) return f_release;
   return g == ADDR(MODE) ? f_mode : g == ADDR(PROFILE) ? f_profile : g == ADDR(MANAGER) ? f_manager
        : g == ADDR(BYNAME) ? f_by_name : g == ADDR(DESTROY) ? f_destroy : g == ADDR(FSEXISTS) ? f_fs_exists
        : g == ADDR(REQUEST) ? f_request : 0;
@@ -346,11 +424,24 @@ uint64_t rc_call_guest(uint64_t fn, const uint64_t *ints, int nint, const uint64
       game_request(as_host(ints[0]), id[0], id[1]);
       return 0;
     }
+    case ADDR(G_FIND): return as_game(g_find(as_host(ints[0]), as_host(ints[1])));
+    case ADDR(G_REMOVE): return (uint64_t)g_remove(as_host(ints[0]), as_host(ints[1]));
+    case ADDR(G_MERGE): g_merge(as_host(ints[0]), as_host(ints[1]), (uint32_t)ints[2]); return 0;
+    case ADDR(G_SET): g_set(as_host(ints[0]), as_host(ints[1]), as_host(ints[2])); return 0;
+    case ADDR(G_KEY): g_key(as_host(ints[1]), as_host(ints[0])); return 0;
+    case ADDR(G_BUILD): g_build(as_host(ints[0])); return 0;
+    case ADDR(G_FUP): g_focus(as_host(ints[0]), (int)ints[1], 0); return 0;
+    case ADDR(G_FDOWN): g_focus(as_host(ints[0]), (int)ints[1], 1); return 0;
+    case ADDR(G_DTOR): g_dtor(as_host(ints[0])); return 0;
   }
   return 0;
 }
 // OV_VCALL, the Mac app's (overrides/src/rc_ov.c): the one virtual call the fixes here make
 uint64_t ov_vcall_n(uint64_t obj, int slot, const uint64_t *args, int nargs) {
+  if (slot == (int)rc_off("json_node_add_ref_slot") || slot == (int)rc_off("json_node_release_slot")) {
+    g_ref(as_host(obj), slot == (int)rc_off("json_node_add_ref_slot"));
+    return 0;
+  }
   CHECK_EQ((uint64_t)slot, (uint64_t)rc_off("fs_exists_slot"));
   CHECK_EQ(nargs, 2);
   CHECK_EQ(args[0], obj);
@@ -438,7 +529,7 @@ static void start(void) {
   CHECK_EQ(logged_lines("[rs-mods] frame rate: on, 0 of 8 points"), 1);
   CHECK_EQ(logged_lines("[rs-mods] Guitarcade Skip Tuner: on"), 1);
   CHECK_EQ(logged_lines("[rs-mods] menu movie request again: on"), 1);
-  CHECK_EQ(logged_lines("[rs-mods] Learn a Song alternate arrangements: on"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song alternate arrangements: on, scrolling"), 1);
   CHECK_EQ(logged_lines("[rs-mods] no intro hook point") + logged_lines("[rs-mods] no DLC ownership hook point") +
            logged_lines("[rs-mods] no hook point for Player 2's saved input"), 0);
   CHECK(!strstr(logged, "no points for"));  // the batched mounting's four mid points
@@ -1533,41 +1624,349 @@ static void menu_retry(void) {
   rs_mods_reload_config();
 }
 
-// Learn a Song with more than five arrangements: the builder, at each alternate, has the slots it has filled in a
-// local. The movie has four: from the fifth the hook goes to the loop's end, and the first four are the game's.
-static void alt_slots(void) {
+// Learn a Song with more than five arrangements: the page, the nodes of its movie definition and the game's functions
+// that build and move them, as far as the scroll uses them. The builder runs the mid points as the game's does, over
+// the song's records; a focus step runs its own (the menu class's) and moves the focus by the steps it is left with.
+#define NNODES 96
+typedef struct {
+  uint8_t *o, *parent;
+  char name[40];
+  int attached, refs;
+} node_t;
+static node_t nodes[NNODES];
+static int nnodes;
+static char ops[4096];
+static char key_names[16][48];
+static int nkeys, song_n, song_sel, focus_pos, built_slots, builds;
+static char labels[8][64];
+
+static void op(const char *fmt, ...) {
+  va_list ap;
+  size_t n = strlen(ops);
+  va_start(ap, fmt);
+  vsnprintf(ops + n, sizeof ops - n, fmt, ap);
+  va_end(ap);
+  strcat(ops, " ");
+}
+static void put_word(uint8_t *at, uint64_t w) { memcpy(at, &w, (size_t)rc_guest_ptr_size); }
+static uint64_t get_word(const uint8_t *at) {
+  uint64_t w = 0;
+  memcpy(&w, at, (size_t)rc_guest_ptr_size);
+  return w;
+}
+static node_t *node_new(uint8_t *parent, const char *name) {
+  CHECK(nnodes < NNODES);
+  node_t *n = &nodes[nnodes++];
+  n->o = game_alloc(16);
+  put_ptr(n->o, data + D_NODE_VTABLE);
+  n->parent = parent;
+  snprintf(n->name, sizeof n->name, "%s", name);
+  n->attached = parent != NULL;
+  n->refs = 1;
+  return n;
+}
+static node_t *node_of(const uint8_t *o) {
+  for (int k = 0; k < nnodes; k++)
+    if (nodes[k].o == o) return &nodes[k];
+  return NULL;
+}
+static node_t *child_of(const uint8_t *node, const char *name) {
+  for (int k = 0; k < nnodes; k++)
+    if (nodes[k].attached && nodes[k].parent == node && !strcmp(nodes[k].name, name)) return &nodes[k];
+  return NULL;
+}
+static const char *key_name(const uint8_t *key) {
+  uint64_t id = get_word(key);
+  CHECK(id && id <= (uint64_t)nkeys);
+  return key_names[id - 1];
+}
+// The text of a game string (in place, or behind a pointer at its start)
+static void gs_text(const uint8_t *str, char *out) {
+  const uint8_t *end = str + rc_off("efd_str_size"), *inl = str + rc_off("efd_str_inline");
+  strcpy(out, get_ptr(inl) == end ? (const char *)str : (const char *)get_ptr(str));
+}
+
+static void *g_find(uint8_t *node, const char *name) {
+  node_t *n = child_of(node, name);
+  return n ? n->o : NULL;
+}
+static int g_remove(uint8_t *node, uint8_t *key) {
+  const char *name = key_name(key);
+  node_t *n = child_of(node, name);
+  op("remove:%s", name);
+  if (n) n->attached = 0;
+  return n != NULL;
+}
+static void g_set(uint8_t *node, uint8_t *key, uint8_t *value) {
+  node_t *n = node_of(get_ptr(value));
+  CHECK(n && !n->attached);  // a node is given to one parent
+  op("set:%s", key_name(key));
+  n->parent = node;
+  snprintf(n->name, sizeof n->name, "%s", key_name(key));
+  n->attached = 1;
+}
+static void g_key(const char *text, uint8_t *out) {
+  CHECK(text && out && nkeys < 16);
+  snprintf(key_names[nkeys++], sizeof key_names[0], "%s", text);
+  put_word(out, (uint64_t)nkeys);
+}
+static uint8_t *merge_target;
+static void g_merge(uint8_t *target, uint8_t *source, uint32_t replace) {
+  CHECK(target && source && target != source && replace == 1);
+  merge_target = target;
+  op("merge");
+}
+static void g_ref(uint8_t *node, int add) {
+  node_t *n = node_of(node);
+  CHECK(n);
+  n->refs += add ? 1 : -1;
+  op(add ? "ref+" : "ref-");
+}
+static void g_dtor(uint8_t *record) {
+  CHECK(record);
+  op("dtor");
+}
+
+// the points the way the game reaches them: registers and locals as the tables of this test have them
+static int run_mid(int point) {
+  uint32_t fl = 0;
+  return rc_mid_call(point, ctx, &fl);
+}
+static int mid_alts(uint8_t *page, uint32_t filled, uint32_t record_offset) {
+#ifdef RC_GUEST32
+  ctx->r[3] = as_game(page);
+  ctx->r[4] = esp0 - 1024;
+  wr((uint32_t)ctx->r[4] + 0x6c, filled);
+  wr((uint32_t)ctx->r[4] + 0x44, record_offset);
+#else
+  ctx->r[12] = as_game(page);
+  ctx->r[13] = record_offset;
+  ctx->r[5] = as_game(MID_FRAME);
+  memcpy(MID_FRAME - 0x348, &filled, 4);
+#endif
+  return run_mid(M_ALT);
+}
+static void mid_page(int point, uint8_t *page) {  // the points that have the page in one register
+#ifdef RC_GUEST32
+  ctx->r[point == M_ROOT ? 3 : 7] = as_game(page);
+#else
+  ctx->r[point == M_ROOT ? 15 : 13] = as_game(page);
+#endif
+  CHECK_EQ(run_mid(point), 0);
+}
+
+static void set_records(uint8_t *vec, uint32_t n) {
+  uint8_t *buf = game_alloc(n * OFF("arr_record_size") + 1);
+  put_ptr(vec, buf);
+  put_ptr(vec + rc_guest_ptr_size, buf + n * OFF("arr_record_size"));
+}
+static uint32_t records_of(const uint8_t *vec) {
+  return (uint32_t)((get_word(vec + rc_guest_ptr_size) - get_word(vec)) / OFF("arr_record_size"));
+}
+static void show_focus(uint8_t *page) {
+  char text[64];
+  snprintf(text, sizeof text, "Buttons.altArrangementsP1_slot%d.States", focus_pos + 1);
+  put_string(page + OFF("menu_page_focus"), text);
+}
+
+// The page's builder: a new root and page node with the recommendation buttons (without their States), the root's
+// point, then each record but the selected one through the loop's point; a slot for each that goes on, its Label
+static void g_build(uint8_t *page) {
+  uint64_t sv[16];
+  memcpy(sv, ctx->r, sizeof sv);
+  op("build");
+  builds++;
+  node_t *root = node_new(NULL, "root"), *pn = node_new(root->o, "page");
+  put_ptr(page + OFF("menu_page_root"), root->o);
+  put_ptr(page + OFF("menu_page_node"), pn->o);
+  for (int k = 1; k <= 3; k++) {
+    char name[32];
+    snprintf(name, sizeof name, "playnext_slot%d", k);
+    node_new(pn->o, name);
+  }
+  mid_page(M_ROOT, page);
+  if (!records_of(page + OFF("las_page_records"))) set_records(page + OFF("las_page_records"), (uint32_t)song_n);
+  uint32_t selected = (uint32_t)song_sel;
+  memcpy(page + OFF("las_page_selected"), &selected, 4);
+  built_slots = 0;
+  memset(labels, 0, sizeof labels);
+  for (uint32_t i = 0; i < (uint32_t)song_n; i++) {
+    if (i == selected) continue;
+    if (mid_alts(page, (uint32_t)built_slots, i * OFF("arr_record_size"))) continue;  // to the loop's latch
+    uint8_t *str = game_alloc(0x20);
+    char name[16];
+    snprintf(name, sizeof name, "Arr%u", i);
+    put_string(str, name);
+#ifdef RC_GUEST32
+    ctx->r[7] = as_game(str);
+#else
+    ctx->r[1] = as_game(str);
+#endif
+    CHECK_EQ(run_mid(M_LABEL), 0);
+#ifdef RC_GUEST32
+    gs_text(as_host((uint32_t)ctx->r[7]), labels[built_slots]);
+#else
+    gs_text(as_host(ctx->r[1]), labels[built_slots]);
+#endif
+    snprintf(name, sizeof name, "altArrangementsP1_slot%d", built_slots + 1);
+    node_new(pn->o, name);
+    built_slots++;
+  }
+  memcpy(ctx->r, sv, sizeof sv);
+}
+
+// The menu class's focus step: its point first, with the page and the steps; the focus moves by the steps it is left with
+static void g_focus(uint8_t *page, int steps, int down) {
+  uint64_t sv[16];
+  memcpy(sv, ctx->r, sizeof sv);
+  op(down ? "down" : "up");
+#ifdef RC_GUEST32
+  int saved;
+  memcpy(&saved, MID_FRAME + 8, 4);
+  ctx->r[7] = as_game(page);
+  ctx->r[5] = as_game(MID_FRAME);
+  memcpy(MID_FRAME + 8, &steps, 4);
+  CHECK_EQ(run_mid(down ? M_FDOWN : M_FUP), 0);
+  memcpy(&steps, MID_FRAME + 8, 4);
+  memcpy(MID_FRAME + 8, &saved, 4);
+#else
+  ctx->r[down ? 13 : 3] = as_game(page);
+  ctx->r[12] = (uint64_t)(uint32_t)steps;
+  CHECK_EQ(run_mid(down ? M_FDOWN : M_FUP), 0);
+  steps = (int)(uint32_t)ctx->r[12];
+#endif
+  memcpy(ctx->r, sv, sizeof sv);
+  focus_pos += down ? steps : -steps;
+  focus_pos = focus_pos < 0 ? 0 : focus_pos > built_slots - 1 ? built_slots - 1 : focus_pos;
+  show_focus(page);
+}
+
+// The page as the game opens it: a page update (its point), the builder, the States nodes of the recommendations
+static uint8_t *open_page(int records, int selected, uint8_t *vtable) {
+  uint8_t *page = game_alloc(0x800);
+  put_ptr(page, vtable);
+  song_n = records, song_sel = selected;
+  mid_page(M_OPEN, page);
+  g_build(page);
+  node_t *pn = node_of(get_ptr(page + OFF("menu_page_node")));
+  for (int k = 1; k <= 3; k++) {
+    char name[32];
+    snprintf(name, sizeof name, "playnext_slot%d", k);
+    node_new(child_of(pn->o, name)->o, "States");
+  }
+  focus_pos = 0;
+  show_focus(page);
+  return page;
+}
+static void check_labels(const char *a, const char *b, const char *c, const char *d) {
+  if (strcmp(labels[0], a) || strcmp(labels[1], b) || strcmp(labels[2], c) || strcmp(labels[3], d))
+    log_end(), fprintf(stderr, "labels [%s] [%s] [%s] [%s], not [%s] [%s] [%s] [%s]\n", labels[0], labels[1], labels[2], labels[3], a,
+            b, c, d);
+  CHECK(!strcmp(labels[0], a) && !strcmp(labels[1], b) && !strcmp(labels[2], c) && !strcmp(labels[3], d));
+}
+// The window moves: Down on the last shown alternate scrolls, the entries are rebuilt with " (-N)" / " (+N)" on the
+// first / last, and the focus ends where it was; the rest is the game's step.
+static void alt_scroll(void) {
   no_switches();
   setenv("RS_MODS_LOG", "1", 1);
   rs_mods_reload_config();
-  uint32_t fl = 0x40;
+  if (!mid_frame) mid_frame = game_alloc(0x800);
+  const uint32_t fl = 0x40;
+  (void)fl;
   log_start();
-  for (uint32_t filled = 0; filled < 12; filled++) {
-    set_frame();
-#ifdef RC_GUEST32
-    ctx->r[4] = esp0 - 1024;
-    memcpy(RC32_H((uint32_t)ctx->r[4] + 0x6c), &filled, 4);
-#else
-    memcpy(MID_FRAME - 0x348, &filled, 4);
-#endif
-    int go = rc_mid_call(M_ALT, ctx, &fl);
-    CHECK_EQ(go, filled < 4 ? 0 : 1);  // the one continuation, the loop's latch
-    CHECK_EQ(fl, 0x40);
-  }
+  uint8_t *a = open_page(8, 0, data + D_LAS_VTABLE);  // seven alternates, four of them shown
+  CHECK_EQ(built_slots, 4);
+  check_labels("Arr1", "Arr2", "Arr3", "Arr4 (+3)");
+  CHECK_EQ(records_of(a + OFF("las_page_records")), 8);
+
+  // Down on slot 4: scrolls one, the focus returns to slot 4 through one step up and one down
+  focus_pos = 3;
+  show_focus(a);
+  ops[0] = 0;
+  builds = 0;
+  g_focus(a, 1, 1);
+  CHECK_EQ(builds, 1);
+  CHECK_EQ(focus_pos, 3);
+  check_labels("Arr2 (-1) ", "Arr3 ", "Arr4 ", "Arr5 (+2) ");
+  CHECK(!strcmp(ops, "down dtor dtor dtor dtor dtor dtor dtor dtor remove:altArrangementsP1_slot1 "
+                     "remove:altArrangementsP1_slot2 remove:altArrangementsP1_slot3 remove:altArrangementsP1_slot4 "
+                     "ref+ remove:States ref+ remove:States ref+ remove:States ref+ build merge ref- set:States ref- "
+                     "set:States ref- set:States ref- up down "));
+  CHECK(merge_target == get_ptr(a + OFF("menu_page_root")));
+  CHECK(child_of(get_ptr(a + OFF("menu_page_node")), "playnext_slot2") &&
+        child_of(child_of(get_ptr(a + OFF("menu_page_node")), "playnext_slot2")->o, "States"));  // given to the new buttons
+  CHECK_EQ(records_of(a + OFF("las_page_records")), 8);
+  // down twice more reaches the end (seven alternates: the window starts at 3 at most); then the step is the game's
+  focus_pos = 3;
+  show_focus(a);
+  g_focus(a, 1, 1);
+  check_labels("Arr3 (-2) ", "Arr4 ", "Arr5 ", "Arr6 (+1) ");
+  g_focus(a, 1, 1);
+  check_labels("Arr4 (-3) ", "Arr5 ", "Arr6 ", "Arr7 ");
+  CHECK_EQ(focus_pos, 3);
+  builds = 0;
+  g_focus(a, 1, 1);  // no more alternates below: the game's step, which stops at the end
+  CHECK_EQ(builds, 0);
+  CHECK_EQ(focus_pos, 3);
+  // Up on slot 3 is the game's step; on slot 1 it scrolls back, and the focus is slot 1 again
+  g_focus(a, 1, 0);
+  CHECK_EQ(builds, 0);
+  CHECK_EQ(focus_pos, 2);
+  focus_pos = 0;
+  show_focus(a);
+  ops[0] = 0;
+  g_focus(a, 1, 0);
+  CHECK_EQ(builds, 1);
+  CHECK_EQ(focus_pos, 0);
+  check_labels("Arr3 (-2) ", "Arr4 ", "Arr5 ", "Arr6 (+1) ");
+  CHECK(strstr(ops, "build merge") && !strncmp(ops, "up ", 3) && !strcmp(ops + strlen(ops) - strlen("up down up "), "up down up "));
+
+  // a page opened anew starts at the top: the update's point, with records already there, builds it again
+  uint8_t *d = game_alloc(0x800);
+  put_ptr(d, data + D_LAS_VTABLE);
+  song_n = 8, song_sel = 0;
+  g_build(d);
+  check_labels("Arr3 (-2)", "Arr4", "Arr5", "Arr6 (+1)");  // the window is where the last page left it
+  builds = 0;
+  mid_page(M_OPEN, d);
+  CHECK_EQ(builds, 1);
+  check_labels("Arr1 ", "Arr2 ", "Arr3 ", "Arr4 (+3) ");
+  builds = 0;
+  mid_page(M_OPEN, d);  // the same page, updated again at once: nothing
+  CHECK_EQ(builds, 0);
+
+  // five arrangements or fewer: nothing to scroll; the focus steps are the game's, whatever slot they are on
+  uint8_t *e = open_page(5, 2, data + D_LAS_VTABLE);
+  CHECK_EQ(built_slots, 4);
+  check_labels("Arr0", "Arr1", "Arr3", "Arr4");
+  focus_pos = 3;
+  show_focus(e);
+  builds = 0;
+  g_focus(e, 1, 1);
+  CHECK_EQ(builds, 0);
+  CHECK_EQ(focus_pos, 3);
+  // another page class is not ours
+  uint8_t *o = open_page(8, 0, data + D_OTHER_VTABLE);
+  focus_pos = 3;
+  show_focus(o);
+  builds = 0;
+  g_focus(o, 1, 1);
+  CHECK_EQ(builds, 0);
   log_stop();
-  CHECK_EQ(logged_lines("[rs-mods] Learn a Song: a song with more than five arrangements shows the first four "
-                        "alternates"), 1);  // said once
-  setenv("RS_MODS_ARRANGEMENTS", "0", 1);  // the original
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song: a song with more than five arrangements shows four alternates at a "
+                        "time; the arrow keys and the mouse wheel scroll the rest"), 1);  // said once
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song: Down, window 0 -> 1 of 7 alternates"), 1);
+  CHECK_EQ(logged_lines("[rs-mods] Learn a Song: Down, window 3 -> 3 of 7 alternates"), 1);
+
+  // RS_MODS_ARRANGEMENTS=0 is the original: the builder takes every alternate it is given, the page nothing
+  setenv("RS_MODS_ARRANGEMENTS", "0", 1);
   rs_mods_reload_config();
-  for (uint32_t filled = 3; filled < 7; filled++) {
-    set_frame();
-#ifdef RC_GUEST32
-    ctx->r[4] = esp0 - 1024;
-    memcpy(RC32_H((uint32_t)ctx->r[4] + 0x6c), &filled, 4);
-#else
-    memcpy(MID_FRAME - 0x348, &filled, 4);
-#endif
-    CHECK_EQ(rc_mid_call(M_ALT, ctx, &fl), 0);
-  }
+  for (uint32_t filled = 0; filled < 7; filled++) CHECK_EQ(mid_alts(a, filled, OFF("arr_record_size")), 0);
+  focus_pos = 3;
+  show_focus(a);
+  builds = 0;
+  g_focus(a, 1, 1);
+  CHECK_EQ(builds, 0);
   no_switches();
   rs_mods_reload_config();
 }
@@ -1625,6 +2024,8 @@ int main(void) {
   strcpy((char *)data + D_TEXT_MIC, "MicKey");
   put_ptr(data + D_KEY_DIRECT, data + D_TEXT_DIRECT);
   put_ptr(data + D_KEY_MIC, data + D_TEXT_MIC);
+  put_ptr(data + D_NODE_VTABLE, as_host(ADDR(G_ADDREF)));  // the nodes' reference methods (the 32-bit runtime calls
+  put_ptr(data + D_NODE_VTABLE + rc_guest_ptr_size, as_host(ADDR(G_RELEASE)));  // these; the 64-bit test dispatches by slot)
   input_obj = game_alloc(64);
   manager_obj = game_alloc(16);
   text_heap = game_alloc(TEXT_HEAP);
@@ -1642,7 +2043,7 @@ int main(void) {
   saved_input();
   skip_tuner();
   menu_retry();
-  alt_slots();
+  alt_scroll();
   alt_window();
   manifests();
   mounting_edges();

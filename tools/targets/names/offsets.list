@@ -450,3 +450,13 @@ ui_slider_value           # RSSlider: float value
 # stock-game fixes (overrides/mods/mods_shared.c)
 menu_movie_uri          # a menu movie object: its "urn:application:x-shockwave-flash:NAME" string, a string of the game's
 file_index_name         # the local file index's writer: from its frame pointer (negative), the file's name and extension, a string of the game's
+# wave3 alts: the scrollable "Other arrangements" list (overrides/mods/mods_shared.c)
+menu_page_root          # the menu class: the view definition root a build fills, a pointer (a new one per build)
+menu_page_node          # the menu class: the page's node under the root, a pointer
+menu_page_focus         # the menu class: the focused button's id, a string of the game's
+menu_page_focus_lists   # the menu class: the focus lists, six pointers (keys: begin, end, capacity; ids: begin, end, capacity)
+las_page_records        # the Learn a Song page: its record vector (begin, end pointers; the second player's follows)
+las_page_records2       # the Learn a Song page: the second player's record vector
+las_page_selected       # the Learn a Song page: the selected record's index, 32 bits
+las_page_slot_counter   # the Learn a Song page: the count the builder raises for each slot, 32 bits
+arr_record_size         # an arrangement record's size

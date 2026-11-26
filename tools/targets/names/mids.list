@@ -214,3 +214,9 @@ menu_located          # the locator has answered: accepted or not
 file_indexed          # a file is in the local file index (or was already), its lock released: on the indexing threads
 # --- Stock-game fixes: Learn a Song with more than five arrangements
 las_alt_slot          # the Learn a Song page's builder, at an alternate arrangement: the slots filled so far, and where to skip it
+# wave3 alts: the scrollable "Other arrangements" list of Learn a Song (mods_shared.c)
+las_alt_label         # the alternate loop, before an entry's Label is set from the record's name (a game string): the first / last entry get " (-N)" / " (+N)"
+las_alt_root          # the page builder's start, after it took a new view definition root: a scroll rebuild merges the previous root into it
+las_alt_page          # the Learn a Song page's update, after its base update: the page is open (a page opened anew starts at the top of the alternates)
+menu_focus_step_up    # a menu's focus step up (arrow Up, the mouse wheel): the menu and the number of steps, which the page may take over
+menu_focus_step_down  # the same, down

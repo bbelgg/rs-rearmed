@@ -150,7 +150,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
   compared with the game on Windows.
 - **The white loading screen and Learn a Song's long songs** have fixes that have not been run in this game: the
   menu movie's request asked for again (`RS_MODS_MENU_RETRY`) and four alternate arrangements on the page
-  (`RS_MODS_ARRANGEMENTS`). The page's scrollable list for the others is not done ([the Mac plan](../mac/PLAN.md#open-issues)).
+  (`RS_MODS_ARRANGEMENTS`: four alternates at a time, the arrow keys and the wheel scrolling the rest; not Page Up and
+  Down, [the Mac plan](../mac/PLAN.md#open-issues)).
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address 0x0`), and a fault
   at guest address 0x168 before it. Neither has come back.
 - **A song ending a few seconds in**: with the machine heavily loaded by other builds, a song went back to its page

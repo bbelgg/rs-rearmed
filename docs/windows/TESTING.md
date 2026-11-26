@@ -329,8 +329,11 @@ test runs showed: wait for the `menu:` line, or look at a snapshot, rather than 
   played after a skip.
 - **The white loading screen** (`RS_MODS_MENU_RETRY`) and **Learn a Song with more than five arrangements**
   (`RS_MODS_ARRANGEMENTS`): the Mac edition's checks ([Mac testing](../mac/TESTING.md#unattended-runs)) with this game's
-  files; the same log lines. The retry's replay is the one place the games differ (the movie goes in `eax` here), so a
-  `menu load: ... accepted after 2 requests` line here is the check that the call works. Not run in the game.
+  files; the same log lines, and the scroll of the page's other arrangements (arrow Down on the last of four, Up on
+  the first; the mouse wheel). The retry's replay is the one place the games differ (the movie goes in `eax` here), so a
+  `menu load: ... accepted after 2 requests` line here is the check that the call works; the scroll's `eax` call is the
+  member lookup by name, `Learn a Song: Down, window 0 -> 1 of 7 alternates` and a redrawn page the check of that. Not
+  run in the game.
 - **Batched DLC mounting** (`RS_MODS_BUDGET_MS`): the Mac edition's lines and checks
   ([Mac testing](../mac/TESTING.md#unattended-runs)): `[rs-mods] DLC: N archives mounted in F frames, T s`, with
   `, their songs in the lists S s later` when the song manifests came after the last archive, and `DLC: A of the

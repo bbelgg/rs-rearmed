@@ -18,7 +18,8 @@ notes and empties this file. -->
   indexing is not seen). Before, the request was refused, nothing asked again, and the screen stayed white for good; it
   happened with a community fast-load `cache.psarc` on a busy machine. Both editions.
   `RS_MODS_MENU_RETRY=0` is the game's own behaviour. Not yet run in either game.
-- **Learn a Song doesn't crash on a song with more than five arrangements:** the page shows the first four of the
-  other arrangements. Before, the page asked its movie for a slot it hasn't and crashed when it drew. The others can't
-  be chosen on the page yet. Both editions. `RS_MODS_ARRANGEMENTS=0` is the game's own behaviour. Not yet run in
-  either game.
+- **Learn a Song doesn't crash on a song with more than five arrangements, and its other arrangements scroll:** the
+  page shows four of the other arrangements at a time, and the arrow keys and the mouse wheel scroll the rest (Down
+  on the last one shown, Up on the first), the first and last entry saying how many are out of sight, "(+3)". Before,
+  the page asked its movie for a slot it hasn't and crashed when it drew. Page Up and Page Down do not scroll. Both
+  editions. `RS_MODS_ARRANGEMENTS=0` is the game's own behaviour. Not yet run in either game.

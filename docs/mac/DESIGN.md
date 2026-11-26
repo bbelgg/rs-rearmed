@@ -369,8 +369,22 @@ What each does:
   the selected one, and the page's movie has four. A fifth alternate asks Scaleform for a slot it does not have, which
   leaves a display node with nothing behind it, and the renderer crashes on it when it draws the page. At each alternate
   the builder has the slots it has filled in a local; with four filled the hook goes on at the loop's end, as the
-  builder does for the selected arrangement, so the page shows the first four alternates and the rest are left out.
-  Songs with five or fewer arrangements are not touched.
+  builder does for the selected arrangement, so the page shows four alternates. Songs with five or fewer arrangements
+  are not touched. The rest are reached by scrolling, after RS Extended Range's list (`mods_shared.c`, the points
+  `las_alt_slot`, `las_alt_label`, `las_alt_root`, `las_alt_page`, `menu_focus_step_up` and `_down`; the game's
+  functions and the page's fields by name in `tools/targets`): the loop's point takes a window of four alternates from
+  a scroll position, the first and last entry's label gets `(-N)` / `(+N)` for the alternates out of sight, and the menu
+  class's focus steps (arrow keys and the mouse wheel) scroll the window when Down is on the last entry shown or Up on
+  the first, the step itself made no steps long. A scroll runs the page's builder again, the way the game runs it on
+  page entry: first the page's record vectors are emptied and the four slots removed (the movie redraws an entry only
+  when its node is new), the recommendation buttons' `States` nodes taken out of the old buttons and given to the new
+  ones (the focus setter refuses a button without it), the page's own focus lists put back around the build (it
+  refills the ones it has), and the previous view definition root merged into the new one by `las_alt_root` (the song
+  header); last the focus moves one entry away and back with the game's own steps, which is what makes the movie
+  redraw, and a rebuilt entry's label ends in a space because the movie skips a label that is the text it drew before.
+  A page opened anew starts at the top (`las_alt_page`, the page update). A game whose tables lack a point keeps the
+  first four alternates. Page Up and Page Down do not scroll (Learn & Play has them as window messages, the Mac not at
+  all).
 - **Direct Connect choice** (`RS_MODS_OVERLAY=0` reads `cache.psarc` alone). The game code handles a fourth
   button on the cable screen, `othercable` (Direct Connect), and a fourth value of the INPUT slider, but the menu
   data (two JSON files in one of `cache.psarc`'s `cacheN.7z` archives) leaves them out. At each copy or refresh

@@ -28,7 +28,8 @@
 //   RS_MODS_MENU_RETRY=0 a menu movie the game asked for before the file index had it is not asked for again, as in
 //                      the original: the screen may stay white for good (default: asked again when the file is indexed)
 //   RS_MODS_ARRANGEMENTS=0 Learn a Song's page fills a slot for every arrangement of a song, as in the original: a song
-//                      with more than five arrangements crashes it (default: the page shows four alternates)
+//                      with more than five arrangements crashes it (default: the page shows four alternates at a time, and the
+//                      arrow keys and the mouse wheel scroll the rest)
 //   RS_MODS_LOG=1      log what is applied, to stderr (the edition's log)
 typedef struct {
   int bypass;
@@ -41,7 +42,7 @@ typedef struct {
   int log;
   int guitarcade_skip;  // Skip Tuner in a Guitarcade game's tuner
   int menu_retry;       // a rejected menu movie request asked again
-  int arrangements;     // at most four alternate arrangements on Learn a Song's page
+  int arrangements;     // four alternate arrangements at a time on Learn a Song's page, scrolled by the arrows and the wheel
 } rs_mods_config;
 // The switches as they were last read; the defaults until then.
 extern rs_mods_config rs_mods_cfg;
@@ -67,11 +68,11 @@ int rs_mods_overlay_name(const char *path, char *alt, size_t n);
 // (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), an archive
 // of dlc/ owned while it is mounted (RS_MODS_BYPASS), the batched mounting's song manifests and file questions
 // (RS_MODS_FIXES), Player 2's saved input (RS_MODS_MULTIPLAYER), Skip Tuner in a Guitarcade game's tuner
-// (RS_MODS_GUITARCADE_SKIP), the menu movie request asked again (RS_MODS_MENU_RETRY) and Learn a Song's four
-// alternate arrangements (RS_MODS_ARRANGEMENTS).
+// (RS_MODS_GUITARCADE_SKIP), the menu movie request asked again (RS_MODS_MENU_RETRY) and Learn a Song's
+// alternate arrangements, four at a time and scrolled (RS_MODS_ARRANGEMENTS).
 void rs_mods_start(void);
-// The window arithmetic of a scrollable "Other arrangements" list (not wired to the page yet). Learn a Song's list
-// has four slots: whether record `index` (not `selected`) is among the four alternates shown from `offset`; the offset
+// The window arithmetic of the scrollable "Other arrangements" list (the points of mods_shared.c use it). Learn a Song's
+// list has four slots: whether record `index` (not `selected`) is among the four alternates shown from `offset`; the offset
 // after a step (down only while alternates remain below the window, up while some are above); the tag of slot 1..4
 // (" (-N)" with N alternates above, " (+N)" with N below, else empty). The co-op list shows RS_MODS_COOP_ROWS records:
 // the offset that shows `selected` (moved just far enough), and the record number of a focused button named

@@ -646,3 +646,5 @@ plain_packages  0x100161893  4:010fdda3   =4c897da0f645d4047431                #
 
 # gaps
 seven_string   0x1001f4247  3:83cb63a0   +2=07                        # N13 in 0x1001f1f70: the back-fill loop over strings 0-6
+seven_glow      unsupported the Mac's glow points call Entity_SetScale themselves (seven_frg*_setscale)
+seven_barre     unsupported the Mac's barre point calls Entity_SetScale itself (seven_pubbc_setscale)

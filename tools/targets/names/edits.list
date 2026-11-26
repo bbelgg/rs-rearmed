@@ -3,5 +3,7 @@
 # (runtime/rc_mid.h). The generated code and the runtime number the groups by their place here.
 # --- Seven-String Guitar (a mod's: rearmed-mods, after rs7string): begin
 seven_string  # Seven-String Guitar: the native layouts
+seven_glow  # Seven-String Guitar: the fret range glow's injected Entity_SetScale calls (on with its mid points only)
+seven_barre  # Seven-String Guitar: the barre capsules' injected Entity_SetScale calls (on with its mid points only)
 plain_packages  # Plain Packages: unencrypted song archives
 # --- Seven-String Guitar: end

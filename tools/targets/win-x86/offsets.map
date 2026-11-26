@@ -442,3 +442,7 @@ ui_slider_value                   0x88    # float (the slider handler 0x1181dbd)
 # Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
 menu_movie_uri                    0x8c    # GFxMovieModel: the URI string (the Mac's 0xe0), read by the request (0x1798a27: lea ecx,[esi+0x8c], size word 0x9c)
 file_index_name                   -0x38   # the index writer 0x101e250 (the Mac's 0x100496b20): the string of the file's name and extension (ebp-0x38: the file name, then its extension appended), destroyed first at its tail 0x101e770
+
+# wave3 headstock (the extended headstock: width, a bass's added segments)
+ni_local_rotate                   0x4c    # NiAVObject: the local rotation, nine floats (the constructor 0x1560bdd..: 0x4c..0x6c, translation 0x70, scale 0x7c)
+headstock_seg_loaded              0x18    # Rnd_Headstock: u8 per segment, loaded (GSHC 0x110fbc6: cmp byte [ecx+esi+0x18], 0)

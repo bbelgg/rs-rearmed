@@ -205,6 +205,9 @@ seven_pubbc_setscale none  Learn & Play injects the scale call itself (seven_pub
 # tuner camera pan (rs7string beta.4)
 seven_tf2           0x01133e85  (void *session@edi, uint8_t lefty@[ebp-0x44], float y@[ebp-0x24])  # TF2 (Steam 0x5B297F) the tuner camera pose 0x1133ba0 (TF1's), the start of the overview offset table's path (table 0x1e70c68; the other, 0x1e70de8, is the [edx+0x58] path): the camera's world y along the neck, before that table's offset is added
 
+# wave2 P3 eight-string chords: a marker (a callback that does nothing): its presence says this RS Re-ARMed's edits run the chord loops over eight strings
+seven_e8   0x010ea96f  ()  # E8 seven_pp1's function (run once a song loads; any harmless instruction would do), after the pp1 point, `test eax, eax`
+
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.
 fps_calib_window      0x0116adf5  (uint32_t window@edx)  # the calibration meter's start 0x116a9d0 (virtual, vtable cell 0x1d3180c; the Mac's 0x10065ce30): max(30, (int)(1 / frame time)) in edx, before it is stored at +0x788; the samples are 100 floats a player at +0x3d4 and +0x564, the meter's own state from +0x6f4

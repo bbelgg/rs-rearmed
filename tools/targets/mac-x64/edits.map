@@ -438,44 +438,44 @@ seven_string   0x1007d6463  7:97c67a42     =488b9dc8feffff488b03488985c8feffff  
 
 # chdraw
 seven_string   0x10000fb00  6:4acee173   +5=48                        # HS1 in 0x10000f920: the template's frets -> T8 frets[8]
-seven_string   0x10000fe78  4:4dbcdae2   +3=07                        # HS2 in 0x10000f920: its loop end 6 -> 7
+seven_string   0x10000fe78  4:4dbcdae2   +3=08                        # HS2 in 0x10000f920: its loop end 6 -> 8
 seven_string   0x100013310  6:02a4af82   +5=48                        # NR5 in 0x100013100: the fret-label scan reads T8 frets[8]
-seven_string   0x1000133aa  4:d73558dd   +3=07                        # NR6 in 0x100013100: its count 6 -> 7
+seven_string   0x1000133aa  4:d73558dd   +3=08                        # NR6 in 0x100013100: its count 6 -> 8
 seven_string   0x100018c30  4:89669bd3  =4685bcaf48090000             # CLBM in 0x100018b80: the bend bit reads C8 mask[8] (+0x948)
 seven_string   0x100018c3e  5:3bb72c9a   +4=48                        # CLBF in 0x100018b80: its fret from T8 frets[8]
 seven_string   0x100018cd3  4:4dbcdae2   +3=08                        # CLB1 in 0x100018b80: its loop end 6 -> 8
 seven_string   0x100018d4a  3:e1dbb0cd   +2=07                        # CLBG-M in 0x100018d30: its string guard 6 -> 8 (ja past 7)
 seven_string   0x100018d61  5:a1fe3a2f  =488d840888090000             # CLBA-M in 0x100018d30: lea rax,[rax+rcx+0x18] -> C8 bends[8] (+0x988)
-seven_string   0x100018df1  3:02c3e950   +2=06                        # NM1 in 0x100018d70: its string < 7 (ja past 6)
+seven_string   0x100018df1  3:02c3e950   +2=07                        # NM1 in 0x100018d70: its string < 8 (ja past 7)
 seven_string   0x100018e2b  5:b025441b   +4=48                        # NM2 in 0x100018d70: T8 frets[8]
 seven_string   0x100018e37  3:a0969fb2  =8b948148090000               # NM1 in 0x100018d70: C8 mask[8] (+0x948)
 seven_string   0x100018e42  7:1b4b527b   +3=7009                      # NM3 in 0x100018d70: C8 slideUnpitchTo[8]
 seven_string   0x100018f99  7:f68faa24   +3=6809                      # NM4 in 0x100018d70: C8 slideTo[8]
-seven_string   0x100018fea  3:cb29d5d2   +2=06                        # NM5 in 0x100018fb0: string < 7
+seven_string   0x100018fea  3:cb29d5d2   +2=07                        # NM5 in 0x100018fb0: string < 8
 seven_string   0x100018fff  3:0667c264  =8b849048090000               # NM5/TM6 in 0x100018fb0: C8 mask[8] (+0x948)
-seven_string   0x100019147  4:27c70dad   +3=06                        # NM6 in 0x100019050: string < 7
+seven_string   0x100019147  4:27c70dad   +3=07                        # NM6 in 0x100019050: string < 8
 seven_string   0x100019158  4:a029a21d  =438b84a648090000             # NM6 in 0x100019050: C8 mask[8] (+0x948)
 seven_string   0x100019164  9:febcda3d   +5=7009                      # NM8 in 0x100019050: C8 slideUnpitchTo[8]
 seven_string   0x100019171  6:f183972b   +5=48                        # NM7 in 0x100019050: T8 frets[8]
 seven_string   0x10001927c  9:7024ab61   +5=6809                      # NM10 in 0x100019050: C8 slideTo[8]
 seven_string   0x100019289  6:f183972b   +5=48                        # NM9 in 0x100019050: T8 frets[8], the second read
-seven_string   0x10001944a  4:27c70dad   +3=06                        # BH1 in 0x1000193d0: the string guard 6 -> 7
+seven_string   0x10001944a  4:27c70dad   +3=07                        # BH1 in 0x1000193d0: the string guard 6 -> 8
 seven_string   0x100019466  5:a3a46b29  =488dbc1188090000             # BH1 in 0x1000193d0: lea rdi,[rcx+rdx+0x18] -> C8 bends[8]
-seven_string   0x1000194bb  4:27c70dad   +3=06                        # BH1b in 0x1000193d0: the second guard 6 -> 7
+seven_string   0x1000194bb  4:27c70dad   +3=07                        # BH1b in 0x1000193d0: the second guard 6 -> 8
 seven_string   0x1000194d3  5:a8417e2d  =4c8dac0888090000             # BH1b in 0x1000193d0: lea r13,[rax+rcx+0x18] -> C8 bends[8]
 seven_string   0x1001973e0  6:58d81975   +5=48                        # FG2-M in 0x100197310: loop 1 frets -> T8 frets[8]
 seven_string   0x1001973f6  6:7e819d79   +5=50                        # FG1 in 0x100197310: loop 1 fingers -> T8 fingers[8]
-seven_string   0x100197453  4:d73558dd   +3=07                        # FG3 in 0x100197310: loop 1 end 6 -> 7
-seven_string   0x10019745e  7:463fa657   +3=f9                        # FG3b in 0x100197310: loop 2 from -7 (strings 0-6)
-seven_string   0x100197470  6:bbb86f99   +5=4f                        # FG2b in 0x100197310: loop 2 frets: T8 frets[8] = +0x48 + 7 + r15
-seven_string   0x100197491  6:b2ec4d18   +5=57                        # FG1b in 0x100197310: loop 2 fingers: T8 fingers[8] = +0x50 + 7 + r15
+seven_string   0x100197453  4:d73558dd   +3=08                        # FG3 in 0x100197310: loop 1 end 6 -> 8
+seven_string   0x10019745e  7:463fa657   +3=f8                        # FG3b in 0x100197310: loop 2 from -8 (strings 0-7)
+seven_string   0x100197470  6:bbb86f99   +5=50                        # FG2b in 0x100197310: loop 2 frets: T8 frets[8] = +0x48 + 8 + r15
+seven_string   0x100197491  6:b2ec4d18   +5=58                        # FG1b in 0x100197310: loop 2 fingers: T8 fingers[8] = +0x50 + 8 + r15
 seven_string   0x100197f8a  5:ca18ef89   +4=48                        # FG4 in 0x100197f70: frets[string] from T8 frets[8]
-seven_string   0x100197f92  21:05e8651a  =0fb64b34b80700000031f60fb67a5541b80600000039cf410f44c00fb67a5441b80500000039cf410f44c00fb67a5341b80400000039cf410f44c00fb67a5241b80300000039cf410f44c00fb67a5141b80200000039cf410f44c00fb67a5041b80100000039cf410f44c00fb67a5641b80000000039cf410f44c00fb67a5641b80000000039cf410f44f00fb67a5041b80100000039cf410f44f00fb67a5141b80200000039cf410f44f00fb67a5241b80300000039cf410f44f00fb67a5341b80400000039cf410f44f00fb67a5441b80500000039cf410f44f00fb67a5541b80600000039cf410f44f08d4e0129c1894b2ce9c1ffffff # FG5M in 0x100197f70 (Mac-only): the finger's span over T8 fingers[8] (+0x50) for strings 0-6, branch-free, then on at 0x10019804b: lowest and highest of the strings' physical ranks (string 6 lies beyond string 0: rank 0, string s < 6 rank s + 1; rs7string's PUBGF), so a barre over the low B and string 0 is two strings (the game's six unrolled reads of the stock fingers left string 6 out: a finger only on string 6 gave span -5, a pill over the whole neck)
+seven_string  0x100197f92  21:05e8651a =0fb64b34b80800000031f60fb67a5541b80700000039cf410f44c00fb67a5441b80600000039cf410f44c00fb67a5341b80500000039cf410f44c00fb67a5241b80400000039cf410f44c00fb67a5141b80300000039cf410f44c00fb67a5041b80200000039cf410f44c00fb67a5641b80100000039cf410f44c00fb67a5741b80000000039cf410f44c00fb67a5741b80000000039cf410f44f00fb67a5641b80100000039cf410f44f00fb67a5041b80200000039cf410f44f00fb67a5141b80300000039cf410f44f00fb67a5241b80400000039cf410f44f00fb67a5341b80500000039cf410f44f00fb67a5441b80600000039cf410f44f00fb67a5541b80700000039cf410f44f08d4e0129c1894b2ce9a1ffffff # FG5M in 0x100197f70 (Mac-only): the finger's span over T8 fingers[8] (+0x50) for strings 0-7, branch-free, then on at 0x10019804b: lowest and highest of the strings' physical ranks (strings 6 and 7 lie beyond string 0: ranks 1 and 0, string s < 6 rank s + 2, a 7-string guitar's ranks all one more than rs7string's, only the span counts; rs7string's PUBGF), so a barre over the low B and string 0 is two strings (the game's six unrolled reads of the stock fingers left string 6 out: a finger only on string 6 gave span -5, a pill over the whole neck)
 seven_string   0x100196ed0  6:546fd915   +5=48                        # FG9-M in 0x100196de0: frets -> T8 frets[8]
 seven_string   0x100196edf  6:c2b9a75a   +5=50                        # FG7 in 0x100196de0: fingers -> T8 fingers[8]
-seven_string   0x100196f13  4:171c3f4b   +3=07                        # FG8 in 0x100196de0: its loop 6 -> 7
-seven_string   0x1001d4350  25:763ff7ae =0fb647480fb6574939c20f42c20fb6574a39c20f42c20fb6574b39c20f42c20fb6574c39c20f42c20fb6574d39c20f42c20fb6574e39c20f42c2c3  # NR1/NR2 the chord's lowest fret 0x1001d4350 (callers 0x100013100 and others): the unsigned minimum of frets8[0..6] (0xff = none is the largest byte, as the game's own test of its 0xff global)
-seven_string   0x1001d42e0  22:5bf13bae =b8ff000000b906000000807f4eff0f45c1b905000000807f4dff0f45c1b904000000807f4cff0f45c1b903000000807f4bff0f45c1b902000000807f4aff0f45c1b901000000807f49ff0f45c1b900000000807f48ff0f45c1c3  # NR3/NR4 and NB1/NB2 the first sounding string 0x1001d42e0 (callers 0x100013100, the box builder 0x1000135d0): the first s of 0..6 with frets8[s] != 0xff, else 0xff (the game's 0x1013ea697)
+seven_string   0x100196f13  4:171c3f4b   +3=08                        # FG8 in 0x100196de0: its loop 6 -> 8
+seven_string  0x1001d4350  25:763ff7ae =0fb647480fb6574939c20f42c20fb6574a39c20f42c20fb6574b39c20f42c20fb6574c39c20f42c20fb6574d39c20f42c20fb6574e39c20f42c20fb6574f39c20f42c2c3 # NR1/NR2 the chord's lowest fret 0x1001d4350 (callers 0x100013100 and others): the unsigned minimum of frets8[0..7] (0xff = none is the largest byte, as the game's own test of its 0xff global)
+seven_string  0x1001d42e0  22:5bf13bae =b8ff000000b907000000807f4fff0f45c1b906000000807f4eff0f45c1b905000000807f4dff0f45c1b904000000807f4cff0f45c1b903000000807f4bff0f45c1b902000000807f4aff0f45c1b901000000807f49ff0f45c1b900000000807f48ff0f45c1c3 # NR3/NR4 and NB1/NB2 the first sounding string 0x1001d42e0 (callers 0x100013100, the box builder 0x1000135d0): the first s of 0..7 with frets8[s] != 0xff, else 0xff (the game's 0x1013ea697)
 seven_string   0x100018718  6:5411a7f6   +5=48                        # NN2 in 0x100018550: the chord loop's frets from T8 frets[8]
 seven_string   0x10001879f  3:e1dbb0cd   +2=07                        # PUBNN3/PUBNN4 in 0x100018550: the slide guard string <= 5 -> <= 7 (the Mac has one guard for both slides)
 seven_string   0x1000187a8  4:6fca5d0d  =428b8caf48090000             # TM3-TM5 in 0x100018550: the mask (inline test) from C8 mask[8]
@@ -496,18 +496,18 @@ seven_string   0x100015ff8  4:3ab7b487  =428b84aa48090000             # CT2 in 0
 seven_string   0x10001602e  9:52a38c21   +5=7809                      # CT2 in 0x100015c40: vibrato -> C8 vibrato[8]
 seven_string   0x10001606e  5:d90f3420  =488db40288090000             # CT2 in 0x100015c40: the bend data copied -> C8 bends[8]
 seven_string   0x100016259  4:4dbcdae2   +3=08                        # CLCT11 in 0x100015c40: loop B's end 6 -> 8 (CLCT4-10's guards have no Mac copy)
-seven_string   0x1001ea7c7  3:02c3e950   +2=06                        # SMb in 0x1001ea7b0: its string guard <= 5 -> <= 6
-seven_string   0x100011a68  5:501be965 =31c0403877480f94c108c8403877490f94c108c84038774a0f94c108c84038774b0f94c108c84038774c0f94c108c84038774d0f94c108c84038774e0f94c108c8  # SH3/SH4 in 0x100011980: any of frets8[0..6] == sil (eax, ecx as the call left them)
+seven_line   0x1001ea7c7  3:02c3e950   +2=07                        # SMb in 0x1001ea7b0: its string guard <= 5 -> <= 7
+seven_string  0x100011a68  5:501be965  =31c0403877480f94c108c8403877490f94c108c84038774a0f94c108c84038774b0f94c108c84038774c0f94c108c84038774d0f94c108c84038774e0f94c108c84038774f0f94c108c8 # SH3/SH4 in 0x100011980: any of frets8[0..7] == sil (eax, ecx as the call left them)
 seven_string   0x1000151c5  2:2e2f8907  =be48090000                   # NS2 in 0x1000150c0: loop 1's mask offset starts at C8 mask[8] (+0x948; +4 a string)
 seven_string   0x1000151c7  5:e9f6829c   +1=8809                      # NS2 in 0x1000150c0: loop 1's bend offset starts at C8 bends[8] (+0x988; +0x184 a string)
 seven_string   0x1000151f0  6:1a7d03f3   +5=48                        # NS1 in 0x1000150c0: loop 1's frets -> T8 frets[8]
-seven_string   0x100015768  4:ae05269c   +3=07                        # NS5 in 0x1000150c0: loop 1's end 6 -> 7
+seven_string   0x100015768  4:ae05269c   +3=08                        # NS5 in 0x1000150c0: loop 1's end 6 -> 8
 seven_string   0x1000157e0  4:73523656  =468bbcab48090000             # NS7 in 0x1000150c0: loop 2's mask -> C8 mask[8]
 seven_string   0x100015808  6:dc15412b   +5=48                        # NS1b in 0x1000150c0: loop 2's frets -> T8 frets[8]
-seven_string   0x100015be3  4:4dbcdae2   +3=07                        # NS8 in 0x1000150c0: loop 2's end 6 -> 7
+seven_string   0x100015be3  4:4dbcdae2   +3=08                        # NS8 in 0x1000150c0: loop 2's end 6 -> 8
 seven_string   0x1003be80b  7:8147e773   +3=080b0000                  # NS9/NS12 in 0x1003be800: usedCount of C8 bends[8] (+0x988 + 0x180)
 seven_string   0x1003be84a  6:3b8a2e5c  =f30f5f84978c090000           # NS10/NS11 in 0x1003be800: the steps of C8 bends[8] (+0x988 + 4)
-seven_string   0x100014dec  3:02c3e950   +2=06                        # BH1 in 0x100014db0: the string guard 6 -> 7 (its second guard, the per-string mode read, keeps 6 as on Learn & Play)
+seven_string   0x100014dec  3:02c3e950   +2=07                        # BH1 in 0x100014db0: the string guard 6 -> 8 (its second guard, the per-string mode read, keeps 6 as on Learn & Play)
 seven_string   0x100014e0b  5:9bcf6b87  =488dbc0188090000             # BH1 in 0x100014db0: lea rdi,[rcx+rax+0x18] -> C8 bends[8]
 
 # headstock
@@ -628,12 +628,13 @@ seven_string   0x1001119be  4:cf1b1720  =488db384020000 # EV5 in 0x100111830 (LP
 seven_string   0x1001113c9  13:bcb89ff9  =31f68b83a002000085c00f4ff08b839c02000085c00f4ff04585db410f4ff385c90f4ff1 # PD1a in 0x100111260 (LP 0x13f7ad0 inlined, strings 0-3 cmov'd before): the first sounding of strings 4-7 (eval+0x284 int32[8]: 6/7 at +0x29c/+0x2a0), else 0
 seven_string   0x1001114ea  15:76881eb4  =4531ed8b83a002000085c0440f4fe88b839c02000085c0440f4fe88b839802000085c0440f4fe8 # PD1b in 0x100111260 (LP 0x13f7ad0 inlined, strings 0-4 tested before): the first sounding of strings 5-7, else 0
 seven_string   0x10010e5f5  6:d0d37b18  +5=48        # CC1 in 0x10010e5a0 (LP 0x13f45d0): the fret from the T8's frets[8] (+0x48)
-seven_string   0x10010e651  4:2f5a2a56  +3=06        # CC2/BF1 in 0x10010e5a0: its technique guard, strings 0-5 -> 0-6
+seven_string   0x10010e651  4:2f5a2a56  +3=07        # CC2/BF1 in 0x10010e5a0: its technique guard, strings 0-5 -> 0-7
 seven_string   0x10010e664  4:87d82a12  =43859caf48090000 # CC3 in 0x10010e5a0: the bend test reads the C8's mask[8] (+0x948)
 seven_string   0x10010e681  5:0389e5dc  =498db40788090000 # BF1 in 0x10010e5a0 (LP 0x131c960 inlined): a string's BendData32 from bends[8] (+0x988)
-seven_string   0x10010e9a9  4:eeb2da5a  =31db837e70000f9fc3f7db8b826009000021d88545c80f95c14100cc8545cc0f95c14100cd4185c20f95c14100ce8545d00f95c14100cb8545d40f95c14100cf4128d9837e2400 # CN1-CN3 in 0x10010e790 (LP 0x13f4770): string 6 counted (T8 midi[6] +0x70 > 0: the C8's mask[6] +0x960 against the five technique masks, the sounding count), branch-free, before string 5's step (rsi/rdx are still the T8/C8 there)
-seven_string   0x10010ef86  5:c6005fc6  =41837d70000f8efaffffff488dbdb8e5ffffbe060000004c89e9e8fbf5ffff4c89e7488db5b8e5ffffe84c0100004969ce280c0000498d8c0c260c0000488db5a0e5ffff4d85f6480f48ce8801488b95a8e5ffff4c8b85b0e5ffff # CH1-CH3 in 0x10010ea80 (LP 0x13f4890): string 6's child (T8 midi[6] +0x70 > 0): its note by 0x10010e5a0 (CC), its eval by 0x10010f100, the slot's low byte into the parent's +0xc1e (slot + 0xc26; a parent without a slot writes a dead spill instead); note and C8 back in rdx/r8 for string 5
-seven_string   0x10010ef8b  6:99a37126  =41837d24000f8e43010000 # CH1-CH3 in 0x10010ea80: string 5's test again after string 6's step (its jle unchanged)
+seven_string  0x10010e9a9  4:eeb2da5a  =31db837e70000f9fc3f7db8b826009000021d88545c80f95c14100cc8545cc0f95c14100cd4185c20f95c14100ce8545d00f95c14100cb8545d40f95c14100cf4128d931db837e74000f9fc3f7db8b826409000021d88545c80f95c14100cc8545cc0f95c14100cd4185c20f95c14100ce8545d00f95c14100cb8545d40f95c14100cf4128d9837e2400 # CN1-CN3 in 0x10010e790 (LP 0x13f4770): strings 6 and 7 counted (T8 midi[6] +0x70 / midi[7] +0x74 > 0: the C8's mask[6] +0x960 / mask[7] +0x964 against the five technique masks, the sounding count), branch-free, before string 5's step (rsi/rdx are still the T8/C8 there)
+seven_string   0x10010ef86  5:c6005fc6  =41837d70000f8efaffffff488dbdb8e5ffffbe060000004c89e9e8fbf5ffff4c89e7488db5b8e5ffffe84c0100004969ce280c0000498d8c0c260c0000488db5a0e5ffff4d85f6480f48ce8801488b95a8e5ffff4c8b85b0e5ffff # CH1-CH3 in 0x10010ea80 (LP 0x13f4890): string 6's child (string 7's is the next range, string 5's test the one after) (T8 midi[6] +0x70 > 0): its note by 0x10010e5a0 (CC), its eval by 0x10010f100, the slot's low byte into the parent's +0xc1e (slot + 0xc26; a parent without a slot writes a dead spill instead); note and C8 back in rdx/r8 for string 5
+seven_string   0x10010ef8b  6:99a37126  =41837d74000f8efbffffff488dbdb8e5ffffbe070000004c89e9e8f6f5ffff4c89e7488db5b8e5ffffe8470100004969ce280c0000498d8c0c270c0000488db5a0e5ffff4d85f6480f48ce8801488b95a8e5ffff4c8b85b0e5ffff # CH1-CH3 in 0x10010ea80: string 7's child as string 6's (T8 midi[7] +0x74 > 0; its slot's low byte into the parent's +0xc1f = slot + 0xc27; note and C8 back in rdx/r8); a skip goes to string 5's test (the next range)
+seven_string   0x10010ef91  7:782a4947  =41837d24000f8e3d010000488dbdb8e5ffff # CH1-CH3 in 0x10010ea80: string 5's test (moved here from the two ranges before: cmp [r13+0x24],0; jle to the end), then the instruction the game has here
 seven_string   0x10010e2d9  5:80ec6d89  =4e8d3423    # RL1 in 0x10010e270 (LP 0x13f43f0): r14 = the slot (was the eval, slot + 8) for seven_rl1
 seven_string   0x10010e395  3:34eb50fd  =498d7e08    # RL1 in 0x10010e270: Play_Eval_ClearState gets the eval (slot + 8) as before
 seven_string   0x10010e3f9  5:edb68961  =4e8d343b    # RL2 in 0x10010e3c0 (LP 0x13f44b0): r14 = the slot for seven_rl2
@@ -645,6 +646,6 @@ plain_packages  0x1001eb6fb  10:c201113a  =837dc0017404837dc0030f85bb050000  # P
 plain_packages  0x100161893  4:010fdda3   =4c897da0f645d4047431                # PP_TOC the table of contents reader 0x100161780, at the start of its decrypt block: the register the block saves is saved as before, then archive flags without 4 (a plain table of contents) go on after the block, others run it as before
 
 # gaps
-seven_string   0x1001f4247  3:83cb63a0   +2=07                        # N13 in 0x1001f1f70: the back-fill loop over strings 0-6
+seven_line   0x1001f4247  3:83cb63a0   +2=08                        # N13 in 0x1001f1f70: the back-fill loop over strings 0-7
 seven_glow      unsupported the Mac's glow points call Entity_SetScale themselves (seven_frg*_setscale)
 seven_barre     unsupported the Mac's barre point calls Entity_SetScale itself (seven_pubbc_setscale)

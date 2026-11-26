@@ -113,9 +113,9 @@ seven_tp13   0x1007d4f7b  (void *template@rbx, void *templates@[r12+0x100], uint
 # chdraw
 seven_b1   0x100013de1  (void *geom@r15, void *chord@r14, void *session@[rbp-0x120])  # B1 the chord box builder 0x1000135d0 (LP 0x1323410): its frame geometry made (efd_alloc 0x60 + ctor 0x1004098c0, kind 4), before 0x100408e70 takes it; the session is the function's spill of its second argument
 seven_b2   0x1002a4599  (void *component@rbx, float *scale@rsi, float *translate@rdx, uint64_t from@[rbp+0x8])  # B2 Rnd_GemGeom_ApplySpan 0x1002a4530 (LP 0x132ff80), its call of SetScaleTranslate 0x1002a45b0: rbx is Rnd_GemGeom_Build 0x100409930's component (ApplySpan never writes it); from = 0x100409ac4 for Build's kind-4 case (the chord frame)
-seven_sh7  0x1000146a7  (void *obj@r12, void *notes@r13, void *arg@rsi, uint32_t time_arg@r15, void *note@[rbp-0x38])  # SH1/SH2 Mac: the slide-to heads 0x100014510 (LP 0x13217b0, unrolled six), before its sixth string's copy (a join: reached once a call, from string 4's copy either way); the callback draws string 6 by the game's per-string call 0x100011980
-seven_pl7  0x10043aeee  (void *session@r14, void *tpl@r15)  # PL1 Mac: the chord pluck 0x10043ad10 (LP 0x13637b0, unrolled six; map.tsv's 0x1363d50 pairing is this function), after string 5's copy (a join of its two ways); the callback plucks string 6 through 0x1001b1460
-seven_sm7  0x1001f4009  (void *records@r12, uint64_t index9@r14, void *mask@[rbp-0x80], uint32_t phrase@rbx)  # SMa/SMc Mac: SNG_Song_PostProcessNotes 0x1001f1f70, the section string mask's chord branch (unrolled six), before string 5's copy (a join); the record is r12 + r14*8; the callback sets string 6's bit through 0x1001ea7b0
+seven_sh7  0x1000146a7  (void *obj@r12, void *notes@r13, void *arg@rsi, uint32_t time_arg@r15, void *note@[rbp-0x38])  # SH1/SH2 Mac: the slide-to heads 0x100014510 (LP 0x13217b0, unrolled six), before its sixth string's copy (a join: reached once a call, from string 4's copy either way); the callback draws strings 6 and 7 by the game's per-string call 0x100011980
+seven_pl7  0x10043aeee  (void *session@r14, void *tpl@r15)  # PL1 Mac: the chord pluck 0x10043ad10 (LP 0x13637b0, unrolled six; map.tsv's 0x1363d50 pairing is this function), after string 5's copy (a join of its two ways); the callback plucks strings 6 and 7 through 0x1001b1460
+seven_sm7  0x1001f4009  (void *records@r12, uint64_t index9@r14, void *mask@[rbp-0x80], uint32_t phrase@rbx)  # SMa/SMc Mac: SNG_Song_PostProcessNotes 0x1001f1f70, the section string mask's chord branch (unrolled six), before string 5's copy (a join); the record is r12 + r14*8; the callback sets the bits of strings 6 and 7 through 0x1001ea7b0
 
 # headstock
 seven_al1           0x1003d5c62  (void *res@rbx, const char *name@r12, const void *buf@r15, uint32_t size@r14)  # AL1
@@ -158,7 +158,7 @@ seven_psd_tail      0x1001b6a9a  (void *pegs@rbx)                               
 # chdetect
 seven_md1   0x10022e0a0  (void *matcher@rdi, int32_t *targets@rsi, int tolerance@rcx, int history@r8, uint8_t lenient@r9, uint32_t matched@rax) -> ret=0x10022ed24  # MD1 Play_Matcher_DetectChord's entry: up to six targets compacted into a scratch int32[6] for the game's body, seven or eight judged here (al), on at its ret
 seven_am1   0x10010fe1f  (int32_t *targets@rsi, void *chord@[rbp-0x80], int shift@rbx)  # AM1 the call of 0x1002302e0 when string 0 has a target: the six shifted targets + the T8's strings 6/7 shifted as an int32[8]
-seven_ch3   none the Mac's child loop in AddNoteOrChord 0x10010ea80 is unrolled: the edit CH (0x10010ef86) adds string 6's step and stores its child slot's byte at the parent's +0xc1e itself (a parent without a slot: not stored, as seven_ch3 does)
+seven_ch3   none the Mac's child loop in AddNoteOrChord 0x10010ea80 is unrolled: the edits CH (0x10010ef86, 0x10010ef8b) add the steps of strings 6 and 7 and store their child slots' bytes at the parent's +0xc1e and +0xc1f themselves (a parent without a slot: not stored, as seven_ch3 does)
 seven_rl1   0x10010e2ed  (void *slot@r14, void *tracker@rbx)  # RL1 the eval release 0x10010e270 (LP 0x13f43f0, a chord's): its children of strings 6/7 released first, then the game's six (unrolled)
 seven_rl2   0x10010e40d  (void *slot@r14, void *tracker@rbx)  # RL2 the eval release 0x10010e3c0 (LP 0x13f44b0): the same
 seven_ag1   0x1001101a0  (void *eval@rsi, void *tracker@rdi, uint8_t *string@rdx, uint8_t result@rax) -> ret=0x10011039e  # AG1 the child query 0x1001101a0 (LP 0x13f5560: flags +0x56 / +0x76; an empty child fails the chord) over eight strings
@@ -203,6 +203,9 @@ seven_frg3_scale      none  the Mac calls Entity_SetScale from the C (seven_frg3
 seven_frg2_setscale   0x1006547a2  (void *obj@rbx)  # FRG2 the glow update 0x100654510 (LP 0xf8b7e0), a bar placed (the join after both ways of placing it): Entity_SetScale(entity, 1, k)
 seven_frg2b_setscale  0x1006548c9  (void *obj@rbx)  # FRG2B the same update, a bar moved: the same
 seven_frg3_setscale   0x100654d53  (void *obj@rbx)  # FRG3 the glow box's update 0x100654bc0 (LP 0xf8c4a0), after its first placement's Entity_SetTranslation
+
+# wave2 P3 eight-string chords: a marker (a callback that does nothing): its presence says this RS Re-ARMed's edits run the chord loops over eight strings
+seven_e8   0x1001edfc8  ()  # E8 seven_pp1's function (run once a song loads), its epilogue after pp1: `pop rbx`
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840

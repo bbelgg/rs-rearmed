@@ -6,4 +6,6 @@ seven_string  # Seven-String Guitar: the native layouts
 seven_glow  # Seven-String Guitar: the fret range glow's injected Entity_SetScale calls (on with its mid points only)
 seven_barre  # Seven-String Guitar: the barre capsules' injected Entity_SetScale calls (on with its mid points only)
 plain_packages  # Plain Packages: unencrypted song archives
+# wave2 P3 the section string mask bits of strings 6/7 (rs7string's string7_line)
+seven_line  # Seven-String Guitar: the section string mask's bits for strings 6 and 7 (N12/N13/SM, [Seven String] string7_line)
 # --- Seven-String Guitar: end

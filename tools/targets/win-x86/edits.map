@@ -139,11 +139,11 @@ seven_string   0x0111d7a2  4:02b9a75f     =6683f908                    # PSU1 gi
 seven_string   0x0111d7f4  4:e8d6489b     =6683fb08                    # PSU2 give-back loop latch
 seven_string   0x0111d7fd  5:0e549bda     +1=08                        # PSU3 taken flags cleared 6 -> 8
 seven_string   0x01131f41  10:e0996223    =8b4e2c8b51188b520c0fb74204  # PSR1 colour reset bound: the PegSet's active pegs (guitar +0x18 -> +0xc -> u16 +4) instead of the strings (+0xb); ecx = guitar, edx = PegSet as the loop expects
-seven_string   0x010de021  3:49f5d9d8     +2=07                        # N12 single-note string bound 6 -> 7
-seven_string   0x010de13c  3:49f5d9d8     +2=07                        # N13 back-fill: the level guard for string 6
-seven_string   0x010de171  3:49f5d9d8     +2=07                        # N13 back-fill: the level guard for string 6
-seven_string   0x010de19e  3:49f5d9d8     +2=07                        # N13 back-fill: the OR for string 6
-seven_string   0x010de1ea  3:49f5d9d8     +2=07                        # N13 back-fill loop over strings 0-6
+seven_line   0x010de021  3:49f5d9d8     +2=08                        # N12 single-note string bound 6 -> 8 (the section string mask's bit for string 6/7; group seven_line)
+seven_line   0x010de13c  3:49f5d9d8     +2=08                        # N13 back-fill: the level guard for strings 6 and 7
+seven_line   0x010de171  3:49f5d9d8     +2=08                        # N13 back-fill: the level guard for strings 6 and 7
+seven_line   0x010de19e  3:49f5d9d8     +2=08                        # N13 back-fill: the OR for strings 6 and 7
+seven_line   0x010de1ea  3:49f5d9d8     +2=08                        # N13 back-fill loop over strings 0-7
 seven_string   0x013649ca  3:bc64fe2a     +2=40                        # N18 single-note bend bound: active strings
 seven_string   0x013649df  4:313283c9     +3=40                        # N18 main[s]
 seven_string   0x01364a29  3:0d2ccd20     +2=40                        # N19 bend release bound
@@ -651,44 +651,44 @@ seven_string   0x013f745c  3:37b38a09  =8d8684020000  # EV4 0x13f73e0: the chord
 seven_string   0x013f74ec  3:6e139b4d  =8d8f84020000  # EV5 0x13f7480: the chord wrapper 0x10676b0 gets eval+0x284
 seven_string   0x013f7ae1  2:ad7e5c14   +1=08                        # PD1 0x13f7ad0 (the first sounding string's MIDI): eval+0x284 is an int32[8], 6 -> 8
 seven_string   0x013f4627  4:c8afc53d   +3=48                        # CC1 0x13f45d0 (a chord string -> a note): the fret from the T8's frets[8] (+0x48)
-seven_string   0x013f4665  3:734a5d7c   +2=07                        # CC2 0x13f45d0: its technique guard, strings 0-5 -> 0-6
+seven_string   0x013f4665  3:734a5d7c   +2=08                        # CC2 0x13f45d0: its technique guard, strings 0-5 -> 0-7
 seven_string   0x013f466e  7:5c756f8e  =f7848a4809000000100000  # CC3 0x13f45d0: the bend test reads the C8's mask[8] (+0x948)
-seven_string   0x0131c963  2:ad7e5c14   +1=07                        # BF1 0x131c960 (its only caller is 0x13f45d0): strings 0-5 -> 0-6
+seven_string   0x0131c963  2:ad7e5c14   +1=08                        # BF1 0x131c960 (its only caller is 0x13f45d0): strings 0-5 -> 0-7
 seven_string   0x0131c97b  4:e79f5fb4  =8db40888090000  # BF1 0x131c960 (ecx a C8): a string's BendData32 from bends[8] (+0x988)
 seven_string   0x013f47aa  5:2676e368  =8db1480900008d7a58  # CN1 the technique census 0x13f4770 (ecx a C8, edx a T8): esi = the C8's mask[8] (+0x948), edi = the T8's midi[8] (+0x58)
-seven_string   0x013f47b5  3:734a5d7c   +2=07                        # CN2 0x13f4770: its string guard 6 -> 7
-seven_string   0x013f4813  3:734a5d7c   +2=07                        # CN3 0x13f4770: its loop 6 -> 7 strings (a chord is tracked whole only when string 6 shares the techniques)
+seven_string   0x013f47b5  3:734a5d7c   +2=08                        # CN2 0x13f4770: its string guard 6 -> 8
+seven_string   0x013f4813  3:734a5d7c   +2=08                        # CN3 0x13f4770: its loop 6 -> 8 strings (a chord is tracked whole only when strings 6 and 7 share the techniques)
 seven_string   0x013f4b1d  3:4fb468bc   +2=58                        # CH1 Play_Tracker_AddNoteOrChord 0x13f4890, its child loop: the T8's midi[8] (+0x58)
-seven_string   0x013f4ba4  2:ad7e5c14   +1=07                        # CH2 0x13f4890: the child loop 6 -> 7 strings (a child eval for string 6; seven_ch3 keeps its slot)
+seven_string   0x013f4ba4  2:ad7e5c14   +1=08                        # CH2 0x13f4890: the child loop 6 -> 8 strings (a child eval for strings 6 and 7; seven_ch3 keeps its slot)
 
 # chdraw
 seven_string   0x0131f144  3:3858273c   +2=48                        # NR1 chord render object 0x131f0b0: the lowest-fret scan reads T8 frets[8]
-seven_string   0x0131f147  5:318faede   +1=07                        # NR2 the same scan over 7 strings
+seven_string   0x0131f147  5:318faede   +1=08                        # NR2 the same scan over 8 strings
 seven_string   0x0131f186  5:10baec92   +3=48                        # NR3 the first-string scan reads T8 frets[8]
-seven_string   0x0131f193  2:ad7e5c14   +1=07                        # NR4 its bound 6 -> 7
+seven_string   0x0131f193  2:ad7e5c14   +1=08                        # NR4 its bound 6 -> 8
 seven_string   0x0131f23c  3:e9b3b7b2   +2=48                        # NR5 the fret-label (unique fret) scan reads T8 frets[8]
-seven_string   0x0131f23f  8:fbd87b5e   +4=07                        # NR6 its count 6 -> 7
+seven_string   0x0131f23f  8:fbd87b5e   +4=08                        # NR6 its count 6 -> 8
 seven_string   0x013238b3  5:688825c6   +3=48                        # NB1 chord box builder 0x1323410: the first sounding string from T8 frets[8]
-seven_string   0x013238bc  2:ad7e5c14   +1=07                        # NB2 its bound 6 -> 7
+seven_string   0x013238bc  2:ad7e5c14   +1=08                        # NB2 its bound 6 -> 8
 seven_string   0x01320fd3  3:b9d5c0a1   +2=48                        # HS1 handshape 0x1320e40: the template's frets -> T8 frets[8]
-seven_string   0x013212d7  3:49f5d9d8   +2=07                        # HS2 its loop end 6 -> 7
+seven_string   0x013212d7  3:49f5d9d8   +2=08                        # HS2 its loop end 6 -> 8
 seven_string   0x013218f7  3:b9d5c0a1   +2=48                        # NS1 chord spawner 0x1321860: the template's frets of both loops -> T8 frets[8]
 seven_string   0x013218ff  33:ab8c435e  +0=81c6480900008975e48975fc83c640885de3897dac885def89458c8945c88975c0 # NS2 its per-string pointers: [ebp-0x1c] and [ebp-4] = C8 mask[8], esi and [ebp-0x40] = C8 bends[8]
-seven_string   0x01321958  3:734a5d7c   +2=07                        # NS3 the gem loop's bend-notation guard 6 -> 7
+seven_string   0x01321958  3:734a5d7c   +2=08                        # NS3 the gem loop's bend-notation guard 6 -> 8
 seven_string   0x0132197e  3:8b4e3e91   +2=fc                        # NS6 SNG_ChordNotes_GetMaxBendStep gets C8 + 0x948 (its only caller)
-seven_string   0x01321a27  3:734a5d7c   +2=07                        # NS4 the gem loop's mask -> gem model guard 6 -> 7 (an open string 6 gets the game's open-string bar)
-seven_string   0x01321dd4  3:734a5d7c   +2=07                        # NS5 the gem loop's end 6 -> 7
+seven_string   0x01321a27  3:734a5d7c   +2=08                        # NS4 the gem loop's mask -> gem model guard 6 -> 8 (an open string 6 or 7 gets the game's open-string bar)
+seven_string   0x01321dd4  3:734a5d7c   +2=08                        # NS5 the gem loop's end 6 -> 8
 seven_string   0x01321de7  3:8b4e3e91   +2=fc                        # NS7 the technique-gem loop's mask pointer = C8 mask[8]
-seven_string   0x01322220  2:ad7e5c14   +1=07                        # NS8 the technique-gem loop's end 6 -> 7
+seven_string   0x01322220  2:ad7e5c14   +1=08                        # NS8 the technique-gem loop's end 6 -> 8
 seven_string   0x010d4078  6:ac2d128d   +2=c0                        # NS9 SNG_ChordNotes_GetMaxBendStep 0x10d4060 (base C8 + 0x948): usedCount of C8 bends[8]
 seven_string   0x010d4093  3:c4c6affb   +2=40                        # NS10 its bends base -> C8 bends[8]
 seven_string   0x010d4098  4:62e31a17   +3=40                        # NS11 its bends base, the second path
 seven_string   0x010d40be  6:dcca213c   +2=c0                        # NS12 its usedCount, the second read
 seven_string   0x013217e0  15:24088bd3  +4=68,+8=8d7ee090909090      # SH1 slide-to heads 0x13217b0: esi = C8 slideTo[8], edi = C8 mask[8]
-seven_string   0x0132184a  3:734a5d7c   +2=07                        # SH2 their loop end 6 -> 7
+seven_string   0x0132184a  3:734a5d7c   +2=08                        # SH2 their loop end 6 -> 8
 seven_string   0x010d3fc6  4:fcbabda2   +3=48                        # SH3 SNG_ChordTemplate_HasFret 0x10d3fc0: T8 frets[8]
-seven_string   0x010d3fce  2:ad7e5c14   +1=07                        # SH4 its bound 6 -> 7
-seven_string   0x013272c9  3:49f5d9d8   +2=07                        # BH1 bend head offset 0x13272a0, chord branch: the string guard 6 -> 7
+seven_string   0x010d3fce  2:ad7e5c14   +1=08                        # SH4 its bound 6 -> 8
+seven_string   0x013272c9  3:49f5d9d8   +2=08                        # BH1 bend head offset 0x13272a0, chord branch: the string guard 6 -> 8
 seven_string   0x013272de  4:701cce93   =8d841188090000              # BH1 its bend data `lea eax,[ecx+edx+0x18]` -> C8 bends[8] (+0x988)
 seven_string   0x013286f2  3:3858273c   +2=48                        # CT1 chord sustains 0x1328680: the template's frets -> T8 frets[8]
 seven_string   0x01328788  27:6e82c260  +0=81c148,+6=8d5128899538feffff8d5140898d44feffff83c130 # CT2 their per-string pointers: C8 slideUnpitchTo[8], mask[8], bends[8], vibrato[8]
@@ -727,30 +727,30 @@ seven_string   0x01326f38  7:623ed129   +3=70                        # NN6 slide
 seven_string   0x01326f8c  7:d5f75ac0   +0=6683f908909090            # PUBNN1 the chord loop's end `cmp cx,[edx+0xd00]` -> cmp cx, 8
 seven_string   0x01326659  4:09e0e67a   +3=48                        # NK1 Rnd_NeckTarget_Spawn's chord branch compares with T8 frets[8]
 seven_string   0x01327786  4:d04008e5   +3=48                        # NM2 neck-target slide motion 0x1327630: T8 frets[8]
-seven_string   0x0132778a  20:893cf52b  +0=80f9071bd223f20f84a10000008bbc8648090000 # NM1 its string < 7 -> C8 mask[8] (esi = 0 otherwise: the game's exit)
+seven_string   0x0132778a  20:893cf52b  +0=80f9081bd223f20f84a10000008bbc8648090000 # NM1 its string < 8 (was < 6), and the C8 mask[8] (esi = 0 otherwise: the game's exit)
 seven_string   0x013277ab  7:3603263d   +3=70                        # NM3 C8 slideUnpitchTo[8]
 seven_string   0x0132781b  7:191d8c75   +3=68                        # NM4 C8 slideTo[8]
-seven_string   0x01327999  35:76b9f08c  +0=0fb6d38b84914809000080fb077330a900004000750da9000800,+27=7422eb0490909090 # NM5 neck-target slide 0x1327960: C8 mask[8], string < 7
-seven_string   0x01327b0c  20:245000a4  +0=0fb645083c071bc98b55f8,+12=bc824809000023f9 # NM6 neck-target slide 0x1327a10: C8 mask[8], string < 7 (else mask 0)
+seven_string   0x01327999  35:76b9f08c  +0=0fb6d38b84914809000080fb087330a900004000750da9000800,+27=7422eb0490909090 # NM5 neck-target slide 0x1327960: C8 mask[8], string < 8
+seven_string   0x01327b0c  20:245000a4  +0=0fb645083c081bc98b55f8,+12=bc824809000023f9 # NM6 neck-target slide 0x1327a10: C8 mask[8], string < 8 (else mask 0)
 seven_string   0x01327b30  4:20d4b794   +3=48                        # NM7 its T8 frets[8]
 seven_string   0x01327b34  7:f9867115   +3=70                        # NM8 its C8 slideUnpitchTo[8]
 seven_string   0x01327b92  4:20d4b794   +3=48                        # NM9 its T8 frets[8], the second read
 seven_string   0x01327b96  7:50fcd7c0   +3=68                        # NM10 its C8 slideTo[8]
 seven_string   0x0110dabd  5:c53f30e4   +1=b0                        # FG6 finger keep/hide pass 0x110d9f0: the string index bias for T8 fingers[8]
 seven_string   0x0110dac2  3:f25e94f1   +2=50                        # FG7 its fingers base -> T8 fingers[8]
-seven_string   0x0110dac7  7:84bb09ec   +3=07                        # FG8 its loop count 6 -> 7
+seven_string   0x0110dac7  7:84bb09ec   +3=08                        # FG8 its loop count 6 -> 8
 seven_string   0x0110dad0  3:7c05e766   +2=f8                        # FG9 its fret = the fingers pointer - 8
 seven_string   0x0110e401  3:fda24b4b   +2=50                        # FG1 neck finger display 0x110e370: fingers base -> T8 fingers[8]
 seven_string   0x0110e410  3:bf625af9   +2=f8                        # FG2 its fret = the fingers pointer - 8 (T8 layout)
-seven_string   0x0110e49a  3:4051a674   +2=07                        # FG3 its per-string loop end 6 -> 7
+seven_string   0x0110e49a  3:4051a674   +2=08                        # FG3 its per-string loop end 6 -> 8
 seven_string   0x0110e4c6  5:a5879327   +4=48                        # FG4 finger marker 0x110e4b0: frets[string] from T8 frets[8]
 seven_string   0x01363876  2:a53632a3   =8a4744                      # PL1 the loop's fret `mov al,[edi]` -> [edi+0x44]: edi = T8 + 4 + s (TP12), so T8 frets[8]
 seven_string   0x013638a1  3:4ecb819e   +2=40                        # PL1 the bound reads the active count (+0x40), as the GuitarStrings pluck does
 seven_string   0x013638ac  4:05d69ffe   +3=40                        # PL1 the string from the native main[8] (+0x40)
-seven_string   0x013638c9  3:734a5d7c   +2=07                        # PL1 the loop's end 6 -> 7
+seven_string   0x013638c9  3:734a5d7c   +2=08                        # PL1 the loop's end 6 -> 8
 seven_string   0x010ddfdc  5:ee239eda   +3=48                        # SMa SNG_Song_PostProcessNotes, the section string mask's chord branch: T8 frets[8] (template from TP11)
-seven_string   0x010ddfe8  3:4051a674   +2=07                        # SMb its bit guard 6 -> 7
-seven_string   0x010de00c  3:4051a674   +2=07                        # SMc its chord loop end 6 -> 7
+seven_line   0x010ddfe8  3:4051a674   +2=08                        # SMb its bit guard 6 -> 8
+seven_line   0x010de00c  3:4051a674   +2=08                        # SMc its chord loop end 6 -> 8
 
 # headstock
 seven_string   0x011151c7  7:a779f646   +3=07                        # PSQ1 GuitarProfile_Load, guitar branch: peg pool request 6 -> 7

@@ -184,6 +184,16 @@ seven_pd2_chord     none  the Mac inlines the all-strings-slide test into the ch
 seven_pd4_sustain   none  the Mac inlines the all-strings-tremolo test into the sustain update; Learn & Play's is the function seven_pd4
 seven_pd5_eval      none  the Mac's unrolled slide-distance function; Learn & Play's is seven_pd5
 
+# the fixes of rs7string 1.0.0-beta.4: the song camera, the fret range glow
+seven_cam             0x01114f6a  (void *guitar@esi, uint32_t z_a@[esp+0x18], uint32_t z_b@[esp+0x24], uint32_t z_c@[esp+0x30], uint32_t z_guitar@edx)  # SC1 Rnd_Guitar_SendCameraMarkers 0x1114ed0 (Steam 0x593A1A), before the guitar becomes its info: the four outgoing vectors' z (three on the stack, the guitar's offset z in edx) get the floor's shift
+seven_frg1            0x00f8dbdd  (void *fx@ebx, void *player@[ebp+0xc])  # FRG1 Rnd_FretRangeFx_Init 0xf8d950 (Steam 0x40DCCD), after its four GetFretWireEnd calls: the effect's wire ends move, its pieces are recorded for their scale
+seven_frg2_scale      0x00f8b9f3  (void *obj@ebx, uint32_t scale_bits@ecx)  # FRG2 the glow update 0xf8b7e0 (Steam 0x40BAE3), a bar placed: the start of the scale edit: ecx = the scale's float bits, 0 for no Entity_SetScale
+seven_frg2b_scale     0x00f8bb70  (void *obj@ebx, uint32_t scale_bits@ecx)  # FRG2B the same update (Steam 0x40BC60), a bar moved: the same
+seven_frg3_scale      0x00f8c4f7  (void *obj@edi, uint32_t scale_bits@ecx)  # FRG3 the glow box's update 0xf8c4a0 (Steam 0x40C5E7), the box first placed: the same
+seven_frg2_setscale   none  Learn & Play injects the scale call itself (seven_frg2_scale)
+seven_frg2b_setscale  none  Learn & Play injects the scale call itself (seven_frg2b_scale)
+seven_frg3_setscale   none  Learn & Play injects the scale call itself (seven_frg3_scale)
+
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.
 fps_calib_window      0x0116adf5  (uint32_t window@edx)  # the calibration meter's start 0x116a9d0 (virtual, vtable cell 0x1d3180c; the Mac's 0x10065ce30): max(30, (int)(1 / frame time)) in edx, before it is stored at +0x788; the samples are 100 floats a player at +0x3d4 and +0x564, the meter's own state from +0x6f4

@@ -182,6 +182,16 @@ seven_pd5_eval    0x10011314f  (void *eval@rsi, int extreme@rax)  # PD5 Mac: 0x1
 # plain
 plain_pp_sngd  0x1001eb84a  (const uint8_t *src@rdi, uint32_t len@rsi, uint8_t *out@r8, uint32_t out_len@r9, uint8_t ok@rax) -> done=0x1001eb84f  # PP_SNGD the song file loader 0x1001eb6a0's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, SysV: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
 
+# the fixes of rs7string 1.0.0-beta.4: the song camera, the fret range glow
+seven_cam             0x1001a1157  (void *guitar@rsi, uint32_t z_a@[rbp-0x8c], uint32_t z_b@[rbp-0x80], uint32_t z_c@[rbp-0x74], uint32_t z_guitar@[rbp-0x98])  # SC1 Rnd_Guitar_SendCameraMarkers 0x1001a10a0 (LP 0x1114ed0), where the guitar's info is loaded: the four outgoing vectors' z, already copied to the stack, get the floor's shift
+seven_frg1            0x10065784c  (void *fx@r14, void *player@r13)  # FRG1 Rnd_FretRangeFx_Init 0x100657170 (LP 0xf8d950), after its four GetFretWireEnd calls (0x10019ce70)
+seven_frg2_scale      none  the Mac calls Entity_SetScale from the C (seven_frg2_setscale): no injected call
+seven_frg2b_scale     none  the Mac calls Entity_SetScale from the C (seven_frg2b_setscale): no injected call
+seven_frg3_scale      none  the Mac calls Entity_SetScale from the C (seven_frg3_setscale): no injected call
+seven_frg2_setscale   0x1006547a2  (void *obj@rbx)  # FRG2 the glow update 0x100654510 (LP 0xf8b7e0), a bar placed (the join after both ways of placing it): Entity_SetScale(entity, 1, k)
+seven_frg2b_setscale  0x1006548c9  (void *obj@rbx)  # FRG2B the same update, a bar moved: the same
+seven_frg3_setscale   0x100654d53  (void *obj@rbx)  # FRG3 the glow box's update 0x100654bc0 (LP 0xf8c4a0), after its first placement's Entity_SetTranslation
+
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840
 fps_calib_step_play   0x100662ca0  (float step@xmm3)  # the played phase 0x100662b90: +-0.001 x (min(|-22.5 - average|, 30) x 9.5 / 30 + 0.5), before it is added to the level at +0x8ac

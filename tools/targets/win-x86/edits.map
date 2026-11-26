@@ -755,6 +755,11 @@ seven_string   0x010de00c  3:4051a674   +2=07                        # SMc its c
 # headstock
 seven_string   0x011151c7  7:a779f646   +3=07                        # PSQ1 GuitarProfile_Load, guitar branch: peg pool request 6 -> 7
 
+# the fret range glow reaching all strings (rs7string 1.0.0-beta.4): after the game placed a glow piece, Entity_SetScale(entity, ecx) when ecx (seven_frg*_scale) is not 0; the game's own instruction first, again after (eax = the entity)
+seven_string   0x00f8b9f3  3:c4cc09bd  =8b431085c974fc5251e84f393a0083c4045a8b4310   # FRG2 in 0xf8b7e0 (Steam 0x40BAE3), a glow bar placed: the entity [ebx+0x10] scaled
+seven_string   0x00f8bb70  3:c4cc09bd  =8b431085c974fc5251e8d2373a0083c4045a8b4310   # FRG2B in 0xf8b7e0 (Steam 0x40BC60), a glow bar moved: the same
+seven_string   0x00f8c4f7  4:1e76814e  =0fb6471885c974fc5250518b4710e8462e3a0083c404585a   # FRG3 in 0xf8c4a0 (Steam 0x40C5E7), the glow box placed: the entity [edi+0x10] scaled, eax (the byte the game pushes) kept
+
 # plain
 plain_packages  0x010d9fca  11:5e80f013  =837c2468017404837c2468030f852f060000  # PP_SNGF the song file loader 0x10d9f80: its flags check takes 1 (compressed, not encrypted) as it takes 3 and goes on to the signature check; any other value goes to the reject path as before
 plain_packages  0x01422f13  5:ecc17232   =8b558c8b3af645ac047442b910000000      # PP_TOC the table of contents reader 0x1422d10, at the start of its decrypt block: the two registers the block leaves (the archive buffer's holder and the buffer) set first, then archive flags without 4 (a plain table of contents) go on after the block, others run it as before

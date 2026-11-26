@@ -98,6 +98,14 @@ Exported by `libRSOpenGL`, implemented for both backends, used by the shell, Lea
 offscreen contexts let every test run the same GL calls on both backends and compare pixels. See the
 header for the calls.
 
+`rs_gfx_set_switch` changes four switches while the game runs, for every context: `RS_METAL_SHARPEN`, `RS_METAL_MSAA`,
+`RS_METAL_ANISO` and `RS_METAL_COLORS` (the Mac edition's ADV DISPLAY SETTINGS, through the shell's `rsp_live_switch`,
+which sets `RS_METAL_DRAWABLES` and `RS_METAL_HUD` on its own layer; the HUD only in a game started with it, since
+enabling it costs CPU time each frame even hidden). Each is kept in an atomic the render thread
+reads, so from the next frame a pass takes the new MSAA count (a twin of another count is made again, and none for
+off), each texture's sampler is made again for the new anisotropy, the present sharpens by the new amount, and the
+next present sets the layer's colour space. Any other switch is read once, as the process starts.
+
 ## Metal core (`shims/opengl/src/metal/`)
 
 Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per thread.
@@ -179,6 +187,10 @@ Objective-C (`-fobjc-arc`), one context object per `rs_gfx_context`, current per
   the size it would have, and it is scaled up to the backing size the same way. Layer contexts are tagged sRGB
   (`CAMetalLayer.colorspace`), so macOS colour-matches the game's sRGB colours to the display;
   `RS_METAL_COLORS=vivid` leaves the layer untagged.
+- **Sharpening** (`RS_METAL_SHARPEN=N`, 0-100; 0 or unset: none): the present draws the frame with `rsm_sharpen_fs` in
+  place of a plain copy, at the drawable's own pixels, so after any upscaling. Each pixel is pushed away from its four
+  neighbours' mean, the more the higher N, and kept within their range (the limit of AMD's RCAS, written here, not
+  taken from its code): an edge gets steeper and never rings, and a flat area stays as it is.
 - **Conventions** (applied by the translator, so the core passes GL state through unchanged):
   - row 0 of every texture and render target is GL's bottom row; the vertex shader epilogue negates
     `y`, so viewport and scissor rectangles map 1:1 and uploads/reads need no flip; only present flips;

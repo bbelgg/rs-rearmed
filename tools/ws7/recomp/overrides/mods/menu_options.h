@@ -46,6 +46,9 @@ const char *rs_menu_locked(const rs_menu_option *o);
 extern const char RS_MENU_SESSION[];
 // Whether the renderer's RS_GL_BACKEND came from outside the game (the Mac shell's; NULL: not asked).
 extern int (*rs_menu_renderer_env_given)(void);
+// A choice handed on as the game runs as well (the Mac shell's rsp_live_switch; NULL: Learn & Play, which reads the
+// switches as it starts): 1 when it takes effect from the next frame on.
+extern int (*rs_menu_live_switch)(const char *name, const char *value);
 
 // The list's scroll bar: the overlay's edit of SettingsScene puts the game's own scroll bar beside the panel
 // (cache_overlay.py: BAR_GAP and THUMB_LEAST there, SettingsScene's BACKGROUND_* in the movie: the same numbers as

@@ -503,18 +503,23 @@ Clear overrides… unsets them after asking.
 
 Learn & Play sees a variable set this way too ([its switches](../windows/INSTALL.md#settings-and-switches)).
 
-**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists twelve of the switches after the game's own rows: FRAME RATE, ANY
-WINDOW SHAPE, RENDERER, MULTITHREADED GL ENGINE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE,
-ANTI-ALIASING, TEXTURE FILTERING, COLOR and PERFORMANCE OVERLAY. A change is written to `options.env` (the renderer to
-the `renderer` file), as the installer writes it, and takes effect the next time the game starts. A switch set for the
-login session (`launchctl setenv`; for the renderer, `RS_GL_BACKEND`) still wins over it, as over the installer's page,
-so its row shows the session's value, greyed, with SET FOR THIS SESSION, until it is unset (`launchctl unsetenv`) and
-the game started again. One set to the value `options.env` has can't be told apart: its row can be changed, but the
-session's value is the one used. The other renderer's rows are greyed too, and LOW LATENCY at a fixed FRAME RATE, where
-two frames are queued anyway (unless `RS_METAL_DRAWABLES` has a value the row has no choice for, such as 3: the row
-stays open, to take it out). The list scrolls with the focus, and its scroll bar can be dragged. They come with the
-menu overlay (`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with `RS_MODS_OVERLAY=0`. Learn & Play lists
-ten of them, without RENDERER and MULTITHREADED GL ENGINE ([its switches](../windows/INSTALL.md#settings-and-switches)).
+**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists thirteen of the switches after the game's own rows: FRAME RATE,
+ANY WINDOW SHAPE, RENDERER, MULTITHREADED GL ENGINE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER
+SCALE, SHARPENING, ANTI-ALIASING, TEXTURE FILTERING, COLOR and PERFORMANCE OVERLAY. A change is written to `options.env`
+(the renderer to the `renderer` file), as the installer writes it. LOW LATENCY, SHARPENING, ANTI-ALIASING, TEXTURE
+FILTERING and COLOR take effect at once, the others the next time the game starts. PERFORMANCE OVERLAY takes effect at
+once in a game started with it on (macOS 13 and later), else at the next start: the HUD is enabled only in a start with
+it, as it costs CPU time each frame even hidden. At a start, a switch set for the login session (`launchctl setenv`; for
+the renderer, `RS_GL_BACKEND`) still wins over the file, as over the installer's page, so its row shows the session's
+value, greyed, with SET FOR THIS SESSION, until it is unset (`launchctl unsetenv`) and the game started again. One set
+to the value `options.env` has can't be told apart: its row can be changed, but at the next start the session's value is
+the one used. A row that can't do anything with the choices made is greyed, with why: the other renderer's, LOW LATENCY
+at a fixed FRAME RATE, where two frames are queued anyway (unless `RS_METAL_DRAWABLES` has a value the row has no choice
+for, such as 3: the row stays open, to take it out), and METALFX UPSCALING with nothing upscaled. The list scrolls with
+the focus, and its scroll bar can be dragged. They come with the menu overlay
+(`tools/ws7/recomp/overrides/mods/menu_options.c`), so not with `RS_MODS_OVERLAY=0`. Learn & Play lists eleven of them,
+without RENDERER and MULTITHREADED GL ENGINE, each for the next start ([its
+switches](../windows/INSTALL.md#settings-and-switches)).
 
 Each row is a switch set away from its default, and what that does. Everything is compiled into the app; the
 `RS_METAL_` switches are for the Metal renderer.
@@ -544,6 +549,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
+| `RS_METAL_SHARPEN=N` | 0 | sharpen the picture on the screen by N%, 0-100, after any upscaling |
 | `RS_METAL_DRAWABLES=2`, or `3` | 3 with vsync, 2 without | the frames queued for the screen: 2 with vsync is low-latency presentation, each frame on the screen a refresh sooner and a late one shown as a repeat |
 | `RS_METAL_HUD=1` | off | Apple's Metal Performance HUD over the game (macOS 13 and later): its frame rate, frame times and GPU memory |
 | `RS_WINDOW_ANY_SHAPE=0` | on | a window keeps 16:9, as in the original ([Window modes](#window-modes)) |

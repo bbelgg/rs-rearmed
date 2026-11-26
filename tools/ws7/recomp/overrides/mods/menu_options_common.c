@@ -16,6 +16,7 @@
 
 #include "menu_options.h"
 #include "mods_shared.h"
+#include "rsp_scale.h"
 
 #define OFF_ON {"0", "1"}, {"$[31679]", "$[31678]"}  // the game's own Off and On
 enum { METAL = RS_MENU_METAL, OPENGL = RS_MENU_OPENGL };
@@ -28,6 +29,7 @@ rs_menu_option rs_menu_opts[] = {
     {"rsMetalFXUpscaling", "RS_METAL_UPSCALE", 0, METAL, 2, 1, OFF_ON, 0},
     {"rsFullRetina", "RS_METAL_RETINA", 0, METAL, 2, 0, OFF_ON, 0},
     {"rsRenderScale", "RS_METAL_SCALE", 1, METAL, 4, 3, {"50", "75", "90", ""}, {"50%", "75%", "90%", "100%"}, 0},
+    {"rsSharpening", "RS_METAL_SHARPEN", 1, METAL, 4, 0, {"", "30", "60", "100"}, {"OFF", "LOW", "MEDIUM", "HIGH"}, 0},
     {"rsAntiAliasing", "RS_METAL_MSAA", 1, METAL, 4, 2, {"1", "2", "4", "8"}, {"OFF", "2X", "4X", "8X"}, 0},
     {"rsTextureFiltering", "RS_METAL_ANISO", 1, METAL, 5, 4, {"1", "2", "4", "8", "16"},
      {"1X", "2X", "4X", "8X", "16X"}, 0},
@@ -210,12 +212,16 @@ static int session_set(const option *o) {
   return strcmp(v, line) != 0;
 }
 
+// The Mac's menu_options.c sets it to the shell's rsp_live_switch; Learn & Play has none.
+int (*rs_menu_live_switch)(const char *name, const char *value);
+
 void rs_menu_set_choice(option *o, int c) {
   o->now = c;
   const char *v = o->value[c];
   int r = o->env ? save_switch(o->env, c == o->dflt || !*v ? NULL : v) : save_renderer(v);
-  rs_mods_logf("menu options: %s %s%s", o->env ? o->env : "renderer", *v ? v : "(default)",
-               r ? " (not written)" : "");
+  int now = o->env && rs_menu_live_switch && rs_menu_live_switch(o->env, v);
+  rs_mods_logf("menu options: %s %s%s%s", o->env ? o->env : "renderer", *v ? v : "(default)",
+               r ? " (not written)" : "", now ? ", at once" : "");
 }
 
 void rs_menu_opts_init(int lp) {
@@ -246,18 +252,27 @@ static int fixed_rate(const option *fps) {
   return !*end && n >= 1 && n <= 1000;
 }
 
+// Whether the game starts next at a render scale below 100%: its notch's, or a value with no notch (60, hand-set in
+// options.env, say) read as the shell reads it, as fixed_rate does the frame rate's.
+static int upscaled(const option *scale) {
+  if (scale->now >= 0) return scale->now < scale->dflt;
+  return rsp_scale_value(getenv(scale->env)) < 1.0;
+}
+
 // Why an option can't be changed now, as its row says it (NULL: it can), by the choices the game starts with next:
 // an option of one renderer while the other is chosen (Learn & Play: Metal); Low Latency with a fixed frame rate,
-// whose presents are not held for the display and have the two drawables already; a switch the session sets
-// (session_set).
+// whose presents are not held for the display and have the two drawables already; MetalFX upscaling with nothing
+// upscaled (Full Retina at a render scale of 100%); a switch the session sets (session_set).
 const char RS_MENU_SESSION[] = "SET FOR THIS SESSION";
 const char *rs_menu_locked(const option *o) {
   const option *renderer = rs_menu_opt_of_id("rsRenderer"), *fps = rs_menu_opt_of_id("rsFrameRate");
+  const option *retina = rs_menu_opt_of_id("rsFullRetina"), *scale = rs_menu_opt_of_id("rsRenderScale");
   int r = renderer ? rs_menu_choice(renderer) : METAL - 1;
   if (o->only && o->only - 1 != r) return o->only == METAL ? "METAL ONLY" : "OPENGL ONLY";
   // (one whose switch has a value it has no choice for, RS_METAL_DRAWABLES=3, stays open: the row is the way to
   // take it out)
   if (!strcmp(o->id, "rsLowLatency") && o->now >= 0 && fixed_rate(fps)) return "DISPLAY RATE ONLY";
+  if (!strcmp(o->id, "rsMetalFXUpscaling") && rs_menu_choice(retina) == 1 && !upscaled(scale)) return "NOT UPSCALING";
   return o->session ? RS_MENU_SESSION : NULL;
 }
 

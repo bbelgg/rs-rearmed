@@ -43,6 +43,7 @@ RSMTL_WEAK rs_gfx_context *rsmtl_gfx_current(void) { return NULL; }
 RSMTL_WEAK void rsmtl_gfx_resize(rs_gfx_context *ctx, int w, int h) { (void)ctx, (void)w, (void)h; }
 RSMTL_WEAK void rsmtl_gfx_present(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK void rsmtl_gfx_set_output_size(rs_gfx_context *ctx, int w, int h) { (void)ctx, (void)w, (void)h; }
+RSMTL_WEAK int rsmtl_gfx_set_switch(const char *name, const char *value) { return (void)name, (void)value, 0; }
 RSMTL_WEAK void rsmtl_gfx_lock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK void rsmtl_gfx_unlock(rs_gfx_context *ctx) { (void)ctx; }
 RSMTL_WEAK CGLContextObj rsmtl_gfx_cgl(rs_gfx_context *ctx) { (void)ctx; return NULL; }
@@ -310,6 +311,10 @@ RS_EXPORT void rs_gfx_resize(rs_gfx_context *c, int w, int h) {
 RS_EXPORT void rs_gfx_set_output_size(rs_gfx_context *c, int w, int h) {
     if (METAL)
         rsmtl_gfx_set_output_size(c, w, h);
+}
+
+RS_EXPORT int rs_gfx_set_switch(const char *name, const char *value) {
+    return METAL && name ? rsmtl_gfx_set_switch(name, value ? value : "") : 0;
 }
 
 RS_EXPORT void rs_gfx_present(rs_gfx_context *c) {

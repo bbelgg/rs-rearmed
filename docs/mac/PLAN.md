@@ -46,6 +46,8 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
+- **Sharpening** (not released): `RS_METAL_SHARPEN=N` sharpens the picture on the screen after any upscaling, never
+  past a pixel's neighbours, so edges don't ring ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)).
 - **Performance overlay and low latency** (new in 1.20.0): `RS_METAL_HUD=1` shows Apple's Metal Performance HUD over
   the game (macOS 13 and later), and `RS_METAL_DRAWABLES=2` queues two frames for the screen instead of three with
   vsync, each shown a refresh sooner ([INSTALL.md](INSTALL.md#settings-and-switches)).
@@ -58,12 +60,13 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (50-100) and scales up with MetalFX. Played at 75% and 50% on an M1 MacBook Air: on its own Retina screen 50% took
   0.5 W off the GPU's 6.1 W, where `RS_METAL_UPSCALE=0` takes 2.7 W off; on a 1x external display nothing measurable
   ([PERFORMANCE.md](PERFORMANCE.md#measured-runs)).
-- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY not released): OPTIONS → ADV DISPLAY
-  SETTINGS lists twelve of the picture switches after the game's own rows, saved where the installer saves them, for the
-  next start; the other renderer's rows are greyed, as are those a switch set for the session (`launchctl setenv`)
-  holds, and the longer list scrolls, with a scroll bar that can be dragged
-  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists ten of them (not released;
-  [its plan](../windows/PLAN.md#status)).
+- **In the game's menu** (new in 1.19.0; LOW LATENCY and PERFORMANCE OVERLAY new in 1.20.0; SHARPENING and the rows
+  taking effect at once not released): OPTIONS → ADV DISPLAY SETTINGS lists thirteen of the picture switches after the
+  game's own rows, saved where the installer saves them, five of them taking effect at once (PERFORMANCE OVERLAY too, in
+  a game started with it); a row that can't apply is greyed with why, as is one a switch set for the session
+  (`launchctl setenv`) holds, and the longer list scrolls, with a scroll bar that can be dragged
+  ([INSTALL.md](INSTALL.md#settings-and-switches)). Learn & Play lists eleven of them (new in 1.20.0), four taking
+  effect at once (not yet run there; [its plan](../windows/PLAN.md#status)).
 
 **Built-in fixes** ([DESIGN.md](DESIGN.md#built-in-fixes-and-mods) says what each is for)
 

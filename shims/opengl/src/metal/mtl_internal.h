@@ -142,6 +142,7 @@ typedef struct {
     int swz;           // rsm_swizzle_*
     rsm_texparams p;
     id<MTLSamplerState> sampler;  // nil: rebuild from p
+    unsigned sampler_gen;          // rsm_aniso_gen() when it was made: another one is out of date
     uint64_t last_use;
     bool bound;
     uint64_t log_id;  // the texture log's hash of level 0 (mtl_texlog.m); 0 without the log
@@ -397,6 +398,7 @@ typedef struct {
     id<MTLTexture> own_view;       // the copy through a texture's swizzle, when it has one
     int own_view_swz;
     void *own_for;                 // the target own_copy holds, while the draw it was made for is drawn; else NULL
+    id<MTLRenderPipelineState> sharpen_pipeline;
     // One descriptor for every pass: a new one per pass costs more than the encoder's own setup on this side.
     MTLRenderPassDescriptor *pass_desc;
     MTLRenderPassColorAttachmentDescriptor *pass_desc_color;
@@ -432,6 +434,7 @@ typedef struct {
     id<MTLTexture> fx_out;        // its output, drawn into the drawable
     id<MTLSamplerState> linear_sampler;
     bool fx_tried;
+    unsigned colors_gen;           // rsm_colors_g when the layer's colours were last set
     id<MTLTexture> dummy_tex, dummy_cube;
     uint64_t next_uid;
 
@@ -547,6 +550,11 @@ MTLRenderPipelineDescriptor *rsm_pipeline_desc(id<MTLFunction> vs, id<MTLFunctio
 // Draws (mtl_draw.m).
 void rsm_draw_init(RSMContext *ctx);
 void rsm_present_draw(RSMContext *ctx, id<MTLTexture> drawable, id<MTLTexture> src, id<MTLSamplerState> smp);
+// Switches that change while the game runs (rsmtl_gfx_set_switch; "" is the default): mtl_draw.m's and mtl_objects.m's.
+void rsm_set_sharpen(const char *v);
+void rsm_set_msaa(const char *v);
+void rsm_set_aniso(const char *v);
+unsigned rsm_aniso_gen(void);  // changes with RS_METAL_ANISO: each texture's sampler is made again
 void rsm_pt_frame(RSMContext *ctx, id<MTLCommandBuffer> cb);  // RS_METAL_PASS_TIMES: the frame's last command buffer
 
 enum { RSM_SWZ_NONE, RSM_SWZ_RGB1, RSM_SWZ_LUM, RSM_SWZ_ALPHA, RSM_SWZ_LUM_ALPHA,

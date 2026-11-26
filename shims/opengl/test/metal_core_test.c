@@ -2493,6 +2493,43 @@ static void case_own_target(void) {
     glok("own target");
 }
 
+// RS_METAL_MSAA changed while a target stays bound (the game's menu changes it during play, through
+// rs_gfx_set_switch): the next pass takes the new count, whatever the bind decided. Turning MSAA off this way
+// once aborted in Metal's validation, with a multisample twin of one sample.
+static void case_msaa_switch(void) {
+    const char *was = getenv("RS_METAL_MSAA");
+    static const char *const counts[] = {"4", "1", "2", "1"};
+    GLuint color, ds;
+    GLuint fbo = make_fbo(&color, &ds, W, H);
+    GLuint p = program(kVS, kFScolor, "pos", NULL);
+    rs_gfx_set_switch("RS_METAL_MSAA", counts[0]);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+    glClearColor(0, 0, 0.5f, 1);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT);
+    for (int i = 0; i < 4; i++) {
+        uniform4(p, "color", i & 1 ? 1 : 0, i & 2 ? 1 : 0, 1, 1);
+        draw_rect(i * 8, i * 8, i * 8 + 8, i * 8 + 8);
+        snap();  // the pass ends; the target stays bound
+        rs_gfx_set_switch("RS_METAL_MSAA", i < 3 ? counts[i + 1] : counts[0]);
+    }
+    uniform4(p, "color", 1, 1, 1, 1);
+    draw_rect(40, 40, 48, 48);
+    snap();
+    check_px(4, 4, 0, 0, 255, 255, "drawn with MSAA");
+    check_px(12, 12, 255, 0, 255, 255, "drawn after MSAA was turned off");
+    check_px(20, 20, 0, 255, 255, 255, "drawn after it was turned back on");
+    check_px(28, 28, 255, 255, 255, 255, "drawn after it was turned off again");
+    check_px(44, 44, 255, 255, 255, 255, "drawn after it was turned on again");
+    check_px(60, 10, 0, 0, 128, 255, "the clear kept");
+    rs_gfx_set_switch("RS_METAL_MSAA", was ? was : "");
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glDeleteFramebuffers(1, &fbo);
+    glDeleteRenderbuffers(1, &ds);
+    glDeleteTextures(1, &color);
+    glok("msaa switch");
+}
+
 typedef struct {
     const char *name;
     void (*fn)(void);
@@ -2543,6 +2580,7 @@ static const test_case kCases[] = {
     {"key_reuse", case_key_reuse, 1},
     {"packed_float", case_packed_float, 1},
     {"own_target", case_own_target, 0},
+    {"msaa_switch", case_msaa_switch, 0},
     {"api", case_api, 0},
 };
 enum { N_CASES = sizeof kCases / sizeof kCases[0] };

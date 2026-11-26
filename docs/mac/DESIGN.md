@@ -67,7 +67,7 @@ The launcher (`tools/play-native/launch.sh`, run in the `~/Applications/RS Re-AR
 checks the copy is complete (telling a drive that is not connected from an incomplete copy), links `static.psarc` to the
 title logo or the original, keeps the game's `Rocksmith.ini` offline ([Online services](#online-services)), passes the
 built-in mods switched off in `settings.env` (only its nine switches) and the other switches set in `options.env` (only
-its 38; a value in the environment wins over either), seeds the
+its 39; a value in the environment wins over either), seeds the
 offline Steam saves once, and starts the game with the network guard inserted (`open -n -a`). Nothing of Steam's is read
 while the game runs, except `loginusers.vdf` for the account, and without it (Steam uninstalled) the account whose saves
 are there.
@@ -397,21 +397,21 @@ What each does:
   `mods_shared.c`, one rule for both editions). A movie the overlay doesn't hold opens as before, through a mod's
   own hook too (rearmed-mods serves three).
 - **RS Re-ARMed's options in ADV DISPLAY SETTINGS** (`RS_MODS_OVERLAY=0` leaves the menu as it is; Learn & Play has
-  ten of them, [its design](../windows/DESIGN.md)). The options, their switches and files and why a row is locked are
+  eleven of them, [its design](../windows/DESIGN.md)). The options, their switches and files and why a row is locked are
   one source with Learn & Play (`menu_options_common.c`); the rest of `menu_options.c` is this game's.
-  The overlay adds a button for each of twelve switches to the menu's definition
+  The overlay adds a button for each of thirteen switches to the menu's definition
   (`manifests/ui_menu_pillar_options.database.json`), with their labels and descriptions as new rows of the game's
-  text table (38901-38924, the English in every language), and the game lists, sorts and shows them with its own. The
+  text table (38901-38926, the English in every language), and the game lists, sorts and shows them with its own. The
   menu's code knows only the game's settings, so `tools/ws7/recomp/overrides/mods/menu_options.c` puts a native
   function in front of five of its methods, in the classes' vtables at the first frame: the list's refresh (each row's
-  current value, and the rows that can't apply locked, with why as their value: the other renderer's, Low Latency at a
-  fixed frame rate, and those the session sets: a switch whose value in the environment isn't `options.env`'s, since
-  the launcher passes the file's lines and prefers the session's, or an `RS_GL_BACKEND` set neither by the launcher,
-  for an OpenGL `renderer` file, nor by the shell's own restart (`rsp_renderer_env_given`)), a press (Edit Setting
-  opened on the switch), Edit Setting's build (a checkbox, or a notched slider as the game makes VISUAL QUALITY's) and
-  its input (a change written to `options.env`, the renderer to `renderer`). The menu's movie
-  (`gfxassets/views/displaysettings.gfx` of `static.psarc`, through the same hook as the lists) gets two edits: a
-  locked row's label in the movie's own greys, and the list, now longer than its panel, scrolled with the focus
+  current value; the rows that can't apply locked, with why as their value, and those the session sets locked with its
+  value: a switch whose value in the environment isn't `options.env`'s, since the launcher passes the file's lines and
+  prefers the session's, or an `RS_GL_BACKEND` set neither by the launcher, for an OpenGL `renderer` file, nor by the
+  shell's own restart, `rsp_renderer_env_given`), a press (Edit Setting opened on the switch), Edit Setting's build (a
+  checkbox, or a notched slider as the game makes VISUAL QUALITY's) and its input (a change written to `options.env`,
+  the renderer to `renderer`, and handed to the renderer at once where it can take it: `rsp_live_switch`). The menu's
+  movie (`gfxassets/views/displaysettings.gfx` of `static.psarc`, through the same hook as the lists) gets two edits:
+  a locked row's label in the movie's own greys, and the list, now longer than its panel, scrolled with the focus
   (SettingsScene's PopulateButtons wrapped), with the game's own scroll bar beside it. The menu has no code to drag
   that bar, so the fifth native function, in front of the list's input, does: a press on the bar starts a drag, and
   the game's own Up and Down move the focus to the row under the pointer.

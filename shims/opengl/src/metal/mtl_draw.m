@@ -25,6 +25,17 @@ static NSString *const kInternalMSL =
      "fragment float4 rsm_blit_fs(rsm_blit_v in [[stage_in]], texture2d<float> t [[texture(0)]],\n"
      "                            sampler s [[sampler(0)]]) {\n"
      "  return float4(t.sample(s, in.uv).rgb, 1.0);\n"
+     "}\n"
+     // The present sharpened (RS_METAL_SHARPEN): the pixel moved away from its four neighbours' mean by k, and kept
+     // within their range, so an edge gets steeper and never rings.
+     "struct rsm_sharp_u { float2 px; float k; };\n"
+     "fragment float4 rsm_sharpen_fs(rsm_blit_v in [[stage_in]], texture2d<float> t [[texture(0)]],\n"
+     "                               sampler s [[sampler(0)]], constant rsm_sharp_u &u [[buffer(0)]]) {\n"
+     "  float3 c = t.sample(s, in.uv).rgb;\n"
+     "  float3 n = t.sample(s, in.uv + float2(0, u.px.y)).rgb, so = t.sample(s, in.uv - float2(0, u.px.y)).rgb;\n"
+     "  float3 e = t.sample(s, in.uv + float2(u.px.x, 0)).rgb, w = t.sample(s, in.uv - float2(u.px.x, 0)).rgb;\n"
+     "  float3 lo = min(c, min(min(n, so), min(e, w))), hi = max(c, max(max(n, so), max(e, w)));\n"
+     "  return float4(clamp(c + u.k * (4.0 * c - n - so - e - w), lo, hi), 1.0);\n"
      "}\n";
 
 static id<MTLTexture> rsm_dummy(RSMContext *ctx, bool cube) {
@@ -76,17 +87,35 @@ void rsm_draw_init(RSMContext *ctx) {
 @implementation RSMMsaa
 @end
 
+// RS_METAL_MSAA's count, asked for (as the process started, or as rsm_set_msaa last set it: a twin of another count
+// is made again, so the change shows from the next frame); -1 before it is read.
+static _Atomic int rsm_msaa_asked = -1;
+
+static int rsm_msaa_value(const char *e) {
+    int n = e && *e ? atoi(e) : 4;
+    return n >= 8 ? 8 : n >= 4 ? 4 : n >= 2 ? 2 : 1;
+}
+
+void rsm_set_msaa(const char *v) { atomic_store(&rsm_msaa_asked, rsm_msaa_value(v)); }
+
 static int rsm_msaa_samples(RSMContext *ctx) {
-    static int v;
-    if (!v) {
-        const char *e = getenv("RS_METAL_MSAA");
-        int n = e && *e ? atoi(e) : 4;
-        n = n >= 8 ? 8 : n >= 4 ? 4 : n >= 2 ? 2 : 1;
+    static int asked = -1, v;  // (the render thread's)
+    int a = atomic_load(&rsm_msaa_asked);
+    if (a < 0) {
+        int was = -1;
+        atomic_compare_exchange_strong(&rsm_msaa_asked, &was, rsm_msaa_value(getenv("RS_METAL_MSAA")));
+        a = atomic_load(&rsm_msaa_asked);
+    }
+    if (a != asked) {
+        int n = a;
         while (n > 1 && ![ctx->dev supportsTextureSampleCount:(NSUInteger)n])
             n >>= 1;
+        asked = a;
         v = n;
         if (n > 1)
             rsm_log("MSAA %dx on the game's screen-sized targets with depth (RS_METAL_MSAA)", n);
+        else
+            rsm_log("MSAA off (RS_METAL_MSAA)");
     }
     return v;
 }
@@ -385,8 +414,9 @@ static bool rsm_begin_pass(__unsafe_unretained RSMContext *ctx) {
     // MSAA (above): the twins, when every target it loads has one that is up to date
     RSMMsaa *mc = nil, *md = nil;
     int samples = 1;
-    if (ctx->pass_msaa_shape) {
-        int n = rsm_msaa_samples(ctx);
+    // The shape was decided at the bind; the count may have changed since (rsm_set_msaa), to off as well.
+    int n = ctx->pass_msaa_shape ? rsm_msaa_samples(ctx) : 1;
+    if (n > 1) {
         mc = rsm_msaa_twin(ctx, color, n);
         md = rsm_msaa_twin(ctx, depth, n);
         bool ok = mc && md && (mc->valid || (pc & GL_COLOR_BUFFER_BIT)) && (md->valid || (pc & GL_DEPTH_BUFFER_BIT)) &&
@@ -1320,7 +1350,7 @@ static void rsm_draw(__unsafe_unretained RSMContext *ctx, GLenum mode, GLint fir
                 mt = instead;
             __unsafe_unretained id<MTLSamplerState> ms = ctx->present_sampler;
             if (t && t->mtl) {
-                if (!t->sampler)
+                if (!t->sampler || t->sampler_gen != rsm_aniso_gen())
                     rsm_texture_sampler(ctx, t);
                 ms = t->sampler;
                 t->last_use = ctx->serial;
@@ -1403,16 +1433,44 @@ void rsmtl_glDrawElementsInstancedARB(GLenum mode, GLsizei count, GLenum type, c
 }
 
 // --- Present -------------------------------------------------------------------------------
+// RS_METAL_SHARPEN=N, 0-100: the present sharpens the frame by N% (rsm_sharpen_fs's k, at most 0.5), after any
+// upscaling, at the drawable's own pixels. 0 or unset: none.
+static _Atomic int rsm_sharpen_v = -1;  // its percent: as the process started, or as rsm_set_sharpen last set it
+
+static int rsm_sharpen_value(const char *e) {
+    int n = e && *e ? atoi(e) : 0;
+    return n < 0 ? 0 : n > 100 ? 100 : n;
+}
+
+void rsm_set_sharpen(const char *v) {
+    int n = rsm_sharpen_value(v);
+    if (atomic_exchange(&rsm_sharpen_v, n) != n)
+        rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", n);
+}
+
+static float rsm_sharpen(void) {
+    int n = atomic_load(&rsm_sharpen_v);
+    if (n < 0) {
+        int was = -1, v = rsm_sharpen_value(getenv("RS_METAL_SHARPEN"));
+        if (atomic_compare_exchange_strong(&rsm_sharpen_v, &was, v) && v)
+            rsm_log("sharpening %d%% at present (RS_METAL_SHARPEN)", v);
+        n = atomic_load(&rsm_sharpen_v);
+    }
+    return (float)n / 200.0f;
+}
+
 void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src, id<MTLSamplerState> smp) {
-    if (!ctx->present_pipeline || ctx->present_pipeline.label.integerValue != (NSInteger)target.pixelFormat) {
+    float k = rsm_sharpen();
+    __strong id<MTLRenderPipelineState> *pipe = k > 0 ? &ctx->sharpen_pipeline : &ctx->present_pipeline;
+    if (!*pipe || (*pipe).label.integerValue != (NSInteger)target.pixelFormat) {
         MTLRenderPipelineDescriptor *d = [MTLRenderPipelineDescriptor new];
         d.vertexFunction = [ctx->internal_lib newFunctionWithName:@"rsm_blit_vs"];
-        d.fragmentFunction = [ctx->internal_lib newFunctionWithName:@"rsm_blit_fs"];
+        d.fragmentFunction = [ctx->internal_lib newFunctionWithName:k > 0 ? @"rsm_sharpen_fs" : @"rsm_blit_fs"];
         d.colorAttachments[0].pixelFormat = target.pixelFormat;
         d.label = [NSString stringWithFormat:@"%lu", (unsigned long)target.pixelFormat];
         NSError *e = nil;
-        ctx->present_pipeline = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
-        if (!ctx->present_pipeline) {
+        *pipe = [ctx->dev newRenderPipelineStateWithDescriptor:d error:&e];
+        if (!*pipe) {
             rsm_log("present pipeline: %s", e.localizedDescription.UTF8String);
             return;
         }
@@ -1424,9 +1482,13 @@ void rsm_present_draw(RSMContext *ctx, id<MTLTexture> target, id<MTLTexture> src
     if (rsm_pt_on())
         rsm_pt_pass_begin(rp, target, RSM_PT_PRESENT, 1, false, false);
     id<MTLRenderCommandEncoder> e = [rsm_cmd(ctx) renderCommandEncoderWithDescriptor:rp];
-    [e setRenderPipelineState:ctx->present_pipeline];
+    [e setRenderPipelineState:*pipe];
     [e setFragmentTexture:src atIndex:0];
     [e setFragmentSamplerState:smp atIndex:0];
+    if (k > 0) {  // one of the drawable's pixels in uv, and k
+        float u[4] = {1.0f / (float)target.width, 1.0f / (float)target.height, k, 0};
+        [e setFragmentBytes:u length:sizeof u atIndex:0];
+    }
     [e drawPrimitives:MTLPrimitiveTypeTriangle vertexStart:0 vertexCount:3];
     [e endEncoding];
 }

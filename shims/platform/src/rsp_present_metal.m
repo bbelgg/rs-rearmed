@@ -39,6 +39,7 @@ static struct {
   int (*prepare_progress)(rs_gfx_context *, int *, int *);  // optional too
   int (*warm_only)(double, double, FILE *);  // warm-only mode
   void (*set_output)(rs_gfx_context *, int, int);  // optional: upscaling to the backing pixels
+  int (*set_switch)(const char *, const char *);    // optional: a switch changed as the game runs
 } gfx;
 static int gfx_ok;
 
@@ -59,6 +60,7 @@ static void gfx_load(void) {
   *(void **)&gfx.prepare_progress = dlsym(RTLD_DEFAULT, "rs_gfx_prepare_progress");
   *(void **)&gfx.warm_only = dlsym(RTLD_DEFAULT, "rs_gfx_warm_only");
   *(void **)&gfx.set_output = dlsym(RTLD_DEFAULT, "rs_gfx_set_output_size");
+  *(void **)&gfx.set_switch = dlsym(RTLD_DEFAULT, "rs_gfx_set_switch");
 }
 
 struct rsp_mtl {
@@ -111,7 +113,47 @@ int rsp_mtl_retina(void) {
   return v;
 }
 
-int rsp_mtl_drawables(int swap_interval) { return rsp_layer_drawables(swap_interval != 0); }
+// Switches changed while the game runs (Adv Display Settings: rsp_live_switch). The layer's are applied by the
+// next present, on the frame thread; -1: as the process started.
+static atomic_int g_drawables = -1;  // RS_METAL_DRAWABLES's count, 0 for the default's
+static atomic_int g_hud = -1;
+static atomic_int g_layer_changed;
+
+int rsp_mtl_drawables(int swap_interval) {
+  int f = atomic_load(&g_drawables);
+  return f < 0 ? rsp_layer_drawables(swap_interval != 0) : f ? f : swap_interval ? 3 : 2;
+}
+
+static int hud_on(void) {
+  int v = atomic_load(&g_hud);
+  return v < 0 ? rsp_layer_hud() : v;
+}
+
+// The HUD switched as the game runs: only in a game started with it (its MTL_HUD_ENABLED set then, rsp_layer_env), on
+// macOS 13 and later (the layer's developerHUDProperties hide and show it). In one started without it, enabling it
+// for every start would cost CPU time each frame, so it waits for the next start.
+static int hud_live(void) {
+  if (__builtin_available(macOS 13.0, *)) return rsp_layer_hud();
+  return 0;
+}
+
+int rsp_live_switch(const char *name, const char *value) {
+  const char *v = value ? value : "";
+  if (!name) return 0;
+  if (!strcmp(name, "RS_METAL_DRAWABLES")) {
+    atomic_store(&g_drawables, rsp_layer_drawables_value(v));
+  } else if (!strcmp(name, "RS_METAL_HUD")) {
+    if (!hud_live()) return 0;
+    atomic_store(&g_hud, rsp_layer_hud_value(v));
+  } else {
+    static pthread_once_t once = PTHREAD_ONCE_INIT;
+    pthread_once(&once, gfx_load);
+    return gfx.set_switch ? gfx.set_switch(name, v) : 0;
+  }
+  atomic_store(&g_layer_changed, 1);
+  fprintf(stderr, "[rsp] %s=%s from the next frame on\n", name, *v ? v : "(its default)");
+  return 1;
+}
 
 // Frame thread or before the first frame: the layer's sync settings for `swap`.
 static void apply_swap(rsp_mtl *m, int swap) {
@@ -180,7 +222,7 @@ rsp_mtl *rsp_mtl_attach(NSView *view, int swap_interval) {
   CGFloat scale;
   view_size(view, &w, &h, &scale);
   layer.contentsScale = scale;
-  rsp_layer_show_hud(layer);
+  rsp_layer_show_hud(layer, hud_on());
   // Layer-hosting: AppKit never draws into it; the drawable is scaled to the bounds.
   [view setLayer:layer];
   [view setWantsLayer:YES];
@@ -244,7 +286,15 @@ void rsp_mtl_set_swap_interval(rsp_mtl *m, int interval) { atomic_store(&m->want
 
 void rsp_mtl_present(rsp_mtl *m) {
   int s = atomic_load(&m->want_swap);
-  if (s != m->swap) apply_swap(m, s);
+  if (atomic_exchange(&g_layer_changed, 0)) {
+    apply_swap(m, s);
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+    rsp_layer_show_hud(m->layer, hud_on());
+    [CATransaction commit];
+  } else if (s != m->swap) {
+    apply_swap(m, s);
+  }
   gfx.present(m->ctx);
 }
 

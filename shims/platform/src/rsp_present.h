@@ -81,6 +81,11 @@ void *rsp_mtl_context(rsp_mtl *m);       // the rs_gfx_context
 CGDirectDisplayID rsp_mtl_display(NSView *view);
 // RS_METAL_RETINA=1.
 int rsp_mtl_retina(void);
+// A switch changed while the game runs (Adv Display Settings; VALUE "" for its default), from the next frame on:
+// RS_METAL_DRAWABLES and RS_METAL_HUD here, the renderer's through rs_gfx_set_switch (RS_METAL_SHARPEN,
+// RS_METAL_MSAA, RS_METAL_ANISO, RS_METAL_COLORS). Any thread. 1: taken; 0: another switch (read
+// only as the process starts), or no libRSOpenGL that takes it.
+int rsp_live_switch(const char *name, const char *value);
 // Drawable count for a swap interval (rsp_layer_drawables: RS_METAL_DRAWABLES, else 3 with sync, 2 without).
 int rsp_mtl_drawables(int swap_interval);
 

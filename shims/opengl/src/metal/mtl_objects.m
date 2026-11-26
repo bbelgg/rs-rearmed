@@ -1388,18 +1388,36 @@ static MTLSamplerAddressMode rsm_wrap(GLenum w) {
 // RS_METAL_ANISO=N (1-16, default 16): the least anisotropy of a trilinear or bilinear mipmapped
 // texture, more than the game asks for (1 to 4); 1 keeps the game's own. The note highway and the
 // strings are seen at a shallow angle, where plain mipmapping blurs them along their length.
+// As the process started, or as rsm_set_aniso last set it: each texture's sampler is then made again (rsm_aniso_gen).
+static _Atomic int rsm_aniso_v;  // 0 before it is read
+static _Atomic unsigned rsm_aniso_g;
+
+static int rsm_aniso_value(const char *e) {
+    int n = e && *e ? atoi(e) : 16;
+    return n < 1 ? 1 : n > 16 ? 16 : n;
+}
+
+void rsm_set_aniso(const char *v) {
+    if (atomic_exchange(&rsm_aniso_v, rsm_aniso_value(v)) != rsm_aniso_value(v))
+        atomic_fetch_add(&rsm_aniso_g, 1);
+}
+
+unsigned rsm_aniso_gen(void) { return atomic_load(&rsm_aniso_g); }
+
 static int rsm_aniso_min(void) {
-    static int v;
+    int v = atomic_load(&rsm_aniso_v);
     if (!v) {
-        const char *e = getenv("RS_METAL_ANISO");
-        int n = e && *e ? atoi(e) : 16;
-        v = n < 1 ? 1 : n > 16 ? 16 : n;
+        int was = 0;
+        atomic_compare_exchange_strong(&rsm_aniso_v, &was, rsm_aniso_value(getenv("RS_METAL_ANISO")));
+        v = atomic_load(&rsm_aniso_v);
     }
     return v;
 }
 
 void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t) {
     const rsm_texparams *p = &t->p;
+    // (its generation before the anisotropy: one changed in between makes this sampler out of date, not current)
+    unsigned gen = rsm_aniso_gen();
     // Levels the sampler may use: GL_TEXTURE_MAX_LEVEL, and level 0 only when the
     // min filter has no mipmaps.
     bool mip = p->min_filter != GL_NEAREST && p->min_filter != GL_LINEAR;
@@ -1441,6 +1459,7 @@ void rsm_texture_sampler(RSMContext *ctx, RSMTexture *t) {
         rsm_map_put(&ctx->samplers, &key, s);
     }
     t->sampler = s;
+    t->sampler_gen = gen;
 }
 
 // Swizzle is not allowed on render-target textures: sample through a view.

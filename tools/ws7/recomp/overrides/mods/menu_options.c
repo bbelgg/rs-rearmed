@@ -12,7 +12,8 @@
 //                                               our buttons' CurrentSettingValue, the value the list's "CURRENT
 //                                               SETTING:" line shows, and those that can't be changed now locked,
 //                                               greyed by the overlay's edit of the movie, with why (locked: the
-//                                               other renderer's, Low Latency at a fixed rate, the session's switches)
+//                                               other renderer's, Low Latency at a fixed rate, MetalFX with nothing
+//                                               upscaled, the session's switches)
 //   AdvancedDisplaySettings, menu_press_slot    a press on one of our buttons ("Buttons.<id>.States"): the edited
 //                                               setting is ours and Edit Setting opens, as for the game's own (not
 //                                               for a locked one); any other press is the game's
@@ -153,6 +154,9 @@ typedef rs_menu_option option;
 #define SESSION RS_MENU_SESSION
 // The Mac shell's (shims/platform/include/rsp_renderer.h).
 extern int rsp_renderer_env_given(void) __attribute__((weak_import));
+// The Mac shell's (shims/platform/src/rsp_present.h): a switch changed as the game runs, taken from the next frame
+// on where it can be (Low Latency, Sharpening, Anti-Aliasing, Texture Filtering, Color, Performance Overlay).
+extern int rsp_live_switch(const char *name, const char *value) __attribute__((weak_import));
 
 static option *opt_current(void) { return rs_menu_opt_named(RC_LD(const char *, RC_GA(menu_current_setting))); }
 
@@ -358,6 +362,7 @@ static int before_frame(rc_ctx *c, void *user) {
   static atomic_int done;
   if (atomic_exchange(&done, 1) || !rs_mods_cfg.overlay) return 0;
   rs_menu_renderer_env_given = rsp_renderer_env_given;
+  rs_menu_live_switch = rsp_live_switch;
   rs_menu_opts_init(0);
   for (size_t i = 0; i < NOPTS; i++)
     g_opts[i].name = (const char *)(uintptr_t)OV_GUEST(fixed_string_create, (uint64_t)(uintptr_t)g_opts[i].id);

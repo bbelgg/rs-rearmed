@@ -313,14 +313,16 @@ the other on/off switches, and `KEY=value` for the rest: other lines are ignored
 has is passed on and does nothing), and the top of `logs/last-run.log` says what was used. The Mac edition has
 its own files, read the same way. 
 
-**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists ten of the switches after the game's own rows: FRAME RATE, ANY
-WINDOW SHAPE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, ANTI-ALIASING, TEXTURE FILTERING,
-COLOR and PERFORMANCE OVERLAY (the Mac edition's twelve without RENDERER and MULTITHREADED GL ENGINE). A change is
-written to `options.env`, as the installer writes it, and takes effect the next time the game starts. A switch set for
-the login session (`launchctl setenv`) still wins over it, so its row shows the session's value, greyed, with SET FOR
-THIS SESSION; LOW LATENCY is greyed at a fixed FRAME RATE, unless
-`RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row can then take out. The list scrolls with the
-focus, and its scroll bar can be dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
+**In the game.** OPTIONS → ADV DISPLAY SETTINGS lists eleven of the switches after the game's own rows: FRAME RATE, ANY
+WINDOW SHAPE, LOW LATENCY, METALFX UPSCALING, FULL RETINA RESOLUTION, RENDER SCALE, SHARPENING, ANTI-ALIASING, TEXTURE
+FILTERING, COLOR and PERFORMANCE OVERLAY (the Mac edition's thirteen without RENDERER and MULTITHREADED GL ENGINE). A
+change is written to `options.env`, as the installer writes it. SHARPENING, ANTI-ALIASING, TEXTURE FILTERING and COLOR
+take effect at once, as in the Mac edition, the others the next time the game starts (the Mac edition also takes LOW
+LATENCY at once, and PERFORMANCE OVERLAY in a game started with it). A switch set for the login session
+(`launchctl setenv`) still wins over it, so its row shows the session's value, greyed, with SET FOR THIS SESSION; LOW
+LATENCY is greyed at a fixed FRAME RATE, unless `RS_METAL_DRAWABLES` has a value it has no choice for (3), which the row
+can then take out, and METALFX UPSCALING with nothing upscaled. The list scrolls with the focus, and its scroll bar can
+be dragged. They come with the menu overlay, so not with `RS_MODS_OVERLAY=0`.
 
 ```
 RS_MODS_INTRO=0
@@ -369,6 +371,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_METAL_COLORS=vivid` | sRGB | leave the picture untagged, so a wide-colour (P3) screen, such as a Mac's own, shows it more saturated than the game made it |
 | `RS_METAL_ANISO=N` | 16 | the least anisotropic filtering of mipmapped textures, 1-16; 1 keeps the game's own (1x to 4x) |
 | `RS_METAL_MSAA=N` | 4 | MSAA on the game's 3D picture (its screen-sized targets with depth): 1 (off), 2, 4 or 8 |
+| `RS_METAL_SHARPEN=N` | 0 | sharpen the picture on the screen by N%, 0-100, after any upscaling |
 | `RS_METAL_DRAWABLES=2`, or `3` | 3 with vsync, 2 without | the frames queued for the screen: 2 with vsync is low-latency presentation, each frame on the screen a refresh sooner and a late one shown as a repeat |
 | `RS_METAL_HUD=1` | off | Apple's Metal Performance HUD over the game (macOS 13 and later): its frame rate, frame times and GPU memory |
 | `RS_WINDOW_ANY_SHAPE=0` | on | 16:9 with bars, as on Windows, and a resized window keeps the game's resolution ([Window modes](#window-modes)) |

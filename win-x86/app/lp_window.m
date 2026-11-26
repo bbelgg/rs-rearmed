@@ -534,7 +534,7 @@ rs_gfx_context *d3d9_platform_context(uint32_t hwnd, int w, int h) {
     // RS_METAL_DRAWABLES's, else 2 without vsync and 3 with it
     if (rsp_fps()) layer.displaySyncEnabled = NO;
     layer.maximumDrawableCount = (NSUInteger)rsp_layer_drawables(!rsp_fps());
-    rsp_layer_show_hud(layer);
+    rsp_layer_show_hud(layer, rsp_layer_hud());
     v.wantsLayer = YES;
     v.layer = layer;
     g_view = v;

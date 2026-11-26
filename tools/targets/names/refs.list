@@ -498,6 +498,8 @@ peg_slot_dtor
 tuning_store_song_select2
 tuning_store_song_select3
 tuning_store_guitarcade3
+# wave2 P2 extended bass
+tuner_bass_open_midi  # int32[6]: the tuner's bass open notes (28 33 38 43 0 0): the low B / high C slots take 23 / 48
 # --- Seven-String Guitar: end
 # --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c)
 menu_current_setting      # const char *: the setting Edit Setting edits, the fixed string a press sets

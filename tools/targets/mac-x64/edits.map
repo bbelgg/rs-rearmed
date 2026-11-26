@@ -641,6 +641,10 @@ seven_string   0x10010e3f9  5:edb68961  =4e8d343b    # RL2 in 0x10010e3c0 (LP 0x
 seven_string   0x10010e4b5  3:34eb50fd  =498d7e08    # RL2 in 0x10010e3c0: Play_Eval_ClearState gets the eval as before
 seven_string   0x10010fc71  3:dfc71f42  =4889f34889758048c745c8ffffffff # AM1 in 0x10010fc60 (LP 0x13f53a0): the template (a T8) kept at [rbp-0x80] for seven_am1/seven_am1_b (rbx becomes the shift); targets 6/7 at [rbp-0x38] = -1 (an int32[8] at [rbp-0x50] if the points do nothing)
 
+# wave2 P2 extended bass: the expected pitch of bass strings 4 / 5 (rs7string PE0's bass path: low B 23, high C 48; they were -1)
+seven_string   0x10017a952  11:707b5d38  =83fe060f831400000083fe047215b8170000000f8404000000b830000000e9faffffff8d44b61ce9f1ffffff  # PE0 in 0x10017a940 (the vector tuning's expected pitch), the bass branch `cmp esi,4; jae; lea eax,[rsi+4*rsi+0x1c]; jmp`: strings 0-3 the game's 5 * s + 28, string 4 the base 23, 5 the base 48, above 5 the base it loaded (-1); all join at 0x10017a96f
+seven_string   0x10017ab53  11:1ba31d7d  =83fe060f830200000083fe047215b8170000000f84fbffffffb830000000e9f1ffffff8d44b61ce9e8ffffff  # PE0B in 0x10017ab30 (the same with an InstrumentInfo), the bass branch: as PE0; above 5 it goes on at the -1 load (0x10017ab5e), the rest join at 0x10017ab67
+
 # plain
 plain_packages  0x1001eb6fb  10:c201113a  =837dc0017404837dc0030f85bb050000  # PP_SNGF the song file loader 0x1001eb6a0: its flags check takes 1 (compressed, not encrypted) as it takes 3 and goes on to the signature check; any other value goes to the reject path as before
 plain_packages  0x100161893  4:010fdda3   =4c897da0f645d4047431                # PP_TOC the table of contents reader 0x100161780, at the start of its decrypt block: the register the block saves is saved as before, then archive flags without 4 (a plain table of contents) go on after the block, others run it as before

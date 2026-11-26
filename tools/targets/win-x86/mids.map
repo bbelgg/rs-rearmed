@@ -207,6 +207,12 @@ seven_tf2           0x01133e85  (void *session@edi, uint8_t lefty@[ebp-0x44], fl
 
 # wave2 P3 eight-string chords: a marker (a callback that does nothing): its presence says this RS Re-ARMed's edits run the chord loops over eight strings
 seven_e8   0x010ea96f  ()  # E8 seven_pp1's function (run once a song loads; any harmless instruction would do), after the pp1 point, `test eax, eax`
+# wave2 P2 extended bass (rs7string PSN3, LT0, PBH)
+seven_psn3        0x01131ef2  (void *slot@[esp], uint32_t sp@esp) -> skip=0x01131ef7  # PSN3 the tuner's per-peg loop 0x1131e80 (Steam 0x5B0960, up to InstrumentInfo +0xb), the call of the named-colour dispatch 0x111d360 (the slot pushed, `ret 4`): a NULL slot (a bass peg without a seat on the stock 4-peg headstock) skips the call and drops its argument, as seven_psn2
+seven_lt0         0x01132fc0  (void *slot@eax, int index@edx, void *pegs@ecx)  # LT0 UI_PlayerTuner_PlacePegLetters 0x1132f00 (Steam 0x5B1A10), `mov esi,[eax+4]` of the peg slot edx's record (0 for an empty slot): a slot without a seat takes the record of the nearest seated one
+seven_pbh         0x01364952  (int channel@[ebp-0x7c], void *data@[ebp-0x78], float semis@[ebp-0x44], float now@[ebp-0x5c], uint8_t ok@eax)  # PBH Rnd_Note_UpdateInProgress, after the single-note bend read 0x106ad20 (its `add esp,8`; al = read ok, [ebp-0x44] the semitones): the low B of an extended bass holds its last good reading
+seven_s1_bass     none  Learn & Play's seven_s1 is the join the bass branch of 0x13f3d60 goes to: it covers the bass strings 4 / 5 too
+seven_s1b_bass    none  as seven_s1_bass
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

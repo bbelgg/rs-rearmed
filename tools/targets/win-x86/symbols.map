@@ -1316,6 +1316,8 @@ peg_slot_dtor                unsupported  the Mac game's (Seven-String Guitar); 
 tuning_store_song_select2    0x011c6474 code -  # the Mac copies Play_SetPlayerTuningFromManifest per caller; here the one of tuning_store_song_select
 tuning_store_song_select3    0x011c6474 code -  # as tuning_store_song_select2
 tuning_store_guitarcade3     0x01187cac code -  # the Mac's third copy; here the one of tuning_store_guitarcade
+# wave2 P2 extended bass
+tuner_bass_open_midi           0x01d19c54  data      int32_t[6]  # rs7string's 0x1199CA4 (X_TBASS: 28 33 38 43 0 0; ApplyTuning 0x1130767, ResetStandard, GetTolerance): the bass tuning's open notes; [4] / [5] are 0, the low B / high C take 23 / 48
 # --- Seven-String Guitar: end
 # --- Adv Display Settings' own options (built in: overrides/mods/menu_options.c; here win-x86/shims/win32_menu_options.c)
 menu_current_setting                                             0x1e6958c    data      const char *  # the edited setting's name: the press 0x117c9c0 stores "Brightness" (0x117ca23), Edit Setting's build interns it as the control's key (0x117d871) and compares it (0x13e72e0)

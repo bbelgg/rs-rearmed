@@ -181,6 +181,12 @@ seven_pubbc_setscale
 seven_tf2
 # wave2 P3 eight-string chords: the marker that says the tables' loops cover eight strings
 seven_e8
+# wave2 P2 extended bass (rs7string PSN3, LT0, PBH; the Mac's bass paths of S1)
+seven_psn3
+seven_lt0
+seven_pbh
+seven_s1_bass
+seven_s1b_bass
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

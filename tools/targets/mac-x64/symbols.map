@@ -1259,6 +1259,8 @@ peg_slot_dtor                0x1001b63e0 sysv void(void *slot)  # the PegSet dto
 tuning_store_song_select2    0x1006b1715 code -  # another copy, from NonStopPlay's pre-song tuner 0x1006afe90 (LP: = song_select)
 tuning_store_song_select3    0x10085a9a5 code -  # another copy, from Score Attack 0x100859eb0 (LP: = song_select)
 tuning_store_guitarcade3     0x10054c649 code -  # GUESS: 0x10054c590 from the Guitarcade tuner 0x100546e30 (LP: = guitarcade)
+# wave2 P2 extended bass
+tuner_bass_open_midi           0x1013ed0c0 data int32_t[6]  # the same table (ApplyTuning 0x100528f70's r9 at 0x100528fd0, GetTolerance 0x100529159); the guitar's follows at 0x1013ed0e0
 # --- Seven-String Guitar: end
 # --- Learn & Play's built-in fixes (names/refs.list, win-x86/shims/win32_overrides.c): what that game has as a function
 # or global of its own

@@ -412,6 +412,8 @@ fxpiece_hash                0x10    # a glow piece (box, bar): u32 its effect ha
 fxpiece_entity              0x18    # a glow piece: its entity (0x100654d53, 0x1006547a6); Learn & Play 0x10
 # tuner and pitch fixes (rs7string beta.4)
 detection_floor             0x1308  # [0x11f4] detection: s32 raw candidate floor MIDI, 0x18 from Play_Detector_Reset (0x10021bda7); read at 0x100221fe5, 0x10022244b, 0x10022519f
+# wave2 P2 extended bass
+sng_note_string                0x10    # SNG note: u8, the string (Rnd_Note_UpdateInProgress 0x10043a687's [note + 0x10])
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: overrides/mods/framerate.c)
 service_holder_frame_dt      0x16c  # the frame tick 0x1000e0330 stores min((ms now - ms before) / 1000, 1/15) here (movss at 0x1000e0520); its getter is 0x1000dd0c0

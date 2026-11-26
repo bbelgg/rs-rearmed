@@ -766,6 +766,9 @@ seven_string   0x01364e08  4:84a59d6d   +3=40                        # CLVE and 
 # barre markers over all strings (rs7string PUBBC)
 seven_barre   0x0110df49  7:505ec0d6   =c743140100000085c974fc518b4304e8f313220083c404518b4308e8e713220083c404  # PUBBC finger marker update 0x110dd80, its span changed: Entity_SetScale(capsule, ecx) on the entities [ebx+4], [ebx+8] unless ecx (seven_pubbc_scale) is 0
 
+# wave2 P2 extended bass: the expected pitch of bass strings 4 / 5 (rs7string PE0's bass path: low B 23, high C 48; they were -1)
+seven_string   0x013f3cb5  5:49c633c4  =83fa030f86fcffffffb91700000083fa040f840f000000b93000000083fa050f840100000083c9ffe9f9ffffff  # PE0 0x13f3c70's bass branch `cmp edx,3; ja`: strings 0-3 go on at the game's jump table, string 4 takes the base 23, 5 the base 48 and join the base add at 0x13f3cdb; above 5 the base stays -1
+
 # plain
 plain_packages  0x010d9fca  11:5e80f013  =837c2468017404837c2468030f852f060000  # PP_SNGF the song file loader 0x10d9f80: its flags check takes 1 (compressed, not encrypted) as it takes 3 and goes on to the signature check; any other value goes to the reject path as before
 plain_packages  0x01422f13  5:ecc17232   =8b558c8b3af645ac047442b910000000      # PP_TOC the table of contents reader 0x1422d10, at the start of its decrypt block: the two registers the block leaves (the archive buffer's holder and the buffer) set first, then archive flags without 4 (a plain table of contents) go on after the block, others run it as before

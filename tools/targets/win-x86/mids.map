@@ -216,6 +216,8 @@ seven_s1b_bass    none  as seven_s1_bass
 # wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
 seven_gkb             0x0111523d  (void *profile@esi)                                                    # GKB GuitarProfile_Load 0x1115091, the bass branch's store of its peg word (after `mov [esi+0x38], 4`; Steam 0x593D33's twin): the extended bass's count
 seven_gkp             0x01115244  (void *profile@esi)                                                    # GKP GuitarProfile_Load after both branches' peg-word stores (the guitar's `jmp 0x1115244` and the bass's fall-through): the peg word of 8 strings and of an extended bass
+# wave3 coop local co-op: player 1's guitar or bass rebuilt through the game's own rebuild
+seven_gkr             0x013e3abe  (int player@ecx)  # GKR guitar_rebuild_player0 0x13e3a60 (the Lua rebuild), before its `call Rnd_Guitar_EnsureForPlayer 0x1117400` (thiscall: ecx = player, one stack argument, `xor ecx, ecx` just before it): ecx is player 0 there, set to the player of the rebuild asked for; the attach after it runs for both holders
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.

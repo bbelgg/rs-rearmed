@@ -215,6 +215,8 @@ seven_s1b_bass    0x10017a9af  (void *tuning@rcx, int string@rsi, int pitch@rax)
 # wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
 seven_gkb             none  the Mac's GKC point follows both branches' common store: the bass's count is written there
 seven_gkp             0x1001a1dbb  (void *profile@r13)                                                  # GKP GuitarProfile_Load 0x1001a1be0 after `mov [r13+0x4a], cx` (the peg word; both branches): the peg word of 8 strings and of an extended bass
+# wave3 coop local co-op: player 1's guitar or bass rebuilt through the game's own rebuild
+seven_gkr             none  the Mac's guitar_rebuild_player0 0x1001c3340 takes the player (its edi, passed on in esi to 0x1001ac2f0: EnsureForPlayer 0x1001a7ce0 then the attach): nothing to set
 
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      0x10065d62f  (uint32_t window@rcx)  # the calibration meter's start 0x10065ce30 (virtual): max(30, (int)(1 / frame time)) in ecx, before its store to the meter's +0x8ec; the samples are 100 floats a player at +0x520 and +0x6b0, the meter's own state from +0x840

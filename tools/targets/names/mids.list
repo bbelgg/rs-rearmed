@@ -190,6 +190,8 @@ seven_s1b_bass
 # wave2 P1 the strings of 8-string guitars and 5/6-string basses: the profile's count and pegs
 seven_gkb
 seven_gkp
+# wave3 coop local co-op: player 1's guitar or bass rebuilt through the game's own rebuild
+seven_gkr
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

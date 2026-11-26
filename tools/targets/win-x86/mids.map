@@ -184,6 +184,11 @@ seven_pd2_chord     none  the Mac inlines the all-strings-slide test into the ch
 seven_pd4_sustain   none  the Mac inlines the all-strings-tremolo test into the sustain update; Learn & Play's is the function seven_pd4
 seven_pd5_eval      none  the Mac's unrolled slide-distance function; Learn & Play's is seven_pd5
 
+# native N-string charts (rs7string beta.5, docs/release/NATIVE-FORMAT.md): the package, manifest and chart read in the unit's own form
+seven_native_psarc  0x01422da0  (uint32_t magic@eax, uint32_t stored@[ebp-0x70])  # PN1 the PSARC open function 0x1422d10: the byte-swapped header magic, at its `cmp eax, "PSAR"`; stored is where it was just kept ([ebp-0x70], copied into the table of contents buffer): a native package's "PSXR" becomes "PSAR" in both
+seven_native_json   0x01408a90  (void *cursor@[esp+0xc])  # JM1 the JSON parser's entry 0x1408a90 (cdecl: the output, 0, the address of the text pointer; the object and array parsers 0x13f810f, 0x1400f1f call it too): a text with native arrangements is rewritten, the text pointer moved to the new text
+seven_native_sng    0x010da186  (const void *body@[esp+0x24], uint32_t size@[esp+0x2c]) -> fail=0x010da5f9  # XI1 SNG_Song_Load 0x10d9f80 after its inflate checks (cmp [esp+0x6c], ecx; jne), before the first section's parser: the inflated body's memory stream (+0x10 buffer, +0x18 size, at [esp+0x14]); fail is the loader's own failure exit, the target of that jne
+
 # Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz. The
 # Windows code keeps these values in memory or on the x87 stack, and its objects in esi.
 fps_calib_window      0x0116adf5  (uint32_t window@edx)  # the calibration meter's start 0x116a9d0 (virtual, vtable cell 0x1d3180c; the Mac's 0x10065ce30): max(30, (int)(1 / frame time)) in edx, before it is stored at +0x788; the samples are 100 floats a player at +0x3d4 and +0x564, the meter's own state from +0x6f4

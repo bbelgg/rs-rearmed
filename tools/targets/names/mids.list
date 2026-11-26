@@ -159,6 +159,10 @@ seven_pd4_update
 seven_pd2_chord
 seven_pd4_sustain
 seven_pd5_eval
+# native N-string charts (rs7string beta.5, docs/release/NATIVE-FORMAT.md): the package, manifest and chart read in the unit's own form
+seven_native_psarc
+seven_native_json
+seven_native_sng
 # --- Seven-String Guitar: end
 # --- Frame rate (built in: tools/ws7/recomp/overrides/mods/framerate.c): what the game counts in frames, as at 60 Hz
 fps_calib_window      # calibration's start: its averaging window, before it is stored

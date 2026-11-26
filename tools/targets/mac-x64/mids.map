@@ -179,6 +179,11 @@ seven_pd2_chord   0x10011130c  (void *eval@rbx, uint8_t result@rax)  # PD2 Mac: 
 seven_pd4_sustain 0x1001118c3  (void *eval@rbx, uint8_t result@rax)  # PD4 Mac: 0x100111830 (LP 0x13f7480's call of 0x13f7bb0), al after string 5
 seven_pd5_eval    0x10011314f  (void *eval@rsi, int extreme@rax)  # PD5 Mac: 0x100113040 (LP 0x13f7bf0), the extreme slide distance in eax at its end (its caller reads eax only)
 
+# native N-string charts (rs7string beta.5, docs/release/NATIVE-FORMAT.md): the package, manifest and chart read in the unit's own form
+seven_native_psarc  0x1001617d6  (uint32_t magic@rax, uint32_t stored@[rbp-0x48])  # PN1 the PSARC open function 0x100161780 (LP 0x1422d10): the header magic as the file has it (before its bswap), at the `cmp eax, "PSAR"`; stored is the header copy that the bswap then overwrites: a native package's "PSXR" becomes "PSAR"
+seven_native_json   0x1001052c0  (void *cursor@rdx)  # JM1 the JSON parser's entry 0x1001052c0 (LP 0x1408a90; SysV: the output, 0, the address of the text pointer): a text with native arrangements is rewritten, the text pointer moved to the new text
+seven_native_sng    0x1001eb928  (const void *body@[rbp-0x98], uint32_t size@[rbp-0x8c]) -> fail=0x1001ebcce  # XI1 SNG_Song_Load 0x1001eb6a0 (LP 0x10d9f80) after its inflate checks (cmp eax, [rbp-0xc0]; jne), before the first section's parser: the inflated body's memory stream (at [rbp-0xb8]); fail is the loader's own failure exit (result 0), the target of that jne
+
 # plain
 plain_pp_sngd  0x1001eb84a  (const uint8_t *src@rdi, uint32_t len@rsi, uint8_t *out@r8, uint32_t out_len@r9, uint8_t ok@rax) -> done=0x1001eb84f  # PP_SNGD the song file loader 0x1001eb6a0's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, SysV: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
 

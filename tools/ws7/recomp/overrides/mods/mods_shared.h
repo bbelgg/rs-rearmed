@@ -25,6 +25,10 @@
 //                      the original (default: as at 60 Hz at any rate; framerate.h)
 //   RS_MODS_GUITARCADE_SKIP=0 a Guitarcade game's tuner has no Skip Tuner, as in the original (default: it has
 //                      the one a song's tuner has)
+//   RS_MODS_MENU_RETRY=0 a menu movie the game asked for before the file index had it is not asked for again, as in
+//                      the original: the screen may stay white for good (default: asked again when the file is indexed)
+//   RS_MODS_ARRANGEMENTS=0 Learn a Song's page fills a slot for every arrangement of a song, as in the original: a song
+//                      with more than five arrangements crashes it (default: the page shows four alternates)
 //   RS_MODS_LOG=1      log what is applied, to stderr (the edition's log)
 typedef struct {
   int bypass;
@@ -36,6 +40,8 @@ typedef struct {
   int overlay;
   int log;
   int guitarcade_skip;  // Skip Tuner in a Guitarcade game's tuner
+  int menu_retry;       // a rejected menu movie request asked again
+  int arrangements;     // at most four alternate arrangements on Learn a Song's page
 } rs_mods_config;
 // The switches as they were last read; the defaults until then.
 extern rs_mods_config rs_mods_cfg;
@@ -60,8 +66,9 @@ int rs_mods_overlay_name(const char *path, char *alt, size_t n);
 // switches, raises the open-file limit, adds the hooks of the fixes that are here and of the frame rate fixes
 // (framerate.c), and logs what is on. The fixes that are here: no intro screens (RS_MODS_INTRO), an archive
 // of dlc/ owned while it is mounted (RS_MODS_BYPASS), the batched mounting's song manifests and file questions
-// (RS_MODS_FIXES), Player 2's saved input (RS_MODS_MULTIPLAYER), and Skip Tuner in a Guitarcade game's tuner
-// (RS_MODS_GUITARCADE_SKIP).
+// (RS_MODS_FIXES), Player 2's saved input (RS_MODS_MULTIPLAYER), Skip Tuner in a Guitarcade game's tuner
+// (RS_MODS_GUITARCADE_SKIP), the menu movie request asked again (RS_MODS_MENU_RETRY) and Learn a Song's four
+// alternate arrangements (RS_MODS_ARRANGEMENTS).
 void rs_mods_start(void);
 // Batched DLC mounting (RS_MODS_FIXES, RS_MODS_BUDGET_MS): what is one source of it (mods_shared.c says what it is
 // for). Each edition's dlc_update runs the install steps and waits for a mount in its game's own way; all of these

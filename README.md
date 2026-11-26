@@ -79,6 +79,7 @@ Both editions play. Learn & Play has had far less testing than the Mac edition.
 | Built-in fixes, Re-ARMed title logo, no intro screens or Auto Save warning | ✅ | ✅ |
 | Calibration and the tuner the same at any frame rate | ⚠️ not yet played with a guitar above 60 Hz | ⚠️ the same |
 | Skip Tuner in a Guitarcade game's tuner | ✅ the button and its warning; ⚠️ a game played with a guitar after it | ✅ ⚠️ the same |
+| A menu asked for too early asked again (the white loading screen); Learn a Song's long songs (four alternate arrangements, no crash) | ⚠️ built and tested without the game, not played | ⚠️ the same |
 | Switches set in the installer (Settings and switches…) | ✅ | ✅ |
 | Offline, no Ubisoft sign-in, your Steam profiles copied in once | ✅ | ✅ |
 | Real Tone cable | ✅ | ✅ ² |

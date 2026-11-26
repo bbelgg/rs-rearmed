@@ -10,8 +10,8 @@
 // The same keys as the Mac launcher's settings_keys and the installer's builtInMods.
 const char *const lp_settings_keys[] = {
     "RS_MODS_BYPASS", "RS_MODS_FIXES", "RS_MODS_INTRO", "RS_MODS_AUTOSAVE",
-    "RS_MODS_OVERLAY", "RS_MODS_MULTIPLAYER", "RS_MODS_GUITARCADE_SKIP", "RS_MODS_FRAME_RATE",
-    "RS_REARMED", NULL,
+    "RS_MODS_OVERLAY", "RS_MODS_MULTIPLAYER", "RS_MODS_GUITARCADE_SKIP", "RS_MODS_MENU_RETRY",
+    "RS_MODS_ARRANGEMENTS", "RS_MODS_FRAME_RATE", "RS_REARMED", NULL,
 };
 // The same keys as the Mac launcher's options_keys and the installer's optionSpecs, in the same order.
 const char *const lp_options_keys[] = {

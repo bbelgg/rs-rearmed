@@ -434,3 +434,7 @@ ui_class_slot                     0x2     # the class descriptor (0x11813a0; the
 ui_class_parent                   0x4     # {name, parent} (0x11813bc)
 ui_checkbox_checked               0x80    # byte (the checkbox handler 0x1182327)
 ui_slider_value                   0x88    # float (the slider handler 0x1181dbd)
+
+# Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+menu_movie_uri                    0x8c    # GFxMovieModel: the URI string (the Mac's 0xe0), read by the request (0x1798a27: lea ecx,[esi+0x8c], size word 0x9c)
+file_index_name                   -0x38   # the index writer 0x101e250 (the Mac's 0x100496b20): the string of the file's name and extension (ebp-0x38: the file name, then its extension appended), destroyed first at its tail 0x101e770

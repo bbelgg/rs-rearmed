@@ -83,6 +83,8 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
+- **The white loading screen and Learn a Song's long songs** (not released): as the Mac edition, from the same source
+  with this game's points; not run in the game yet.
 - **Learn a Song's scroll bar** (new in 1.18.0): as the Mac edition, by the same overlay; this game's song list is the
   same file. The other lists, and a bar for those that had none (new in 1.18.0): as the Mac edition, by the same rule.
 - **A fixed frame rate** (new in 1.16.0): `RS_FPS=N`, the installer's Frame rate, with the Mac edition's rule and clock
@@ -146,6 +148,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
   own last frame), but not what first put purple into the glow's texture at its right edge at a 1102x717 and a
   1104x718 back buffer and not at 1280x720 or 1470x956: nothing the game drew there. The red peg has not been
   compared with the game on Windows.
+- **The white loading screen and Learn a Song's long songs** have fixes that have not been run in this game: the
+  menu movie's request asked for again (`RS_MODS_MENU_RETRY`) and four alternate arrangements on the page
+  (`RS_MODS_ARRANGEMENTS`). The page's scrollable list for the others is not done ([the Mac plan](../mac/PLAN.md#open-issues)).
 - **Two crashes seen once each**: one on the stage at the tuner skip (`lp: signal 10: guest address 0x0`), and a fault
   at guest address 0x168 before it. Neither has come back.
 - **A song ending a few seconds in**: with the machine heavily loaded by other builds, a song went back to its page

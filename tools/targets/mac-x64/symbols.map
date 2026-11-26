@@ -1302,3 +1302,7 @@ json_set_array                                                   0x1000fd270  sy
 json_array_add                                                   0x1000ed5e0  sysv  void(void *array, void *value)
 menu_slider_xscale                                               0x1013ed450  data  double
 menu_slider_yscale                                               0x1013ecf90  data  double
+
+# Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+menu_movie_request                                               0x100b708f0  sysv  void(void *movie, const void *id)  # GFxMovieModel's request to the asset locator (rsi: the id's two words, read at 0x100b70a4e); called by the model's setup 0x100b708a4 and by two listeners (0x100b749e7, 0x100b74a7a)
+menu_movie_request_reg                                           unsupported  the Mac's request takes the movie as its first argument and the id by pointer: menu_movie_request

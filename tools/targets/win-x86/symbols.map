@@ -1344,3 +1344,7 @@ json_set_array                                                   0x01402ca0   st
 json_array_add                                                   0x013f81d0   custom    bool(void *array, void *value@esi)  # ret 4; the array takes its own reference (0x117faaa)
 menu_slider_xscale                                               0x1da5f48    data      double  # 80.0: Visual Quality's XScale (0x117f9b9)
 menu_slider_yscale                                               0x1da5d88    data      double  # 90.0: Visual Quality's YScale (0x117f9ff)
+
+# Stock-game fixes (built in: tools/ws7/recomp/overrides/mods/mods_shared.c)
+menu_movie_request                                               unsupported  Learn & Play's request takes the movie in eax and the id as two words: menu_movie_request_reg
+menu_movie_request_reg                                           0x017989e0   custom    void(void *movie@eax, uint32_t id_lo, uint32_t id_hi)  # GFxMovieModel's request to the asset locator (the Mac's 0x100b708f0), `ret 8`; called by the model's setup 0x1795f07 and a listener 0x1798cd8

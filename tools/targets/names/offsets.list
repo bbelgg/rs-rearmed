@@ -442,3 +442,7 @@ ui_class_slot             # a control's vtable: its class info
 ui_class_parent           # a class info: its parent's
 ui_checkbox_checked       # RSCheckBox: u8 checked
 ui_slider_value           # RSSlider: float value
+
+# stock-game fixes (overrides/mods/mods_shared.c)
+menu_movie_uri          # a menu movie object: its "urn:application:x-shockwave-flash:NAME" string, a string of the game's
+file_index_name         # the local file index's writer: from its frame pointer (negative), the file's name and extension, a string of the game's

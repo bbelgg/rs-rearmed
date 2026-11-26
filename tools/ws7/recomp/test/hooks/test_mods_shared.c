@@ -1572,6 +1572,36 @@ static void alt_slots(void) {
   rs_mods_reload_config();
 }
 
+// The window arithmetic of the scrollable arrangement lists
+static void alt_window(void) {
+  // selected 2 of 9 records: alternates are records 0,1,3,4,5,6,7,8 (ranks 0..7)
+  int shown[9] = {0};
+  for (uint32_t i = 0; i < 9; i++) shown[i] = rs_mods_alt_in_window(i, 2, 0);
+  CHECK(shown[0] && shown[1] && !shown[2] && shown[3] && shown[4] && !shown[5] && !shown[8]);
+  CHECK(rs_mods_alt_in_window(8, 2, 4) && !rs_mods_alt_in_window(0, 2, 1) && rs_mods_alt_in_window(1, 2, 1));
+  CHECK_EQ(rs_mods_alt_scroll(0, 8, 1, 0), 1);
+  CHECK_EQ(rs_mods_alt_scroll(4, 8, 1, 0), 4);  // the window ends at the last alternate
+  CHECK_EQ(rs_mods_alt_scroll(0, 8, 0, 1), 0);
+  CHECK_EQ(rs_mods_alt_scroll(3, 8, 0, 1), 2);
+  CHECK_EQ(rs_mods_alt_scroll(0, 4, 1, 0), 0);  // four alternates: nothing to scroll
+  char t[16];
+  rs_mods_alt_label_tag(1, 0, 8, t, sizeof t); CHECK_EQ(strcmp(t, ""), 0);
+  rs_mods_alt_label_tag(4, 0, 8, t, sizeof t); CHECK_EQ(strcmp(t, " (+4)"), 0);
+  rs_mods_alt_label_tag(1, 2, 8, t, sizeof t); CHECK_EQ(strcmp(t, " (-2)"), 0);
+  rs_mods_alt_label_tag(2, 2, 8, t, sizeof t); CHECK_EQ(strcmp(t, ""), 0);
+  rs_mods_alt_label_tag(4, 4, 8, t, sizeof t); CHECK_EQ(strcmp(t, ""), 0);
+  CHECK_EQ(rs_mods_coop_window_for(0, 8, 7), 0);  // eight rows fit
+  CHECK_EQ(rs_mods_coop_window_for(0, 12, 3), 0);
+  CHECK_EQ(rs_mods_coop_window_for(0, 12, 8), 1);
+  CHECK_EQ(rs_mods_coop_window_for(5, 12, 6), 4);  // 6 is in rows 5..12 but the list ends at 4..11
+  CHECK_EQ(rs_mods_coop_window_for(3, 12, 1), 1);
+  CHECK_EQ(rs_mods_coop_window_for(0, 12, 11), 4);
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.arrangement3.States"), 3);
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.arrangement.States"), -1);
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.back"), -1);
+  CHECK_EQ(rs_mods_coop_focus_index(NULL), -1);
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -1613,6 +1643,7 @@ int main(void) {
   skip_tuner();
   menu_retry();
   alt_slots();
+  alt_window();
   manifests();
   mounting_edges();
   file_questions();

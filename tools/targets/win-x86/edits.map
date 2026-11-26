@@ -755,6 +755,13 @@ seven_string   0x010de00c  3:4051a674   +2=07                        # SMc its c
 # headstock
 seven_string   0x011151c7  7:a779f646   +3=07                        # PSQ1 GuitarProfile_Load, guitar branch: peg pool request 6 -> 7
 
+# chord note end: the stop-pluck of string 6 (rs7string CLVE; the Mac's GSVB edits cover its callee)
+seven_string   0x01364dfe  3:0d2ccd20   +2=40                        # CLVE the note-end update 0x1364c00, the stop-pluck of a chord string: the bound reads the active count (+0x40)
+seven_string   0x01364e08  4:84a59d6d   +3=40                        # CLVE and the string from the native main[8] (+0x40): string 6 its own object, not the game's ghost 0 (+0x1c)
+
+# barre markers over all strings (rs7string PUBBC)
+seven_string   0x0110df49  7:505ec0d6   =c743140100000085c974fc518b4304e8f313220083c404518b4308e8e713220083c404  # PUBBC finger marker update 0x110dd80, its span changed: Entity_SetScale(capsule, ecx) on the entities [ebx+4], [ebx+8] unless ecx (seven_pubbc_scale) is 0
+
 # plain
 plain_packages  0x010d9fca  11:5e80f013  =837c2468017404837c2468030f852f060000  # PP_SNGF the song file loader 0x10d9f80: its flags check takes 1 (compressed, not encrypted) as it takes 3 and goes on to the signature check; any other value goes to the reject path as before
 plain_packages  0x01422f13  5:ecc17232   =8b558c8b3af645ac047442b910000000      # PP_TOC the table of contents reader 0x1422d10, at the start of its decrypt block: the two registers the block leaves (the archive buffer's holder and the buffer) set first, then archive flags without 4 (a plain table of contents) go on after the block, others run it as before

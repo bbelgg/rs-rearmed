@@ -398,6 +398,7 @@ nf_adapter_size              0x30  # bytes (the stack object at rbp-0x90 .. -0x5
 seven_fretgrid_wire_head     0xa0  # fret-wire row: the header before record 0 (0x100199fd0); Learn & Play 0xa0
 seven_fretgrid_wire_rec      0x38  # fret-wire record (ctor 0x10019dc30); Learn & Play 0x30
 seven_fretgrid_wire_state    0x8  # fret-wire record: u32 state, 2 = settled (0x10019a0b0); Learn & Play 0x8
+seven_marker_player        0xa0  # the neck's finger marker manager (the owner of the marker update and the marker function): its player (session at session_guitar)
 detect_target_string         0x10  # [0x10] the target note PUBAN gets: u8 its string (0x10010fa23; LP 0x13f5265)
 detect_target_fret           0x11  # [0x11] u8 its fret (0x10010fa28; LP 0x13f525f)
 tuner_entity_release_slot    0x2  # [0x2] the vtable slot the game releases the session's picks and letters with (Mac dtor

@@ -179,6 +179,12 @@ seven_pd2_chord   0x10011130c  (void *eval@rbx, uint8_t result@rax)  # PD2 Mac: 
 seven_pd4_sustain 0x1001118c3  (void *eval@rbx, uint8_t result@rax)  # PD4 Mac: 0x100111830 (LP 0x13f7480's call of 0x13f7bb0), al after string 5
 seven_pd5_eval    0x10011314f  (void *eval@rsi, int extreme@rax)  # PD5 Mac: 0x100113040 (LP 0x13f7bf0), the extreme slide distance in eax at its end (its caller reads eax only)
 
+# barre markers over all strings (rs7string PUBFA, PUBGF, PUBBC; Learn & Play's 0x110e4b0 / 0x110e680 / 0x110dd80 are the Mac's 0x100197f70 / inlined into it / 0x100197570)
+seven_pubfa          0x100197f86  (uint32_t string@r15, void *template@rdx)  # PUBFA the neck's finger marker 0x100197f70 (LP 0x110e4b0; only caller 0x100197436 in the marker loop 0x100197310), before it stores the string at [rbx+0x35]: r15 = the string the loop found, rdx = the template (a T8); the finger's anchor becomes its lowest string (FG4 reads frets[r15] next)
+seven_pubgf          none  the Mac's finger span is unrolled into the marker function 0x100197f70: the edit FG5M (0x100197f92) counts the physical ranks over T8 fingers[8]
+seven_pubbc_scale    none  the Mac calls Entity_SetScale from the C (seven_pubbc_setscale): no injected call
+seven_pubbc_setscale 0x10019790b  (void *owner@r14, int32_t span@[r13+0x2c], void *entity1@[r13+0x8], void *entity2@[r13+0x10])  # PUBBC the finger marker update 0x100197570 (LP 0x110dd80; r13 = the marker, r14 its owner), the span changed (inlined seek 0x1001978b7): at the state store `mov [r13+0x24], 1` after both capsules' clip time is set: Entity_SetScale(entity, 1, k) on both capsules
+
 # plain
 plain_pp_sngd  0x1001eb84a  (const uint8_t *src@rdi, uint32_t len@rsi, uint8_t *out@r8, uint32_t out_len@r9, uint8_t ok@rax) -> done=0x1001eb84f  # PP_SNGD the song file loader 0x1001eb6a0's call of the AES-CTR decrypt (rsg_cryptopp_aes_ctr_decrypt, SysV: the file past its 8-byte header, its length, key, key length, output, output size; al: decrypted): a plain file (magic 0x4a, flags 1) is copied and the call skipped
 

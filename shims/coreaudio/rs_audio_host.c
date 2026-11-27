@@ -42,7 +42,7 @@ void rs_audio_log(const char *fmt, ...) {
 int rs_audio_dev_get(AudioObjectID dev, AudioObjectPropertySelector sel, void *out, UInt32 size) {
   AudioObjectPropertyAddress a = {sel, kAudioObjectPropertyScopeGlobal, kAudioObjectPropertyElementMain};
   UInt32 sz = size;
-  return AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, out) == noErr && sz == size;
+  return rs_audio_hal_get(dev, &a, 0, NULL, &sz, out) == noErr && sz == size;
 }
 
 void rs_audio_dev_name(AudioObjectID dev, char *buf, size_t n) {
@@ -57,7 +57,7 @@ void rs_audio_dev_name(AudioObjectID dev, char *buf, size_t n) {
 static int has_streams(AudioObjectID dev, AudioObjectPropertyScope scope) {
   AudioObjectPropertyAddress a = {kAudioDevicePropertyStreams, scope, kAudioObjectPropertyElementMain};
   UInt32 size = 0;
-  return AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &size) == noErr && size > 0;
+  return rs_audio_hal_get_size(dev, &a, 0, NULL, &size) == noErr && size > 0;
 }
 int rs_audio_has_input(AudioObjectID dev) { return has_streams(dev, kAudioObjectPropertyScopeInput); }
 int rs_audio_has_output(AudioObjectID dev) { return has_streams(dev, kAudioObjectPropertyScopeOutput); }
@@ -65,10 +65,10 @@ int rs_audio_has_output(AudioObjectID dev) { return has_streams(dev, kAudioObjec
 int rs_audio_channels(AudioObjectID dev, AudioObjectPropertyScope scope) {
   AudioObjectPropertyAddress a = {kAudioDevicePropertyStreamConfiguration, scope, kAudioObjectPropertyElementMain};
   UInt32 sz = 0;
-  if (AudioObjectGetPropertyDataSize(dev, &a, 0, NULL, &sz) != noErr || !sz) return 0;
+  if (rs_audio_hal_get_size(dev, &a, 0, NULL, &sz) != noErr || !sz) return 0;
   AudioBufferList *l = malloc(sz);
   int n = 0;
-  if (l && AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, l) == noErr)
+  if (l && rs_audio_hal_get(dev, &a, 0, NULL, &sz, l) == noErr)
     for (UInt32 i = 0; i < l->mNumberBuffers; i++) n += (int)l->mBuffers[i].mNumberChannels;
   free(l);
   return n;
@@ -112,7 +112,7 @@ uint32_t rs_audio_set_device_buffer(AudioObjectID dev, uint32_t cap, const char 
     AudioObjectPropertyAddress a = {kAudioDevicePropertyBufferFrameSize, kAudioObjectPropertyScopeGlobal,
                                     kAudioObjectPropertyElementMain};
     UInt32 v = n;
-    OSStatus st = AudioObjectSetPropertyData(dev, &a, 0, NULL, sizeof v, &v);
+    OSStatus st = rs_audio_hal_set(dev, &a, 0, NULL, sizeof v, &v);
     if (st != noErr) rs_audio_log("%s: device %u: setting the buffer to %u frames failed (%d)", who, dev, n, (int)st);
   }
   UInt32 applied = 0;

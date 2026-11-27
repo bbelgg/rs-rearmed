@@ -12,6 +12,7 @@
 #include <unistd.h>
 #include <xlocale.h>
 
+#include "rs_audio_fake.h"
 #include "rs_audio_host.h"
 
 #define MAX_FILE (64 * 1024)
@@ -210,6 +211,7 @@ int rs_audio_is_cable(AudioObjectID dev) {
 static int input_rank(AudioObjectID dev) {
   UInt32 transport = 0;
   if (rs_audio_is_cable(dev)) return RS_AUDIO_RANK_CABLE;
+  if (rs_audio_fake_is(dev)) return RS_AUDIO_RANK_INTERFACE;  // the test input: a channel each, as an interface
   rs_audio_dev_get(dev, kAudioDevicePropertyTransportType, &transport, sizeof transport);
   if (transport == kAudioDeviceTransportTypeVirtual || transport == kAudioDeviceTransportTypeAggregate)
     return RS_AUDIO_RANK_VIRTUAL;

@@ -14,6 +14,7 @@
 //   RS_AUDIO_STABLE_UIDS   one CFString per device UID (default on)
 //   RS_AUDIO_INPUTS_FIRST  input devices first in the device list (default on)
 //   RS_AUDIO_LOG           log to stderr with the "[rs-audio]" prefix (default off)
+//   RS_AUDIO_FAKE_INPUT    the test input (rs_audio_fake.h, default none)
 #ifndef RS_AUDIO_HOST_H
 #define RS_AUDIO_HOST_H
 
@@ -30,6 +31,26 @@
 int rs_audio_env_on(const char *name, int dflt);
 int rs_audio_log_on(void);
 void rs_audio_log(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+
+// The HAL as the game sees it: the system's calls, and with RS_AUDIO_FAKE_INPUT the test input (rs_audio_fake.h),
+// first in the system's device list and answered here. Every call this code and the editions' audio code make with
+// a device the game has goes through these (rs_audio_fake.c).
+OSStatus rs_audio_hal_get(AudioObjectID obj, const AudioObjectPropertyAddress *a, UInt32 qsize, const void *qdata,
+                          UInt32 *size, void *data);
+OSStatus rs_audio_hal_get_size(AudioObjectID obj, const AudioObjectPropertyAddress *a, UInt32 qsize,
+                               const void *qdata, UInt32 *size);
+OSStatus rs_audio_hal_set(AudioObjectID obj, const AudioObjectPropertyAddress *a, UInt32 qsize, const void *qdata,
+                          UInt32 size, const void *data);
+Boolean rs_audio_hal_has(AudioObjectID obj, const AudioObjectPropertyAddress *a);
+// AudioObjectAddPropertyListener (add 1) or AudioObjectRemovePropertyListener; the test input never changes.
+OSStatus rs_audio_hal_listen(AudioObjectID obj, const AudioObjectPropertyAddress *a,
+                             AudioObjectPropertyListenerProc fn, void *client, int add);
+// AudioDeviceCreateIOProcID, AudioDeviceDestroyIOProcID, AudioDeviceStart and AudioDeviceStop. The test input
+// takes a function's own address in place of its id as the HAL does, for the first registration of it.
+OSStatus rs_audio_hal_io_create(AudioObjectID dev, AudioDeviceIOProc proc, void *client, AudioDeviceIOProcID *out);
+OSStatus rs_audio_hal_io_destroy(AudioObjectID dev, AudioDeviceIOProcID id);
+OSStatus rs_audio_hal_start(AudioObjectID dev, AudioDeviceIOProcID id);
+OSStatus rs_audio_hal_stop(AudioObjectID dev, AudioDeviceIOProcID id);
 
 // A global-scope property of dev of exactly size bytes; 1 on success.
 int rs_audio_dev_get(AudioObjectID dev, AudioObjectPropertySelector sel, void *out, UInt32 size);

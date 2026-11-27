@@ -2222,6 +2222,124 @@ static void alt_window(void) {
   CHECK_EQ(rs_mods_coop_focus_index(NULL), -1);
 }
 
+// The same arithmetic at its edges: no alternates, exactly as many as the slots (no scroll), one more (the smallest
+// scroll), the selected record first, last or not a record, the co-op list at exactly RS_MODS_COOP_ROWS and one more;
+// then every list length up to twenty, scrolled from top to bottom and back
+static void alt_window_edges(void) {
+  char t[16];
+  // no records, and a song of one arrangement: nothing shown, nothing to scroll, no tags
+  CHECK(!rs_mods_alt_in_window(0, 0, 0));
+  CHECK_EQ(rs_mods_alt_scroll(0, 0, 1, 0), 0);
+  CHECK_EQ(rs_mods_alt_scroll(0, 0, 0, 1), 0);
+  for (uint32_t s = 1; s <= 4; s++) {
+    rs_mods_alt_label_tag(s, 0, 0, t, sizeof t);
+    CHECK_EQ(t[0], 0);
+  }
+  // five records, four alternates: all shown, whichever is selected; no tag, no scroll
+  for (uint32_t sel = 0; sel < 5; sel++)
+    for (uint32_t i = 0; i < 5; i++) CHECK_EQ(rs_mods_alt_in_window(i, sel, 0), i != sel);
+  CHECK_EQ(rs_mods_alt_scroll(0, 4, 1, 0), 0);
+  rs_mods_alt_label_tag(4, 0, 4, t, sizeof t);
+  CHECK_EQ(t[0], 0);
+  // six records, five alternates, the selected one last: records 0..3, then 1..4
+  CHECK(rs_mods_alt_in_window(0, 5, 0) && rs_mods_alt_in_window(3, 5, 0) && !rs_mods_alt_in_window(4, 5, 0));
+  rs_mods_alt_label_tag(4, 0, 5, t, sizeof t);
+  CHECK_EQ(strcmp(t, " (+1)"), 0);
+  CHECK_EQ(rs_mods_alt_scroll(0, 5, 1, 0), 1);
+  CHECK(!rs_mods_alt_in_window(0, 5, 1) && rs_mods_alt_in_window(4, 5, 1) && !rs_mods_alt_in_window(5, 5, 1));
+  CHECK_EQ(rs_mods_alt_scroll(1, 5, 1, 0), 1);  // the last alternate is in the last slot
+  rs_mods_alt_label_tag(1, 1, 5, t, sizeof t);
+  CHECK_EQ(strcmp(t, " (-1)"), 0);
+  rs_mods_alt_label_tag(4, 1, 5, t, sizeof t);
+  CHECK_EQ(t[0], 0);
+  CHECK_EQ(rs_mods_alt_scroll(1, 5, 0, 1), 0);
+  // the selected one first: the window starts at record 1
+  CHECK(!rs_mods_alt_in_window(0, 0, 0) && rs_mods_alt_in_window(1, 0, 0) && rs_mods_alt_in_window(4, 0, 0) &&
+        !rs_mods_alt_in_window(5, 0, 0) && rs_mods_alt_in_window(5, 0, 1) && !rs_mods_alt_in_window(1, 0, 1));
+  // a selection that is no record: every record is an alternate
+  CHECK(rs_mods_alt_in_window(0, 0xffffffffu, 0) && rs_mods_alt_in_window(3, 0xffffffffu, 0) &&
+        !rs_mods_alt_in_window(4, 0xffffffffu, 0));
+  // both ways at once, and neither: a step one way (down first), or none
+  CHECK_EQ(rs_mods_alt_scroll(1, 8, 1, 1), 2);
+  CHECK_EQ(rs_mods_alt_scroll(1, 8, 0, 0), 1);
+  // a tag in a buffer too small for it is cut, a buffer of none is left alone
+  rs_mods_alt_label_tag(4, 0, 9, t, 3);
+  CHECK_EQ(strcmp(t, " ("), 0);
+  t[0] = 'x';
+  rs_mods_alt_label_tag(4, 0, 9, t, 0);
+  CHECK_EQ(t[0], 'x');
+  rs_mods_alt_label_tag(4, 0, 1000, t, sizeof t);
+  CHECK_EQ(strcmp(t, " (+996)"), 0);
+
+  // every song of up to twenty arrangements, any one selected: from the top, Down to the end and Up back. At every
+  // position the window shows min(4, the alternates left from there) of them, each alternate shown in exactly one slot
+  // position, the tags count what is out of sight, and Down stops with the last alternate in the window
+  for (uint32_t count = 0; count <= 20; count++)
+    for (uint32_t sel = 0; sel < (count ? count : 1); sel++) {
+      uint32_t alts = count ? count - 1 : 0, offset = 0, last = alts > 4 ? alts - 4 : 0, steps = 0;
+      for (;;) {
+        uint32_t shown = 0;
+        for (uint32_t i = 0; i < count; i++) shown += (uint32_t)rs_mods_alt_in_window(i, sel, offset);
+        CHECK_EQ(shown, alts - offset < 4 ? alts - offset : 4);
+        uint32_t hidden = 0;
+        char a[16], b[16];
+        rs_mods_alt_label_tag(1, offset, alts, a, sizeof a);
+        rs_mods_alt_label_tag(4, offset, alts, b, sizeof b);
+        if (a[0]) hidden += (uint32_t)strtoul(a + 3, NULL, 10);
+        if (b[0]) hidden += (uint32_t)strtoul(b + 3, NULL, 10);
+        CHECK_EQ(hidden, alts - shown);
+        CHECK_EQ(a[0] != 0, offset > 0);
+        uint32_t next = rs_mods_alt_scroll(offset, alts, 1, 0);
+        if (next == offset) break;
+        CHECK_EQ(next, offset + 1);
+        offset = next, steps++;
+        CHECK(steps <= 20);
+      }
+      CHECK_EQ(offset, last);
+      while (offset) {
+        uint32_t next = rs_mods_alt_scroll(offset, alts, 0, 1);
+        CHECK_EQ(next, offset - 1);
+        offset = next;
+      }
+      CHECK_EQ(rs_mods_alt_scroll(0, alts, 0, 1), 0);
+    }
+
+  // the co-op list: none, eight (all shown, no window) and nine records (one row to scroll)
+  CHECK_EQ(rs_mods_coop_window_for(0, 0, 0), 0);
+  CHECK_EQ(rs_mods_coop_step(0, 0, 1), 0);
+  CHECK_EQ(rs_mods_coop_step(0, 0, -1), 0);
+  CHECK_EQ(rs_mods_coop_window_for(3, 8, 7), 0);  // a stale offset of a longer list
+  for (uint32_t i = 0; i < 8; i++) CHECK(rs_mods_coop_in_window(i, 8, 0));
+  CHECK_EQ(rs_mods_coop_window_for(0, 9, 7), 0);
+  CHECK_EQ(rs_mods_coop_window_for(0, 9, 8), 1);
+  CHECK_EQ(rs_mods_coop_window_for(1, 9, 0), 0);
+  CHECK_EQ(rs_mods_coop_window_for(5, 9, 4), 1);  // an offset past the last window is pulled back to it
+  CHECK_EQ(rs_mods_coop_window_for(0, 9, 20), 1); // a selection past the end: the last window
+  CHECK(!rs_mods_coop_in_window(8, 9, 0) && rs_mods_coop_in_window(8, 9, 1) && !rs_mods_coop_in_window(0, 9, 1));
+  CHECK_EQ(rs_mods_coop_step(7, 9, 1), 8);
+  CHECK_EQ(rs_mods_coop_step(8, 9, 1), 8);
+  CHECK_EQ(rs_mods_coop_step(1, 9, -1), 0);
+  CHECK_EQ(rs_mods_coop_step(0, 9, 0), 0);
+  // every list of up to twenty records, from every offset, onto every record: the window shows it, moved no further
+  // than it has to (not at all when it is shown already), never past the last window
+  for (uint32_t count = 1; count <= 20; count++) {
+    uint32_t last = count > RS_MODS_COOP_ROWS ? count - RS_MODS_COOP_ROWS : 0;
+    for (uint32_t from = 0; from <= count; from++)
+      for (uint32_t sel = 0; sel < count; sel++) {
+        uint32_t o = rs_mods_coop_window_for(from, count, sel), start = from > last ? last : from;
+        CHECK(o <= last && rs_mods_coop_in_window(sel, count, o));
+        if (count > RS_MODS_COOP_ROWS && rs_mods_coop_in_window(sel, count, start)) CHECK_EQ(o, start);
+        else if (count > RS_MODS_COOP_ROWS) CHECK_EQ(o, sel < start ? sel : sel - RS_MODS_COOP_ROWS + 1);
+      }
+  }
+  // the focused button's record: the digits after "arrangement", and nothing else
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.arrangement12.States"), 12);
+  CHECK_EQ(rs_mods_coop_focus_index("arrangement0"), 0);
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.arrangement99999999.States"), -1);
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.altArrangementsP1_slot1.States"), -1);  // Learn a Song's slots: not co-op
+  CHECK_EQ(rs_mods_coop_focus_index("Buttons.arrangementX1.States"), -1);
+}
+
 int main(void) {
 #ifdef RC_GUEST32
   CHECK(!rc32_mem_init());
@@ -2267,6 +2385,7 @@ int main(void) {
   alt_scroll();
   alt_coop();
   alt_window();
+  alt_window_edges();
   manifests();
   mounting_edges();
   file_questions();

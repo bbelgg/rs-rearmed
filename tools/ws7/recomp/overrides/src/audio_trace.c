@@ -100,7 +100,7 @@ static void device_name(uint32_t dev, char *out, size_t n) {
   CFStringRef s = NULL;
   UInt32 size = sizeof s;
   out[0] = 0;
-  if (AudioObjectGetPropertyData(dev, &a, 0, NULL, &size, &s) == noErr && s) {
+  if (rs_audio_hal_get(dev, &a, 0, NULL, &size, &s) == noErr && s) {
     CFStringGetCString(s, out, (CFIndex)n, kCFStringEncodingUTF8);
     CFRelease(s);
   }
@@ -153,7 +153,7 @@ int32_t rs_audio_get_property_data_size(uint32_t obj, const void *addr, uint32_t
     *size = rs_audio_entry_list_size();
     return noErr;
   }
-  OSStatus st = AudioObjectGetPropertyDataSize(rs_audio_real_dev(obj), addr, qsize, qdata, size);
+  OSStatus st = rs_audio_hal_get_size(rs_audio_real_dev(obj), addr, qsize, qdata, size);
   if (t_open.active) trace('#', obj, addr, st, size ? *size : 0, NULL);
   return st;
 }
@@ -161,7 +161,7 @@ int32_t rs_audio_get_property_data_size(uint32_t obj, const void *addr, uint32_t
 int32_t rs_audio_set_property_data(uint32_t obj, const void *addr, uint32_t qsize, const void *qdata,
                                    uint32_t size, const void *data) {
   if (rs_audio_soft_volume_set(obj, addr, size, data)) return noErr;
-  OSStatus st = AudioObjectSetPropertyData(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
+  OSStatus st = rs_audio_hal_set(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
   if (t_open.active) trace('s', obj, addr, st, size, data);
   return st;
 }

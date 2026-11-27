@@ -56,6 +56,10 @@ uint32_t rs_audio_entry_list_size(void);
 int32_t rs_audio_io_create(uint32_t id, void *proc, void *client, void *out);
 void *rs_audio_io_id(uint32_t id, void *given);
 int32_t rs_audio_io_destroy(uint32_t id, void *given);
+// AudioDeviceStart (start 1) and AudioDeviceStop for an id the game has, and AudioObjectAddPropertyListener (add 1) and
+// AudioObjectRemovePropertyListener: in place of the calls, so the test input (rs_audio_fake.h) can answer them.
+int32_t rs_audio_io_run(uint32_t id, void *given, int start);
+int32_t rs_audio_listen(uint32_t obj, const void *addr, void *fn, void *client, int add);
 // An input's level (audio_devs.c): AudioObjectHasProperty, and a write the input volume takes (1: it did).
 int32_t rs_audio_has_property(uint32_t obj, const void *addr);
 int rs_audio_soft_volume_set(uint32_t obj, const void *addr, uint32_t size, const void *data);

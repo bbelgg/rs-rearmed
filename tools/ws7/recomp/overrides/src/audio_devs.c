@@ -24,6 +24,10 @@
 // 0x7a7a0001), and its calls then go to the device itself.
 // An I/O function gets the real device from the system: audio_chan.c gives the game its own id there, as it compares
 // them.
+//
+// Every call goes to the HAL through rs_audio_hal_* (rs_audio_host.h), which with RS_AUDIO_FAKE_INPUT has the test
+// input (shims/coreaudio/rs_audio_fake.h) first in the system's list and answers for it: to the game it is one more
+// interface, its channels entries of the list as another's.
 #include <CoreAudio/CoreAudio.h>
 #include <math.h>
 #include <os/lock.h>
@@ -57,7 +61,7 @@ static os_unfair_lock g_procs_lock = OS_UNFAIR_LOCK_INIT;
 
 int32_t rs_audio_io_create(uint32_t id, void *proc, void *client, void *out) {
   AudioDeviceIOProcID got = NULL;
-  OSStatus st = AudioDeviceCreateIOProcID(rs_audio_real_dev(id), proc, client, &got);
+  OSStatus st = rs_audio_hal_io_create(rs_audio_real_dev(id), proc, client, &got);
   if (out) *(AudioDeviceIOProcID *)out = got;
   if (st != noErr || !is_entry(id)) return st;
   os_unfair_lock_lock(&g_procs_lock);
@@ -85,7 +89,16 @@ int32_t rs_audio_io_destroy(uint32_t id, void *given) {
       if (g_procs[i].id == id) g_procs[i].id = 0;
     os_unfair_lock_unlock(&g_procs_lock);
   }
-  return AudioDeviceDestroyIOProcID(rs_audio_real_dev(id), (AudioDeviceIOProcID)proc);
+  return rs_audio_hal_io_destroy(rs_audio_real_dev(id), (AudioDeviceIOProcID)proc);
+}
+
+int32_t rs_audio_io_run(uint32_t id, void *given, int start) {
+  AudioDeviceIOProcID proc = (AudioDeviceIOProcID)rs_audio_io_id(id, given);
+  return start ? rs_audio_hal_start(rs_audio_real_dev(id), proc) : rs_audio_hal_stop(rs_audio_real_dev(id), proc);
+}
+
+int32_t rs_audio_listen(uint32_t obj, const void *addr, void *fn, void *client, int add) {
+  return rs_audio_hal_listen(rs_audio_real_dev(obj), addr, (AudioObjectPropertyListenerProc)fn, client, add);
 }
 
 void *rs_audio_io_id(uint32_t id, void *given) {
@@ -135,7 +148,7 @@ float rs_audio_soft_gain(uint32_t id) {
 int32_t rs_audio_has_property(uint32_t obj, const void *addr) {
   const AudioObjectPropertyAddress *a = addr;
   if (soft_volume(obj, a)) return 1;
-  return AudioObjectHasProperty(rs_audio_real_dev(obj), addr);
+  return rs_audio_hal_has(rs_audio_real_dev(obj), addr);
 }
 
 int rs_audio_soft_volume_set(uint32_t obj, const void *addr, uint32_t size, const void *data) {
@@ -153,7 +166,7 @@ static uint32_t entry_list(AudioObjectID *out, uint32_t max) {
                                   kAudioObjectPropertyElementMain};
   AudioObjectID devs[MAX_LIST];
   UInt32 size = sizeof devs;
-  if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &size, devs) != noErr) return 0;
+  if (rs_audio_hal_get(kAudioObjectSystemObject, &a, 0, NULL, &size, devs) != noErr) return 0;
   int n = (int)(size / sizeof *devs);
   rs_audio_entry es[MAX_LIST];
   int m = rs_audio_input_entries(devs, n, rs_audio_entries_budget(), es, MAX_LIST);
@@ -199,7 +212,7 @@ int32_t rs_audio_get_property_data(uint32_t obj, const void *addr, uint32_t qsiz
     return noErr;
   }
   uint32_t asked = size ? *size : 0;
-  OSStatus st = AudioObjectGetPropertyData(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
+  OSStatus st = rs_audio_hal_get(rs_audio_real_dev(obj), addr, qsize, qdata, size, data);
   if (st == noErr && a && is_entry(obj) && size && data) {
     if (a->mSelector == kAudioObjectPropertyName && *size == sizeof(CFStringRef) && *(CFStringRef *)data)
       *(CFStringRef *)data = entry_string(*(CFStringRef *)data, "%s channel %d", obj);

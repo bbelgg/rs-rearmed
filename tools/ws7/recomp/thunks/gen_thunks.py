@@ -113,12 +113,16 @@ HOOKS = {
         "c->r[0] = (uint64_t)(uint32_t)rs_audio_set_property_data(%s, %s, %s, %s, %s, %s); return; }" % tuple(p)],
 }
 # A channel of an interface is a device of its own to the game (overrides/src/audio_devs.c): these calls take the
-# real device, and the input volume is the audio module's.
+# real device, and the input volume is the audio module's. The module makes the calls, so the test input
+# (RS_AUDIO_FAKE_INPUT, shims/coreaudio/rs_audio_fake.h) can answer them; a module without them gets the ids changed.
 HOOKS["AudioObjectHasProperty"] = lambda p: [
     "extern int32_t rs_audio_has_property(uint32_t, const void *) __attribute__((weak_import));",
     "if (rs_audio_has_property) { c->r[0] = (uint64_t)(uint32_t)rs_audio_has_property(%s, %s); return; }" % tuple(p)]
-for _name in ("AudioObjectAddPropertyListener", "AudioObjectRemovePropertyListener"):
-    HOOKS[_name] = lambda p: [
+for _name, _add in (("AudioObjectAddPropertyListener", 1), ("AudioObjectRemovePropertyListener", 0)):
+    HOOKS[_name] = lambda p, _add=_add: [
+        "extern int32_t rs_audio_listen(uint32_t, const void *, void *, void *, int) __attribute__((weak_import));",
+        "if (rs_audio_listen) { c->r[0] = (uint64_t)(uint32_t)rs_audio_listen(%s, %s, (void *)%s, (void *)%s, %d); "
+        "return; }" % (p[0], p[1], p[2], p[3], _add),
         "extern uint32_t rs_audio_real_dev(uint32_t) __attribute__((weak_import));",
         "if (rs_audio_real_dev) %s = rs_audio_real_dev(%s);" % (p[0], p[0])]
 HOOKS["AudioDeviceCreateIOProcID"] = lambda p: [
@@ -127,8 +131,11 @@ HOOKS["AudioDeviceCreateIOProcID"] = lambda p: [
 HOOKS["AudioDeviceDestroyIOProcID"] = lambda p: [
     "extern int32_t rs_audio_io_destroy(uint32_t, void *) __attribute__((weak_import));",
     "if (rs_audio_io_destroy) { c->r[0] = (uint64_t)(uint32_t)rs_audio_io_destroy(%s, %s); return; }" % tuple(p)]
-for _name in ("AudioDeviceStart", "AudioDeviceStop"):
-    HOOKS[_name] = lambda p: [
+for _name, _start in (("AudioDeviceStart", 1), ("AudioDeviceStop", 0)):
+    HOOKS[_name] = lambda p, _start=_start: [
+        "extern int32_t rs_audio_io_run(uint32_t, void *, int) __attribute__((weak_import));",
+        "if (rs_audio_io_run) { c->r[0] = (uint64_t)(uint32_t)rs_audio_io_run(%s, (void *)%s, %d); return; }"
+        % (p[0], p[1], _start),
         "extern void *rs_audio_io_id(uint32_t, void *) __attribute__((weak_import));",
         "extern uint32_t rs_audio_real_dev(uint32_t) __attribute__((weak_import));",
         "if (rs_audio_io_id) %s = rs_audio_io_id(%s, %s);" % (p[1], p[0], p[1]),

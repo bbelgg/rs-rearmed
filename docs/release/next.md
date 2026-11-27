@@ -25,3 +25,15 @@ notes and empties this file. -->
   shows about nine and draws the rest invisibly below the panel, shows eight and scrolls the same way, and Enter picks
   the arrangement in focus. Page Up and Page Down do not scroll. Both editions. `RS_MODS_ARRANGEMENTS=0` is the game's
   own behaviour. Not yet run in either game.
+- **For mod authors: the tables have what rearmed-mods' Seven-String Guitar needs for RS Extended Range's charts,**
+  in both editions: mid points for its native charts (the `PSXR` package, the manifest's native arrangements, the
+  chart after its inflate: `seven_native_psarc`, `_json`, `_sng`), for eight-string guitars and five- and six-string
+  basses (`seven_gkb`, `seven_gkp`, `seven_psn3`, `seven_lt0`, `seven_pbh`, `seven_s1_bass`, `seven_s1b_bass`; the
+  chord loops of `seven_string` now run over eight strings, which `seven_e8` says), for local co-op (`seven_gkr`), the
+  song camera, the fret range glow, the barre markers and the tuner's camera (`seven_cam`, `seven_frg*`,
+  `seven_pubfa`, `seven_pubgf`, `seven_pubbc_*`, `seven_tf2`), the extended headstock's two offsets, and three edit
+  groups: `seven_line` (the section string mask's bits of strings 6 and 7), and on Learn & Play `seven_glow` and
+  `seven_barre` (injected `Entity_SetScale` calls, `unsupported` on the Mac, which calls it from the points
+  `*_setscale`). The section string mask's edits moved from `seven_string` to `seven_line`: a rearmed-mods that switches
+  on `seven_string` alone (0.18.0 and earlier) no longer gets them, and the added strings' lines are left out as with
+  its `string7_line = 0`. Before, the tables had seven-string guitars alone.

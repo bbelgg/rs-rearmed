@@ -539,11 +539,17 @@ What differs, fix by fix:
       of 128 first.
     - An argument this game's code has folded away is not taken (`input_bind`'s `force`, `ui_event`'s last two): a hook
       reads its one value, and a change to it goes nowhere.
-  - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`): the Mac edition's two groups,
-    `seven_string` (735 edits and 127 mid points: the game's arrays for six strings grown to eight) and `plain_packages`
-    (2 edits and a mid point on the song file's decrypt), and the built-in fixes' thirteen mid points, as on the Mac:
-    the eight `fps_*`, `tuner_skip_offer`, and `manifest_request`, `manifest_response`, `fs_mount` and `fs_exists`.
-    The 29 points only the Mac needs are `none` here.
+  - **Edits and mid points** (`tools/targets/win-x86/edits.map` and `mids.map`): the Mac edition's groups,
+    `seven_string` (731 edits: the game's arrays for six strings grown to eight), `seven_line` (7 edits: the section
+    string mask's bits of strings 6 and 7) and `plain_packages` (2 edits and a mid point on the song file's decrypt),
+    146 mid points of the Seven-String Guitar, and two groups the Mac has not: `seven_glow` (3 edits) and
+    `seven_barre` (1), the fret range glow's and the barre markers' `Entity_SetScale` calls, which this game's edits
+    inject with the scale a mid point at the same address put in `ecx` (`seven_frg*_scale`, `seven_pubbc_scale`), so the
+    mod switches them on only with those points taken (the Mac calls it from the C of the points `*_setscale`, `none`
+    here). The built-in fixes' twenty-five mid points are the Mac's: the eight `fps_*`, `tuner_skip_offer`,
+    `manifest_request`, `manifest_response`, `fs_mount`, `fs_exists`, and the twelve of the stock-game fixes. The 35
+    points only the Mac needs are `none` here. The checks of the two tables are the Mac's
+    ([Mac design](../mac/DESIGN.md)).
   - **Files** (`rc_file_provide`, `rc_file.h`): the same interface as the Mac edition's. The Win32 seam's opens for
     reading, reads, seeks, sizes, attributes, finds and mapped views (`win32_kfile.c`, `win32_ksync.c`) go through the
     runtime's `rc_file_*`, which ask the mod's provider first. The provider sees host paths, after the seam's mapping of

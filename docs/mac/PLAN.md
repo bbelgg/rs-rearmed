@@ -132,7 +132,9 @@ What the edition does today. What has not been tested is under [Open issues](#op
   (`tools/targets/mac-x64/edits.map`, `mids.map`) carry rearmed-mods' Seven-String Guitar, after
   [rs7string](https://github.com/SomeeName/rs7string), and Plain Packages, the same units as Learn & Play. The game's
   list of a chord's expected notes keeps six here (eight in Learn & Play); the mod's own chord detection judges larger
-  chords in both editions.
+  chords in both editions. Also, not released: what the mod needs for RS Extended Range's native charts, eight-string
+  guitars, five- and six-string basses and local co-op, and the edit groups `seven_line` (and Learn & Play's
+  `seven_glow`, `seven_barre`); a 7-string and an 8-string chart played in both editions, bass and co-op not yet.
 - **What the game names for mods** (in `tools/targets`, the same names in both editions): the colors of notes and the
   highway, through the [render API](METAL.md#render-api-shimsincluders_renderh) on Metal by the game's small palette
   textures, and of the strings, in the game's own color table; the note the game hears (Player 1's pitch detection,

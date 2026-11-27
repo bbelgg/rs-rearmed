@@ -475,12 +475,23 @@ What each does:
     are listed in `tools/targets/names/hooks.list`; all are functions of this game (Learn & Play has 20 of them).
     `rc_hook_add` with a game address keeps working; `rc_target()` returns `mac-x64`.
   - **Edits and mid points** (`rc_mid.h`), for a change inside a function. The tables (`tools/targets/mac-x64/edits.map`
-    and `mids.map`) have two groups, both for rearmed-mods: `seven_string`, its Seven-String Guitar (618 edits and 122
-    mid points), and `plain_packages`, its Plain Packages (2 edits and a mid point). Thirteen more mid points are the
-    built-in fixes': the eight `fps_*` of the frame rate fixes, `tuner_skip_offer` of Skip Tuner in the Guitarcade,
-    and `manifest_request`, `manifest_response`, `fs_mount` and `fs_exists` of the batched DLC mounting. Learn & Play has 735 edits: many of this game's six-string loops are unrolled, so
-    where Learn & Play's edits lengthen a loop, 29 mid points of this edition's own (`none` in Learn & Play) do the
-    extra strings. The 34 points only Learn & Play needs are `none` here.
+    and `mids.map`) are for rearmed-mods: its Seven-String Guitar has the group `seven_string` (619 edits: the game's
+    arrays for six strings grown to eight, the chord loops over eight strings, the extended bass's expected pitch) and
+    `seven_line` (2 edits: the section string mask's bits of strings 6 and 7, switched by the mod's `string7_line`),
+    and 139 mid points (among them the native charts' `seven_native_*`, the extended bass's `seven_lt0`, `seven_pbh`,
+    `seven_s1_bass`, `seven_gkp`, and `seven_e8`, which says the chord loops cover eight strings); its Plain Packages
+    has `plain_packages` (2 edits and a mid point). Learn & Play's injected `Entity_SetScale` calls of the fret range
+    glow and the barre markers (`seven_glow`, `seven_barre`) are `unsupported` here: this game calls it from the C of
+    the points `seven_frg*_setscale` and `seven_pubbc_setscale`. Twenty-five more mid points are the built-in fixes':
+    the eight `fps_*` of the frame rate fixes, `tuner_skip_offer` of Skip Tuner in the Guitarcade, `manifest_request`,
+    `manifest_response`, `fs_mount` and `fs_exists` of the batched DLC mounting, and the twelve of the stock-game fixes
+    (the white loading screen's `menu_request`, `menu_locate`, `menu_located`, `file_indexed`; the arrangement lists'
+    `las_alt_*`, `menu_focus_step_up` and `_down`, `coop_sort_order` and `coop_select`). Learn & Play has 731 edits in
+    `seven_string`: many of this game's six-string loops are unrolled, so where Learn & Play's edits lengthen a loop,
+    35 mid points of this edition's own (`none` in Learn & Play) do the extra strings. The 42 points only Learn & Play
+    needs are `none` here. `tools/targets/test_targets.py` (`InnerRules`) holds both tables to what the mod's one
+    source needs: every point of the Seven-String section placed or `none` in each game, the same values and
+    continuations by name in both (but the four the mod reads by game), the injected calls in groups of their own.
   - **Files** (`rc_file_provide`, `rc_file.h`): a mod can serve files to the game. The game's file imports (`open`,
     `close`, `read`, `fstat`, `stat`, `fopen`, `opendir`, `readdir`, `closedir`: every one it has that reads a file or
     a folder) are bound to the runtime's `rc_file_*`, which ask the mod's provider first; the same interface as Learn &

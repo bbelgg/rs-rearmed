@@ -121,7 +121,9 @@ edition" is described there. What has not been tested is under [Open issues](#op
   `rearmed-mods.dylib` runs as the same file. No mod code runs without the network guard.
 - **Files a mod serves**: as the Mac edition, through the Win32 seam's file calls.
 - **Edits and mid points, and 7-string charts**: as the Mac edition, with this game's tables
-  (`tools/targets/win-x86/edits.map`, `mids.map`); the points that are the Mac's own are `none` here.
+  (`tools/targets/win-x86/edits.map`, `mids.map`); the points that are the Mac's own are `none` here. Also as the Mac
+  edition, not released: native charts, eight-string guitars, extended basses and local co-op, and two groups of this
+  game's own, `seven_glow` and `seven_barre`.
 - **What the game names for mods**: as the Mac edition. The palette textures are BGRA here, so their hashes differ
   from the Mac's; the note the game hears and the note counts are reached as RSMods reaches them on this game (the
   counts from the UI manager, in Score Attack by its own names); the Mac's names for its game's own route,

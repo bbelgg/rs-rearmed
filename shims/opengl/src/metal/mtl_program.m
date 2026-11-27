@@ -345,12 +345,15 @@ void rsmtl_glLinkProgram(GLuint program) {
         for (NSString *name in p->bound_attribs)
             bound[k++] = (rsmsl_attrib){name.UTF8String, p->bound_attribs[name].intValue, 0};
         char *err = NULL;
+#ifdef RSM_MSL_DYNAMIC
+        // Weak import: only this build can run without the translator (a test provides it).
         if (!rsmsl_translate) {
             free(bound);
             p->log = @"no GLSL -> MSL translator in this build";
             rsm_log("link: %s", p->log.UTF8String);
             return;
         }
+#endif
         rsmsl_program *r = vs.length && fs.length
                                ? rsmsl_translate(vs.UTF8String, fs.UTF8String, bound, nb, &err)
                                : NULL;

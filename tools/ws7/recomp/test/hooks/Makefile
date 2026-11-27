@@ -5,7 +5,8 @@
 #                        of the game runs (docs/*/TESTING.md); test_files (the files a mod serves, runtime/rc_file.h) and
 #                        files_mod.dylib, the mod of its game runs; test_framerate (the arithmetic of the frame rate
 #                        fixes, overrides/mods/framerate.h); test_fftsetup (the Mac game's FFT setups, kept and
-#                        handed out again, overrides/mods/fftsetup.c); test_shared64, test_shared32 (the built-in fixes both
+#                        handed out again, overrides/mods/fftsetup.c); test_quit_tables (the quit's teardown of the
+#                        JSON tables: freed when empty, kept when a load left entries, overrides/mods/quit_tables.c); test_shared64, test_shared32 (the built-in fixes both
 #                        editions share, overrides/mods/mods_shared.c: one object, built as a mod is, on both runtimes)
 OUT      ?= build
 root     := ../../../../..
@@ -18,7 +19,7 @@ MOD      := $(CC) -dynamiclib -undefined dynamic_lookup $(CFLAGS)
 builtin  := $(recomp)/overrides/mods
 SHARED   := $(OUT)/mods_shared.o $(OUT)/framerate.o
 
-all: $(OUT)/test_hooks64 $(OUT)/test_hooks32 $(OUT)/test_files $(OUT)/test_framerate $(OUT)/test_fftsetup $(OUT)/test_shared64 $(OUT)/test_shared32 $(OUT)/files_mod.dylib $(OUT)/mods/hooks_mod.dylib $(OUT)/plain/plain_mod.dylib $(OUT)/probe_mod.dylib
+all: $(OUT)/test_hooks64 $(OUT)/test_hooks32 $(OUT)/test_files $(OUT)/test_framerate $(OUT)/test_fftsetup $(OUT)/test_quit_tables $(OUT)/test_shared64 $(OUT)/test_shared32 $(OUT)/files_mod.dylib $(OUT)/mods/hooks_mod.dylib $(OUT)/plain/plain_mod.dylib $(OUT)/probe_mod.dylib
 
 $(OUT)/target/rc_target_names.h: $(root)/tools/targets/targets.py $(root)/tools/targets/win-x86/symbols.map | $(OUT)
 	$(PY) -I $(root)/tools/targets/targets.py gen --target win-x86 $(OUT)/target > /dev/null
@@ -41,6 +42,8 @@ $(OUT)/test_framerate: test_framerate.c $(recomp)/overrides/mods/framerate.h | $
 	$(CC) $(CFLAGS) test_framerate.c -o $@
 $(OUT)/test_fftsetup: test_fftsetup.c $(builtin)/fftsetup.c $(builtin)/mods_shared.h | $(OUT)
 	$(CC) $(CFLAGS) -I$(builtin) test_fftsetup.c $(builtin)/fftsetup.c -o $@
+$(OUT)/test_quit_tables: test_quit_tables.c $(builtin)/quit_tables.c | $(OUT)
+	$(CC) $(CFLAGS) test_quit_tables.c $(builtin)/quit_tables.c -o $@
 # the shared fixes as both apps build them: one object for either runtime (no RC_GUEST32), names at run time
 $(OUT)/%.o: $(builtin)/%.c $(wildcard $(builtin)/*.h) $(wildcard $(runtime)/rc_*.h) | $(OUT)
 	$(CC) $(CFLAGS) -c $< -o $@
@@ -58,6 +61,7 @@ test: all
 	$(OUT)/test_files
 	$(OUT)/test_framerate
 	$(OUT)/test_fftsetup
+	$(OUT)/test_quit_tables
 	$(OUT)/test_shared64
 	$(OUT)/test_shared32
 

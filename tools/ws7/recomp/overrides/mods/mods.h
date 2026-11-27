@@ -26,6 +26,10 @@ void rs_menu_options_start(void);
 void RC_FN(num_dtor)(rc_ctx *c);  // JSON number object destructor (removes its node)
 void RC_FN(num_intern)(rc_ctx *c);  // JSON number interning (insert/find)
 void RC_FN(num_rehash)(rc_ctx *c);  // JSON number table rehash
+void RC_FN(num_table_free)(rc_ctx *c);  // the quit's teardown of the number table (quit_tables.c)
+void RC_FN(json_key_table_free)(rc_ctx *c);  // the quit's teardown of the number table, then the key table
+// The teardown of one of the two (quit_tables.c): freed when empty, kept otherwise; -> the entries left
+uint64_t rs_quit_table_free(uint64_t *slot, uint64_t *lock_slot, void (*del)(void *), int (*mutex_destroy)(void *));
 void RC_FN(path_md5)(rc_ctx *c);  // path -> interned path object (MD5 cache)
 void RC_FN(dlc_update)(rc_ctx *c);  // DLC coordinator per-frame update (batched mounting)
 void RC_FN(asset_loader_thread)(rc_ctx *c);  // the asset loader thread's loop (its pause, while archives are mounted)

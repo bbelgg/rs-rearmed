@@ -65,6 +65,8 @@ asset_loader_thread                                              0x014adf20  thi
 std_tree_destroy                                                 0x00f964a0  thiscall  void(void *tree, void *root)
 json_number_table                                                0x1ee14c8  data      void *  # a Dinkumware hash_map here
 json_number_table_lock                                           unsupported  a CRITICAL_SECTION here (*0x1ed9154, owner +0x18, depth +0x1c), not a pthread_mutex_t: the Mac code on it does not apply
+json_key_table                                                   unsupported  only num_table_free and json_key_table_free read it, and Learn & Play has no counterpart of those
+json_key_table_lock                                              unsupported  the same
 json_number_vtable                                               0x1d5a130  data      void *[]  # 0x1400040
 const_two_pow_63                                                 unsupported  not needed: only the Mac's inlined hash reads it; the Windows hash is a function of its own (0x1400650)
 hashtable_prime_sizes                                            0x1d1e010  data      uint32_t[28]  # the same primes from 53; MSVC's list starts two entries earlier (0x1d1e008, read by 0xf96960)
@@ -1112,6 +1114,8 @@ lua_close                                                        unsupported  no
 num_dtor                                                         0x013fff60  thiscall  -  # the deleting destructor, ret 4
 num_intern                                                       0x01400040  custom    -  # edi = out, stack = the double
 num_rehash                                                       unsupported  no counterpart: Dinkumware rehashes inside insert; the hash is a function of its own (0x1400650, F_1400650 in win32_overrides.c)
+num_table_free                                                   unsupported  no counterpart: this game's teardown of the table (0x13fff00) frees it with no check of what is left, so it can't crash there
+json_key_table_free                                              unsupported  no counterpart, as num_table_free
 path_md5                                                         unsupported  inlined into its callers: the override wraps path_intern (F_141c130 in win32_overrides.c)
 dlc_update                                                       0x01449310  thiscall  -  # the per-frame update: win32_overrides.c replaces it, the batched mount runs on it
 key_down                                                         unsupported  Mac-only: the Mac game's stand-in for the keyboard device; Windows reads DirectInput and the window messages

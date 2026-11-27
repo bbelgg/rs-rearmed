@@ -650,6 +650,27 @@ void RC_FN(num_dtor)(rc_ctx *c) {
   ov_ret_u64(c, r);
 }
 
+// The quit's teardown of this table and of the key table: kept, not the game's assert, when a load the quit cut
+// short left entries in them (quit_tables.c). json_key_table_free is the game's only caller of num_table_free.
+static void quit_tables_free(const char *what, uint64_t table_ga, uint64_t lock_ga) {
+  uint64_t left = rs_quit_table_free((uint64_t *)(uintptr_t)table_ga, (uint64_t *)(uintptr_t)lock_ga, rs_op_delete,
+                                     (int (*)(void *))pthread_mutex_destroy);
+  if (left)
+    rs_mods_logf("quit: %llu JSON %s still held by documents that were loading: the table is kept",
+                 (unsigned long long)left, what);
+}
+
+void RC_FN(num_table_free)(rc_ctx *c) {
+  quit_tables_free("numbers", RC_GA(json_number_table), RC_GA(json_number_table_lock));
+  ov_ret_void(c);
+}
+
+void RC_FN(json_key_table_free)(rc_ctx *c) {
+  quit_tables_free("numbers", RC_GA(json_number_table), RC_GA(json_number_table_lock));
+  quit_tables_free("keys and strings", RC_GA(json_key_table), RC_GA(json_key_table_lock));
+  ov_ret_void(c);
+}
+
 // ------------------------------------------------------------------------------------------------
 // RSBypass: F_1001eb6a0 (SNG loader) calls the DSA verifier F_10137683d(data, len, keyHex) at 0x1001eb763
 // (return address 0x1001eb768) and, if the result is false, abandons the file; the mod NOPs that
@@ -737,6 +758,8 @@ const ov_entry ov_mods_entries[] = {
     {RC_ADDR(num_dtor), "num_dtor", RC_FN(num_dtor)},
     {RC_ADDR(num_intern), "num_intern", RC_FN(num_intern)},
     {RC_ADDR(num_rehash), "num_rehash", RC_FN(num_rehash)},
+    {RC_ADDR(num_table_free), "num_table_free", RC_FN(num_table_free)},
+    {RC_ADDR(json_key_table_free), "json_key_table_free", RC_FN(json_key_table_free)},
     {RC_ADDR(path_md5), "path_md5", RC_FN(path_md5)},
     {RC_ADDR(dlc_update), "dlc_update", RC_FN(dlc_update)},
     {RC_ADDR(asset_loader_thread), "asset_loader_thread", RC_FN(asset_loader_thread)},

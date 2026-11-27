@@ -5,6 +5,8 @@
 num_dtor             # rsmacfixes: JSON-number hash (remove site 0x1000f8d59)
 num_intern           # rsmacfixes: JSON-number hash (insert site 0x1000f8f61)
 num_rehash           # rsmacfixes: JSON-number hash (rehash site 0x1000f9a35)
+num_table_free       # the quit's teardown of the JSON-number table: kept when numbers are still referenced, where the game crashes (0x1000f8c4d)
+json_key_table_free  # the quit's teardown of the JSON key table, after num_table_free's: kept likewise (0x1000f5212)
 path_md5             # rsmacfixes: path MD5 cache (hook at function entry)
 dlc_update           # rsmacfixes: batched DLC mounting (call site 0x100a0d742)
 asset_loader_thread  # batched DLC mounting: the asset loader thread's loop, for its pause between passes (0x1012856fb)

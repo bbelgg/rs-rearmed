@@ -397,7 +397,9 @@ engine: `DefWindowProc` destroys the window, the game's `WM_DESTROY` posts `WM_Q
 tells its service to quit. A game that does not answer in 8 s goes anyway. Every end of the process runs
 `w32_host_exit` (the shader cache saved, the streams flushed, `_exit`), since the game's threads still run there,
 and DLLs get `DLL_PROCESS_DETACH` with `lpReserved` set, the process-exit form, which leaves the CRT's locks and
-TLS to those threads.
+TLS to those threads. The game's teardown of its JSON tables frees them whatever documents still hold entries, so a
+quit while the profile's gear is loading ends cleanly here; the Mac game's checks the tables first and needs a fix
+([Mac design](../mac/DESIGN.md#built-in-fixes-and-mods)).
 
 ## Built-in fixes and mods
 
@@ -507,6 +509,9 @@ What differs, fix by fix:
   same pieces the game's own code uses. A change is written to `options.env` in `LP_HOME`.
 - **Song ownership during a mount**: the shared hook, which this edition's mounting loop tells when its steps run.
   `RS_MODS_BYPASS=0` also brings back the song-key table, which hides custom songs here whatever their AppID.
+- **A clean quit while the gear loads**: not needed. This game's teardown of the JSON number table (`0x13fff00`) frees
+  it with no check of what is left, so the quit that crashes the Mac game is a clean one here (`num_table_free` and
+  `json_key_table_free` are `unsupported` in its table).
 - **Title logo.** The same `tools/loadscreen` and layout as the Mac edition's. `lp_install.py build` makes
   `static.psarc.rearmed` in the copy, and `title_logo()` in `lp_main.c` links `static.psarc` at each start as
   `launch.sh` does (`RS_REARMED=0` for the original).

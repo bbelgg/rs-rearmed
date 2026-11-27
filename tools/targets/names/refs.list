@@ -18,6 +18,8 @@ dlc_package_queue        # the packages of mounted archives that wait for the up
 std_tree_destroy         # std::map node destruction
 json_number_table        # global table of JSON number values
 json_number_table_lock   # its recursive mutex
+json_key_table           # global table of the JSON keys and strings (interned names with a reference count)
+json_key_table_lock      # its recursive mutex
 json_number_vtable       # number object vtable
 const_two_pow_63         # 2^63
 hashtable_prime_sizes    # table sizes, lower_bound'ed by rehash

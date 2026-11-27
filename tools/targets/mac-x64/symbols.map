@@ -72,6 +72,8 @@ JSONFactory__Response_QueryInterface                             0x1000f46e0  sy
 JSONFactory__Response_QueryInterface_const                       0x1000f4740  sysv  -
 JSONFactory__JSONFactoryData_QueryInterface                      0x1000f49a0  sysv  -
 JSONFactory__JSONFactoryData_QueryInterface_const                0x1000f4a00  sysv  -
+json_key_table_free                                              0x1000f51f0  sysv  void(void)  # the quit's (MainService's destructor tail-calls it): num_table_free, then the key table's; mods.c
+num_table_free                                                   0x1000f8c30  sysv  void(void)  # the number table's teardown; mods.c
 num_dtor                                                         0x1000f8d20  sysv  -
 num_intern                                                       0x1000f8f10  sysv  -
 num_rehash                                                       0x1000f9920  sysv  -
@@ -918,6 +920,8 @@ GRMusicService_class_info                                        0x1018e3130  da
 JSONFactory_class_info                                           0x1018e3620  data  efd::ClassInfo
 JSONFactory__Response_class_info                                 0x1018e3a28  data  efd::ClassInfo
 JSONFactory__JSONFactoryData_class_info                          0x1018e3e30  data  efd::ClassInfo
+json_key_table                                                   0x1018e4238  data  void *  # nodes {next, ?, hash, key}; +0x08 buckets begin, +0x10 end, +0x20 count
+json_key_table_lock                                              0x1018e4240  data  pthread_mutex_t *
 PostEffectColorCorrect_class_info                                0x1018e4e78  data  efd::ClassInfo
 PostEffectsService_class_info                                    0x1018e52b8  data  efd::ClassInfo
 GRClipFadeEffectComponent_class_info                             0x1018e56e8  data  efd::ClassInfo

@@ -5,6 +5,12 @@ change, in the words the release notes will use: the bold lead says what is now 
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
 
+- **The game doesn't crash as it quits right after a profile is loaded:** Command-Q at the main menu soon after
+  choosing a profile, and EXIT GAME (which goes back through the title and the profile first), end cleanly. Before,
+  about one such quit in two ended in a crash report, because the game's own shutdown crashes on purpose when the
+  profile's gear is still loading; in the game tests it never happened after a minute at the menu. This is probably
+  the crash on EXIT GAME after a long tour of the menus that was reported since 1.17.1. Mac only: Learn & Play's game
+  has no such check.
 - **For testers: a test input in place of a guitar:** `RS_AUDIO_FAKE_INPUT` adds an input device, "RS Re-ARMed Test
   Input", whose channels play WAV files, plucked tones (`tone:MIDI[:SECONDS]`), a round of loud plucks and silence
   that calibration takes (`calibrate`) or silence, comma-separated, e.g. `RS_AUDIO_FAKE_INPUT=tone:40,silence`;

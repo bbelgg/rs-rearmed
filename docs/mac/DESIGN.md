@@ -251,6 +251,13 @@ function and `SetAppFocus` (the hook points `input_sink` and `set_app_focus`), a
 original lacked ([INSTALL.md](INSTALL.md#keys)). Learn & Play's input is a layer of its own
 ([Windows design](../windows/DESIGN.md#input)).
 
+**Quitting.** Command-Q and the close button ask the engine to quit (`rsp_request_quit`: the ServiceManager's quit
+byte), as EXIT GAME does from the game's own menu. The frames go on while the services shut down, and when the engine
+says it is done the frame thread runs the game's shutdown (`game_shutdown`, from the main controller's `dealloc` as in
+the original) and ends the process (`rsp_exit`). That shutdown's last check, of the game's JSON tables, crashed when the
+quit came while the profile's gear was loading; the built-in fixes keep it from doing so
+([A clean quit while the gear loads](#built-in-fixes-and-mods)).
+
 ## Built-in fixes and mods
 
 Each fix is a native replacement of a game function or a hook on one, with a switch
@@ -267,7 +274,8 @@ edition's log. The sources are in `tools/ws7/recomp/overrides/mods`:
   environment by then.
 - **Each edition's own.** The batched DLC mounting loop, the Auto Save skip, the Direct Connect overlay's file open, the
   path cache, the number hash and the signature skip sit where the two games' code differs. This edition's are in
-  `mods.c`, with three only it needs (the keys, the thread priority and, in `fftsetup.c`, the FFT setups): a function named in
+  `mods.c`, with four only it needs (the keys, the thread priority, in `fftsetup.c` the FFT setups and in `quit_tables.c`
+  the quit's JSON tables): a function named in
   `tools/targets/names/overrides/mods.list` is left out of the translation and defined there, and the rest are pre hooks
   on hook points. Learn & Play's, and why each differs: [Windows design](../windows/DESIGN.md#built-in-fixes-and-mods).
 
@@ -471,6 +479,20 @@ What each does:
   While the install steps run the hook answers yes (each edition's mounting loop says when they do): an archive in
   `dlc/` counts as owned, whatever AppID it carries. `RS_MODS_BYPASS=0` asks the list again, and such a song then needs
   a refresh and a restart.
+- **A clean quit while the gear loads** (always on; `quit_tables.c`, `num_table_free` and `json_key_table_free` in
+  `mods.list`). The game interns every JSON key and string in one global table and every number in another, and the
+  last release of an entry removes it. Its shutdown, which MainService's destructor ends with, frees the two tables and
+  first checks that each is empty: when one isn't, it writes to address 0 (`0x1000f8c4d`, `0x1000f5212`), a trap here
+  (exit status -5). A table isn't empty when the quit comes while documents are loading: loading a profile asks for its
+  gear by name (`urn:database:json-db:gear_*`, the amps, cabinets, pedals and racks), the asset loader thread reads it
+  and the ManifestManager takes it in on the game thread a few frames later, and a quit in between shuts the services
+  down with those answers owed, whose documents are then never released. So Command-Q at the main menu right after
+  the profile, or EXIT GAME, which goes back through the title and the profile first, crashed about one quit in two in
+  the game tests, and never after a minute at the menu. The original Mac game has the same code. The replacements free
+  an empty table as the game does and keep one that isn't, with its mutex, logging how much was left
+  (`[rs-mods] quit: ... the table is kept`): nothing uses those documents before the process ends, and one released
+  after all still finds its entry. Learn & Play's game has no such check (its teardown frees the table whatever is
+  left).
 - **Title logo.** `tools/loadscreen` builds `static.psarc.rearmed` in the copy (`install.sh`; never in Steam's folder)
   from the copy's `static.psarc.original` with a "Re-ARMed" tag on the title logo; the launcher uses it when it is there
   (`RS_REARMED=0` for the original). It isn't in the copy's manifest, so a refresh leaves it, except that a new

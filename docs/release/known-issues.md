@@ -61,8 +61,6 @@ into the notes as it stands. -->
 - The first time you play a song, venue or mode with Metal, a few short stutters can show. Later plays are smooth.
 - Mods that draw on the screen with OpenGL themselves show nothing with Metal; the rest of the mod works. Use a version
   that draws through the overlay API, or the OpenGL renderer.
-- After a long tour of the menus the game has been reported to crash as it quits with EXIT GAME, in 1.17.1 as well.
-  It was not met in testing; this is another crash than the one 1.18.0 fixes.
 - 7-string charts (rearmed-mods' Seven-String Guitar) need a Mac song archive (`_m.psarc`); one published for Windows
   doesn't load here, and RS Re-ARMed has no converter.
 

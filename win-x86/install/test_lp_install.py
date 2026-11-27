@@ -1516,6 +1516,52 @@ class TestApp(BuildBase):
         self.assertTrue(os.path.isfile(os.path.join(self.app, "Contents", "Resources", "RS2014.icns")))
         self.assertFalse(any(f.endswith(".ico") for f in os.listdir(os.path.join(self.app, "Contents", "Resources"))))
 
+    def test_display_name_follows_the_branding_switch(self):
+        self.built()
+        import plistlib
+
+        def display():
+            # Info.plist's display name is the bundle's file name: the Dock and Finder show the
+            # localized string below only while the two match.
+            with open(os.path.join(self.app, "Contents", "Info.plist"), "rb") as f:
+                return plistlib.load(f)["CFBundleDisplayName"]
+
+        def localized():
+            # The Dock and Finder's name: the localized string, not CFBundleDisplayName above.
+            with open(os.path.join(self.app, "Contents", "Resources", "en.lproj", "InfoPlist.strings")) as f:
+                return f.read()
+
+        def bundle():
+            # The menu's name: AppKit stamps CFBundleName over the title the game sets.
+            with open(os.path.join(self.app, "Contents", "Info.plist"), "rb") as f:
+                return plistlib.load(f)["CFBundleName"]
+
+        self.install()
+        self.assertEqual(display(), lp_build.APP_NAME)
+        self.assertEqual(localized(), '"CFBundleDisplayName" = "%s";\n' % lp_build.APP_NAME)
+        self.assertEqual(bundle(), lp_build.APP_SHORT_NAME)
+        write(os.path.join(self.home, "settings.env"), b"# the game's own branding\nRS_REARMED=0\n")
+        self.install()
+        self.assertEqual(display(), lp_build.APP_NAME)
+        self.assertEqual(localized(), '"CFBundleDisplayName" = "%s";\n' % lp_build.ORIGINAL_NAME)
+        self.assertEqual(bundle(), lp_build.ORIGINAL_SHORT_NAME)
+        write(os.path.join(self.home, "settings.env"), b"RS_REARMED=1\n")
+        self.install()
+        self.assertEqual(display(), lp_build.APP_NAME)
+        self.assertEqual(bundle(), lp_build.APP_SHORT_NAME)
+        with mock.patch.dict(os.environ, {"RS_REARMED": "0"}):
+            self.assertEqual(lp_build.display_name(self.home), lp_build.ORIGINAL_NAME)
+
+    def test_test_install_keeps_its_own_dock_name(self):
+        self.built()
+        self.app = os.path.join(self.top, "Applications", "RS Re-ARMed Learn & Play Test.app")
+        self.install()
+        import plistlib
+        with open(os.path.join(self.app, "Contents", "Info.plist"), "rb") as f:
+            self.assertEqual(plistlib.load(f)["CFBundleDisplayName"], "RS Re-ARMed Learn & Play Test")
+        self.assertFalse(os.path.exists(
+            os.path.join(self.app, "Contents", "Resources", "en.lproj", "InfoPlist.strings")))
+
 
 class TestHarvest(unittest.TestCase):
     """The prebuilt harvester: the committed exe is the one README.md names, and harvest-export copies it

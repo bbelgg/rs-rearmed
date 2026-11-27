@@ -129,6 +129,9 @@ else
 fi
 
 cp "$here/Info.plist" "$app/Contents/Info.plist"
+# The localized display name (honoured only while Info.plist's display name is the bundle's file name).
+mkdir -p "$app/Contents/Resources/en.lproj"
+cp "$here/en.lproj/InfoPlist.strings" "$app/Contents/Resources/en.lproj/"
 # the original app's icon (CFBundleIconFile RS2014.icns), so the Dock shows it
 game_res="${RS_GAME_DIR:-$HOME/Library/Application Support/Steam/steamapps/common/Rocksmith2014}/Rocksmith2014.app/Contents/Resources"
 [ -f "$game_res/RS2014.icns" ] && cp "$game_res/RS2014.icns" "$app/Contents/Resources/" || echo "warning: no RS2014.icns in $game_res" >&2

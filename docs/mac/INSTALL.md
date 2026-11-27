@@ -97,7 +97,8 @@ ends the run; what is done is kept, and Build & Install goes on from there.
   Tuner in the Guitarcade, the frame rate fixes, the title logo) and the other switches below, grouped with the
   common ones first and the rest under Advanced, which is open when one of its switches is set. A change takes
   effect the next time the game starts, with nothing to reinstall, once the game has been installed by a version
-  after 1.16.0; for a game from before, the page says that it takes only the built-in mods it knew
+  after 1.16.0, except the branding's Dock, menu and launcher names, which wait for the next install, so Build &
+  Install again for a new name; for a game from before, the page says that it takes only the built-in mods it knew
   ([Settings and switches](#settings-and-switches)). The page starts at what the files have, can copy the other
   edition's (what only this edition has stays), and Reset to Defaults returns everything to the defaults.
 - Quitting the installer while it works stops the build (it asks first); Build & Install starts it again.
@@ -327,9 +328,12 @@ The design, with the game's own calls, is in [DESIGN.md](DESIGN.md#steam).
 ### The title logo
 
 The install makes the logo once, in the copy; if it can't, the game shows its own. To rebuild it, or for what it
-needs: [tools/loadscreen](../../tools/loadscreen/README.md). `RS_REARMED=0` (or the logo off in the installer's
-Settings and switches…) shows the original. A refresh that brings a new `static.psarc` removes it, and the next install
-makes it again.
+needs: [tools/loadscreen](../../tools/loadscreen/README.md). A refresh that brings a new `static.psarc` removes it,
+and the next install makes it again. `RS_REARMED=0` (or the branding off in the installer's Settings and switches…)
+shows the game's own title (`Rocksmith 2014`) as the logo and app name, in the Dock, the menu and the window title;
+the window title changes at the next start, the Dock and menu names at the next install. The launcher in
+~/Applications shows the same name (its file name stays `RS Re-ARMed.app`). A tile already kept in the Dock keeps
+the name it was added with: remove it and add the app again for the new name.
 
 ## Where things are
 
@@ -533,7 +537,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_MODS_AUTOSAVE=0` | on | the Auto Save warning shows after profile select |
 | `RS_MODS_OVERLAY=0` | on | the game reads `cache.psarc` alone, without the overlay: no DIRECT CONNECT, SHOP instead of ENUMERATE and UPLAY instead of EXIT GAME, and the lists' scroll bars as the game has them ([Game files](#game-files)) |
 | `RS_MODS_MULTIPLAYER=0` | on | [two players](#two-players): Player 2 on a Real Tone cable only |
-| `RS_REARMED=0` | on | the game's own title logo ([The title logo](#the-title-logo)); set for the install, no logo is made |
+| `RS_REARMED=0` | on | the game's own title as the logo and app name ([The title logo](#the-title-logo)); set for the install, no logo is made |
 | `RS_MODS_FRAME_RATE=0` | on | calibration and the tuner count in frames, as in the original, which goes wrong above 60 Hz |
 | `RS_MODS_GUITARCADE_SKIP=0` | on | a Guitarcade game's tuner has no Skip Tuner, as in the original |
 | `RS_MODS_MENU_RETRY=0` | on | a menu asked for before the game's file index has its file is not asked for again, as in the original: the screen can stay white for good |

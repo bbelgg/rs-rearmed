@@ -2,7 +2,7 @@
 #   make         build $(OUT)/libwinaudio.a (wa_*.c + the Mac build's game-independent audio code)
 #   make test    run tests/test_audio (the objects through their guest cells, no game needed;
 #                plays under a second of a quiet tone on the default output device, and runs the
-#                hook point si_io on the default input)
+#                hook point si_io on the default input), then its --fake part on the test input
 #
 # The game links libwinaudio.a, win32_guestobj.o, win32_ksync.o (w32_event_signal) and the
 # AudioToolbox, CoreAudio and CoreFoundation frameworks.
@@ -47,9 +47,10 @@ $(OUT)/test_audio: tests/test_audio.c $(OUT)/libwinaudio.a $(OUT)/win32_guestobj
 	$(CC) $(CFLAGS) tests/test_audio.c $(OUT)/libwinaudio.a $(OUT)/win32_guestobj.o $(OUT)/win32_ksync.o \
 	    $(RT:%=$(OUT)/rt_%.o) $(FRAMEWORKS) -o $@
 
-# The test leaves the devices' sample rates alone (RS_AUDIO_SET_RATE=0).
+# The test leaves the devices' sample rates alone (RS_AUDIO_SET_RATE=0). Then the test input, with no guitar-input.ini.
 test: $(OUT)/test_audio
 	RS_AUDIO_SET_RATE=0 RS_AUDIO_LOG=1 $(OUT)/test_audio
+	RS_AUDIO_FAKE_INPUT=tone:57,silence RS_AUDIO_INPUT_FILE=/dev/null RS_AUDIO_LOG=1 $(OUT)/test_audio --fake
 
 clean:
 	rm -rf $(OUT)

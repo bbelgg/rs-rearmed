@@ -8,6 +8,8 @@
 // exclusive event-mode stream as the game's Wwise sink opens it (0.3 s, 256-frame periods), the
 // guitar input as the game opens it (exclusive, event mode, 48 kHz mono float) when there is a
 // capture device, waveIn / mixer as NSoundInputMgr_Win32 uses them, and a mod's hooks on the hook point si_io.
+// --fake, with RS_AUDIO_FAKE_INPUT=tone:57,silence: the test input (shims/coreaudio/rs_audio_fake.h) as the game sees
+// it, an endpoint per channel, and its guitar input's stream.
 #include <math.h>
 #include <pthread.h>
 #include <stdatomic.h>
@@ -18,6 +20,7 @@
 #include <unistd.h>
 
 #include "audio.h"
+#include "rs_audio_fake.h"
 #include "rs_audio_input.h"
 #include "wa_engine.h"
 #include "win32_guestobj.h"
@@ -723,6 +726,70 @@ static void notify_test(uint32_t en) {
   printf("default output change: 3 calls, none after Unregister\n");
 }
 
+// The test input: one endpoint a channel, capture only, found again by its id; a guitar input's stream on each
+// channel, as the game opens one, has the tone (A3, at -6 dBFS) or silence, in real time.
+static void fake_stream(const wa_endpoint *ep, float *peak, uint32_t *frames, uint32_t *crossings, double *secs) {
+  wa_fmt f;
+  wa_fmt_mix(1, &f);
+  wa_stream *st = wa_stream_open(ep, &f, 256, 256, 1);
+  CHECK(st && wa_stream_device(st) == RS_AUDIO_FAKE_DEV);
+  wa_stream_info inf;
+  wa_stream_info_get(st, &inf);
+  CHECK(inf.device_rate == 48000 && inf.io_frames == 128);
+  CHECK(!wa_stream_start(st) && wa_stream_running(st));
+  static float buf[4096];
+  float prev = 0;
+  *peak = 0;
+  *frames = *crossings = 0;
+  double t0 = now();
+  for (; now() - t0 < 0.5; usleep(2000)) {
+    uint32_t n = wa_capture_available(st, 0);
+    n = wa_capture_peek(st, buf, n > 4096 ? 4096 : n);
+    for (uint32_t i = 0; i < n; i++) {
+      if (fabsf(buf[i]) > *peak) *peak = fabsf(buf[i]);
+      *crossings += prev < 0 && buf[i] >= 0;
+      prev = buf[i];
+    }
+    wa_capture_consume(st, n);
+    *frames += n;
+  }
+  *secs = now() - t0;
+  wa_stream_close(st);
+}
+
+static void test_fake(void) {
+  CHECK(rs_audio_fake_channels() == 2);
+  wa_endpoint eps[64], ch[2], again;
+  int n = wa_endpoints(WA_CAPTURE, eps, 64), found = 0;
+  for (int i = 0; i < n; i++)
+    for (int c = 0; c < 2; c++) {
+      char want[64];
+      snprintf(want, sizeof want, RS_AUDIO_FAKE_NAME " channel %d", c + 1);
+      if (strcmp(eps[i].name, want)) continue;
+      CHECK(eps[i].dev == RS_AUDIO_FAKE_DEV && eps[i].in_ch == c && eps[i].channels == 1 && eps[i].rate == 48000);
+      ch[c] = eps[i];
+      found |= 1 << c;
+    }
+  CHECK(found == 3);
+  n = wa_endpoints(WA_RENDER, eps, 64);
+  for (int i = 0; i < n; i++) CHECK(eps[i].dev != RS_AUDIO_FAKE_DEV);
+  char id[256];
+  wa_endpoint_id(&ch[1], id, sizeof id);
+  CHECK(wa_endpoint_by_id(id, &again) && again.dev == RS_AUDIO_FAKE_DEV && again.in_ch == 1);
+  float peak;
+  uint32_t frames, crossings;
+  double secs;
+  fake_stream(&ch[0], &peak, &frames, &crossings, &secs);
+  printf("fake: channel 1: %u frames in %.3f s, peak %.3f, %u rising zero crossings\n", frames, secs, peak, crossings);
+  CHECK(frames > 0.8 * 48000 * secs && frames < 1.05 * 48000 * secs);
+  CHECK(fabsf(peak - RS_AUDIO_FAKE_PEAK) < 0.02f);
+  CHECK(crossings > 0.9 * 220 * secs);  // A3, and its harmonics' few
+  fake_stream(&ch[1], &peak, &frames, &crossings, &secs);
+  printf("fake: channel 2: %u frames, peak %.3f\n", frames, peak);
+  CHECK(frames > 0.8 * 48000 * secs && peak == 0);
+  printf("fake: ok\n");
+}
+
 int main(int argc, char **argv) {
   CHECK(rc32_mem_init() == 0);
   fake_image();
@@ -761,6 +828,12 @@ int main(int argc, char **argv) {
   test_game_names();
   list_endpoints(en);
   if (argc > 1 && !strcmp(argv[1], "--list")) return 0;  // the device list only, nothing opened
+  if (argc > 1 && !strcmp(argv[1], "--fake")) {  // the test input only
+    test_fake();
+    CHECK(vcall(en, RELEASE, 0, 0) == 0);
+    printf("ok\n");
+    return 0;
+  }
   test_render(en);
   test_capture(en);
   test_wavein();

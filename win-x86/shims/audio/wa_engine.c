@@ -10,6 +10,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "rs_audio_fake.h"
 #include "rs_audio_host.h"
 #include "rs_audio_input.h"
 #include "win32_shims.h"
@@ -214,7 +215,7 @@ static int device_list(AudioObjectID *devs, int max) {
   AudioObjectPropertyAddress a = {kAudioHardwarePropertyDevices, kAudioObjectPropertyScopeGlobal,
                                   kAudioObjectPropertyElementMain};
   UInt32 sz = (UInt32)(max * sizeof *devs);
-  if (AudioObjectGetPropertyData(kAudioObjectSystemObject, &a, 0, NULL, &sz, devs) != noErr) return 0;
+  if (rs_audio_hal_get(kAudioObjectSystemObject, &a, 0, NULL, &sz, devs) != noErr) return 0;
   return (int)(sz / sizeof *devs);
 }
 
@@ -340,6 +341,7 @@ struct wa_stream {
   rs_audio_input_stats in_stats;
   char in_name[128];
   float *conv;  // guest-format conversions on the guest side (ring_frames x channels)
+  AudioDeviceIOProcID fake_io;  // the test input's I/O function (rs_audio_fake.h), in place of the unit
 };
 
 static void ring_read(wa_stream *s, uint64_t pos, float *dst, uint32_t frames) {
@@ -485,24 +487,14 @@ static int si_io_pre(wa_stream *s, rc_ctx *c, uint64_t *frame, AudioBufferList *
 
 // Capture: the device's frames, its channels at its rate, to the stream's channels with the input's settings,
 // past si_io's hooks, then at the stream's rate (linear interpolation when the rates differ) into the ring.
-static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *ts, UInt32 bus,
-                         UInt32 frames, AudioBufferList *unused) {
-  (void)unused;
-  wa_stream *s = ref;
-  if (frames > s->in_max) frames = s->in_max;
-  AudioBufferList abl;
-  abl.mNumberBuffers = 1;
-  abl.mBuffers[0].mNumberChannels = s->dev_ch;
-  abl.mBuffers[0].mDataByteSize = frames * s->dev_ch * sizeof(float);
-  abl.mBuffers[0].mData = s->in_buf;
-  if (AudioUnitRender(s->unit, flags, ts, bus, frames, &abl) != noErr) return noErr;
+static void capture_frames(wa_stream *s, const float *in, uint32_t frames) {
   uint32_t ch = s->fmt.channels, dch = s->dev_ch;
   float *x = s->in_game, peak = 0, gain = s->in_gain * atomic_load_explicit(&s->gain, memory_order_relaxed);
   uint32_t pushed = 0, dropped = 0, clips = 0;
   for (uint32_t i = 0; i < frames; i++)
     for (uint32_t c = 0; c < ch; c++) {
       uint32_t sc = s->in_ch >= 0 ? (uint32_t)s->in_ch : c < dch ? c : 0;
-      x[(size_t)i * ch + c] = rs_audio_input_apply(s->in_buf[(size_t)i * dch + sc], gain, &peak, &clips);
+      x[(size_t)i * ch + c] = rs_audio_input_apply(in[(size_t)i * dch + sc], gain, &peak, &clips);
     }
   rs_audio_input_note(&s->in_stats, peak, clips, frames);
   int hooked = atomic_load_explicit(&g_si.npre, memory_order_acquire) ||
@@ -510,7 +502,7 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
   rc_ctx view;
   uint64_t frame[8];
   AudioBufferList list;
-  if (hooked && si_io_pre(s, &view, frame, &list, &x, &frames)) return noErr;
+  if (hooked && si_io_pre(s, &view, frame, &list, &x, &frames)) return;
   uint64_t w = atomic_load_explicit(&s->w, memory_order_relaxed);
   uint64_t r = atomic_load_explicit(&s->r, memory_order_acquire);
   float out[MAX_CH];
@@ -541,6 +533,31 @@ static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const Aud
     int n = atomic_load_explicit(&g_si.npost, memory_order_acquire);
     for (int i = 0; i < n; i++) g_si.post[i](&view, g_si.post_user[i]);
   }
+}
+
+static OSStatus input_cb(void *ref, AudioUnitRenderActionFlags *flags, const AudioTimeStamp *ts, UInt32 bus,
+                         UInt32 frames, AudioBufferList *unused) {
+  (void)unused;
+  wa_stream *s = ref;
+  if (frames > s->in_max) frames = s->in_max;
+  AudioBufferList abl;
+  abl.mNumberBuffers = 1;
+  abl.mBuffers[0].mNumberChannels = s->dev_ch;
+  abl.mBuffers[0].mDataByteSize = frames * s->dev_ch * sizeof(float);
+  abl.mBuffers[0].mData = s->in_buf;
+  if (AudioUnitRender(s->unit, flags, ts, bus, frames, &abl) == noErr) capture_frames(s, s->in_buf, frames);
+  return noErr;
+}
+
+// The test input's I/O function: its one buffer, its channels interleaved, as the unit renders a device's.
+static OSStatus fake_input_cb(AudioObjectID dev, const AudioTimeStamp *now, const AudioBufferList *in,
+                              const AudioTimeStamp *in_time, AudioBufferList *out, const AudioTimeStamp *out_time,
+                              void *ref) {
+  wa_stream *s = ref;
+  if (!in || !in->mNumberBuffers || !in->mBuffers[0].mData || in->mBuffers[0].mNumberChannels != s->dev_ch)
+    return noErr;
+  uint32_t frames = in->mBuffers[0].mDataByteSize / (s->dev_ch * (uint32_t)sizeof(float));
+  capture_frames(s, in->mBuffers[0].mData, frames > s->in_max ? s->in_max : frames);
   return noErr;
 }
 
@@ -554,7 +571,7 @@ static double use_rate(AudioObjectID dev, double want) {
   AudioObjectPropertyAddress a = {kAudioDevicePropertyNominalSampleRate, kAudioObjectPropertyScopeGlobal,
                                   kAudioObjectPropertyElementMain};
   Float64 v = want;
-  if (AudioObjectSetPropertyData(dev, &a, 0, NULL, sizeof v, &v) != noErr) return cur;
+  if (rs_audio_hal_set(dev, &a, 0, NULL, sizeof v, &v) != noErr) return cur;
   for (int i = 0; i < 50; i++) {  // the switch is asynchronous
     rs_audio_dev_get(dev, kAudioDevicePropertyNominalSampleRate, &cur, sizeof cur);
     if (cur == want) break;
@@ -567,14 +584,14 @@ static double use_rate(AudioObjectID dev, double want) {
 static uint32_t scope_u32(AudioObjectID dev, AudioObjectPropertySelector sel, AudioObjectPropertyScope scope) {
   AudioObjectPropertyAddress a = {sel, scope, kAudioObjectPropertyElementMain};
   UInt32 v = 0, sz = sizeof v;
-  return AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, &v) == noErr ? v : 0;
+  return rs_audio_hal_get(dev, &a, 0, NULL, &sz, &v) == noErr ? v : 0;
 }
 
 static uint32_t stream_latency(AudioObjectID dev, AudioObjectPropertyScope scope) {
   AudioObjectPropertyAddress a = {kAudioDevicePropertyStreams, scope, kAudioObjectPropertyElementMain};
   AudioStreamID st[8];
   UInt32 sz = sizeof st;
-  if (AudioObjectGetPropertyData(dev, &a, 0, NULL, &sz, st) != noErr || !sz) return 0;
+  if (rs_audio_hal_get(dev, &a, 0, NULL, &sz, st) != noErr || !sz) return 0;
   return scope_u32(st[0], kAudioStreamPropertyLatency, kAudioObjectPropertyScopeGlobal);
 }
 
@@ -599,12 +616,15 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
   s->dev_rate = use_rate(ep->dev, fmt->rate);
   if (s->dev_rate <= 0) s->dev_rate = fmt->rate;
 
+  // The test input has no unit: its I/O function, as the HAL would call one, does the input callback's work.
+  int fake = rs_audio_fake_is(ep->dev);
+  if (fake && !capture) goto fail;
   AudioComponentDescription d = {kAudioUnitType_Output, kAudioUnitSubType_HALOutput, kAudioUnitManufacturer_Apple, 0,
                                  0};
-  AudioComponent comp = AudioComponentFindNext(NULL, &d);
-  if (!comp || AudioComponentInstanceNew(comp, &s->unit) != noErr) goto fail;
+  AudioComponent comp = fake ? NULL : AudioComponentFindNext(NULL, &d);
+  if (!fake && (!comp || AudioComponentInstanceNew(comp, &s->unit) != noErr)) goto fail;
   UInt32 one = 1, zero = 0;
-  if (capture) {
+  if (capture && !fake) {
     AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Input, 1, &one, sizeof one);
     AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_EnableIO, kAudioUnitScope_Output, 0, &zero, sizeof zero);
   }
@@ -616,8 +636,8 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
   if (capture && cap > 128) cap = 128;
   s->io_frames = rs_audio_set_device_buffer(ep->dev, cap, who);
   AudioObjectID dev = ep->dev;
-  if (AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &dev,
-                           sizeof dev) != noErr)
+  if (!fake && AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_CurrentDevice, kAudioUnitScope_Global, 0, &dev,
+                                    sizeof dev) != noErr)
     goto fail;
   AudioStreamBasicDescription c = {0};
   c.mFormatID = kAudioFormatLinearPCM;
@@ -638,8 +658,8 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
     c.mSampleRate = s->dev_rate;  // the input side of a HAL unit does not convert rates
     c.mChannelsPerFrame = s->dev_ch;
     c.mBytesPerFrame = c.mBytesPerPacket = 4u * s->dev_ch;
-    if (AudioUnitSetProperty(s->unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &c, sizeof c) !=
-        noErr)
+    if (!fake &&
+        AudioUnitSetProperty(s->unit, kAudioUnitProperty_StreamFormat, kAudioUnitScope_Output, 1, &c, sizeof c) != noErr)
       goto fail;
     s->in_max = 8192;
     s->in_buf = calloc((size_t)s->in_max * s->dev_ch, sizeof(float));
@@ -650,9 +670,12 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
     s->step = s->dev_rate / fmt->rate;
     s->phase = 0.0;  // at the device's rate too: from 1.0 the stream's second frame was passed over
     AURenderCallbackStruct cb = {input_cb, s};
-    if (AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &cb,
-                             sizeof cb) != noErr)
+    if (fake) {
+      if (rs_audio_hal_io_create(ep->dev, fake_input_cb, s, &s->fake_io) != noErr) goto fail;
+    } else if (AudioUnitSetProperty(s->unit, kAudioOutputUnitProperty_SetInputCallback, kAudioUnitScope_Global, 0, &cb,
+                                    sizeof cb) != noErr) {
       goto fail;
+    }
   } else {
     c.mSampleRate = fmt->rate;
     c.mChannelsPerFrame = fmt->channels;
@@ -665,7 +688,7 @@ wa_stream *wa_stream_open(const wa_endpoint *ep, const wa_fmt *fmt, uint32_t buf
                              sizeof cb) != noErr)
       goto fail;
   }
-  if (AudioUnitInitialize(s->unit) != noErr) goto fail;
+  if (!fake && AudioUnitInitialize(s->unit) != noErr) goto fail;
   rs_audio_dev_get(ep->dev, kAudioDevicePropertyBufferFrameSize, &s->io_frames, sizeof s->io_frames);
   AudioObjectPropertyScope sc = capture ? kAudioObjectPropertyScopeInput : kAudioObjectPropertyScopeOutput;
   s->latency_frames = scope_u32(ep->dev, kAudioDevicePropertyLatency, sc) +
@@ -684,6 +707,10 @@ fail:
 
 void wa_stream_close(wa_stream *s) {
   if (!s) return;
+  if (s->fake_io) {
+    rs_audio_hal_stop(s->ep.dev, s->fake_io);
+    rs_audio_hal_io_destroy(s->ep.dev, s->fake_io);
+  }
   if (s->unit) {
     AudioOutputUnitStop(s->unit);
     AudioUnitUninitialize(s->unit);
@@ -717,7 +744,7 @@ int wa_stream_running(wa_stream *s) { return atomic_load(&s->running); }
 
 int wa_stream_start(wa_stream *s) {
   if (atomic_load(&s->running)) return 0;
-  OSStatus st = AudioOutputUnitStart(s->unit);
+  OSStatus st = s->fake_io ? rs_audio_hal_start(s->ep.dev, s->fake_io) : AudioOutputUnitStart(s->unit);
   if (st != noErr) {
     rs_audio_log("starting \"%s\" failed (%d)", s->ep.name, (int)st);
     return -1;
@@ -728,7 +755,8 @@ int wa_stream_start(wa_stream *s) {
 
 int wa_stream_stop(wa_stream *s) {
   if (!atomic_load(&s->running)) return 0;
-  AudioOutputUnitStop(s->unit);
+  if (s->fake_io) rs_audio_hal_stop(s->ep.dev, s->fake_io);
+  else AudioOutputUnitStop(s->unit);
   atomic_store(&s->running, 0);
   return 0;
 }

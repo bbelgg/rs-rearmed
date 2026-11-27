@@ -88,6 +88,14 @@ static void parse_one(const char *s, size_t n, rs_audio_fake_source *out) {
     else say("\"%.*s\" is not tone:MIDI[:SECONDS] (MIDI 0-127, 0.05-60 s): silence in its place", (int)n, s);
     return;
   }
+  if ((n == 9 || (n > 9 && s[9] == ':')) && strncasecmp(s, "calibrate", 9) == 0) {
+    out->midi = 40;
+    if (n == 9 || (number(s + 10, n - 10, &out->midi) && out->midi >= 0 && out->midi <= 127))
+      out->kind = RS_AUDIO_FAKE_CALIBRATE;
+    else
+      say("\"%.*s\" is not calibrate[:MIDI] (MIDI 0-127): silence in its place", (int)n, s);
+    return;
+  }
   if (n >= sizeof out->path) {
     say("a path of %zu characters is too long: silence in its place", n);
     return;
@@ -123,6 +131,9 @@ void rs_audio_fake_describe(const rs_audio_fake_source *src, char *buf, size_t n
     if (cents) snprintf(off, sizeof off, " %+d cents", cents);
     snprintf(buf, n, "tone:%g (%s%d%s, %.1f Hz, every %g s)", src->midi, names[note % 12], note / 12 - 1, off,
              440.0 * pow(2.0, (src->midi - 69) / 12.0), src->seconds);
+  } else if (src->kind == RS_AUDIO_FAKE_CALIBRATE) {
+    snprintf(buf, n, "calibrate:%g (%g s of plucks, %g s of silence)", src->midi, RS_AUDIO_FAKE_CALIBRATE_PLAY,
+             RS_AUDIO_FAKE_CALIBRATE_QUIET);
   } else if (src->kind == RS_AUDIO_FAKE_WAV) {
     snprintf(buf, n, "%s", src->path);
   } else {
@@ -159,6 +170,27 @@ int rs_audio_fake_tone(float midi, float seconds, double rate, rs_audio_fake_loo
   out->s = s;
   out->n = n;
   return 1;
+}
+
+// The game's calibration raises the level while the player plays loud, then wants the strings muted: a pluck every half
+// second near full scale, then silence, so each round of the loop has both.
+int rs_audio_fake_calibrate(float midi, double rate, rs_audio_fake_loop *out) {
+  rs_audio_fake_loop note;
+  if (!rs_audio_fake_tone(midi, 0.5f, rate, &note)) {
+    out->s = NULL;
+    out->n = 0;
+    return 0;
+  }
+  uint32_t plucks = (uint32_t)(RS_AUDIO_FAKE_CALIBRATE_PLAY / 0.5f);
+  uint32_t n = plucks * note.n + (uint32_t)lround(RS_AUDIO_FAKE_CALIBRATE_QUIET * rate);
+  float *s = calloc(n, sizeof *s);
+  if (s)
+    for (uint32_t i = 0; i < plucks * note.n; i++)
+      s[i] = note.s[i % note.n] * (RS_AUDIO_FAKE_CALIBRATE_PEAK / RS_AUDIO_FAKE_PEAK);
+  rs_audio_fake_loop_free(&note);
+  out->s = s;
+  out->n = s ? n : 0;
+  return s != NULL;
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -318,6 +350,8 @@ static void init(void) {
       char err[128] = "";
       int ok = g_src[c].kind == RS_AUDIO_FAKE_TONE
                    ? rs_audio_fake_tone(g_src[c].midi, g_src[c].seconds, k_rates[r], &g_loop[c][r])
+               : g_src[c].kind == RS_AUDIO_FAKE_CALIBRATE
+                   ? rs_audio_fake_calibrate(g_src[c].midi, k_rates[r], &g_loop[c][r])
                    : rs_audio_fake_wav_file(g_src[c].path, k_rates[r], &g_loop[c][r], err, sizeof err);
       if (ok) continue;
       if (g_src[c].kind == RS_AUDIO_FAKE_WAV) say("channel %d: %s: %s: silence in its place", c + 1, g_src[c].path, err);
@@ -329,8 +363,8 @@ static void init(void) {
       rs_audio_log("test input: channel %d, %s: %u frames at 48 kHz (%.2f s), looped", c + 1, what,
                    g_loop[c][1].n, g_loop[c][1].n / 48000.0);
   }
-  if (db != 0) say("%d channels: %s; gain %+.1f dB", n, list, db);
-  else say("%d channels: %s", n, list);
+  if (db != 0) say("%d channel%s: %s; gain %+.1f dB", n, n == 1 ? "" : "s", list, db);
+  else say("%d channel%s: %s", n, n == 1 ? "" : "s", list);
   atomic_store(&g_channels, n);
 }
 

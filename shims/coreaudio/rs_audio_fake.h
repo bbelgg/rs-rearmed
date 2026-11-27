@@ -5,6 +5,9 @@
 //                           24-bit or 32-bit float
 //   tone:MIDI[:SECONDS]     a plucked string's note at MIDI (a fraction is cents: 40.5 is E2 50 cents sharp),
 //                           decaying, again every SECONDS (default 2)
+//   calibrate[:MIDI]        what the game's calibration needs: RS_AUDIO_FAKE_CALIBRATE_PLAY seconds of loud plucks
+//                           of MIDI (default 40, E2), then RS_AUDIO_FAKE_CALIBRATE_QUIET of silence ("mute the
+//                           strings"), over and over
 //   silence                 nothing
 // e.g. RS_AUDIO_FAKE_INPUT=tone:35,silence. Unset, empty or 0: no test input, and nothing of this runs (the
 // calls below go straight to the system's). RS_AUDIO_FAKE_GAIN_DB raises or lowers every channel (default 0;
@@ -38,8 +41,11 @@
 #define RS_AUDIO_FAKE_MAX_FRAMES 4096u  // the largest I/O buffer it takes
 #define RS_AUDIO_FAKE_PEAK 0.5f         // a tone's peak, -6 dBFS
 #define RS_AUDIO_FAKE_RATES 2           // 44100 and 48000
+#define RS_AUDIO_FAKE_CALIBRATE_PLAY 12.0f   // calibrate: seconds of plucks, one every half second
+#define RS_AUDIO_FAKE_CALIBRATE_QUIET 15.0f  // then seconds of silence
+#define RS_AUDIO_FAKE_CALIBRATE_PEAK 0.9f    // its plucks' peak, about -1 dBFS
 
-enum { RS_AUDIO_FAKE_SILENCE, RS_AUDIO_FAKE_TONE, RS_AUDIO_FAKE_WAV };
+enum { RS_AUDIO_FAKE_SILENCE, RS_AUDIO_FAKE_TONE, RS_AUDIO_FAKE_WAV, RS_AUDIO_FAKE_CALIBRATE };
 
 typedef struct {
   int kind;
@@ -59,6 +65,8 @@ int rs_audio_fake_parse(const char *text, rs_audio_fake_source *out, int max);
 void rs_audio_fake_describe(const rs_audio_fake_source *src, char *buf, size_t n);
 // A tone's note at rate, seconds long; 0 when midi or seconds is out of range (0..127, 0.05..60 s).
 int rs_audio_fake_tone(float midi, float seconds, double rate, rs_audio_fake_loop *out);
+// calibrate's loop at rate: the plucks, then the silence.
+int rs_audio_fake_calibrate(float midi, double rate, rs_audio_fake_loop *out);
 // A WAV file's sound at rate, from its bytes or its path; 0 with why in err when it isn't one this reads.
 int rs_audio_fake_wav(const void *data, size_t size, double rate, rs_audio_fake_loop *out, char *err, size_t nerr);
 int rs_audio_fake_wav_file(const char *path, double rate, rs_audio_fake_loop *out, char *err, size_t nerr);

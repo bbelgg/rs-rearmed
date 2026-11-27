@@ -39,7 +39,14 @@ static void test_parse(void) {
   // at most max
   CHECK(rs_audio_fake_parse("silence,silence,silence,silence,silence,silence,silence,silence,silence,tone:40", s, 8) ==
         8);
+  // calibrate, with its note or E2
+  CHECK(rs_audio_fake_parse("calibrate,CALIBRATE:28,calibrate:x,calibrate:", s, 8) == 4);
+  CHECK(s[0].kind == RS_AUDIO_FAKE_CALIBRATE && s[0].midi == 40);
+  CHECK(s[1].kind == RS_AUDIO_FAKE_CALIBRATE && s[1].midi == 28);
+  CHECK(s[2].kind == RS_AUDIO_FAKE_SILENCE && s[3].kind == RS_AUDIO_FAKE_SILENCE);
   char d[256];
+  rs_audio_fake_describe(&s[0], d, sizeof d);
+  CHECK(!strcmp(d, "calibrate:40 (12 s of plucks, 15 s of silence)"));
   rs_audio_fake_parse("tone:35,tone:40.5:3,silence", s, 8);
   rs_audio_fake_describe(&s[0], d, sizeof d);
   CHECK(!strcmp(d, "tone:35 (B1, 61.7 Hz, every 2 s)"));
@@ -112,6 +119,20 @@ static void test_tone(void) {
   rs_audio_fake_loop l;
   CHECK(rs_audio_fake_tone(35, 0.5f, 48000, &l) && l.n == 24000);
   rs_audio_fake_loop_free(&l);
+  // calibrate: loud plucks of the note, then silence
+  for (int r = 0; r < 2; r++) {
+    double rate = r ? 48000 : 44100;
+    uint32_t play = (uint32_t)(RS_AUDIO_FAKE_CALIBRATE_PLAY * rate), quiet = (uint32_t)(RS_AUDIO_FAKE_CALIBRATE_QUIET * rate);
+    CHECK(rs_audio_fake_calibrate(40, rate, &l) && l.n == play + quiet);
+    float peak = 0, after = 0;
+    for (uint32_t i = 0; i < play; i++) peak = fmaxf(peak, fabsf(l.s[i]));
+    for (uint32_t i = play; i < l.n; i++) after = fmaxf(after, fabsf(l.s[i]));
+    CHECK(NEAR(peak, RS_AUDIO_FAKE_CALIBRATE_PEAK, 1e-3) && after == 0);
+    for (uint32_t k = 0; k < play; k += (uint32_t)(0.5 * rate)) CHECK(rms(l.s, k, (uint32_t)(0.05 * rate)) > 0.1);
+    CHECK(strongest_cents(l.s, (uint32_t)(0.01 * rate), (uint32_t)(0.45 * rate), 82.4069, rate) == 0);
+    rs_audio_fake_loop_free(&l);
+  }
+  CHECK(!rs_audio_fake_calibrate(127, 48000, &l) && !l.s);
   CHECK(!rs_audio_fake_tone(127, 2, 48000, &l) && !l.s);  // above the harmonics' limit
   CHECK(!rs_audio_fake_tone(-1, 2, 48000, &l));
   CHECK(!rs_audio_fake_tone(40, 0.01f, 48000, &l));

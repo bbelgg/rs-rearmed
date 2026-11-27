@@ -144,10 +144,19 @@ The game's Wwise engine has a CoreAudio sink and its own guitar input. The audio
   another device fails to open, and input devices are listed first (`RS_AUDIO_STABLE_UIDS`; `RS_AUDIO_INPUTS_FIRST`
   applies with the list of inputs off, as the list has its own order). A device whose identifier can't be read is
   skipped (`audio_devs.c`).
+- **The test input.** With `RS_AUDIO_FAKE_INPUT` a capture device that isn't there, "RS Re-ARMed Test Input", is
+  first in the system's list, its channels fed from WAV files, plucked tones or silence, so a game run needs no
+  guitar ([TESTING.md](TESTING.md#unattended-runs)). Every HAL call the audio code makes with a device goes through
+  `rs_audio_hal_*` (`shims/coreaudio/rs_audio_fake.c`), which answers the device's properties and runs its I/O
+  functions on a real-time thread of its own at the device's rate; the import thunks send the game's start, stop and
+  listener calls there too (`rs_audio_io_run`, `rs_audio_listen`). To the game it is an interface: an entry a
+  channel, its own level, the game's I/O function called with a buffer of its channels as the HAL calls it. Without
+  the switch the calls go straight to the system's.
 
 The game-independent parts (buffer sizes, real-time threads, workgroups, stable UIDs, input-first order, the input's
-settings and gain) are in `shims/coreaudio/rs_audio_host.c` and `rs_audio_input.c`, which Learn & Play shares
-([Windows design](../windows/DESIGN.md#audio)). `RS_AUDIO_LOG=1` logs the setup.
+settings and gain, the test input) are in `shims/coreaudio/rs_audio_host.c`, `rs_audio_input.c` and
+`rs_audio_fake.c`, which Learn & Play shares ([Windows design](../windows/DESIGN.md#audio)). `RS_AUDIO_LOG=1` logs
+the setup.
 
 ### Your own plug-in
 

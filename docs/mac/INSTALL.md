@@ -563,6 +563,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_AUDIO_INPUT_TRIM=0` | on | stale guitar audio is not dropped |
 | `RS_AUDIO_STABLE_UIDS=0`, `RS_AUDIO_INPUTS_FIRST=0` | on | the game's own device scan, which loses an interface when another device, such as a webcam, fails to open |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](#guitar-input) |
+| `RS_AUDIO_FAKE_INPUT=…`, `RS_AUDIO_FAKE_GAIN_DB=N` | none | for tests: an input device that isn't there, "RS Re-ARMed Test Input", whose channels play WAV files, tones or silence ([TESTING.md](TESTING.md#unattended-runs)) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_STEAM_LOG=1`, `RS_FILE_LOG=1` | off | log the offline Steam layer's calls, and the files a mod serves, to `logs/last-run.log` |
 | `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library (`launchctl setenv` only) |

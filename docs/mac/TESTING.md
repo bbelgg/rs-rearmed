@@ -31,6 +31,7 @@ game is in the repository.
 | Hook points and mods | `recomp.hooks` (`make -C tools/ws7/recomp/test/hooks test OUT=DIR`) | shared with Learn & Play: one mod dylib in the 64-bit and the 32-bit runtime, for each convention (`test_hooks64`, `test_hooks32`): what a hook reads, changes, sets and calls; adapted calls, refusals, names by run-time lookup, the mods folder; the cost of a point without hooks. `test_files`: the files a mod serves (`rc_file.h`) as descriptors, as a `FILE` and in a folder's listing. `test_framerate`: the arithmetic of the frame rate fixes (`overrides/mods/framerate.h`), with the game's whole-millisecond frame times from 30 to 360 Hz. `test_fftsetup`: this edition's FFT setups (`overrides/mods/fftsetup.c`): one of each size made and handed out again, also to eight threads at once, a kept one known as such, and the game's own call with the fixes off. `test_shared64`, `test_shared32` (`test_mods_shared.c`): the built-in fixes that are one source for both editions (`overrides/mods/mods_shared.c`), as one object beside each runtime: the switches, the log lines and the start, each fix's hook against a game of the test's own, called by that runtime's convention, and the batched DLC mounting's shared part: the manifests' counts, hold and log lines, a manifest that never comes, the file questions step by step with each safeguard, the check at the mounting's end, and a mounting that does not go by the book (an enumeration during the hold, a flag cleared elsewhere, a step a frame); the white loading screen's table (a refused request asked again when its file is indexed, by each game's form of the request, a movie that is gone, the 5 s fallback, the switch) the arrangement slots' continuation, the scroll of Learn a Song's alternates and the co-op list against a page of the test's own, and their window arithmetic at its edges (no alternates, exactly four and five, the selection first, last or no record, the co-op list at eight and nine records, every list of up to twenty scrolled to its end and back). The frame rate fixes' hooks are not in it. It also builds `probe_mod.dylib` and `files_mod.dylib` for the game runs |
 | Edits and mid points | `recomp.inner64` (`tools/ws7/recomp/test/x64/innercases.py`) | [The recompiler](#the-recompiler) |
 | Guitar input | `audio.input` (`shims/coreaudio/test`) | shared with Learn & Play: `guitar-input.ini` and the switches, the default file, a number in any locale, a channel across streams, the gain, the clip, the peak and clip counts, on made-up buffers |
+| Test input | `audio.fake`, `audio.fake.off` (`shims/coreaudio/test`) | shared with Learn & Play: `RS_AUDIO_FAKE_INPUT`'s entries and what it doesn't take; the tone in tune within a cent from B0 to E6 at both rates, its peak, decay and loop; `calibrate`'s plucks and silence; WAV files (16-bit, 24-bit, float, extensible, stereo mixed to one channel, at the other rate, a data size never filled in, what is refused); the device first in the system's list and an entry a channel in the list of inputs, its properties as the games read and set them, and its I/O function in real time at 48 and 44.1 kHz (about a second); `--off`: without the switch nothing of it is there |
 | Platform shell | `platform.core.*`, `platform.shell.*`, `platform.overlay.*`, `platform.present.*`, `platform.warm.metal`, `platform.difftest.x86_64` (`shims/platform/test`) | the shell's logic, paths and `Rocksmith.ini`, the renderer decision and fallback (`rsp_renderer_decide`), the render scale's sizes and `RS_METAL_SCALE`, the overlay API on both backends, Metal presentation, the shader warm-up; the difftest compares rewritten shell functions with the original image's |
 | Renderer | `opengl.*` (`shims/opengl/test`) | the GL entry-point table and its clients (`opengl.table.clients`), offscreen contexts on both backends, 44 GL sequences run on GL and Metal with their pixels compared (`opengl.metal.*`; `own_target`, a draw that samples the texture it draws into, checks its pixels on Metal only, GL leaving them undefined), every game import with `RS_GL_CHECK=1` (`opengl.metal.coverage`), the Metal disk cache (`opengl.metal.cache`) |
 | Shader translator | `msl.unit`, `msl.verify.builtin`, `msl.verify.corpus` | GLSL to MSL; `msl_verify` runs programs on offscreen GL and Metal with the same inputs and compares pixels, depth and vertex outputs (the corpus test needs shader dumps) |
@@ -163,9 +164,48 @@ in a cache that has the entries.
 
 ### Unattended runs
 
-The repository has no virtual audio cable (a recording played into the Real Tone input), so an unattended run
-of either edition has no guitar input. What it has:
+An unattended run has no one to play, but it can have a guitar input: the test input below plays the game a
+recording or a tone. What it has:
 
+- **The test input** (`RS_AUDIO_FAKE_INPUT`, both editions): an input device that isn't there, "RS Re-ARMed Test
+  Input", listed with the real ones, with as many channels as the switch names, comma-separated, each one of:
+  - a WAV file's path, played over and over: 44.1 or 48 kHz, mono or stereo (mixed to one channel), 16-bit, 24-bit
+    or 32-bit float;
+  - `tone:MIDI[:SECONDS]`, a plucked string's note, decaying, again every SECONDS (default 2); a fraction is cents,
+    `tone:40.1` is E2 10 cents sharp;
+  - `calibrate[:MIDI]`, what the game's calibration needs: 12 s of loud plucks of MIDI (default 40, E2), one every
+    half second at about -1 dBFS, then 15 s of silence for "MUTE THE STRINGS", over and over;
+  - `silence`.
+
+  `RS_AUDIO_FAKE_INPUT=tone:40,tone:45` is a low E on channel 1 and an A on channel 2. A tone peaks at -6 dBFS;
+  `RS_AUDIO_FAKE_GAIN_DB=N` raises or lowers every channel. To the game it is an interface: each channel an entry of
+  DIRECT CONNECT's list ("RS Re-ARMed Test Input channel 1", ..., after the cable and before the other interfaces),
+  with the input level of any input but the cable. It runs in real time at the rate and I/O buffer the game sets,
+  on a thread of its own, whatever real devices there are; its clock keeps the default output's pace while that
+  runs. A profile takes it as any input (Path/Input, DIRECT CONNECT, the entry) and then keeps its name, so give it
+  a test profile. The log has `[audio] fake input: 2 channels: tone:40 (E2, 82.4 Hz, every 2 s), tone:45 (A2,
+  110.0 Hz, every 2 s)`, and a line for an entry it can't use, which is silence; with `RS_AUDIO_LOG=1`
+  `[rs-audio] test input:` lines say what the game does with the device (its rate, buffer, I/O functions started
+  and stopped), `input device 4194048 "RS Re-ARMed Test Input" (list entry 0) opened, 2 channel(s)` an entry the
+  game opened, and the game's input has its peak every 5 s (`guitar input "RS Re-ARMed Test Input": peak -6.0
+  dBFS, 0 clipped`). rearmed-mods' Show Current Note (`ShowCurrentNoteOnScreen = on` in `RSMods.ini`) logs the note
+  the game's pitch detection hears, `[rsmods] game note: 40`, with `RS_MODS_LOG=1`. Unset, empty or `0`: no test
+  input, and none of its code runs.
+
+  What runs showed, the same in both editions (`tone:40,tone:45`, a test profile whose input was the first entry):
+  the game opens both channels at the title, and from the main menu on the log has `game note: 40` with each pluck
+  (and `-1` between). The tuner (Space on the main menu, Down twice to TUNER, Return, Return on E STANDARD)
+  takes the E: it reads the tone 12-14 cents sharp, as it did a pure 82.41 Hz sine from a WAV file, with the
+  device's frames counted at 48,000 a second (a tone of `tone:39.88` is in tune to it and the tuner goes on to the
+  A string; whether the game reads a real guitar so too is not known). Return on the tuner is Calibrate: with a
+  tone it raises the level a few steps and stops at "LOUDER!" (a pluck every 2 s is too little), with `calibrate`
+  (or a WAV of the same) it goes "KEEP GOING!", "MUTE THE STRINGS", saves the profile and comes back to the tuner,
+  the level set (`input level: ... to 0.1389, gain -9.1 dB`); Esc cancels it. A test needs none of it: the game
+  calibrates only when asked (Return on a tuner, Calibrate on "Calibrate now?" after a new input, where "Not now"
+  skips it), and Skip Tuner (`fwddelete`) passes the tuner too; until a calibration has run in the edition's folder
+  (`input-level-calibrated`) the input is at unity, the test input's -6 dBFS. Not run yet: two players (player 2
+  on channel 2), a song, a WAV of a real guitar. Keys from keyfifo here: Return on the title and the profile, then
+  `space`, `down`, `down`, `return`, `return` to the tuner ([Learn & Play's script](../windows/TESTING.md#unattended-runs)).
 - **`tools/ws8/keyfifo`**: keys for a running game from a FIFO, in either edition. Build it with
   `tools/ws8/keyfifo/build.sh OUTDIR`, start the game's executable with `RS_KEY_FIFO=FILE` and
   `DYLD_INSERT_LIBRARIES=<home>/libnetguard.dylib:OUTDIR/libkeyfifo.dylib`, then write a command a line to

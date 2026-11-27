@@ -386,6 +386,7 @@ Each row is a switch set away from its default, and what that does. Everything i
 | `RS_AUDIO_SET_RATE=0` | on | a device is not switched to 48 kHz |
 | `RS_AUDIO_RS_NAMES=0` | on | keep CoreAudio's device names (by default only the cable is called "Rocksmith") |
 | `RS_AUDIO_INPUT…`, `RS_AUDIO_CHANNEL_ENTRIES=N` | | the guitar input's channel, gain, level and list: [Guitar input](../mac/INSTALL.md#guitar-input) |
+| `RS_AUDIO_FAKE_INPUT=…`, `RS_AUDIO_FAKE_GAIN_DB=N` | none | for tests: an input device that isn't there, "RS Re-ARMed Test Input", whose channels play WAV files, tones or silence ([Mac testing](../mac/TESTING.md#unattended-runs)) |
 | `RS_AUDIO_LOG=1` | off | log the audio setup to `logs/last-run.log` |
 | `RS_STEAM_LOG=1`, `RS_FILE_LOG=1` | off | log the offline Steam layer's calls, and the files a mod serves, to `logs/last-run.log` |
 | `RS_LOAD_MODS=0`, `RS_MODS_PATH=PATH` | every `.dylib` in `mods/` | no mods; another folder of mods, or one library (`launchctl setenv` or `open --env` only) |

@@ -296,6 +296,10 @@ The policy is the Mac edition's, from the same code (`shims/coreaudio/rs_audio_h
   and tones get what a hook wrote. With no mod the hooks cost one test.
 - **The list of inputs.** `wa_engine.c` lists an interface's channels as mono endpoints, in the priority order
   the game's limit of 10 needs.
+- **The test input** (`RS_AUDIO_FAKE_INPUT`): the Mac edition's device, from the same code
+  (`shims/coreaudio/rs_audio_fake.c`), which the endpoints, rates and buffer sizes here reach through the same
+  `rs_audio_hal_*` calls. A capture stream on it has no HAL unit: the device calls the stream's I/O function, which
+  does what the input callback does with a unit's buffer (`fake_input_cb`).
 - **An input's level.** The game sets the level through `IAudioEndpointVolume` and the winmm mixer, which share
   one value per endpoint (`wa_com.c`). For any input but the cable that value is the shared level, applied in
   the capture callback.

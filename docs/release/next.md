@@ -5,6 +5,12 @@ change, in the words the release notes will use: the bold lead says what is now 
 like before. Say which edition when it isn't both. tools/release/bump.py moves these entries into the release
 notes and empties this file. -->
 
+- **For testers: a test input in place of a guitar:** `RS_AUDIO_FAKE_INPUT` adds an input device, "RS Re-ARMed Test
+  Input", whose channels play WAV files, plucked tones (`tone:MIDI[:SECONDS]`), a round of loud plucks and silence
+  that calibration takes (`calibrate`) or silence, comma-separated, e.g. `RS_AUDIO_FAKE_INPUT=tone:40,silence`;
+  `RS_AUDIO_FAKE_GAIN_DB` sets its level. It is listed under DIRECT CONNECT a channel an entry, as an interface, and
+  the game's note detection, the tuner and calibration hear it, so a game run needs no one to play. Both editions.
+  Without the switch nothing changes. Before, a run without a guitar had no input but a microphone.
 - **ADV DISPLAY SETTINGS takes effect at once, with SHARPENING:** SHARPENING is among RS Re-ARMed's rows in the game's
   menu in both editions (Metal only), for the switch below, and rows change the picture as soon as they're set:
   SHARPENING, ANTI-ALIASING, TEXTURE FILTERING and COLOR in both editions, and on the Mac LOW LATENCY too (and

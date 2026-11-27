@@ -4,6 +4,7 @@
 usage: python3 tools/targets/test_targets.py   (also run by ctest: targets.check)
 """
 import os
+import re
 import shutil
 import sys
 import tempfile
@@ -319,6 +320,144 @@ class Inner(Tree, unittest.TestCase):
                            ("pick 0x1008 int n@rax\n", "expected (VALUES)")):
             self.write("mac-x64/mids.map", text)
             self.assertIn(want, "\n".join(self.errs()))
+
+
+class InnerRules(unittest.TestCase):
+    """Rules of the committed edits and mid points that check.py does not hold every table to, and the mods that
+    use them do: rearmed-mods' Seven-String Guitar reads both games with one source."""
+    # The points whose values differ between the games, which that mod reads by target (README.md, "Edits and mid
+    # points")
+    DIFFER = {"seven_psn2", "seven_psn2_after", "seven_s3", "seven_md1"}
+    # Learn & Play's F1 fret bars: an injected Entity_SetScale in seven_string itself (released so, in 1.20.0), which
+    # is on only with the mod that always takes seven_f1_scale; later ones have a group of their own
+    INJECTED_IN_SEVEN_STRING = {"seven_f1_scale"}
+
+    @classmethod
+    def setUpClass(cls):
+        cls.t = {tid: targets.Target(tid) for tid in targets.target_ids()}
+        with open(os.path.join(HERE, "names", "mids.list")) as f:
+            lines = f.read().splitlines()
+        section, cls.seven = False, []
+        for ln in lines:
+            if ln.startswith("# --- Seven-String Guitar"):
+                section = ln.rstrip().endswith("begin")
+                continue
+            name = ln.split("#", 1)[0].strip()
+            if section and name:
+                cls.seven.append(name)
+
+    @staticmethod
+    def kind(t, name):
+        return "address" if name in t.mids else "none" if name in t.inner_none else \
+            "unsupported" if name in t.inner_unsupported else "missing"
+
+    def test_section_read(self):
+        self.assertIn("seven_gkc", self.seven)
+        self.assertIn("seven_gkr", self.seven)
+        self.assertNotIn("fps_calib_window", self.seven)
+
+    def test_every_point_runs_somewhere(self):
+        # a point no game calls is a name for nothing: `none` in one target says the other does the work
+        for name in targets.read_list(os.path.join(HERE, "names", "mids.list")):
+            kinds = {self.kind(t, name) for t in self.t.values()}
+            self.assertIn("address", kinds, name)
+
+    def test_seven_string_points_are_there(self):
+        # every point of the section is a place or `none` in each game, never `unsupported`: the mod takes each
+        # (the native charts, eight strings, the extended bass and co-op among them) on both editions
+        for name in self.seven:
+            for tid, t in self.t.items():
+                self.assertIn(self.kind(t, name), ("address", "none"), "%s in %s" % (name, tid))
+
+    def test_same_values_in_every_target(self):
+        # one mod source reads both games: a point placed in two games has the same values by name and kind (an integer
+        # of any width, a pointer, a float or double) and the same continuations
+        cls = {"b": "int", "h": "int", "i": "int", "q": "int", "p": "ptr", "f": "float", "d": "float"}
+        placed = [t for t in self.t.values()]
+        for name in sorted(set().union(*(set(t.mids) for t in placed)) - self.DIFFER):
+            have = [t for t in placed if name in t.mids]
+            seen = {t.id: (sorted((v[1], cls[v[0]]) for v in t.mids[name][1]), sorted(c for c, _ in t.mids[name][2]))
+                    for t in have}
+            self.assertEqual(len(set(map(repr, seen.values()))), 1, "%s: %s" % (name, seen))
+
+    def test_injected_calls_have_groups_of_their_own(self):
+        # Learn & Play's edits that call Entity_SetScale with what a point put in a register start at that point
+        # (NAME_scale) and are a group the mod switches on only with the point taken; the other game calls it from the
+        # point NAME_setscale, its NAME_scale `none` and the group `unsupported`
+        for tid, t in self.t.items():
+            at = {a: n for n, (a, _, _) in t.mids.items()}
+            groups = {}
+            for g, a, *_ in t.edits:
+                n = at.get(a, "")
+                if n.endswith("_scale"):
+                    if n in self.INJECTED_IN_SEVEN_STRING:
+                        self.assertEqual(g, "seven_string", n)
+                        continue
+                    self.assertNotEqual(g, "seven_string", "%s %s: an injected call in seven_string" % (tid, n))
+                    groups.setdefault(g, []).append(n)
+            for g, points in groups.items():
+                for g2, a, *_ in t.edits:
+                    if g2 == g:
+                        self.assertTrue(at.get(a, "").endswith("_scale"), "%s %s 0x%x: not at a scale point" % (tid, g, a))
+                for n in points:
+                    self.assertEqual(self.kind(t, n[:-len("_scale")] + "_setscale"), "none", "%s %s" % (tid, n))
+                for oid, o in self.t.items():
+                    if oid == tid or g not in o.inner_unsupported:
+                        continue
+                    for n in points:
+                        self.assertEqual(self.kind(o, n), "none", "%s %s" % (oid, n))
+                        self.assertEqual(self.kind(o, n[:-len("_scale")] + "_setscale"), "address", "%s %s" % (oid, n))
+        self.assertIn("seven_glow", {e[0] for e in self.t["win-x86"].edits})
+        self.assertIn("seven_barre", {e[0] for e in self.t["win-x86"].edits})
+
+    def test_no_register_read_after_a_call_changed_it(self):
+        # An `=HEX` that calls a game function reads no register the call may change (the caller-saved ones but the
+        # result: Learn & Play's ecx and edx, the Mac's rcx, rdx, rsi, rdi, r8-r11) before it sets it again. The barre
+        # edit pushed ecx, the scale, once more for its second Entity_SetScale, which had left its own ecx there.
+        try:
+            import capstone
+        except ImportError:
+            self.skipTest("no capstone (tools/requirements.txt)")
+
+        def family(n):
+            m = re.match(r"^[re]?([abcd])[xlh]$", n) or re.match(r"^[re]?(si|di|sp|bp)l?$", n) or \
+                re.match(r"^(r\d+)[dwb]?$", n)
+            return (m.group(1) + ("x" if len(m.group(1)) == 1 else "")) if m else n
+        changed = {"win32": {"cx", "dx"}, "sysv": {"cx", "dx", "si", "di", "r8", "r9", "r10", "r11"}}
+        for tid, t in self.t.items():
+            abi = "win32" if t.info.get("abi") == "win32" else "sysv"
+            md = capstone.Cs(capstone.CS_ARCH_X86, capstone.CS_MODE_32 if abi == "win32" else capstone.CS_MODE_64)
+            md.detail = True
+            for g, a, n, check_, patches, where in t.edits:
+                for off, code in patches:
+                    if off is not None:
+                        continue
+                    stale = set()
+                    for i in md.disasm(code, a):
+                        read, written = (({family(i.reg_name(r)) for r in regs}) for regs in i.regs_access())
+                        ops = [o.strip() for o in i.op_str.split(",")]
+                        if i.mnemonic in ("xor", "sub") and len(ops) == 2 and ops[0] == ops[1]:
+                            read = set()  # a register cleared, not read
+                        if i.mnemonic != "call":
+                            self.assertFalse(read & stale, "%s (%s) 0x%x %s %s: %s after a call" % (
+                                where, g, i.address, i.mnemonic, i.op_str, " ".join(sorted(read & stale))))
+                        stale -= written
+                        if i.mnemonic == "call":
+                            stale |= changed[abi]
+
+    def test_eight_strings(self):
+        # with seven_e8 (its presence tells the mod that the chord loops run over eight strings) no edit of the
+        # Seven-String groups stops at seven; the peg pool's PSQ1 asks for seven, and seven_gkp makes it eight
+        seven_bound = re.compile(r"\b6 -> 7\b|strings 0-6\b|0-5 -> 0-6\b|< 7\b|over 7 strings")
+        for tid, t in self.t.items():
+            self.assertEqual(self.kind(t, "seven_e8"), "address", tid)
+            self.assertIn(self.kind(t, "seven_gkp"), ("address", "none"), tid)
+            with open(os.path.join(HERE, tid, "edits.map")) as f:
+                lines = f.readlines()
+            for ln in lines:
+                code, _, note = ln.partition("#")
+                if code.strip().startswith("seven_") and seven_bound.search(note) and "PSQ1" not in note:
+                    self.fail("%s: %s" % (tid, ln.strip()))
 
 
 class Sources(unittest.TestCase):

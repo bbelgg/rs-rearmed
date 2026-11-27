@@ -410,6 +410,38 @@ class InnerRules(unittest.TestCase):
         self.assertIn("seven_glow", {e[0] for e in self.t["win-x86"].edits})
         self.assertIn("seven_barre", {e[0] for e in self.t["win-x86"].edits})
 
+    # A replacement whose branch past its range's end means the game's instruction there, which happens to start
+    # where the replacement's own layout has one too: Learn & Play's R1 (released, played) goes on at the game's
+    # 0x11114c6 after its bounds
+    BRANCH_TO_GAME = {("win-x86", 0x11114e0)}
+
+    def test_no_branch_into_a_replacement_past_its_range(self):
+        # The translator takes a branch target from the range's end on as the game's code (README.md, "Edits and mid
+        # points"), so a branch to an instruction of the replacement's own past that end goes into the game instead.
+        # The Mac's PE0 and PE0B sent the bass strings 0-3 there.
+        try:
+            import capstone
+            from capstone import x86
+        except ImportError:
+            self.skipTest("no capstone (tools/requirements.txt)")
+        for tid, t in self.t.items():
+            md = capstone.Cs(capstone.CS_ARCH_X86,
+                             capstone.CS_MODE_32 if t.info.get("abi") == "win32" else capstone.CS_MODE_64)
+            md.detail = True
+            for g, a, n, check_, patches, where in t.edits:
+                for off, code in patches:
+                    if off is not None:
+                        continue
+                    insns = list(md.disasm(code, a))
+                    own = {i.address for i in insns}
+                    for i in insns:
+                        if (x86.X86_GRP_JUMP in i.groups or i.mnemonic.startswith("loop")) and i.operands \
+                                and i.operands[0].type == x86.X86_OP_IMM:
+                            to = i.operands[0].imm
+                            if to > a + n and to in own and (tid, i.address) not in self.BRANCH_TO_GAME:
+                                self.fail("%s (%s) 0x%x %s: 0x%x is the game's code, not the replacement's" % (
+                                    where, g, i.address, i.mnemonic, to))
+
     def test_no_register_read_after_a_call_changed_it(self):
         # An `=HEX` that calls a game function reads no register the call may change (the caller-saved ones but the
         # result: Learn & Play's ecx and edx, the Mac's rcx, rdx, rsi, rdi, r8-r11) before it sets it again. The barre

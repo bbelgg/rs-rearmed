@@ -122,13 +122,22 @@ guest), or memory at a general register plus an offset (`[esp+0x18]`); its type 
 `uint8_t`, `float`, `double`, a pointer, ...). The same name on two targets should have the same values and
 continuations, so one mod reads both; the check holds the built-in fixes to that (below), and four points of
 rearmed-mods' Seven-String Guitar differ between the games (`seven_psn2`, `seven_psn2_after`, `seven_s3`,
-`seven_md1`), which that mod reads by target.
+`seven_md1`), which that mod reads by target, and `seven_native_psarc` has the same values in another form: the
+header magic as the file has it on the Mac, byte-swapped in Learn & Play (and only the magic counts on the Mac).
+`test_targets.py` (`InnerRules`) holds every other point to the same values and continuations in both.
 
 Three rules from the Mac's tables. A code address a hook reads at a point (a return address at `[rsp]`, say) is
 where the image is mapped on the Mac, the image address in Learn & Play: compare it with the mapped address (`RC_A`),
 not the table's. A patch keeps every instruction's length, so a displacement that outgrows its byte needs `=HEX`,
 the whole instruction replaced. And where clang unrolled a six-string loop that Learn & Play's edits lengthen, there
 is no count to edit: the Mac needs a mid point of its own that does the extra strings, `none` on Learn & Play.
+
+A branch in an `=HEX` replacement is to the game's code: a target before the range or from its end on is the
+game's instruction there (the range's end is the usual way on), and one inside the range stops the build. So a
+replacement longer than its range can't branch forward to an instruction of its own past the range's end: that
+address is the game's, and the branch goes there without a word from the build (the Mac's PE0 sent every bass
+string 0-3 into the game's code so, until 2026-11-27). Lay it out with no such branch, and `test_targets.py` checks
+it (with capstone).
 
 ## Adding a game function, global or field
 

@@ -764,7 +764,7 @@ seven_string   0x01364dfe  3:0d2ccd20   +2=40                        # CLVE the 
 seven_string   0x01364e08  4:84a59d6d   +3=40                        # CLVE and the string from the native main[8] (+0x40): string 6 its own object, not the game's ghost 0 (+0x1c)
 
 # barre markers over all strings (rs7string PUBBC)
-seven_barre   0x0110df49  7:505ec0d6   =c743140100000085c974fc518b4304e8f313220083c404518b4308e8e713220083c404  # PUBBC finger marker update 0x110dd80, its span changed: Entity_SetScale(capsule, ecx) on the entities [ebx+4], [ebx+8] unless ecx (seven_pubbc_scale) is 0
+seven_barre   0x0110df49  7:505ec0d6   =c743140100000085c974fc51ff34248b4304e8f013220083c4048b4308e8e513220083c404  # PUBBC finger marker update 0x110dd80, its span changed: Entity_SetScale(capsule, ecx) on the entities [ebx+4], [ebx+8] unless ecx (seven_pubbc_scale) is 0; the scale is pushed, and a copy of it for each call (Entity_SetScale leaves ecx changed and may write its argument)
 
 # wave2 P2 extended bass: the expected pitch of bass strings 4 / 5 (rs7string PE0's bass path: low B 23, high C 48; they were -1)
 seven_string   0x013f3cb5  5:49c633c4  =83fa030f86fcffffffb91700000083fa040f840f000000b93000000083fa050f840100000083c9ffe9f9ffffff  # PE0 0x13f3c70's bass branch `cmp edx,3; ja`: strings 0-3 go on at the game's jump table, string 4 takes the base 23, 5 the base 48 and join the base add at 0x13f3cdb; above 5 the base stays -1

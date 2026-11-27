@@ -44,7 +44,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
   original fits a 16:9 picture into the screen ([DESIGN.md](DESIGN.md#screen-and-window)). A window resized in Windowed
   mode becomes the game's resolution. `RS_WINDOW_ANY_SHAPE=0` keeps the original.
 - **Retina, colour and a sharper picture**: as the Mac edition, the renderer being shared.
-- **Sharpening** (not released): `RS_METAL_SHARPEN`, as the Mac edition, the renderer being shared; compiled, not run
+- **Sharpening** (new in 1.21.0): `RS_METAL_SHARPEN`, as the Mac edition, the renderer being shared; compiled, not run
   yet.
 - **Performance overlay and low latency** (new in 1.20.0): `RS_METAL_HUD` and `RS_METAL_DRAWABLES`, as the Mac edition,
   from the same header (`shims/platform/include/rsp_layer.h`); compiled, not run yet.
@@ -83,7 +83,7 @@ edition" is described there. What has not been tested is under [Open issues](#op
 - **Calibration and the tuner at any frame rate** (new in 1.16.0): as the Mac edition, from the same source with this
   game's eight points.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): as the Mac edition, from the same source with this game's point.
-- **The white loading screen and Learn a Song's long songs** (not released): as the Mac edition, from the same source
+- **The white loading screen and Learn a Song's long songs** (new in 1.21.0): as the Mac edition, from the same source
   with this game's points; not run in the game yet.
 - **Learn a Song's scroll bar** (new in 1.18.0): as the Mac edition, by the same overlay; this game's song list is the
   same file. The other lists, and a bar for those that had none (new in 1.18.0): as the Mac edition, by the same rule.

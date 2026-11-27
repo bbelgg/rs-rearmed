@@ -46,7 +46,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
 - **Retina, colour and a sharper picture** (Metal): each frame is scaled up to a Retina screen's pixels with MetalFX and
   tagged sRGB; the game's own texture LOD bias, 16x anisotropic filtering and 4x MSAA on its screen-sized 3D targets
   ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)). The same renderer serves Learn & Play.
-- **Sharpening** (not released): `RS_METAL_SHARPEN=N` sharpens the picture on the screen after any upscaling, never
+- **Sharpening** (new in 1.21.0): `RS_METAL_SHARPEN=N` sharpens the picture on the screen after any upscaling, never
   past a pixel's neighbours, so edges don't ring ([METAL.md](METAL.md#metal-core-shimsopenglsrcmetal)).
 - **Performance overlay and low latency** (new in 1.20.0): `RS_METAL_HUD=1` shows Apple's Metal Performance HUD over
   the game (macOS 13 and later), and `RS_METAL_DRAWABLES=2` queues two frames for the screen instead of three with
@@ -89,7 +89,7 @@ What the edition does today. What has not been tested is under [Open issues](#op
   frame's own time, for frames shorter than a 60 Hz one; at 60 Hz the game runs as before.
 - **Skip Tuner in the Guitarcade** (new in 1.16.0): a Guitarcade game's tuner has the Skip Tuner a song's tuner has,
   with the same warning. The game left it out there, so only a finished tuning got a player into a game.
-- **The white loading screen and Learn a Song's long songs** (not released): a menu movie the game asked the file index
+- **The white loading screen and Learn a Song's long songs** (new in 1.21.0): a menu movie the game asked the file index
   for too early is asked for again when its file is indexed, and Learn a Song's page shows four alternate arrangements
   for a song with more than five, which crashed it, and the arrow keys and the wheel scroll the rest. Both are one
   source with Learn & Play; neither has been run in the game yet ([Open issues](#open-issues)).

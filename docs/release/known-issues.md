@@ -33,8 +33,8 @@ into the notes as it stands. -->
   earlier, not yet by a download through the installer; if it stops, install the game in Steam and run the installer
   again, and please open an issue with the installer's log), moving the game files back to the game's drive, the Game
   files choice in Learn & Play, a run of the installer app for Learn & Play, a build from scratch, a mod serving files
-  in the Mac edition on this code (Learn & Play's was played with 2250 archives), the Mac edition's tuner on a
-  7-string chart's low B and a seven-row chord diagram, full screen on a 16:10 or ultrawide screen in the Mac edition,
+  in the Mac edition on this code (Learn & Play's was played with 2250 archives), a seven-row chord diagram in the Mac
+  edition, full screen on a 16:10 or ultrawide screen in the Mac edition,
   an ultrawide screen in Learn & Play, full screen on a second display in Learn & Play, the music category (Game Mode
   off) in Learn & Play, a Real Tone cable, a Real Tone or Microphone profile with the Auto Save skip, unplugging an
   interface while the game runs, a Guitarcade game played with a guitar after Skip Tuner (the button and its warning
@@ -53,7 +53,14 @@ into the notes as it stands. -->
   and not tried: the next start with a row of ADV DISPLAY SETTINGS changed, in either edition (the rows were opened,
   LOW LATENCY changed and saved, the scroll bar dragged and a row clicked, with a mouse driven by a test mod, in each
   edition), the trackpad on a real trackpad in this release's runs, the Metal HUD in Learn & Play since its release
-  build, and the installer app, which was not opened. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing.
+  build, and the installer app, which was not opened. The stuck tone that Prevent Buggy Tones fixes is rare and hasn't been met in testing. New in
+  1.21.0 and not tried: the white loading screen's retry at work (no start in the runs needed it), the co-op page's
+  scrolling list, local co-op with rearmed-mods' extended instruments (the two-player route isn't driven yet; player 2
+  on a second input was not played), and the test input with a real guitar beside it. The runs for 1.21.0 were made
+  with the test input in place of a guitar (both editions: start-up, a stock song and bass, the pause menu, Score
+  Attack, a Guitarcade game, ADV DISPLAY SETTINGS, quitting and the next start, and rearmed-mods' 7- and 8-string guitar
+  and 5-string bass charts); the game's tuner reads a perfectly tuned test tone 12 to 14 cents sharp, as players report
+  of the first game's tuner too.
 - In Multiplayer each player chooses their input through their own profile, not on the Multiplayer screen.
 
 **Mac**
